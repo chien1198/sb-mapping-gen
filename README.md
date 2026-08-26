@@ -1,106 +1,38 @@
 # seabank-mapping-gen
 
-Công cụ generate tài liệu mapping dim/fact (Excel) từ:
-
-1. Tài liệu thiết kế database (`.docx`)
-2. Tài liệu thiết kế datamart, có mô tả logic (`.xlsx`)
-
-theo một template Excel chuẩn có sẵn.
-
-## Kiến trúc pipeline
-
-```
-docx (database design)  ──┐
-                           ├─► extract ─► cache JSON ─► mapping ─► generate ─► output .xlsx
-xlsx (datamart design)  ──┘
-```
-
-- **extract**: đọc file gốc (docx/xlsx) một lần, chuẩn hoá thành JSON theo schema
-  cố định (`src/seabank_mapping_gen/models/schema.py`), lưu vào `data/cache/`.
-  Các bước sau chỉ đọc JSON cache — không phải đọc lại docx/xlsx gốc mỗi lần
-  chạy, giúp tiết kiệm token/thời gian khi lặp lại.
-- **mapping**: đối chiếu database design và datamart design (đã cache) để build
-  ra danh sách mapping (source → target, transform logic), đồng thời cảnh báo
-  cột nào không đối chiếu được.
-- **generate**: đổ mapping đã build vào file `templates/mapping_template.xlsx`
-  (giữ nguyên style/header của template), xuất ra `data/output/`.
+Gen tài liệu mapping dim/fact (Excel) từ tài liệu thiết kế database (docx) và
+thiết kế datamart (excel), dựa theo template mapping có sẵn.
 
 ## Cấu trúc thư mục
 
 ```
 seabank-mapping-gen/
-├── src/seabank_mapping_gen/
-│   ├── extract/         # đọc docx/xlsx gốc -> model chuẩn hoá
-│   │   ├── database_docx.py
-│   │   └── datamart_xlsx.py
-│   ├── mapping/         # build mapping logic từ 2 design đã chuẩn hoá
-│   │   └── build_mapping.py
-│   ├── generate/        # ghi mapping vào template xlsx
-│   │   └── xlsx_writer.py
-│   ├── models/          # schema trung gian (Pydantic) dùng chung toàn pipeline
-│   │   └── schema.py
-│   ├── utils/           # cache JSON, helper dùng chung
-│   │   └── cache.py
-│   └── cli.py           # entrypoint CLI (extract / build / run)
-├── templates/            # template .xlsx mapping chuẩn (đặt file mẫu vào đây)
-├── data/
-│   ├── input/
-│   │   ├── database_design/   # đặt file .docx thiết kế database vào đây
-│   │   └── datamart_design/   # đặt file .xlsx thiết kế datamart vào đây
-│   ├── cache/            # JSON đã extract (git-ignored, tự sinh lại được)
-│   │   ├── database/
-│   │   └── datamart/
-│   └── output/            # file mapping .xlsx kết quả (git-ignored)
-├── tests/
-└── docs/                  # tài liệu tham chiếu, ghi chú nghiệp vụ
+├── input/         # tài liệu đầu vào gốc: docx (database design), xlsx (datamart design)
+├── extract/       # bản convert của input sang dạng file native (markdown/json) — tối ưu token khi đọc
+├── references/    # template mapping mẫu có sẵn (2 tài liệu tham chiếu)
+└── mapping/       # file đích: kết quả mapping được generate ra
 ```
 
-> **Lưu ý bảo mật**: `data/input/`, `data/cache/`, `data/output/` bị git-ignore
-> mặc định vì có thể chứa dữ liệu thiết kế nội bộ/nhạy cảm của ngân hàng.
-> Chỉ commit code, template rỗng, và tài liệu tham chiếu không nhạy cảm.
+- **input/**: đặt file `.docx` (thiết kế database) và `.xlsx` (thiết kế datamart) gốc vào đây.
+- **extract/**: nội dung đã convert từ input/ sang dạng dễ đọc (markdown/json), dùng thay
+  cho việc đọc lại docx/xlsx gốc mỗi lần.
+- **references/**: 2 tài liệu template mapping mẫu có sẵn, dùng làm chuẩn đối chiếu khi gen.
+- **mapping/**: file mapping đích được tạo ra từ input + references.
 
-## Cài đặt
+> **Lưu ý bảo mật**: `input/`, `extract/`, `mapping/` bị git-ignore mặc định vì có thể
+> chứa dữ liệu thiết kế nội bộ/nhạy cảm của ngân hàng. Chỉ `references/` (template không
+> nhạy cảm) được commit.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
+## Skills
 
-## Sử dụng
+- **mapping-extract-input** (`.claude/skills/mapping-extract-input/`): convert `input/*.docx`
+  và `input/*.xlsx` thành các file Markdown nhỏ theo từng bảng trong
+  `extract/database/` và `extract/datamart/`, kèm `_index.json` để tra
+  nhanh bảng nào ở file nào. Chạy lại skill này mỗi khi upload/đổi file
+  trong `input/`.
 
-```bash
-# Bước 1: extract riêng (tạo cache JSON, có thể inspect/sửa tay trước khi build)
-mapping-gen extract \
-  --database data/input/database_design/db_design.docx \
-  --datamart data/input/datamart_design/datamart_design.xlsx
-
-# Bước 2: build mapping từ cache đã có + template -> output
-mapping-gen build \
-  --database-cache data/cache/database/db_design.json \
-  --datamart-cache data/cache/datamart/datamart_design.json \
-  --template templates/mapping_template.xlsx \
-  --output data/output/mapping.xlsx
-
-# Hoặc chạy full pipeline 1 lệnh
-mapping-gen run \
-  --database data/input/database_design/db_design.docx \
-  --datamart data/input/datamart_design/datamart_design.xlsx \
-  --template templates/mapping_template.xlsx \
-  --output data/output/mapping.xlsx
-```
-
-## Trạng thái hiện tại
-
-Đây là khung sườn (scaffold) ban đầu. Các phần sau còn là **skeleton cần
-hoàn thiện dựa trên file mẫu thực tế**:
-
-- [`extract/database_docx.py`](src/seabank_mapping_gen/extract/database_docx.py) —
-  cần chỉnh `EXPECTED_HEADERS`/`_parse_table` theo layout bảng thật trong docx.
-- [`extract/datamart_xlsx.py`](src/seabank_mapping_gen/extract/datamart_xlsx.py) —
-  cần chỉnh `EXPECTED_HEADERS`/`_parse_sheet` theo layout sheet thật trong xlsx.
-- [`generate/xlsx_writer.py`](src/seabank_mapping_gen/generate/xlsx_writer.py) —
-  cần chỉnh `TEMPLATE_SHEET_NAME`/`START_ROW`/`COLUMN_MAP` theo template thật.
-
-Khi bạn gửi tài liệu mẫu (database design, datamart design, template mapping),
-các phần trên sẽ được cập nhật để khớp đúng layout thực tế.
+  Chạy trực tiếp (không qua skill):
+  ```bash
+  python3 -m venv .venv && .venv/bin/pip install python-docx openpyxl
+  .venv/bin/python scripts/extract_input.py
+  ```

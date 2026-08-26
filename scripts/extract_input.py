@@ -1,0 +1,244 @@
+"""Convert raw design docs in input/ into per-table Markdown files in extract/.
+
+Sources handled:
+  - Design_Database_PDTD_DTM_v1.0.docx  -> extract/database/<TABLE>.md
+  - DATAMODEL_DWH_LOS_*.xlsx            -> extract/datamart/<SHEET>.md
+
+Each source also gets an _index.json listing every table/sheet extracted,
+so a later step can look up "where is table X" without reading every file.
+
+Run:
+    .venv/bin/python scripts/extract_input.py
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+import openpyxl
+from docx import Document
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+INPUT_DIR = REPO_ROOT / "input"
+EXTRACT_DIR = REPO_ROOT / "extract"
+
+DOCX_TABLE_HEADING_RE = re.compile(r"^[\d.]+\s+Bảng\s+(.+)$")
+
+
+def slugify(name: str) -> str:
+    name = name.strip()
+    name = re.sub(r"[^\w\-.]+", "_", name, flags=re.UNICODE)
+    return name.strip("_")
+
+
+def table_to_markdown(table) -> str:
+    rows = [[cell.text.strip().replace("\n", " ") for cell in row.cells] for row in table.rows]
+    if not rows:
+        return ""
+    header, *body = rows
+    lines = ["| " + " | ".join(header) + " |", "| " + " | ".join(["---"] * len(header)) + " |"]
+    for row in body:
+        lines.append("| " + " | ".join(row) + " |")
+    return "\n".join(lines)
+
+
+def clear_stale_markdown(out_dir: Path, keep_files: set[str]) -> None:
+    """Remove .md files left over from a previous run whose table no longer
+    exists / was renamed in the latest source document."""
+    for existing in out_dir.glob("*.md"):
+        if existing.name not in keep_files:
+            existing.unlink()
+
+
+def extract_docx(docx_path: Path, out_dir: Path) -> list[dict]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    doc = Document(docx_path)
+
+    body_items = list(doc.element.body)
+    tables_by_id = {id(t._element): t for t in doc.tables}
+
+    index: list[dict] = []
+    pending_heading: str | None = None
+    pending_section: str | None = None
+
+    for item in body_items:
+        if item.tag.endswith("}p"):
+            para = next((p for p in doc.paragraphs if p._element is item), None)
+            if para is not None and para.style is not None and para.style.name.startswith("Heading"):
+                text = para.text.strip()
+                match = DOCX_TABLE_HEADING_RE.match(text)
+                if match:
+                    pending_heading = match.group(1).strip()
+                    pending_section = text
+        elif item.tag.endswith("}tbl"):
+            table = tables_by_id.get(id(item))
+            if table is None or pending_heading is None:
+                continue
+
+            table_name = pending_heading
+            slug = slugify(table_name)
+            md_table = table_to_markdown(table)
+            n_rows = max(len(table.rows) - 1, 0)
+
+            content = f"# {table_name}\n\nNguồn: docx section \"{pending_section}\"\n\n{md_table}\n"
+            (out_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+
+            index.append(
+                {
+                    "table": table_name,
+                    "file": f"{slug}.md",
+                    "section": pending_section,
+                    "columns": n_rows,
+                }
+            )
+            pending_heading = None
+
+    clear_stale_markdown(out_dir, {t["file"] for t in index})
+
+    (out_dir / "_index.json").write_text(
+        json.dumps({"source": docx_path.name, "tables": index}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return index
+
+
+def cell_value(ws, row: int, col: int):
+    cell = ws.cell(row=row, column=col)
+    for merged in ws.merged_cells.ranges:
+        if cell.coordinate in merged:
+            top_left = ws.cell(row=merged.min_row, column=merged.min_col)
+            return top_left.value
+    return cell.value
+
+
+def extract_xlsx_table_sheet(ws) -> tuple[dict, str]:
+    max_row = ws.max_row
+    max_col = ws.max_column
+
+    # Metadata block: rows from top until first fully-blank row.
+    metadata: dict[str, str] = {}
+    header_row = None
+    row = 1
+    while row <= max_row:
+        key = cell_value(ws, row, 1)
+        val = cell_value(ws, row, 2)
+        if key is None and val is None:
+            row += 1
+            break
+        if key is not None and val is not None and row > 1:
+            metadata[str(key).strip()] = str(val).strip()
+        row += 1
+
+    # Skip additional blank rows, then find the column-table header row.
+    while row <= max_row and all(cell_value(ws, row, c) is None for c in range(1, max_col + 1)):
+        row += 1
+    header_row = row
+
+    headers = [str(cell_value(ws, header_row, c) or "").strip() for c in range(1, max_col + 1)]
+    while headers and headers[-1] == "":
+        headers.pop()
+
+    body_rows = []
+    for r in range(header_row + 1, max_row + 1):
+        vals = [cell_value(ws, r, c) for c in range(1, len(headers) + 1)]
+        if all(v is None for v in vals):
+            continue
+        body_rows.append(["" if v is None else str(v).strip().replace("\n", " ") for v in vals])
+
+    return {"metadata": metadata, "headers": headers, "rows": body_rows}, ws.title
+
+
+def sheet_data_to_markdown(table_name: str, data: dict, source_file: str) -> str:
+    lines = [f"# {table_name}", "", f"Nguồn: xlsx sheet \"{table_name}\" ({source_file})", ""]
+    if data["metadata"]:
+        for k, v in data["metadata"].items():
+            lines.append(f"- {k}: {v}")
+        lines.append("")
+
+    headers = data["headers"]
+    if headers:
+        lines.append("| " + " | ".join(headers) + " |")
+        lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
+        for row in data["rows"]:
+            lines.append("| " + " | ".join(row) + " |")
+    return "\n".join(lines) + "\n"
+
+
+def extract_xlsx(xlsx_path: Path, out_dir: Path) -> list[dict]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+
+    overview_sheets = {"00_Muc_luc", "00_Nguon_CDC", "00_Sinh_khoa"}
+    index: list[dict] = []
+    overview_parts: list[str] = []
+
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        if sheet_name in overview_sheets:
+            data, _ = extract_xlsx_table_sheet(ws) if sheet_name == "00_Nguon_CDC" else ({}, sheet_name)
+            if sheet_name == "00_Nguon_CDC":
+                overview_parts.append(f"## {sheet_name} — mapping bảng nguồn CDC -> bảng DWH\n")
+                headers = data["headers"]
+                overview_parts.append("| " + " | ".join(headers) + " |")
+                overview_parts.append("| " + " | ".join(["---"] * len(headers)) + " |")
+                for row in data["rows"]:
+                    overview_parts.append("| " + " | ".join(row) + " |")
+                overview_parts.append("")
+            else:
+                overview_parts.append(f"## {sheet_name}\n")
+                for row in ws.iter_rows(values_only=True):
+                    text_cells = [str(v).strip() for v in row if v is not None]
+                    if text_cells:
+                        overview_parts.append("- " + " | ".join(text_cells))
+                overview_parts.append("")
+            continue
+
+        data, table_name = extract_xlsx_table_sheet(ws)
+        slug = slugify(table_name)
+        content = sheet_data_to_markdown(table_name, data, xlsx_path.name)
+        (out_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+        index.append(
+            {
+                "table": table_name,
+                "file": f"{slug}.md",
+                "loai_bang": data["metadata"].get("Loại bảng", ""),
+                "columns": len(data["rows"]),
+            }
+        )
+
+    clear_stale_markdown(out_dir, {t["file"] for t in index} | {"_overview.md"})
+
+    (out_dir / "_overview.md").write_text(
+        f"# Tổng quan {xlsx_path.name}\n\n" + "\n".join(overview_parts),
+        encoding="utf-8",
+    )
+    (out_dir / "_index.json").write_text(
+        json.dumps({"source": xlsx_path.name, "tables": index}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return index
+
+
+def main() -> None:
+    docx_files = [p for p in INPUT_DIR.glob("*.docx") if not p.name.startswith("~$")]
+    xlsx_files = [p for p in INPUT_DIR.glob("*.xlsx") if not p.name.startswith("~$")]
+
+    if not docx_files and not xlsx_files:
+        print(f"Không tìm thấy file .docx/.xlsx nào trong {INPUT_DIR}")
+        return
+
+    for docx_path in docx_files:
+        out_dir = EXTRACT_DIR / "database"
+        tables = extract_docx(docx_path, out_dir)
+        print(f"[docx] {docx_path.name}: {len(tables)} bảng -> {out_dir}/")
+
+    for xlsx_path in xlsx_files:
+        out_dir = EXTRACT_DIR / "datamart"
+        tables = extract_xlsx(xlsx_path, out_dir)
+        print(f"[xlsx] {xlsx_path.name}: {len(tables)} sheet -> {out_dir}/")
+
+
+if __name__ == "__main__":
+    main()
