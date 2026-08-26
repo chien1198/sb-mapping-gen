@@ -48,6 +48,27 @@ table scope (e.g. the docx also has ~40 PDTD_DTM tables the xlsx doesn't).
 
 Temp/lock files (`~$*.xlsx`) and non-source files are ignored automatically.
 
+## Re-running on updated input (important)
+
+Output file names are always derived from the **table name as it appears in
+the latest input document** (`slugify(table_name)`), not from any prior
+extract run. This means re-running after the user uploads a revised
+`input/` document is always safe and always reflects the newest content:
+
+- **Table content changed, name unchanged** → its `.md` file is overwritten
+  with the new content. No stale data left behind.
+- **Table renamed or removed from the source doc** → the extractor detects
+  this: any `.md` file in `extract/database/` or `extract/datamart/` whose
+  name is not in the freshly extracted set gets deleted automatically
+  (`clear_stale_markdown` in the script), so old/renamed tables never linger
+  alongside the new ones.
+- **New table added** → a new `.md` file simply appears.
+
+So the correct flow when the user says the input document changed is just:
+re-run step 2 below. Don't hand-edit files under `extract/` to patch in a
+change — re-run the extractor on the updated `input/` file instead, so the
+file name and content both stay derived from the source of truth.
+
 ## Steps
 
 1. Ensure the project venv has the two required packages (only needed once,

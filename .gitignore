@@ -1,8 +1,9 @@
-# Raw/derived documents may contain confidential bank data — do not commit
+# Raw input documents may contain confidential bank data — do not commit
 input/*
 !input/.gitkeep
-extract/*
-!extract/.gitkeep
+
+# extract/ is tracked (private repo) so table add/rename/remove is visible
+# in git history when input/ is re-extracted.
 mapping/*
 !mapping/.gitkeep
 

@@ -1,0 +1,125 @@
+{
+  "source": "DATAMODEL_DWH_LOS_20260820.xlsx",
+  "tables": [
+    {
+      "table": "DIM_LOS_APPLICATION",
+      "file": "DIM_LOS_APPLICATION.md",
+      "loai_bang": "DIM - thực thể (SCD Type 2)",
+      "columns": 30
+    },
+    {
+      "table": "DIM_LOS_PARTY",
+      "file": "DIM_LOS_PARTY.md",
+      "loai_bang": "DIM - thực thể (SCD Type 2)",
+      "columns": 21
+    },
+    {
+      "table": "DIM_LOS_COLLATERAL",
+      "file": "DIM_LOS_COLLATERAL.md",
+      "loai_bang": "DIM - thực thể (SCD Type 2)",
+      "columns": 22
+    },
+    {
+      "table": "DIM_LOS_WORKSTEP",
+      "file": "DIM_LOS_WORKSTEP.md",
+      "loai_bang": "DIM - danh mục",
+      "columns": 11
+    },
+    {
+      "table": "DIM_LOS_APPROVAL_GROUP",
+      "file": "DIM_LOS_APPROVAL_GROUP.md",
+      "loai_bang": "DIM - danh mục",
+      "columns": 7
+    },
+    {
+      "table": "DIM_LOS_ORG_UNIT",
+      "file": "DIM_LOS_ORG_UNIT.md",
+      "loai_bang": "DIM - danh mục",
+      "columns": 9
+    },
+    {
+      "table": "DIM_LOS_USER",
+      "file": "DIM_LOS_USER.md",
+      "loai_bang": "DIM - danh mục",
+      "columns": 5
+    },
+    {
+      "table": "DIM_LOS_EXCEPTION_REASON",
+      "file": "DIM_LOS_EXCEPTION_REASON.md",
+      "loai_bang": "DIM - danh mục",
+      "columns": 11
+    },
+    {
+      "table": "DIM_LOS_COLLATERAL_TYPE",
+      "file": "DIM_LOS_COLLATERAL_TYPE.md",
+      "loai_bang": "DIM - danh mục",
+      "columns": 7
+    },
+    {
+      "table": "DIM_LOS_GEO",
+      "file": "DIM_LOS_GEO.md",
+      "loai_bang": "DIM - danh mục",
+      "columns": 10
+    },
+    {
+      "table": "DIM_LOS_CHANGE_TYPE",
+      "file": "DIM_LOS_CHANGE_TYPE.md",
+      "loai_bang": "DIM - danh mục",
+      "columns": 10
+    },
+    {
+      "table": "DIM_LOS_CARD_PROMOTION",
+      "file": "DIM_LOS_CARD_PROMOTION.md",
+      "loai_bang": "DIM - danh mục",
+      "columns": 5
+    },
+    {
+      "table": "FCT_LOS_APPLICATION_DAILY",
+      "file": "FCT_LOS_APPLICATION_DAILY.md",
+      "loai_bang": "FCT - bảng xương sống",
+      "columns": 86
+    },
+    {
+      "table": "FCT_LOS_WORKSTEP_EVENT",
+      "file": "FCT_LOS_WORKSTEP_EVENT.md",
+      "loai_bang": "FCT - bảng sự kiện",
+      "columns": 27
+    },
+    {
+      "table": "FCT_LOS_SLA_DAILY",
+      "file": "FCT_LOS_SLA_DAILY.md",
+      "loai_bang": "FCT - bảng tổng hợp",
+      "columns": 33
+    },
+    {
+      "table": "FCT_LOS_COLLATERAL",
+      "file": "FCT_LOS_COLLATERAL.md",
+      "loai_bang": "FCT - bảng chi tiết",
+      "columns": 14
+    },
+    {
+      "table": "FCT_LOS_APPLICATION_PARTY",
+      "file": "FCT_LOS_APPLICATION_PARTY.md",
+      "loai_bang": "FCT - bảng quan hệ",
+      "columns": 15
+    },
+    {
+      "table": "FCT_LOS_SUB_PRODUCT",
+      "file": "FCT_LOS_SUB_PRODUCT.md",
+      "loai_bang": "FCT - bảng chi tiết",
+      "columns": 15
+    },
+    {
+      "table": "FCT_LOS_EXCEPTION",
+      "file": "FCT_LOS_EXCEPTION.md",
+      "loai_bang": "FCT - bảng sự kiện",
+      "columns": 17
+    },
+    {
+      "table": "FCT_LOS_DEVIATION",
+      "file": "FCT_LOS_DEVIATION.md",
+      "loai_bang": "FCT - bảng chi tiết",
+      "columns": 12
+    }
+  ]
+}
