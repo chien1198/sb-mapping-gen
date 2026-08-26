@@ -1,0 +1,28 @@
+[project]
+name = "seabank-mapping-gen"
+version = "0.1.0"
+description = "Generate dim/fact mapping documents from database design (docx) and datamart design (xlsx) inputs"
+requires-python = ">=3.10"
+dependencies = [
+    "python-docx>=1.1.0",
+    "openpyxl>=3.1.0",
+    "pydantic>=2.6.0",
+    "click>=8.1.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+]
+
+[project.scripts]
+mapping-gen = "seabank_mapping_gen.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

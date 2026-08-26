@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated/cache artifacts — regenerable from data/input, keep out of VCS by default
+data/cache/database/*
+!data/cache/database/.gitkeep
+data/cache/datamart/*
+!data/cache/datamart/.gitkeep
+data/output/*
+!data/output/.gitkeep
+
+# Raw input documents may contain confidential bank data — do not commit
+data/input/database_design/*
+!data/input/database_design/.gitkeep
+data/input/datamart_design/*
+!data/input/datamart_design/.gitkeep
+
+.DS_Store
