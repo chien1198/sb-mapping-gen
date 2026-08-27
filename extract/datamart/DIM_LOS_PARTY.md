@@ -1,35 +1,35 @@
 # DIM_LOS_PARTY
 
-Nguồn: xlsx sheet "DIM_LOS_PARTY" (DATAMODEL_DWH_LOS_20260820.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_PARTY" (DATAMODEL_DWH_LOS_20260826.xlsx)
 
 - Loại bảng: DIM - thực thể (SCD Type 2)
 - Mô tả: Danh mục người và tổ chức liên quan tới hồ sơ tín dụng.
-- Lưu gì: Lưu thông tin nhân thân và pháp lý của người vay chính, người đồng trả nợ, người đại diện theo pháp luật và khách hàng doanh nghiệp. Tách riêng khỏi hồ sơ vì một người xuất hiện ở nhiều hồ sơ và có thể giữ nhiều vai trò.
-- Grain: 1 dòng = 1 phiên bản thuộc tính của 1 người hoặc 1 tổ chức
-- Khóa: DIMENSION_KEY (sequence). NK = PARTY_NK - CHƯA CHỐT, xem mô tả cột
-- Bảng nguồn CDC: NG_SB_RLOS_APPLICANT_GENERAL, NG_SB_RLOS_APPLICANT_DETAIL, NG_SB_RLOS_APPLICANT_IDGRID, NG_SB_RLOS_COREPAYER_GENERAL, NG_SB_RLOS_COREP_IDGRID, NG_SB_CLOS_CUST_INFO, NG_SB_CLOS_CUST_INFO_LEGAL
+- Lưu gì: Lưu thông tin nhân thân và pháp lý của người vay chính, người đồng trả nợ, người đại diện theo pháp luật và khách hàng doanh nghiệp. Giữ riêng khỏi bảng quan hệ để các thuộc tính nhân thân biến động (địa chỉ, tình trạng hôn nhân) được lưu lịch sử bằng SCD Type 2 mà không làm phình bảng quan hệ. LƯU Ý PHẠM VI: đây là người THEO TỪNG HỒ SƠ. Cùng một người đứng tên hai hồ sơ sẽ có hai dòng dimension, vì nguồn LOS không có mã định danh người dùng chung được - APPLICANTCIF rỗng, CLOS không có cột nào.
+- Grain: 1 dòng = 1 phiên bản thuộc tính của 1 người hoặc 1 tổ chức TRONG PHẠM VI 1 HỒ SƠ. Không nhân dòng theo giấy tờ tùy thân - giấy tờ nằm ở FCT_LOS_PARTY_DOCUMENT vì một người có nhiều giấy tờ
+- Khóa: DIMENSION_KEY (sequence). NK = PARTY_NK = WI_NAME + PARTY_ROLE_CODE + PARTY_SEQ
+- Nguồn: NG_SB_RLOS_APPLICANT_GENERAL, NG_SB_RLOS_APPLICANT_DETAIL, NG_SB_RLOS_APPLICANT_IDGRID, NG_SB_RLOS_COREPAYER_GENERAL, NG_SB_RLOS_COREP_IDGRID, NG_SB_CLOS_CUST_INFO, NG_SB_CLOS_CUST_INFO_LEGAL
 - Báo cáo sử dụng: BC1, BC2, BC3, BC4
+- Quy tắc load: (chưa khai)
 
-| STT | Tên cột | Kiểu dữ liệu | Độ lớn | Notnull | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | 18 | Y | PK | KỸ THUẬT — Khóa thay thế, sinh từ SEQ_DIM_LOS_PARTY |
-| 2 | PARTY_NK | VARCHAR2 | 200 | Y |  | CHƯA CHỐT — Khóa tự nhiên định danh một người. Đề xuất ghép ID_TYPE với ID_NUMBER đã chuẩn hóa (bỏ khoảng trắng và ký tự đặc biệt). Cần chốt quy tắc chuẩn hóa và cách xử lý khi một người đổi giấy tờ từ CMND sang CCCD. Tên và thành phần khóa điền chính thức sau khi chốt khóa nguồn và STG_LOS |
-| 3 | SYSTEM_CODE | VARCHAR2 | 10 | N |  | PHÁI SINH — Hệ nguồn ghi nhận người này lần đầu, suy từ hậu tố mã hồ sơ: 'RLOS' nếu mã kết thúc bằng RLOS, 'CLOS' nếu kết thúc bằng CLOS |
-| 4 | PARTY_TYPE | VARCHAR2 | 20 | N |  | PHÁI SINH — 'ORG' nếu bản ghi đến từ NG_SB_CLOS_CUST_INFO (khách hàng doanh nghiệp), 'IND' cho các trường hợp còn lại |
-| 5 | FULL_NAME | VARCHAR2 | 200 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_GENERAL.FULL_NAME / NG_SB_RLOS_COREPAYER_GENERAL.FULL_NAME / NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME / NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE. Giữ tên phía RLOS. Trường CUSTOMER_NAME của BC1, BC2, BC3, BC4 và CO_REPAYER, LEGAL_REPRESENTATIVE |
-| 6 | DATE_OF_BIRTH | DATE |  | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_GENERAL.DOB (đổi tên cho rõ nghĩa). Trường DATE_OF_BIRTH của BC1. Lưu ý SRS hiện lấy trường này từ T24; model lấy từ LOS để không phụ thuộc T24 |
-| 7 | GENDER | VARCHAR2 | 20 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_GENERAL.GENDER. Giữ nguyên tên. Trường GENDER của BC1 |
-| 8 | MARRIAGE_STATUS | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.MARR_STATUS (đổi tên cho rõ nghĩa). Trường MARRIAGE_STATUS của BC1 |
-| 9 | EDUCATION_LEVEL | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.EDU_LEVEL (đổi tên cho rõ nghĩa). Trường EDUCATION_LEVEL của BC1 |
-| 10 | VEHICLE | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.VEHICLE. Giữ nguyên tên. Trường VEHICLES của BC1 |
-| 11 | ID_TYPE | VARCHAR2 | 50 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_IDGRID.ID_TYPE. Giữ nguyên tên. Loại giấy tờ tùy thân chính của người này |
-| 12 | ID_NUMBER | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_IDGRID.ID_NUMBER / NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER. Giữ nguyên tên |
-| 13 | LEGAL_DOC | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_CLOS_CUST_INFO_LEGAL.LEGAL_DOC. Giữ nguyên tên. Loại giấy tờ pháp lý phía CLOS |
-| 14 | ORG_LEGAL_ID | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER với OBJ_TYPE là doanh nghiệp (đổi tên để phân biệt với giấy tờ cá nhân). Trường ID_NUMBER của BC2 - số ĐKKD hoặc mã số thuế |
-| 15 | PERM_ADDRESS | VARCHAR2 | 500 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.PERM_ADD (đổi tên cho rõ nghĩa). Trường PERMANENT_RESIDENCE_ADDRESS của BC1 |
-| 16 | CURR_HOUSE_NO | VARCHAR2 | 200 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.HOUSNO_CURR_RES (đổi tên cho rõ nghĩa). Thành phần của địa chỉ hiện tại đầy đủ |
-| 17 | CURR_WARD | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.WARD_CURR_RES (đổi tên cho rõ nghĩa). Trường CURRENT_RESIDENTIAL_WARD của BC1 |
-| 18 | GEO_SK | NUMBER | 18 | N |  | KỸ THUẬT — Khóa tới DIM_LOS_GEO, lookup theo CITY_CURR_RES + DISTRICT_CURR_RES của NG_SB_RLOS_APPLICANT_DETAIL. Phục vụ CURRENT_RESIDENTIAL_CITY và CURRENT_RESIDENTIAL_DISTRICT của BC1 |
-| 19 | CURR_FULL_ADDRESS | VARCHAR2 | 500 | N |  | PHÁI SINH — CURR_HOUSE_NO || ', ' || CURR_WARD || ', ' || DISTRICT_NAME || ', ' || CITY_NAME, trong đó tên quận/huyện và tỉnh/thành lấy qua GEO_SK. Trường CURRENT_RESIDENTIAL_ADDRESS của BC1 |
-| 20 | EFF_DATE | DATE |  | Y |  | KỸ THUẬT — Ngày bắt đầu hiệu lực của phiên bản bản ghi. Do ETL sinh khi phát hiện thuộc tính thay đổi |
-| 21 | EXP_DATE | DATE |  | N |  | KỸ THUẬT — Ngày hết hiệu lực của phiên bản. NULL = bản ghi hiện hành |
+| STT | Tên cột | Kiểu dữ liệu | Độ lớn | Notnull | Khóa | Loại | Bảng nguồn | Cột nguồn | Trường đích trên báo cáo | TRẠNG THÁI THIẾT KẾ | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | DIMENSION_KEY | NUMBER | 18 | Y | PK | KỸ THUẬT |  |  |  | DA_CHOT | KỸ THUẬT — Khóa thay thế, sinh từ SEQ_DIM_LOS_PARTY. Mỗi DIM có sẵn một dòng Unknown với DIMENSION_KEY = -1 và các thuộc tính để 'N/A'; mọi lookup không khớp từ fact trỏ về dòng này thay vì để NULL, để phép đếm trên fact không bị hụt. |
+| 2 | PARTY_NK | VARCHAR2 | 200 | Y |  | PHÁI SINH |  |  |  | DA_CHOT | PHÁI SINH — Khóa tự nhiên, ghép WI_NAME || '|' || PARTY_ROLE_CODE || '|' || PARTY_SEQ. TỨC LÀ NGƯỜI THEO PHẠM VI TỪNG HỒ SƠ, không phải người duy nhất toàn ngân hàng. Phương án cũ ghép ID_TYPE với ID_NUMBER đã bị loại vì SAI: một người có nhiều giấy tờ nên cùng một người sẽ sinh ra nhiều dòng dimension khác nhau, và khi đổi CMND sang CCCD thì bị hiểu thành người mới. Không dùng CIF được vì NG_SB_RLOS_APPLICANT_GENERAL.APPLICANTCIF metadata ghi rõ là KHÔNG CÓ DỮ LIỆU, còn NG_SB_CLOS_CUST_INFO không có cột định danh người nào. Hợp nhất một người qua nhiều hồ sơ là bài toán master data khách hàng, nằm NGOÀI phạm vi 11 báo cáo hiện tại vì không báo cáo nào hỏi lịch sử vay của một người |
+| 3 | SYSTEM_CODE | VARCHAR2 | 10 | N |  | PHÁI SINH |  |  |  | DA_CHOT | PHÁI SINH — Hệ nguồn gán theo bảng STG_LOS phát sinh party ('RLOS'/'CLOS'); hậu tố WI_NAME chỉ dùng kiểm tra. |
+| 4 | PARTY_TYPE | VARCHAR2 | 20 | N |  | PHÁI SINH |  |  |  | DA_CHOT | PHÁI SINH — 'ORG' nếu bản ghi đến từ NG_SB_CLOS_CUST_INFO (khách hàng doanh nghiệp), 'IND' cho các trường hợp còn lại |
+| 5 | WI_NAME | VARCHAR2 | 100 | Y |  | 1:1 |  | WI_NAME của các bảng thông tin người liên quan |  | DA_CHOT | 1:1 — Mã hồ sơ mà người này xuất hiện. Nguồn: WI_NAME của các bảng thông tin người liên quan. Nằm trong khóa tự nhiên vì dimension này có phạm vi theo từng hồ sơ |
+| 6 | PARTY_ROLE_CODE | VARCHAR2 | 30 | Y |  | PHÁI SINH |  |  |  | DA_CHOT | PHÁI SINH — Vai trò, gán theo bảng nguồn: APPLICANT từ APPLICANT_GENERAL, COREPAYER từ COREPAYER_GENERAL, ORG_CUSTOMER từ CLOS_CUST_INFO, còn lại suy từ OBJ_TYPE của CLOS_CUST_INFO_LEGAL. BA đã xác nhận một người giữ được nhiều vai trò trong cùng một hồ sơ nên vai trò phải nằm trong khóa |
+| 7 | PARTY_SEQ | NUMBER | 4 | Y |  | PHÁI SINH |  |  |  | DA_CHOT | PHÁI SINH — Số thứ tự người trong WI_NAME + PARTY_ROLE_CODE và phải dùng thống nhất ở DIM_LOS_PARTY, FCT_LOS_APPLICATION_PARTY, FCT_LOS_PARTY_DOCUMENT. RLOS ưu tiên số PIN/Corep đã có; CLOS phải ánh xạ từ key/RECID ổn định. Không dùng BIRTH_SCN/ROW_NUMBER tính lại; chưa có key thì giữ PARTY_NK/PARTY_SEQ placeholder. |
+| 8 | FULL_NAME | VARCHAR2 | 200 | N |  | 1:1 | NG_SB_RLOS_APPLICANT_GENERAL / NG_SB_RLOS_COREPAYER_GENERAL / NG_SB_CLOS_CUST_INFO / NG_SB_CLOS_CUST_INFO_LEGAL | FULL_NAME / CUSTOMER_NAME / NAMEE | BC1.CUSTOMER_NAME; BC1.CO_REPAYER; BC2.CUSTOMER_NAME; BC2.LEGAL_REPRESENTATIVE; BC3.CUSTOMER_NAME; BC4.CUSTOMER_NAME | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_GENERAL.FULL_NAME / NG_SB_RLOS_COREPAYER_GENERAL.FULL_NAME / NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME / NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE. Giữ tên phía RLOS. Trường CUSTOMER_NAME của BC1, BC2, BC3, BC4 và CO_REPAYER, LEGAL_REPRESENTATIVE |
+| 9 | DATE_OF_BIRTH | DATE |  | N |  | 1:1 | NG_SB_RLOS_APPLICANT_GENERAL | DOB | BC1.DATE_OF_BIRTH | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_GENERAL.DOB (đổi tên cho rõ nghĩa). Trường DATE_OF_BIRTH của BC1. Lưu ý SRS hiện lấy trường này từ T24; model lấy từ LOS để không phụ thuộc T24 |
+| 10 | GENDER | VARCHAR2 | 20 | N |  | 1:1 | NG_SB_RLOS_APPLICANT_GENERAL | GENDER | BC1.GENDER | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_GENERAL.GENDER. Giữ nguyên tên. Trường GENDER của BC1 |
+| 11 | MARRIAGE_STATUS | VARCHAR2 | 100 | N |  | 1:1 | NG_SB_RLOS_APPLICANT_DETAIL | MARR_STATUS | BC1.MARRIAGE_STATUS | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.MARR_STATUS (đổi tên cho rõ nghĩa). Trường MARRIAGE_STATUS của BC1 |
+| 12 | EDUCATION_LEVEL | VARCHAR2 | 100 | N |  | 1:1 | NG_SB_RLOS_APPLICANT_DETAIL | EDU_LEVEL | BC1.EDUCATION_LEVEL | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.EDU_LEVEL (đổi tên cho rõ nghĩa). Trường EDUCATION_LEVEL của BC1 |
+| 13 | VEHICLE | VARCHAR2 | 100 | N |  | 1:1 | NG_SB_RLOS_APPLICANT_DETAIL | VEHICLE | BC1.VEHICLES | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.VEHICLE. Giữ nguyên tên. Trường VEHICLES của BC1. LỆCH TÀI LIỆU — SRS chỉ đích danh cột này nhưng sheet 3.Column Review của metadata KHÔNG liệt kê nó. Nhưng metadata chỉ có 13 dòng review cho bảng này và 5 dòng trong đó gộp nhiều cột lại, tức danh sách KHÔNG đầy đủ, nên bằng chứng YẾU - nhiều khả năng cột có thật mà metadata chưa liệt kê. Xem DQ-11 |
+| 14 | ORG_LEGAL_ID | VARCHAR2 | 100 | N |  | 1:1 | NG_SB_CLOS_CUST_INFO_LEGAL | ID_NUMBER | BC2.ID_NUMBER | DA_CHOT | 1:1 — Nguồn: NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER lọc OBJ_TYPE là doanh nghiệp (đổi tên để phân biệt với giấy tờ cá nhân). GIỮ Ở ĐÂY chứ không đẩy sang FCT_LOS_PARTY_DOCUMENT vì số ĐKKD hay mã số thuế là định danh DUY NHẤT và ổn định của tổ chức, khác hẳn giấy tờ tùy thân cá nhân vốn có nhiều loại trên cùng một người. Trường ID_NUMBER của BC2 |
+| 15 | PERM_ADDRESS | VARCHAR2 | 500 | N |  | 1:1 | NG_SB_RLOS_APPLICANT_DETAIL | PERM_ADD | BC1.PERMANENT_RESIDENCE_ADDRESS | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.PERM_ADD (đổi tên cho rõ nghĩa). Trường PERMANENT_RESIDENCE_ADDRESS của BC1 |
+| 16 | CURR_HOUSE_NO | VARCHAR2 | 200 | N |  | 1:1 | NG_SB_RLOS_APPLICANT_DETAIL | HOUSNO_CURR_RES | (thành phần BC1.CURRENT_RESIDENTIAL_ADDRESS) | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.HOUSNO_CURR_RES (đổi tên cho rõ nghĩa). Thành phần của địa chỉ hiện tại đầy đủ |
+| 17 | CURR_WARD | VARCHAR2 | 100 | N |  | 1:1 | NG_SB_RLOS_APPLICANT_DETAIL | WARD_CURR_RES | BC1.CURRENT_RESIDENTIAL_WARD | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_APPLICANT_DETAIL.WARD_CURR_RES (đổi tên cho rõ nghĩa). Trường CURRENT_RESIDENTIAL_WARD của BC1 |
+| 18 | GEO_SK | NUMBER | 18 | Y |  | KỸ THUẬT |  |  | →DIM_LOS_GEO: BC1.CURRENT_RESIDENTIAL_CITY; BC1.CURRENT_RESIDENTIAL_DISTRICT | DA_CHOT | KỸ THUẬT — Khóa tới DIM_LOS_GEO, lookup theo CITY_CURR_RES + DISTRICT_CURR_RES của NG_SB_RLOS_APPLICANT_DETAIL. Phục vụ CURRENT_RESIDENTIAL_CITY và CURRENT_RESIDENTIAL_DISTRICT của BC1 |
+| 19 | EFF_DATE | DATE |  | Y |  | KỸ THUẬT |  |  |  | DA_CHOT | KỸ THUẬT — Ngày bắt đầu hiệu lực của phiên bản bản ghi. Do ETL sinh khi phát hiện thuộc tính thay đổi |
+| 20 | EXP_DATE | DATE |  | N |  | KỸ THUẬT |  |  |  | DA_CHOT | KỸ THUẬT — Ngày hết hiệu lực của phiên bản. NULL = bản ghi hiện hành |

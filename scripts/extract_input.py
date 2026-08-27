@@ -7,6 +7,14 @@ Sources handled:
 Each source also gets an _index.json listing every table/sheet extracted,
 so a later step can look up "where is table X" without reading every file.
 
+The xlsx source mixes real DIM/FCT table sheets with reference/explainer
+sheets (design rationale, load order, business rules, glossaries — usually
+named "00_..." but not necessarily). Only sheets whose name matches a table
+already known from the docx (extract/database/_index.json) get extracted;
+everything else is skipped outright — it isn't a table and isn't needed for
+mapping generation. This requires docx extraction to run before xlsx in the
+same invocation (see main()), which it does.
+
 Run:
     .venv/bin/python scripts/extract_input.py
 """
@@ -166,35 +174,34 @@ def sheet_data_to_markdown(table_name: str, data: dict, source_file: str) -> str
     return "\n".join(lines) + "\n"
 
 
+def load_known_table_names() -> set[str]:
+    """Table names already extracted from the docx (extract/database/_index.json).
+    Used as a whitelist to tell a real DIM/FCT table sheet apart from a
+    reference/explainer sheet (e.g. "00_..." sheets covering design
+    rationale, load order, business rules) — those aren't tables and don't
+    feed mapping generation, so they're skipped entirely rather than parsed
+    as if they were one."""
+    index_path = EXTRACT_DIR / "database" / "_index.json"
+    if not index_path.exists():
+        return set()
+    data = json.loads(index_path.read_text(encoding="utf-8"))
+    return {t["table"] for t in data.get("tables", [])}
+
+
 def extract_xlsx(xlsx_path: Path, out_dir: Path) -> list[dict]:
     out_dir.mkdir(parents=True, exist_ok=True)
     wb = openpyxl.load_workbook(xlsx_path, data_only=True)
 
-    overview_sheets = {"00_Muc_luc", "00_Nguon_CDC", "00_Sinh_khoa"}
+    known_tables = load_known_table_names()
     index: list[dict] = []
-    overview_parts: list[str] = []
+    skipped: list[str] = []
 
     for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
-        if sheet_name in overview_sheets:
-            data, _ = extract_xlsx_table_sheet(ws) if sheet_name == "00_Nguon_CDC" else ({}, sheet_name)
-            if sheet_name == "00_Nguon_CDC":
-                overview_parts.append(f"## {sheet_name} — mapping bảng nguồn CDC -> bảng DWH\n")
-                headers = data["headers"]
-                overview_parts.append("| " + " | ".join(headers) + " |")
-                overview_parts.append("| " + " | ".join(["---"] * len(headers)) + " |")
-                for row in data["rows"]:
-                    overview_parts.append("| " + " | ".join(row) + " |")
-                overview_parts.append("")
-            else:
-                overview_parts.append(f"## {sheet_name}\n")
-                for row in ws.iter_rows(values_only=True):
-                    text_cells = [str(v).strip() for v in row if v is not None]
-                    if text_cells:
-                        overview_parts.append("- " + " | ".join(text_cells))
-                overview_parts.append("")
+        if sheet_name not in known_tables:
+            skipped.append(sheet_name)
             continue
 
+        ws = wb[sheet_name]
         data, table_name = extract_xlsx_table_sheet(ws)
         slug = slugify(table_name)
         content = sheet_data_to_markdown(table_name, data, xlsx_path.name)
@@ -208,12 +215,11 @@ def extract_xlsx(xlsx_path: Path, out_dir: Path) -> list[dict]:
             }
         )
 
-    clear_stale_markdown(out_dir, {t["file"] for t in index} | {"_overview.md"})
+    clear_stale_markdown(out_dir, {t["file"] for t in index})
 
-    (out_dir / "_overview.md").write_text(
-        f"# Tổng quan {xlsx_path.name}\n\n" + "\n".join(overview_parts),
-        encoding="utf-8",
-    )
+    if skipped:
+        print(f"  (bỏ qua {len(skipped)} sheet không phải bảng: {', '.join(skipped)})")
+
     (out_dir / "_index.json").write_text(
         json.dumps({"source": xlsx_path.name, "tables": index}, ensure_ascii=False, indent=2),
         encoding="utf-8",

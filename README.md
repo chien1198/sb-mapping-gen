@@ -36,3 +36,10 @@ seabank-mapping-gen/
   python3 -m venv .venv && .venv/bin/pip install python-docx openpyxl
   .venv/bin/python scripts/extract_input.py
   ```
+
+- **mapping-gen** (`.claude/skills/mapping-gen/`): sinh file mapping
+  `mapping/Mapping_<TABLE>.xlsx` cho một bảng DIM/FCT, theo đúng layout của
+  2 template mẫu trong `references/`. Agent đọc `extract/database/<TABLE>.md`
+  + `extract/datamart/<TABLE>.md` để suy luận công thức "How to mapping"
+  theo từng hệ nguồn (CLOS/RLOS), rồi gọi `scripts/gen_mapping.py` để điền
+  vào bản sao template (giữ nguyên style/màu sắc).

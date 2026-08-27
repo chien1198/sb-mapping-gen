@@ -34,9 +34,18 @@ Sources handled by `scripts/extract_input.py`:
     table (`STT | Tên cột | Kiểu dữ liệu | ... | Mô tả`). The `Mô tả` column
     carries the actual transform/lineage logic (`1:1 —`, `PHÁI SINH —`,
     `KỸ THUẬT —`) — this is preserved verbatim, never summarized or cut.
-  - Overview/index sheets (`00_Muc_luc`, `00_Nguon_CDC`, `00_Sinh_khoa`) are
-    merged into a single `extract/datamart/_overview.md` instead of one file
-    each, since they're reference material rather than table schemas.
+  - The xlsx also mixes in reference/explainer sheets that aren't tables at
+    all (design rationale, load order, business rules, glossaries — usually
+    named `00_...` but not guaranteed to be). These are **skipped
+    entirely**, not extracted in any form: a sheet only gets extracted if
+    its name matches a table already known from the docx
+    (`extract/database/_index.json`), since only the docx's table-heading
+    pattern reliably identifies "this is a real table". This is a
+    whitelist by table name, not by sheet-name pattern, so it keeps working
+    if the doc author adds another explainer sheet under a different name
+    later — no hardcoded sheet-name list to maintain. Because of this, docx
+    extraction always runs before xlsx in the same invocation (see
+    `main()`); don't reorder that.
   - `extract/datamart/_index.json` lists every sheet extracted: name, file,
     table type (DIM/FCT), column count.
 

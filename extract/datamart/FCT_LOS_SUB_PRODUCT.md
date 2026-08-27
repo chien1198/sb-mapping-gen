@@ -1,30 +1,26 @@
 # FCT_LOS_SUB_PRODUCT
 
-Nguồn: xlsx sheet "FCT_LOS_SUB_PRODUCT" (DATAMODEL_DWH_LOS_20260820.xlsx)
+Nguồn: xlsx sheet "FCT_LOS_SUB_PRODUCT" (DATAMODEL_DWH_LOS_20260826.xlsx)
 
 - Loại bảng: FCT - bảng chi tiết
-- Mô tả: Sản phẩm phụ đăng ký kèm sản phẩm chính của hồ sơ, bao gồm cả thẻ tín dụng.
-- Lưu gì: Lưu từng sản phẩm phụ mà hồ sơ đăng ký kèm cùng giá trị và thời hạn của sản phẩm phụ đó. FSS đã xác nhận một hồ sơ có thể có nhiều sản phẩm phụ nên mã hồ sơ không đủ làm khóa. Thẻ tín dụng không có bảng riêng vì nó là một trong các loại sản phẩm phụ và dùng chung bộ cột hạn mức, kỳ hạn; các cột riêng của thẻ chỉ có giá trị ở dòng loại thẻ.
-- Grain: 1 dòng = 1 sản phẩm phụ trên 1 hồ sơ x 1 ngày dữ liệu
-- Khóa: PK = DAYID + WI_NAME + SUB_PRODUCT_BK
-- Quy tắc ghi: Ghi khi hồ sơ thêm sản phẩm phụ hoặc thay đổi hạn mức, kỳ hạn của sản phẩm phụ.
-- Bảng nguồn CDC: NG_SB_RLOS_SUB_PRODUCT, NG_SB_RLOS_CREDIT_CARD, NG_SB_RLOS_CBS, NG_SB_RLOS_SENT_CBS_LOG
+- Mô tả: Quan hệ 1:n giữa hồ sơ và các sản phẩm phụ. Sản phẩm chính, kể cả thẻ tín dụng chính, nằm ở DIM_LOS_APPLICATION và PRODUCT_SK của hồ sơ.
+- Lưu gì: Lưu từng sản phẩm phụ đăng ký kèm hồ sơ: loại sản phẩm phụ, số tiền, thời hạn và thuộc tính riêng của thẻ phụ. Bốn nhóm SeABuy/SeACivil/SeATeacher/SeAWoman tối đa một dòng mỗi loại trên hồ sơ; thẻ tín dụng phụ có thể có nhiều dòng.
+- Grain: 1 dòng = 1 PHIÊN BẢN của 1 occurrence sản phẩm phụ. DAYID là ngày ghi phiên bản, KHÔNG phải ảnh chụp lại mỗi ngày
+- Khóa: PK = DAYID + WI_NAME + SUB_PRODUCT_TYPE_CODE + SUB_PRODUCT_SEQ. SUB_PRODUCT_SEQ là placeholder định danh occurrence ổn định; chốt từ khóa/RECID nguồn, không đánh lại theo giá trị nghiệp vụ mỗi ngày.
+- Quy tắc load: Chỉ ghi khi sản phẩm phụ mới xuất hiện hoặc thuộc tính thay đổi. Đọc as-of ngày D bằng phiên bản mới nhất có DAYID <= D, PARTITION BY WI_NAME, SUB_PRODUCT_TYPE_CODE, SUB_PRODUCT_SEQ ORDER BY DAYID DESC.
+- Nguồn: NG_SB_RLOS_SUB_PRODUCT, NG_SB_RLOS_CREDIT_CARD_APP, NG_SB_RLOS_SEABUY_APP, NG_SB_RLOS_CIVIL_APP, NG_SB_RLOS_TEACHER_APP, NG_SB_RLOS_WOMAN_APP, NG_SB_RLOS_SENT_CBS_LOG
 - Báo cáo sử dụng: BC1, BC5
 
-| STT | Tên cột | Kiểu dữ liệu | Độ lớn | Notnull | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | NUMBER | 8 | Y | PK | KỸ THUẬT — Ngày dữ liệu dạng YYYYMMDD |
-| 2 | WI_NAME | VARCHAR2 | 100 | Y | PK | 1:1 — Nguồn: NG_SB_RLOS_SUB_PRODUCT.WI_NAME. Giữ nguyên tên cột nguồn |
-| 3 | SUB_PRODUCT_BK | VARCHAR2 | 200 | Y | PK | CHƯA CHỐT — Khóa nghiệp vụ định danh một sản phẩm phụ trên hồ sơ. Dự kiến là loại sản phẩm phụ, hoặc loại sản phẩm phụ kết hợp loại nghiệp vụ thẻ. Danh sách CDC đang hỏi BA/DEV khóa của NG_SB_RLOS_SUB_PRODUCT và NG_SB_RLOS_CREDIT_CARD. Điền chính thức sau khi chốt khóa nguồn và STG_LOS |
-| 4 | APPLICATION_SK | NUMBER | 18 | Y |  | KỸ THUẬT — Khóa tới DIM_LOS_APPLICATION |
-| 5 | PRODUCT_SK | NUMBER | 18 | N |  | KỸ THUẬT — Khóa tới DIM_LOS_PRODUCT với PRODUCT_ROLE='SUB' |
-| 6 | CARD_PROMOTION_SK | NUMBER | 18 | N |  | KỸ THUẬT — Khóa tới DIM_LOS_CARD_PROMOTION, lookup theo NG_SB_RLOS_CBS.PROMOTION_ID. Chỉ có giá trị ở dòng sản phẩm phụ là thẻ tín dụng |
-| 7 | SYSTEM_CODE | VARCHAR2 | 10 | Y |  | PHÁI SINH — Suy từ mã hồ sơ. Hiện chỉ có RLOS ghi nhận sản phẩm phụ |
-| 8 | IS_CURRENT_ROW | VARCHAR2 | 1 | Y |  | KỸ THUẬT — 'Y' trên dòng mới nhất |
-| 9 | SUB_PRODUCT_LINE | VARCHAR2 | 200 | N |  | 1:1 — Nguồn: NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE. Giữ nguyên tên. Trường SAN_PHAM_PHU của BC1 |
-| 10 | CARD_TYPE_CODE | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_RLOS_CREDIT_CARD.CARD_TYPE (đổi tên thêm hậu tố CODE). Chỉ có ở dòng thẻ tín dụng. Tên đầy đủ loại thẻ (trường K_TYPE của BC1) tra ở tầng datamart qua bảng thẻ của T24 vì bảng danh mục loại thẻ của LOS không nằm trong phạm vi CDC |
-| 11 | RELEASE_TYPE | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_RLOS_CREDIT_CARD.RELEASE (đổi tên cho rõ nghĩa). Loại nghiệp vụ thẻ: Phát hành mới, Tăng giảm hạn mức, Khác |
-| 12 | SPP_AMOUNT | NUMBER | 20,2 | N |  | 1:1 — Nguồn: NG_SB_RLOS_CREDIT_CARD.LIMIT_NO (đổi tên theo cách BC1 gọi), ép kiểu số từ text. Trường SPP_Amount của BC1 |
-| 13 | SPP_AMOUNT_RAW | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_RLOS_CREDIT_CARD.LIMIT_NO giữ nguyên văn dạng text. Cần giữ vì metadata ghi nhận cột nguồn lưu hạn mức dạng chuỗi không chuẩn hóa |
-| 14 | SPP_TERM | NUMBER | 5 | N |  | 1:1 — Nguồn: NG_SB_RLOS_CREDIT_CARD.TERM (đổi tên theo cách BC1 gọi), đơn vị tháng. Trường SPP_Term của BC1 |
-| 15 | RESULT_MAIN_CARD_ID | VARCHAR2 | 100 | N |  | 1:1 — Nguồn: NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID (đổi tên cho ngắn). Mã thẻ chính do T24 trả về; BC1 dùng để nối sang bảng thẻ T24 lấy trường K_TYPE |
+| STT | Tên cột | Kiểu dữ liệu | Độ lớn | Notnull | Khóa | Loại | Bảng nguồn | Cột nguồn | Trường đích trên báo cáo | TRẠNG THÁI THIẾT KẾ | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | DAYID | DATE |  | Y | PK | KỸ THUẬT |  |  | (phân vùng theo ngày dữ liệu) | DA_CHOT | KỸ THUẬT — Ngày dữ liệu, kiểu DATE đã TRUNC về 00:00:00. Đây là ngày ảnh chụp số liệu, KHÔNG phải ngày nghiệp vụ. |
+| 2 | WI_NAME | VARCHAR2 | 100 | Y | PK | 1:1 | NG_SB_RLOS_SUB_PRODUCT | WI_NAME | (khóa nối về hồ sơ) | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_SUB_PRODUCT.WI_NAME và WI_NAME của 5 bảng sản phẩm phụ. Giữ nguyên tên cột nguồn |
+| 3 | SUB_PRODUCT_TYPE_CODE | VARCHAR2 | 30 | Y | PK | PHÁI SINH | NG_SB_RLOS_CREDIT_CARD_APP / NG_SB_RLOS_SEABUY_APP / NG_SB_RLOS_CIVIL_APP / NG_SB_RLOS_TEACHER_APP / NG_SB_RLOS_WOMAN_APP |  | (phân loại 5 nhóm sản phẩm phụ) | DA_CHOT | PHÁI SINH — Mã LOẠI sản phẩm phụ do DWH chuẩn hóa. ĐỔI TÊN từ SUB_PRODUCT_CODE để tránh trùng nghĩa với DIM_LOS_PRODUCT.SUB_PRODUCT_CODE vốn là sản phẩm nhánh lấy từ nguồn. Gán theo bảng nguồn mà dòng đến từ đó: CREDIT_CARD nếu từ NG_SB_RLOS_CREDIT_CARD_APP, SEABUY nếu từ SEABUY_APP, CIVIL nếu từ CIVIL_APP, TEACHER nếu từ TEACHER_APP, WOMAN nếu từ WOMAN_APP. Nguồn: NG_SB_RLOS_CREDIT_CARD_APP / NG_SB_RLOS_SEABUY_APP / NG_SB_RLOS_CIVIL_APP / NG_SB_RLOS_TEACHER_APP / NG_SB_RLOS_WOMAN_APP |
+| 4 | SUB_PRODUCT_SEQ | NUMBER | 4 | Y | PK | KỸ THUẬT |  |  | (dự phòng khi 1 hồ sơ có nhiều dòng cùng loại) | DA_CHOT | PHÁI SINH — Số thứ tự occurrence trong cùng WI_NAME và SUB_PRODUCT_TYPE_CODE. SEABUY, CIVIL, TEACHER, WOMAN: tối đa MỘT occurrence mỗi loại nên luôn bằng 1. CREDIT_CARD phụ: một hồ sơ CÓ THỂ có nhiều thẻ phụ nên giá trị lớn hơn 1 khi cần. Phải ánh xạ ổn định từ khóa hoặc RECID của bảng nguồn để chạy lại không đổi số. |
+| 5 | APPLICATION_SK | NUMBER | 18 | Y |  | KỸ THUẬT |  |  |  | DA_CHOT | KỸ THUẬT — Khóa tới DIM_LOS_APPLICATION |
+| 6 | PRODUCT_SK | NUMBER | 18 | Y | PK | KỸ THUẬT | NG_SB_RLOS_CREDIT_CARD_APP / NG_SB_RLOS_SEABUY_APP / NG_SB_RLOS_CIVIL_APP / NG_SB_RLOS_TEACHER_APP / NG_SB_RLOS_WOMAN_APP |  | (phân loại 5 nhóm sản phẩm phụ) | DA_CHOT | KỸ THUẬT — Khóa tới DIM_LOS_PRODUCT của sản phẩm tương ứng. Vai trò SUB được xác định bởi việc dòng nằm trong FCT_LOS_SUB_PRODUCT, không phải thuộc tính của DIM_LOS_PRODUCT. Lookup không khớp dùng DIMENSION_KEY = -1. |
+| 7 | SYSTEM_CODE | VARCHAR2 | 10 | Y | PK | PHÁI SINH |  |  | (dự phòng khi 1 hồ sơ có nhiều dòng cùng loại) | DA_CHOT | PHÁI SINH — Gán theo tuyến bảng nguồn/STG_LOS; hiện các bảng sản phẩm phụ trong phạm vi là RLOS. Hậu tố WI_NAME chỉ dùng kiểm tra chất lượng. |
+| 8 | SUB_PRODUCT_LINE | VARCHAR2 | 200 | N |  | 1:1 | NG_SB_RLOS_SUB_PRODUCT | SUB_PRODUCT_LINE | BC1.SAN_PHAM_PHU | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE. Giữ nguyên tên. Đây là danh sách loại sản phẩm phụ mà hồ sơ đã đăng ký, dùng để đối chiếu với các bảng chi tiết. Trường SAN_PHAM_PHU của BC1 |
+| 9 | CARD_TYPE_CODE | VARCHAR2 | 100 | N |  | 1:1 | NG_SB_RLOS_CREDIT_CARD_APP | CARD_TYPE | (khóa tra BC1.K_TYPE qua bảng thẻ T24 ở DTM) | DA_CHOT | 1:1 THEO DÒNG THẺ PHỤ — Nguồn NG_SB_RLOS_CREDIT_CARD_APP.CARD_TYPE. Chỉ có ở loại CREDIT_CARD; đây là thuộc tính của từng thẻ phụ, không dùng làm khóa nếu BA/DEV chưa xác nhận tính duy nhất/ổn định. |
+| 10 | SPP_AMOUNT | NUMBER | 20,2 | N |  | 1:1 | NG_SB_RLOS_CREDIT_CARD_APP / NG_SB_RLOS_SEABUY_APP / NG_SB_RLOS_CIVIL_APP / NG_SB_RLOS_TEACHER_APP / NG_SB_RLOS_WOMAN_APP | LIMIT_NO | BC1.SPP_Amount | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_CREDIT_CARD_APP.LIMIT_NO / NG_SB_RLOS_SEABUY_APP.LIMIT_NO / NG_SB_RLOS_CIVIL_APP.LIMIT_NO / NG_SB_RLOS_TEACHER_APP.LIMIT_NO / NG_SB_RLOS_WOMAN_APP.LIMIT_NO. Năm bảng dùng chung tên cột LIMIT_NO, DWH gộp về một cột và ép kiểu số từ text. Trường SPP_Amount của BC1 QUY TẮC ÉP KIỂU: nguồn lưu dạng text theo định dạng Việt Nam, dấu chấm ngăn hàng nghìn và dấu phẩy ngăn thập phân, ví dụ metadata ghi mẫu 10.000.000 và 10.000.000.000. Dùng TO_NUMBER(REPLACE(REPLACE(TRIM(cot),'.',''),',','.') DEFAULT NULL ON CONVERSION ERROR). Mệnh đề DEFAULT NULL ON CONVERSION ERROR là bắt buộc: giá trị không đọc được thành NULL thay vì làm hỏng cả mẻ nạp, và DQ-12 sẽ đếm số dòng rơi vào trường hợp đó. |
+| 11 | SPP_TERM | NUMBER | 5 | N |  | 1:1 | NG_SB_RLOS_CREDIT_CARD_APP / NG_SB_RLOS_SEABUY_APP / NG_SB_RLOS_CIVIL_APP / NG_SB_RLOS_TEACHER_APP / NG_SB_RLOS_WOMAN_APP | TERM / TIME_VALID | BC1.SPP_Term | DA_CHOT | 1:1 — Nguồn: NG_SB_RLOS_CREDIT_CARD_APP.TERM / NG_SB_RLOS_SEABUY_APP.TIME_VALID / NG_SB_RLOS_CIVIL_APP.TIME_VALID / NG_SB_RLOS_TEACHER_APP.TIME_VALID / NG_SB_RLOS_WOMAN_APP.TIME_VALID. Thẻ tín dụng dùng cột TERM, bốn loại còn lại dùng TIME_VALID. Hai tên cột khác nhau cho cùng một khái niệm, DWH gộp về một cột, đơn vị tháng. Trường SPP_Term của BC1 |
