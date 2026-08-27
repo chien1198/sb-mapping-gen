@@ -45,6 +45,21 @@ that have actually shipped before:
       must come first (column E), RLOS second (column F) — this project's
       fixed convention across every table, so a reviewer scanning many
       files can rely on column E always being CLOS.
+  12. The "Điều kiện lấy dữ liệu" sub-row's label cell (column D, right
+      under the header) must literally read "Điều kiện lấy dữ liệu" — never
+      overwritten with the actual filter expression. A table-wide filter
+      (e.g. STG_DTM's EXP_DATE/DAYID window) belongs in that row's mapping
+      column(s) (E, F, ...), i.e. `table_condition` in gen_mapping.py's
+      input, not in column D. This catches the mistake of reusing the
+      per-column "condition" field (which inserts a new row and writes into
+      Description/D) for what should have been a table-wide filter written
+      into the fixed row instead.
+  13. Every real column row must have a non-blank "Item Name" (column C).
+      `extract/database/<TABLE>.md` always has a business-meaning
+      "Mô tả" for every column, so there's no legitimate reason to leave
+      this blank — a past run left it empty for several columns across
+      multiple tables even though the source description existed, and it
+      went unnoticed because nothing checked for it.
 
 Usage:
     python3 scripts/validate_mapping.py <output.xlsx>
@@ -60,6 +75,20 @@ import openpyxl
 HEADER_ROW_LABEL = "Column name"
 FIRST_MAPPING_COL = 5  # column E
 JOIN_LABEL_COL = 4  # column D — "Điều kiện join giữa các bảng" label (Description column)
+
+
+def last_used_mapping_col(ws, header_row):
+    """Rightmost mapping column (E, F, ...) that actually has a "How to
+    mapping <SYSTEM>" header label. A template may ship with more mapping
+    columns (e.g. E+F for CLOS+RLOS) than a given file actually uses (e.g.
+    a single combined "How to mapping CLOS/RLOS" column in E only) — the
+    unused trailing column(s) are legitimately blank and must not be
+    treated as "should be filled" by the blank-cell checks below."""
+    last = FIRST_MAPPING_COL - 1
+    for c in range(FIRST_MAPPING_COL, ws.max_column + 1):
+        if ws.cell(row=header_row, column=c).value:
+            last = c
+    return max(last, FIRST_MAPPING_COL)
 
 
 def find_layout(ws):
@@ -108,7 +137,7 @@ def find_layout(ws):
 
 
 def check_header_block_bold(ws, header_row, errors):
-    n_cols = ws.max_column
+    n_cols = last_used_mapping_col(ws, header_row)
     for r in range(1, header_row):
         for c in range(FIRST_MAPPING_COL, n_cols + 1):
             cell = ws.cell(row=r, column=c)
@@ -127,7 +156,7 @@ def check_mapping_header_system_order(ws, header_row, errors):
     reviewer scanning many files relies on column E always being CLOS.
     Only enforced when both systems are present in the header labels; a
     table naming some other pair of systems isn't checked here."""
-    n_cols = ws.max_column
+    n_cols = last_used_mapping_col(ws, header_row)
     seen = []
     for c in range(FIRST_MAPPING_COL, n_cols + 1):
         val = ws.cell(row=header_row, column=c).value
@@ -155,8 +184,8 @@ def check_no_strikethrough(ws, errors):
                 errors.append(f"{cell.coordinate}: cell bị gạch ngang (strikethrough), giá trị={cell.value!r}")
 
 
-def check_join_conditions_one_per_cell(ws, join_content_rows, errors):
-    n_cols = ws.max_column
+def check_join_conditions_one_per_cell(ws, header_row, join_content_rows, errors):
+    n_cols = last_used_mapping_col(ws, header_row)
     for r in join_content_rows:
         for c in range(FIRST_MAPPING_COL, n_cols + 1):
             cell = ws.cell(row=r, column=c)
@@ -176,8 +205,28 @@ def check_join_conditions_one_per_cell(ws, join_content_rows, errors):
                 )
 
 
+def check_item_name_not_blank(ws, first_data_row, join_row, errors):
+    """extract/database/<TABLE>.md always carries a "Mô tả" for every
+    column, so "Item Name" (column C) should never be left blank — it's a
+    lossy re-derivation of that description, not new information the
+    generator has to invent. Skip the same non-column rows the mapping-cell
+    check skips (JOIN label, "Chú ý:", the "Điều kiện lấy dữ liệu" sub-row
+    which has no column name in column A)."""
+    last_data_row = (join_row - 1) if join_row else ws.max_row
+    for r in range(first_data_row, last_data_row + 1):
+        name = ws.cell(row=r, column=1).value
+        if not name or name in ("Điều kiện join giữa các bảng", "Chú ý:"):
+            continue
+        item_cell = ws.cell(row=r, column=3)
+        if item_cell.value is None or (isinstance(item_cell.value, str) and item_cell.value.strip() == ""):
+            errors.append(
+                f"{item_cell.coordinate}: cột 'Item Name' của cột '{name}' bị bỏ trống — "
+                f"phải lấy từ Mô tả trong extract/database/<TABLE>.md, không để trống"
+            )
+
+
 def check_mapping_cells_not_blank(ws, header_row, first_data_row, join_row, errors):
-    n_cols = ws.max_column
+    n_cols = last_used_mapping_col(ws, header_row)
     last_data_row = (join_row - 1) if join_row else ws.max_row
     for r in range(first_data_row, last_data_row + 1):
         name = ws.cell(row=r, column=1).value
@@ -255,8 +304,8 @@ def check_notes_row(ws, notes_row, errors):
                 )
 
 
-def check_source_header_alignment(ws, errors):
-    n_cols = ws.max_column
+def check_source_header_alignment(ws, header_row, errors):
+    n_cols = last_used_mapping_col(ws, header_row)
     for r in range(1, 5):
         for c in range(FIRST_MAPPING_COL, n_cols + 1):
             cell = ws.cell(row=r, column=c)
@@ -287,7 +336,7 @@ def check_join_row_fill_and_border(ws, join_row, join_content_rows, errors):
         )
 
 
-def check_condition_row_not_leftover(ws, condition_row, errors):
+def check_condition_row_not_leftover(ws, header_row, condition_row, errors):
     """The 'Điều kiện lấy dữ liệu' sub-row sits ABOVE first_data_row, outside
     the range gen_mapping.py bulk-deletes. Some templates (e.g. FCT_LOAN)
     ship with real sample text in that row's mapping cells; if this table's
@@ -298,7 +347,7 @@ def check_condition_row_not_leftover(ws, condition_row, errors):
     only be sample content from the template, since this table's own
     formulas only ever reference its own declared aliases."""
     declared_aliases = set()
-    n_cols = ws.max_column
+    n_cols = last_used_mapping_col(ws, header_row)
     for r in range(1, 13):
         for c in range(FIRST_MAPPING_COL, n_cols + 1):
             val = ws.cell(row=r, column=c).value
@@ -320,6 +369,32 @@ def check_condition_row_not_leftover(ws, condition_row, errors):
             )
 
 
+CONDITION_ROW_LABEL = "Điều kiện lấy dữ liệu"
+
+
+def check_condition_row_label_intact(ws, condition_row, errors):
+    """Column D of the fixed 'Điều kiện lấy dữ liệu' sub-row must always
+    hold that literal label — never the actual filter expression. A
+    table-wide filter (e.g. STG_DTM's EXP_DATE/DAYID window) belongs in
+    this row's mapping column(s) (E, F, ...) via gen_mapping.py's
+    `table_condition`, not in column D. This catches the mistake of
+    reusing the per-column "condition" field (which writes into
+    Description/D on a *new* row above one column) for what should have
+    been a table-wide filter in the fixed row instead — a past run of this
+    project did exactly that and needed a manual fix."""
+    cell = ws.cell(row=condition_row, column=JOIN_LABEL_COL)
+    val = cell.value
+    if val is None:
+        return
+    if val != CONDITION_ROW_LABEL:
+        errors.append(
+            f"{cell.coordinate}: cột D của hàng 'Điều kiện lấy dữ liệu' phải giữ nguyên "
+            f"nhãn '{CONDITION_ROW_LABEL}', không được ghi đè bằng biểu thức điều kiện "
+            f"(giá trị hiện tại: {val!r}) — nội dung điều kiện lọc toàn bảng phải nằm ở "
+            f"cột mapping (E, F, ...) của chính hàng này, không phải cột D"
+        )
+
+
 def validate(path):
     wb = openpyxl.load_workbook(path)
     if "Mapping" not in wb.sheetnames:
@@ -331,13 +406,15 @@ def validate(path):
 
     check_header_block_bold(ws, header_row, errors)
     check_no_strikethrough(ws, errors)
-    check_join_conditions_one_per_cell(ws, join_content_rows, errors)
+    check_join_conditions_one_per_cell(ws, header_row, join_content_rows, errors)
     check_mapping_cells_not_blank(ws, header_row, first_data_row, join_row, errors)
+    check_item_name_not_blank(ws, first_data_row, join_row, errors)
     check_join_label_column(ws, join_row, errors)
     check_notes_row(ws, notes_row, errors)
-    check_source_header_alignment(ws, errors)
+    check_source_header_alignment(ws, header_row, errors)
     check_join_row_fill_and_border(ws, join_row, join_content_rows, errors)
-    check_condition_row_not_leftover(ws, condition_row, errors)
+    check_condition_row_not_leftover(ws, header_row, condition_row, errors)
+    check_condition_row_label_intact(ws, condition_row, errors)
     check_mapping_header_system_order(ws, header_row, errors)
 
     return errors

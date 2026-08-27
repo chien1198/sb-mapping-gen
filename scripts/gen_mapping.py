@@ -17,6 +17,15 @@ contract. Summary:
     {"column": "F", "lines": ["NG_SB_RLOS_APPLICANT_GENERAL AS A"]}
   ],
   "mapping_headers": ["How to mapping CLOS", "How to mapping RLOS"],  # E, F... labels
+  "table_condition": ["A.EXP_DATE IS NULL OR ..."],   # optional, one per mapping_headers
+                                                        # entry — written into the FIXED
+                                                        # "Điều kiện lấy dữ liệu" sub-row
+                                                        # (E6/F6...) right under the header,
+                                                        # for a filter that applies to the
+                                                        # WHOLE table (not one column). The
+                                                        # "Điều kiện lấy dữ liệu" label itself
+                                                        # already lives in D6 in every template
+                                                        # and is never touched by this script.
   "columns": [
     {
       "name": "DIMENSION_KEY",
@@ -24,7 +33,12 @@ contract. Summary:
       "item_name": "Surrogate Key",
       "description": "",
       "is_key": true,
-      "condition": null,                # optional "Điều kiện lấy dữ liệu" sub-row above it
+      "condition": null,                # optional per-column condition NOTE row inserted
+                                          # directly above this one column (Description
+                                          # column only) — NOT the same thing as
+                                          # "table_condition" above; use this only when a
+                                          # single specific column needs a called-out filter,
+                                          # not for a table-wide WHERE clause
       "mapping": ["SEQ_DIM_LOS_APPLICATION.NEXTVAL", null]   # one per mapping_headers entry
     },
     ...
@@ -195,9 +209,16 @@ def fill_header_block(ws, data):
             cell.alignment = source_alignment
 
 
-def fill_mapping_headers(ws, header_row, mapping_headers):
+def fill_mapping_headers(ws, header_row, mapping_headers, last_mapping_col):
     for i, label in enumerate(mapping_headers):
         ws.cell(row=header_row, column=FIRST_MAPPING_COL + i).value = label
+    # some templates ship with more "How to mapping <SYSTEM>" header cells
+    # than this table actually uses (e.g. FCT_LOAN's own 2-system header
+    # when this table only needs 1) — clear any leftover header label past
+    # what mapping_headers declares, or it survives into the output looking
+    # like a real (but unfilled) source system
+    for c in range(FIRST_MAPPING_COL + len(mapping_headers), last_mapping_col + 1):
+        ws.cell(row=header_row, column=c).value = None
 
 
 def build(data, template_path, output_path):
@@ -242,12 +263,26 @@ def build(data, template_path, output_path):
     # already captured above) so that content only reappears if this
     # table's own data actually uses a "condition" sub-row; otherwise a
     # past table's leftover condition text would silently survive into
-    # every table that doesn't need one.
+    # every table that doesn't need one. Column D (the "Điều kiện lấy dữ
+    # liệu" label itself) is preserved — every template ships it already
+    # and this script never touches that label, only the mapping columns
+    # (E, F, ...) which carry the actual filter expression per source.
     for c in range(1, last_mapping_col + 1):
+        if c == 4:
+            continue
         ws.cell(row=condition_row, column=c).value = None
 
     fill_header_block(ws, data)
-    fill_mapping_headers(ws, header_row, mapping_headers)
+    fill_mapping_headers(ws, header_row, mapping_headers, last_mapping_col)
+
+    # table-wide row filter (e.g. STG_DTM's EXP_DATE/DAYID window) goes into
+    # the FIXED condition_row's mapping columns, one value per source
+    # system — never a new row, and never column D (that's the label).
+    table_condition = data.get("table_condition")
+    if table_condition:
+        for j, cond in enumerate(table_condition):
+            if cond:
+                ws.cell(row=condition_row, column=FIRST_MAPPING_COL + j).value = cond
 
     row = first_data_row
     columns = data["columns"]
