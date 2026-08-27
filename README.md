@@ -19,9 +19,10 @@ seabank-mapping-gen/
 - **references/**: 2 tài liệu template mapping mẫu có sẵn, dùng làm chuẩn đối chiếu khi gen.
 - **mapping/**: file mapping đích được tạo ra từ input + references.
 
-> **Lưu ý bảo mật**: `input/` (tài liệu gốc) bị git-ignore mặc định vì có thể chứa dữ
-> liệu thiết kế nội bộ/nhạy cảm của ngân hàng ở định dạng docx/xlsx gốc. `extract/` và
-> `mapping/` được commit vào repo (private) để giữ lịch sử thay đổi qua git.
+> **Lưu ý bảo mật**: `input/`, `extract/`, `mapping/` đều được commit vào repo (private)
+> để giữ lịch sử thay đổi tài liệu/mapping qua git. Vì repo private nên tài liệu thiết
+> kế nội bộ của ngân hàng trong `input/` được chấp nhận lưu ở đây — không đẩy repo này
+> thành public hoặc chia sẻ ra ngoài phạm vi được phép.
 
 ## Skills
 

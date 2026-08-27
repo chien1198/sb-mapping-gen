@@ -1,9 +1,6 @@
-# Raw input documents may contain confidential bank data — do not commit
-input/*
-!input/.gitkeep
-
-# extract/ and mapping/ are tracked (private repo) so table add/rename/
-# remove and mapping changes are visible in git history.
+# input/, extract/, and mapping/ are all tracked (private repo) so document
+# updates, table add/rename/remove, and mapping changes are visible in git
+# history.
 
 .venv/
 __pycache__/
