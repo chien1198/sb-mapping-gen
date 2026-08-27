@@ -2,10 +2,8 @@
 input/*
 !input/.gitkeep
 
-# extract/ is tracked (private repo) so table add/rename/remove is visible
-# in git history when input/ is re-extracted.
-mapping/*
-!mapping/.gitkeep
+# extract/ and mapping/ are tracked (private repo) so table add/rename/
+# remove and mapping changes are visible in git history.
 
 .venv/
 __pycache__/
