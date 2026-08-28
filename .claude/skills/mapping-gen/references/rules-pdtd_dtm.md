@@ -57,15 +57,29 @@ once the excluded tables above are in scope.
   columns, types, PK).
 - `extract/database/<TABLE_LOS>.md` — the matching LOS table (same suffix
   after `DIM_PDTD_`/`DIM_LOS_` or `FCT_PDTD_`/`FCT_LOS_`) — this is what you
-  diff against, column by column.
-- `mapping/SB_DWH/Mapping_<TABLE_LOS>.xlsx` — the phase-1 output for the LOS
-  counterpart. For every column that exists on both sides, its mapping
-  formula is your starting point (see "How to build the mapping" below) —
-  don't re-derive CLOS/RLOS source logic from scratch, it was already
-  solved in phase 1.
+  diff against, column by column, to tell which PDTD columns are shared vs.
+  new (see "How to build the mapping" below). You do **not** need
+  `mapping/SB_DWH/Mapping_<TABLE_LOS>.xlsx`'s actual CLOS/RLOS formulas —
+  see the important correction below.
 - `references/Mapping_DIM_LOAN_template.xlsx` (DIM) or
   `references/Mapping_FCT_LOAN_template .xlsx` (FCT, mind the trailing
   space) — same templates every phase uses.
+
+**Important correction (confirmed against a real phase-1 file)**: it might
+seem natural to copy phase 1's actual CLOS/RLOS mapping formulas verbatim
+for shared columns, since they "already solved" the source logic. Don't —
+those formulas reference the *original* CLOS/RLOS source tables directly
+(e.g. `mapping/SB_DWH/Mapping_DIM_LOS_GEO.xlsx` has `F9 = 'A.CITY_CODE'`
+where alias `A` is `H_NG_SB_RLOS_MAS_CITY`, a raw RLOS table). But the
+architecture diagram confirms PDTD_DTM only ever reads from the
+already-materialized `SB_DWH.<TABLE_LOS>` table via ODI — it has no access
+to the raw CLOS/RLOS tables phase 1's formulas point at. So for every
+shared column, the correct PDTD formula is the **same shape phase 2 uses**:
+`A.<COLUMN_NAME>` with a single alias `A = SB_DWH.<TABLE_LOS>` — not a
+copy of phase 1's multi-alias CLOS/RLOS formula. Phase 1's file is only
+useful here for `item_name` (column C) and for confirming a column's
+*name* truly carries over unchanged; ignore its mapping columns (E, F, ...)
+entirely for this phase.
 
 ## Known column deltas (from a full diff of all 22 pairs)
 
@@ -79,19 +93,17 @@ first before treating a column as a real delta:
   mapping formula for `DIMENSION_KEY` is simply `A.DIMENSION_KEY` (copy the
   LOS table's own already-generated key), never a new
   `SEQ_DIM_PDTD_<X>.NEXTVAL`.
-- **Existing `_SK` columns just retarget their dimension**: any `_SK`
-  column that already exists in the LOS counterpart (e.g. `PRODUCT_SK`,
-  `ORG_UNIT_SK`) keeps the same lookup *shape* as phase 1's mapping, but
-  the FK now resolves against the `DIM_PDTD_*` version of that dimension,
-  not `DIM_LOS_*`. This is a **rename of the target dimension in the
-  lookup, not new logic** — carry the phase-1 formula's structure forward
-  and swap the dimension name.
+- **Existing `_SK` columns carry over unchanged**: any `_SK` column that
+  already exists in the LOS counterpart (e.g. `PRODUCT_SK`, `ORG_UNIT_SK`)
+  is just `A.<SK_COLUMN_NAME>` like any other shared column — its *value*
+  was already resolved when the row landed in `SB_DWH.<TABLE_LOS>`, PDTD
+  just relays it. (This corrects an earlier draft of this file, which
+  assumed the FK lookup itself had to be re-targeted at `DIM_PDTD_*` — it
+  doesn't; only a genuinely **new** `_SK` not present in LOS needs a real
+  lookup, see step 4 below.)
 
-Pairs that are a **pure 1:1 copy** once the two rules above are applied —
-no added/dropped columns beyond the universal `_SK` retargeting, so their
-mapping is "take the phase-1 SB_DWH mapping formula for every column,
-verbatim, only renaming `DIM_LOS_*`/`FCT_LOS_*` references to
-`DIM_PDTD_*`/`FCT_PDTD_*` where they appear as FK targets":
+Pairs that are a **pure 1:1 copy** — no added/dropped columns at all, so
+every column (including any `_SK`) is simply `A.<COLUMN_NAME>`:
 `DIM_GEO`, `DIM_COLLATERAL`, `DIM_COLLATERAL_TYPE`, `DIM_ORG_UNIT`,
 `DIM_DECISION`, `DIM_APPROVAL_GROUP`, `DIM_EXCEPTION_REASON`,
 `DIM_CHANGE_TYPE`, `DIM_CARD_PROMOTION`, `FCT_COLLATERAL`,
@@ -137,24 +149,26 @@ re-derive the diff yourself rather than trusting stale numbers.
 
 ## How to build the mapping
 
+This phase's header block/source shape is **identical to phase 2**: one
+alias, `SB_DWH.<TABLE_LOS> AS A` (column E), one mapping column
+`"How to mapping CLOS/RLOS"`. No multi-alias JOINs — see the correction
+above for why phase 1's own multi-alias formulas don't carry over.
+
 1. Read both `extract/database/<TABLE_PDTD>.md` and
    `extract/database/<TABLE_LOS>.md`. Confirm the pair is in scope (listed
    above) — if not, stop and tell the user why (see Scope note).
-2. Read `mapping/SB_DWH/Mapping_<TABLE_LOS>.xlsx` (the `Mapping` sheet) to
-   pull, per column: `Item Name` (column C) and every `How to mapping
-   <SYSTEM>` formula (columns E, F, ...).
+2. Read `mapping/SB_DWH/Mapping_<TABLE_LOS>.xlsx` (the `Mapping` sheet) only
+   for `Item Name` (column C) per column — ignore its mapping columns
+   (E, F, ...) entirely, per the correction above.
 3. For every PDTD column that has the **same name** in the LOS schema:
    - `DIMENSION_KEY` → `A.DIMENSION_KEY` (see universal pattern above, not
      a new sequence).
-   - Any `_SK` column that already existed in LOS → carry the phase-1
-     formula's *shape* forward, retargeting the dimension name from
-     `DIM_LOS_*` to `DIM_PDTD_*` (e.g. if phase-1's `PRODUCT_SK` formula
-     was a lookup against `DIM_LOS_PRODUCT`, the PDTD version looks up
-     `DIM_PDTD_PRODUCT` the same way).
-   - Every other shared column → reuse the phase-1 formula verbatim (same
-     alias, same source column) — this is still `SB_DWH.<TABLE_LOS>` data,
-     just relayed through PDTD_DTM, so the underlying CLOS/RLOS logic
-     doesn't change.
+   - Any `_SK` column that already existed in LOS → `A.<SK_COLUMN_NAME>`,
+     same as any other shared column — the FK value itself doesn't change
+     between SB_DWH and PDTD_DTM, only which DIM table *other* rows resolve
+     it against downstream. (Don't confuse this with the brand-new `_SK`
+     case in step 4, which does need a real lookup.)
+   - Every other shared column → `A.<COLUMN_NAME>`.
    - `item_name` → copy from the phase-1 file's Item Name column, same as
      phase 2.
 4. For every PDTD column with **no equivalent in the LOS schema** (see the
@@ -180,18 +194,11 @@ re-derive the diff yourself rather than trusting stale numbers.
    `extract/database/<TABLE_PDTD>.md` states as PK, and flag the delta
    explicitly in your report (it changes row-uniqueness semantics, worth a
    second pair of eyes).
-7. No JOIN section is needed beyond what phase 1's formulas already
-   embedded (this phase relays SB_DWH data, it doesn't join new source
-   tables) — unless a new `_SK` lookup genuinely requires one, in which
-   case treat it the same way phase 1 treats JOINs (one clause per row,
-   see `rules-sb_dwh.md`).
-8. `mapping_headers` for this phase is a single combined column, same
-   convention as phase 2: `["How to mapping CLOS/RLOS"]`, one alias
-   `SB_DWH.<TABLE_LOS> AS A` in the header block — even though a handful of
-   columns' formulas may still show `B.`/`C.` etc. if the phase-1 formula
-   itself used multiple aliases for that column, carry those aliases and
-   their source lines forward into the header block too (list every alias
-   phase-1 used across all copied formulas, not just `A`).
+7. No JOIN section — a single-alias source needs no join, same as phase 2.
+   The only exception would be a brand-new `_SK` lookup that genuinely
+   needs to join against its target DIM_PDTD table to resolve the FK; if
+   that comes up, treat it the same way phase 1 treats JOINs (one clause
+   per row, see `rules-sb_dwh.md`).
 
 ## Table naming and output
 
