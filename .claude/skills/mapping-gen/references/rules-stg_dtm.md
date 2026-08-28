@@ -1,31 +1,22 @@
----
-name: mapping-gen-stg
-description: Generate a 1:1 mapping Excel file (mapping/STG_DTM/Mapping_STG_<TABLE>.xlsx) from an SB_DWH DIM/FCT table into its STG_DTM staging counterpart, following the format of references/Mapping_*_template.xlsx. Use when the user asks to gen/generate/create the STG_DTM mapping (phase 2), as opposed to the SB_DWH mapping (phase 1, see mapping-gen).
----
-
-# Generate STG_DTM mapping (phase 2)
+# Rules — phase 2: SB_DWH → STG_DTM
 
 Produces `mapping/STG_DTM/Mapping_STG_<TABLE>.xlsx` for a table already
 mapped into `SB_DWH` (i.e. one with an existing
-`mapping/SB_DWH/Mapping_<TABLE>.xlsx` from the `mapping-gen` skill / listed
-in `extract/database/_index.json` under the LOS section). This is **phase
-2**: `SB_DWH.<TABLE>` → `STG_DTM.STG_<TABLE>`, a straight 1:1 copy — unlike
-phase 1 (`mapping-gen`), there is no CLOS/RLOS source analysis, no column
-transformation, and no JOIN between multiple source tables. The only
-non-trivial part is the row-level filter each table type needs (see below).
-
-This skill covers **one table per run** unless the user explicitly asks for
-all tables — same default-to-one-table convention as `mapping-gen`.
+`mapping/SB_DWH/Mapping_<TABLE>.xlsx` from phase 1 / listed in
+`extract/database/_index.json` under the LOS section). This is
+`SB_DWH.<TABLE>` → `STG_DTM.STG_<TABLE>`, a straight 1:1 copy — unlike
+phase 1, there is no CLOS/RLOS source analysis, no column transformation,
+and no JOIN between multiple source tables. The only non-trivial part is
+the row-level filter each table type needs (see below).
 
 ## Scope note
 
-This skill only covers `STG_DTM`. `PDTD_DTM` is a **separate, later
-phase**: `extract/database/DIM_PDTD_*.md` schemas differ from their
-`DIM_LOS_*.md` counterparts (different column sets/order, e.g.
+This file only covers `STG_DTM`. `PDTD_DTM` is a different phase (see
+`rules-pdtd_dtm.md`): `extract/database/DIM_PDTD_*.md` schemas differ from
+their `DIM_LOS_*.md` counterparts (different column sets/order, e.g.
 `DIM_PDTD_APPLICATION` has 35 columns vs. `DIM_LOS_APPLICATION`'s 33 —
 extra `BI_FLOW`, `CUSTOMER_SK`, etc.), so PDTD_DTM needs real column
-matching/analysis like phase 1, not a same-schema copy. Do not use this
-skill for PDTD_DTM tables — flag it back to the user if asked.
+matching/analysis like phase 1, not a same-schema copy.
 
 ## Inputs you read (never write to these)
 
@@ -39,12 +30,12 @@ skill for PDTD_DTM tables — flag it back to the user if asked.
   `references/Mapping_FCT_LOAN_template .xlsx` (FCT, mind the trailing
   space in the filename) — same templates phase 1 uses.
 
-## What's different from phase 1 (`mapping-gen`)
+## What's different from phase 1
 
 - **One source table, one alias.** `sources` has exactly one entry: column
   E, single line `"SB_DWH.<TABLE> AS A"`. No column F/G.
 - **One mapping column, labeled "How to mapping CLOS/RLOS".** Even though
-  there's only one physical source table, the user wants the header kept as
+  there's only one physical source table, the header stays
   `"How to mapping CLOS/RLOS"` (not `"How to mapping SB_DWH"`) because
   `SB_DWH.<TABLE>` itself already blends CLOS+RLOS data from phase 1 — the
   label names the original systems, the formula still points at the single
@@ -67,19 +58,22 @@ skill for PDTD_DTM tables — flag it back to the user if asked.
   mechanism inserts a *new* row above one specific column and writes into
   Description (D), which is for a column-specific caveat, not a
   whole-table filter; using it here would misplace the text.
+  `scripts/validate_mapping.py` (rule #12) enforces that column D of this
+  fixed row always keeps the literal label — this exact mistake shipped
+  once and needed a manual fix.
   - **DIM tables**: keep only currently-valid or recently-expired history —
     `A.EXP_DATE IS NULL OR (A.EXP_DATE IS NOT NULL AND A.EXP_DATE >= V_DATE_BATCH - 3)`.
     (Batch runs at T-1, so `V_DATE_BATCH` is already T-1; keeping 3 days of
-    recently-expired rows covers late-arriving history.) Verified: every
+    recently-expired rows covers late-arriving history.) Every
     `DIM_LOS_*.md` table has an `EXP_DATE` column, so this filter applies
     uniformly across all 14 DIM tables — no per-table exceptions expected,
     but double check the specific table's `extract/database/<TABLE>.md`
     still has `EXP_DATE` before applying it.
   - **FCT tables**: keep only the batch day's data —
-    `A.DAYID = V_DATE_BATCH`. Verified: every `FCT_LOS_*.md` table has a
-    `DAYID` PK column, so this applies uniformly across all 8 FCT tables.
-    Also set the template's row 4 ("Tần suất chạy dữ liệu", FCT-only field)
-    to `"Chạy dữ liệu T-1 theo DAYID = V_DATE_BATCH"`.
+    `A.DAYID = V_DATE_BATCH`. Every `FCT_LOS_*.md` table has a `DAYID` PK
+    column, so this applies uniformly across all 8 FCT tables. Also set
+    the template's row 4 ("Tần suất chạy dữ liệu", FCT-only field) to
+    `"Chạy dữ liệu T-1 theo DAYID = V_DATE_BATCH"`.
   - `V_DATE_BATCH` is already defined in the template's `Variable` sheet
     (row 3) — don't redefine it, just reference it in the filter text and
     copy the Variable sheet across unchanged.
@@ -101,7 +95,8 @@ skill for PDTD_DTM tables — flag it back to the user if asked.
   since STG_DTM's columns are identical, reuse that value verbatim per
   column instead of guessing or leaving it empty. Open the phase-1 file
   read-only with openpyxl to pull column C per row before building the
-  JSON.
+  JSON. `scripts/validate_mapping.py` (rule #13) rejects any blank Item
+  Name cell.
 
 ## Steps
 
@@ -122,9 +117,9 @@ skill for PDTD_DTM tables — flag it back to the user if asked.
      the template's fixed "Điều kiện lấy dữ liệu" sub-row (column E), not
      into any column's own row
    - `frequency` (FCT only): `"Chạy dữ liệu T-1 theo DAYID = V_DATE_BATCH"`
-   - Every column: `mapping: ["A.<COLUMN_NAME>"]`, no per-column
-     `"condition"` field (that mechanism is for a different, column-scoped
-     use case — see above)
+   - Every column: `mapping: ["A.<COLUMN_NAME>"]`, `item_name` copied from
+     phase-1, no per-column `"condition"` field (that mechanism is for a
+     different, column-scoped use case — see above)
    - No `join_conditions` key
    Write it to a scratch path (session scratchpad directory, not `/tmp`).
 4. Pick the template per table type (same templates as phase 1).
@@ -151,7 +146,7 @@ skill for PDTD_DTM tables — flag it back to the user if asked.
 
 - `mapping/` is git-ignored — safe to regenerate freely.
 - Reuses `scripts/gen_mapping.py` and `scripts/validate_mapping.py`
-  unchanged — this skill only changes how the input JSON is assembled (no
+  unchanged — this phase only changes how the input JSON is assembled (no
   source-system lookup, straight column copy), not the rendering script.
 - If a specific table's `extract/database/<TABLE>.md` doesn't have
   `EXP_DATE` (DIM) or `DAYID` (FCT) as expected, stop and ask the user how
