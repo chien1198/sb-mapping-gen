@@ -13,4 +13,4 @@ Nguồn: docx section "4.5.6 Bảng RLOS_REF_SLA_TDKHCN"
 | 7 | SLA_MARKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước lập hồ sơ thẩm định |
 | 8 | SLA_CHECKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát thẩm định |
 | 9 | SLA_CREDIT_APPROVER | NUMBER | N | 10,2 |  | Cam kết giờ cho cấp phê duyệt |
-| 10 | APP_GRP | NVARCHAR2 | Y | 200 | UK | Cấp phân quyền phê duyệt |
+| 10 | APP_GRP | NVARCHAR2 | Y | 200 | UK | Cấp thẩm quyền áp dụng, ví dụ CGPD cấp B,C (B1, B2, C1, C2) |

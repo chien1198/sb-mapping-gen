@@ -1,6 +1,6 @@
 # DIM_PDTD_ORG_UNIT
 
-Nguồn: docx section "4.3.7 Bảng DIM_PDTD_ORG_UNIT"
+Nguồn: docx section "4.3.5 Bảng DIM_PDTD_ORG_UNIT"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

@@ -1,6 +1,6 @@
 # DIM_LOS_CARD_PROMOTION
 
-Nguồn: docx section "4.1.14 Bảng DIM_LOS_CARD_PROMOTION"
+Nguồn: docx section "4.1.12 Bảng DIM_LOS_CARD_PROMOTION"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

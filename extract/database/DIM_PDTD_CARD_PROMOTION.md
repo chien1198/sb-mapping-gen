@@ -1,6 +1,6 @@
 # DIM_PDTD_CARD_PROMOTION
 
-Nguồn: docx section "4.3.16 Bảng DIM_PDTD_CARD_PROMOTION"
+Nguồn: docx section "4.3.14 Bảng DIM_PDTD_CARD_PROMOTION"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

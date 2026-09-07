@@ -15,9 +15,8 @@ Nguồn: docx section "4.4.11 Bảng FCT_PDTD_KPI_APPLICATION"
 | 9 | POINT | NUMBER | N | 12,4 |  | Điểm KPI |
 | 10 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi |
 | 11 | TAT_APPLICATION_HOUR | NUMBER | N | 18,6 |  | Tổng thời gian xử lý của cả hồ sơ, đơn vị giờ |
-| 12 | SECURITY_FLAG | VARCHAR2 | N | 10 |  | Hồ sơ có tài sản bảo đảm hay không |
-| 13 | TSBD_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 2 tài sản bảo đảm trở lên |
-| 14 | INCOM_3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 nguồn thu nhập trở lên |
-| 15 | BUSINESS_INCOM | VARCHAR2 | N | 10 |  | Hồ sơ có thu nhập từ kinh doanh |
-| 16 | DEVIATION_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có đúng 2 ngoại lệ chính sách |
-| 17 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ chính sách trở lên |
+| 12 | TSBD_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 2 tài sản bảo đảm trở lên |
+| 13 | INCOM_3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 nguồn thu nhập trở lên |
+| 14 | BUSINESS_INCOM | VARCHAR2 | N | 10 |  | Hồ sơ có thu nhập từ kinh doanh |
+| 15 | DEVIATION_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có đúng 2 ngoại lệ chính sách |
+| 16 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ chính sách trở lên |

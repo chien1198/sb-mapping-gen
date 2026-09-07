@@ -6,7 +6,7 @@ Nguồn: docx section "4.2.8 Bảng FCT_LOS_EXCEPTION"
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
 | 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng |
-| 3 | EXCEPTION_BK | VARCHAR2 | Y | 300 | PK | Khóa nghiệp vụ của dòng, còn để placeholder chờ chốt khóa nguồn |
+| 3 | EXCEPTION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng, còn để placeholder chờ chốt khóa nguồn |
 | 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_APPLICATION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 5 | EXCEPTION_REASON_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_EXCEPTION_REASON. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 6 | RAISED_BY_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_USER, tham chiếu đến người nêu nội dung cần làm rõ. Giá trị mặc định = -1 nếu không có giá trị phù hợp |

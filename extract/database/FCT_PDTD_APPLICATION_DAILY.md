@@ -12,21 +12,21 @@ Nguồn: docx section "4.4.1 Bảng FCT_PDTD_APPLICATION_DAILY"
 | 6 | APPROVAL_GROUP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_APPROVAL_GROUP. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 7 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_CUSTOMER. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 8 | LAST_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_WORKSTEP, tham chiếu đến bước hoàn tất gần nhất. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 9 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Bước hồ sơ cuối cùng |
-| 10 | DATE_SK | NUMBER | Y | 8 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_DATE. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 11 | CURRENT_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_WORKSTEP, tham chiếu đến bước hiện tại của hồ sơ. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 12 | LAST_DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_DECISION, tham chiếu đến quyết định tại bước hoàn tất gần nhất. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 13 | RI_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến người tiếp nhận hồ sơ. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 14 | BRANCH_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến người xử lý tại chi nhánh. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 15 | DDE_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến người nhập liệu chi tiết. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 16 | QC_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến người kiểm soát nhập liệu. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 17 | UND_MAKER_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến người lập hồ sơ thẩm định. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 18 | UND_CHECKER_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến người kiểm soát thẩm định. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 19 | PHV_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến người thẩm định qua điện thoại. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 20 | FA_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến người thẩm định thực địa. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 21 | APPROVER_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến chuyên gia phê duyệt. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 22 | COMMITTEE_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến thành viên hội đồng phê duyệt. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 23 | HOS_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER, tham chiếu đến người hỗ trợ hội sở. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
+| 9 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước hoàn tất gần nhất, đã chuẩn hóa chung hai hệ |
+| 10 | CURRENT_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_WORKSTEP, tham chiếu đến bước hiện tại của hồ sơ. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
+| 11 | LAST_DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_DECISION, tham chiếu đến quyết định tại bước hoàn tất gần nhất. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
+| 12 | LAST_USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
+| 13 | RI_USER | VARCHAR2 | N | 100 |  | User khởi tạo hồ sơ |
+| 14 | BRANCH_USER | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý ở bước BranchSupport, lấy USERNAME của lần HOÀN TẤT GẦN NHẤT tại bước đó trên… |
+| 15 | DDE_USER | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý ở bước DetailDataEntry, lấy USERNAME của lần HOÀN TẤT GẦN NHẤT tại bước đó trên… |
+| 16 | QC_USER | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý ở bước DataInputerChecker, lấy USERNAME của lần HOÀN TẤT GẦN NHẤT tại bước đó trên… |
+| 17 | UND_MAKER_USER | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý ở bước UnderwriterMaker, lấy USERNAME của lần HOÀN TẤT GẦN NHẤT tại bước đó trên… |
+| 18 | UND_CHECKER_USER | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý ở bước UnderwriterChecker, lấy USERNAME của lần HOÀN TẤT GẦN NHẤT tại bước đó trên… |
+| 19 | PHV_USER | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý ở bước PhoneVerification, lấy USERNAME của lần HOÀN TẤT GẦN NHẤT tại bước đó trên… |
+| 20 | FA_USER | VARCHAR2 | N | 100 |  | User Chuyên viên Thực địa |
+| 21 | APPROVER_USER | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý ở bước CreditApproval, lấy USERNAME của lần HOÀN TẤT GẦN NHẤT tại bước đó trên… |
+| 22 | COMMITTEE_USER | VARCHAR2 | N | 100 |  | User Hội đồng tín dụng |
+| 23 | HOS_USER | VARCHAR2 | N | 100 |  | User Hỗ trợ phê duyệt |
 | 24 | SYSTEM_CODE | VARCHAR2 | Y | 10 |  | Hệ nguồn của bản ghi, CLOS hoặc RLOS |
 | 25 | HAS_ACTION_IN_DAY | VARCHAR2 | Y | 1 |  | Hồ sơ có phát sinh xử lý trong ngày dữ liệu hay không |
 | 26 | PROCESSED_DATE | DATE | N | 5 |  | Ngày xử lý của hồ sơ |

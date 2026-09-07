@@ -1,142 +1,413 @@
 {
-  "source": "DATAMODEL_DWH_LOS_20260826.xlsx",
+  "sources": [
+    "DATAMODEL_DTM_PDTD_20260903.xlsx",
+    "DATAMODEL_DWH_LOS_20260903.xlsx"
+  ],
   "tables": [
+    {
+      "table": "Q_RLOS_REF_WORKSTEP_2SYSTEMS",
+      "file": "Q_RLOS_REF_WORKSTEP_2SYSTEMS.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 16
+    },
+    {
+      "table": "REF_RLOS_FLOW",
+      "file": "REF_RLOS_FLOW.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 13
+    },
+    {
+      "table": "REF_CLOS_LEGAL",
+      "file": "REF_CLOS_LEGAL.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 13
+    },
+    {
+      "table": "TMP_REF_COMPANY_REGION_KHCN",
+      "file": "TMP_REF_COMPANY_REGION_KHCN.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 15
+    },
+    {
+      "table": "TMP_REF_COMPANY_REGION_KHDN",
+      "file": "TMP_REF_COMPANY_REGION_KHDN.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 15
+    },
+    {
+      "table": "RLOS_REF_SLA_TDKHCN",
+      "file": "RLOS_REF_SLA_TDKHCN.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 21
+    },
+    {
+      "table": "CLOS_REF_SLA_TDKHDNL",
+      "file": "CLOS_REF_SLA_TDKHDNL.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 20
+    },
+    {
+      "table": "CLOS_REF_SLA_TDKHDN_2",
+      "file": "CLOS_REF_SLA_TDKHDN_2.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 20
+    },
+    {
+      "table": "REF_SLA_NLTT",
+      "file": "REF_SLA_NLTT.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 22
+    },
+    {
+      "table": "DIM_PDTD_APPLICATION",
+      "file": "DIM_PDTD_APPLICATION.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 43
+    },
+    {
+      "table": "DIM_PDTD_APPROVAL_GROUP",
+      "file": "DIM_PDTD_APPROVAL_GROUP.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 14
+    },
+    {
+      "table": "DIM_PDTD_CARD_PROMOTION",
+      "file": "DIM_PDTD_CARD_PROMOTION.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 13
+    },
+    {
+      "table": "DIM_PDTD_CHANGE_TYPE",
+      "file": "DIM_PDTD_CHANGE_TYPE.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 16
+    },
+    {
+      "table": "DIM_PDTD_COLLATERAL_TYPE",
+      "file": "DIM_PDTD_COLLATERAL_TYPE.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 14
+    },
+    {
+      "table": "DIM_PDTD_CUSTOMER",
+      "file": "DIM_PDTD_CUSTOMER.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 18
+    },
+    {
+      "table": "DIM_DATE",
+      "file": "DIM_DATE.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 13
+    },
+    {
+      "table": "DIM_PDTD_DECISION",
+      "file": "DIM_PDTD_DECISION.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 14
+    },
+    {
+      "table": "DIM_PDTD_EXCEPTION_REASON",
+      "file": "DIM_PDTD_EXCEPTION_REASON.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 17
+    },
+    {
+      "table": "DIM_PDTD_GEO",
+      "file": "DIM_PDTD_GEO.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 17
+    },
+    {
+      "table": "DIM_PDTD_ORG_UNIT",
+      "file": "DIM_PDTD_ORG_UNIT.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 16
+    },
+    {
+      "table": "DIM_PDTD_PRODUCT",
+      "file": "DIM_PDTD_PRODUCT.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 18
+    },
+    {
+      "table": "DIM_PDTD_USER",
+      "file": "DIM_PDTD_USER.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "DIM - danh mục",
+      "columns": 4
+    },
+    {
+      "table": "DIM_PDTD_WORKSTEP",
+      "file": "DIM_PDTD_WORKSTEP.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 14
+    },
+    {
+      "table": "FCT_PDTD_APPLICATION_DAILY",
+      "file": "FCT_PDTD_APPLICATION_DAILY.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 108
+    },
+    {
+      "table": "FCT_PDTD_APPLICATION_MILESTONE",
+      "file": "FCT_PDTD_APPLICATION_MILESTONE.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 16
+    },
+    {
+      "table": "FCT_PDTD_APPLICATION_PARTY",
+      "file": "FCT_PDTD_APPLICATION_PARTY.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 30
+    },
+    {
+      "table": "FCT_PDTD_COLLATERAL",
+      "file": "FCT_PDTD_COLLATERAL.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 31
+    },
+    {
+      "table": "FCT_PDTD_DEVIATION",
+      "file": "FCT_PDTD_DEVIATION.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 21
+    },
+    {
+      "table": "FCT_PDTD_DISBURSEMENT",
+      "file": "FCT_PDTD_DISBURSEMENT.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 26
+    },
+    {
+      "table": "FCT_PDTD_EXCEPTION",
+      "file": "FCT_PDTD_EXCEPTION.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 24
+    },
+    {
+      "table": "FCT_PDTD_KPI_APPLICATION",
+      "file": "FCT_PDTD_KPI_APPLICATION.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 24
+    },
+    {
+      "table": "FCT_PDTD_KPI_USER_YEAR",
+      "file": "FCT_PDTD_KPI_USER_YEAR.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 13
+    },
+    {
+      "table": "FCT_PDTD_KPI_YTD_DAILY",
+      "file": "FCT_PDTD_KPI_YTD_DAILY.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 44
+    },
+    {
+      "table": "FCT_PDTD_PARTY_DOCUMENT",
+      "file": "FCT_PDTD_PARTY_DOCUMENT.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 23
+    },
+    {
+      "table": "FCT_PDTD_SLA_DAILY",
+      "file": "FCT_PDTD_SLA_DAILY.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 63
+    },
+    {
+      "table": "FCT_PDTD_SUB_PRODUCT",
+      "file": "FCT_PDTD_SUB_PRODUCT.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 20
+    },
+    {
+      "table": "FCT_PDTD_WORKSTEP_EVENT",
+      "file": "FCT_PDTD_WORKSTEP_EVENT.md",
+      "source": "DATAMODEL_DTM_PDTD_20260903.xlsx",
+      "loai_bang": "",
+      "columns": 34
+    },
     {
       "table": "DIM_LOS_APPLICATION",
       "file": "DIM_LOS_APPLICATION.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "DIM - thực thể (SCD Type 2)",
       "columns": 33
     },
     {
       "table": "DIM_LOS_APPROVAL_GROUP",
       "file": "DIM_LOS_APPROVAL_GROUP.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "DIM - danh mục",
       "columns": 7
     },
     {
       "table": "DIM_LOS_CARD_PROMOTION",
       "file": "DIM_LOS_CARD_PROMOTION.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "DIM - danh mục",
       "columns": 5
     },
     {
       "table": "DIM_LOS_CHANGE_TYPE",
       "file": "DIM_LOS_CHANGE_TYPE.md",
-      "loai_bang": "DIM - danh mục",
-      "columns": 9
-    },
-    {
-      "table": "DIM_LOS_COLLATERAL",
-      "file": "DIM_LOS_COLLATERAL.md",
-      "loai_bang": "DIM - thực thể (SCD Type 2)",
-      "columns": 22
-    },
-    {
-      "table": "DIM_LOS_COLLATERAL_TYPE",
-      "file": "DIM_LOS_COLLATERAL_TYPE.md",
-      "loai_bang": "DIM - danh mục",
-      "columns": 7
-    },
-    {
-      "table": "DIM_LOS_DECISION",
-      "file": "DIM_LOS_DECISION.md",
-      "loai_bang": "DIM - danh mục",
-      "columns": 7
-    },
-    {
-      "table": "DIM_LOS_EXCEPTION_REASON",
-      "file": "DIM_LOS_EXCEPTION_REASON.md",
-      "loai_bang": "DIM - danh mục",
-      "columns": 10
-    },
-    {
-      "table": "DIM_LOS_GEO",
-      "file": "DIM_LOS_GEO.md",
-      "loai_bang": "DIM - danh mục",
-      "columns": 10
-    },
-    {
-      "table": "DIM_LOS_ORG_UNIT",
-      "file": "DIM_LOS_ORG_UNIT.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "DIM - danh mục",
       "columns": 8
     },
     {
-      "table": "DIM_LOS_PARTY",
-      "file": "DIM_LOS_PARTY.md",
-      "loai_bang": "DIM - thực thể (SCD Type 2)",
-      "columns": 20
+      "table": "DIM_LOS_COLLATERAL_TYPE",
+      "file": "DIM_LOS_COLLATERAL_TYPE.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
+      "loai_bang": "DIM - danh mục",
+      "columns": 6
     },
     {
-      "table": "DIM_LOS_PRODUCT",
-      "file": "DIM_LOS_PRODUCT.md",
+      "table": "DIM_LOS_DECISION",
+      "file": "DIM_LOS_DECISION.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
+      "loai_bang": "DIM - danh mục",
+      "columns": 6
+    },
+    {
+      "table": "DIM_LOS_EXCEPTION_REASON",
+      "file": "DIM_LOS_EXCEPTION_REASON.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "DIM - danh mục",
       "columns": 9
     },
     {
+      "table": "DIM_LOS_GEO",
+      "file": "DIM_LOS_GEO.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
+      "loai_bang": "DIM - danh mục",
+      "columns": 9
+    },
+    {
+      "table": "DIM_LOS_ORG_UNIT",
+      "file": "DIM_LOS_ORG_UNIT.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
+      "loai_bang": "DIM - danh mục",
+      "columns": 8
+    },
+    {
+      "table": "DIM_LOS_PRODUCT",
+      "file": "DIM_LOS_PRODUCT.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
+      "loai_bang": "DIM - danh mục",
+      "columns": 8
+    },
+    {
       "table": "DIM_LOS_USER",
       "file": "DIM_LOS_USER.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "DIM - danh mục",
       "columns": 4
     },
     {
       "table": "DIM_LOS_WORKSTEP",
       "file": "DIM_LOS_WORKSTEP.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "DIM - danh mục",
-      "columns": 8
+      "columns": 5
     },
     {
       "table": "FCT_LOS_APPLICATION_DAILY",
       "file": "FCT_LOS_APPLICATION_DAILY.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "FCT - bảng xương sống",
-      "columns": 87
+      "columns": 88
     },
     {
       "table": "FCT_LOS_APPLICATION_PARTY",
       "file": "FCT_LOS_APPLICATION_PARTY.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "FCT - bảng quan hệ",
-      "columns": 10
+      "columns": 21
     },
     {
       "table": "FCT_LOS_COLLATERAL",
       "file": "FCT_LOS_COLLATERAL.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "FCT - bảng chi tiết",
-      "columns": 11
+      "columns": 23
     },
     {
       "table": "FCT_LOS_DEVIATION",
       "file": "FCT_LOS_DEVIATION.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "FCT - bảng chi tiết",
-      "columns": 11
+      "columns": 12
     },
     {
       "table": "FCT_LOS_EXCEPTION",
       "file": "FCT_LOS_EXCEPTION.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "FCT - bảng sự kiện",
-      "columns": 13
+      "columns": 12
     },
     {
       "table": "FCT_LOS_PARTY_DOCUMENT",
       "file": "FCT_LOS_PARTY_DOCUMENT.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "FCT - bảng quan hệ (factless fact)",
       "columns": 12
     },
     {
       "table": "FCT_LOS_SLA_DAILY",
       "file": "FCT_LOS_SLA_DAILY.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "FCT - bảng tổng hợp",
       "columns": 32
     },
     {
       "table": "FCT_LOS_SUB_PRODUCT",
       "file": "FCT_LOS_SUB_PRODUCT.md",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
       "loai_bang": "FCT - bảng chi tiết",
-      "columns": 11
+      "columns": 12
     },
     {
       "table": "FCT_LOS_WORKSTEP_EVENT",
       "file": "FCT_LOS_WORKSTEP_EVENT.md",
-      "loai_bang": "FCT - bảng sự kiện",
+      "source": "DATAMODEL_DWH_LOS_20260903.xlsx",
+      "loai_bang": "FCT - nhật ký sự kiện",
       "columns": 23
     }
   ]

@@ -210,20 +210,15 @@ def extract_xlsx(xlsx_path: Path, out_dir: Path) -> list[dict]:
             {
                 "table": table_name,
                 "file": f"{slug}.md",
+                "source": xlsx_path.name,
                 "loai_bang": data["metadata"].get("Loại bảng", ""),
                 "columns": len(data["rows"]),
             }
         )
 
-    clear_stale_markdown(out_dir, {t["file"] for t in index})
-
     if skipped:
         print(f"  (bỏ qua {len(skipped)} sheet không phải bảng: {', '.join(skipped)})")
 
-    (out_dir / "_index.json").write_text(
-        json.dumps({"source": xlsx_path.name, "tables": index}, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
     return index
 
 
@@ -240,10 +235,26 @@ def main() -> None:
         tables = extract_docx(docx_path, out_dir)
         print(f"[docx] {docx_path.name}: {len(tables)} bảng -> {out_dir}/")
 
+    datamart_dir = EXTRACT_DIR / "datamart"
+    all_datamart_tables: list[dict] = []
     for xlsx_path in xlsx_files:
-        out_dir = EXTRACT_DIR / "datamart"
-        tables = extract_xlsx(xlsx_path, out_dir)
-        print(f"[xlsx] {xlsx_path.name}: {len(tables)} sheet -> {out_dir}/")
+        tables = extract_xlsx(xlsx_path, datamart_dir)
+        print(f"[xlsx] {xlsx_path.name}: {len(tables)} sheet -> {datamart_dir}/")
+        all_datamart_tables.extend(tables)
+
+    if xlsx_files:
+        clear_stale_markdown(datamart_dir, {t["file"] for t in all_datamart_tables})
+        (datamart_dir / "_index.json").write_text(
+            json.dumps(
+                {
+                    "sources": sorted({t["source"] for t in all_datamart_tables}),
+                    "tables": all_datamart_tables,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # DIM_LOS_ORG_UNIT
 
-Nguồn: docx section "4.1.8 Bảng DIM_LOS_ORG_UNIT"
+Nguồn: docx section "4.1.7 Bảng DIM_LOS_ORG_UNIT"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

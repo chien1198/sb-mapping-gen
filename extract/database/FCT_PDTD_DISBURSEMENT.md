@@ -8,7 +8,7 @@ Nguồn: docx section "4.4.10 Bảng FCT_PDTD_DISBURSEMENT"
 | 2 | CONTRACT | VARCHAR2 | Y | 100 | PK | Mã hợp đồng khoản vay |
 | 3 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_CUSTOMER. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 4 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_ORG_UNIT. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 5 | ZONE | VARCHAR2 | N | 50 |  | Khu vực hoạt động |
+| 5 | ZONE | VARCHAR2 | N | 50 |  | Tên vùng của đơn vị kinh doanh |
 | 6 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_APPLICATION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 7 | SEAB_LOS_ID | VARCHAR2 | N | 100 |  | Mã hồ sơ LOS gắn với hợp đồng |
 | 8 | VALUE_DATE | DATE | N |  |  | Ngày giải ngân |

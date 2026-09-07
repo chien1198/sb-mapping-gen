@@ -9,8 +9,8 @@ Nguồn: docx section "4.2.2 Bảng FCT_LOS_WORKSTEP_EVENT"
 | 3 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | PK | Mã bước xử lý trên workflow |
 | 4 | ENTRYDATE | TIMESTAMP | Y | 18 | PK | Thời điểm hồ sơ vào bước xử lý |
 | 5 | WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_WORKSTEP. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 6 | DECISION_SK | NUMBER | Y | 18 | PK | Khóa tham chiếu đến bảng chiều DIM_LOS_DECISION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 7 | USER_SK | NUMBER | Y | 18 | PK | Khóa tham chiếu đến bảng chiều DIM_LOS_USER. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
+| 6 | DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_DECISION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
+| 7 | USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_USER. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 8 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_APPLICATION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 9 | SYSTEM_CODE | VARCHAR2 | Y | 10 |  | Hệ nguồn của bản ghi, CLOS hoặc RLOS |
 | 10 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý |

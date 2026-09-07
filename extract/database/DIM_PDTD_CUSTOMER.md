@@ -1,6 +1,6 @@
 # DIM_PDTD_CUSTOMER
 
-Nguồn: docx section "4.3.12 Bảng DIM_PDTD_CUSTOMER"
+Nguồn: docx section "4.3.10 Bảng DIM_PDTD_CUSTOMER"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
