@@ -1,6 +1,6 @@
 # REF_CLOS_LEGAL
 
-Nguồn: docx section "4.5.3 Bảng REF_CLOS_LEGAL"
+Nguồn: docx "Design_Database_PDTD_DTM_v1.0_20260908.docx"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

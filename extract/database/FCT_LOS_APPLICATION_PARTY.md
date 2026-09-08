@@ -1,6 +1,6 @@
 # FCT_LOS_APPLICATION_PARTY
 
-Nguồn: docx section "4.2.5 Bảng FCT_LOS_APPLICATION_PARTY"
+Nguồn: docx "Design_Database_PDTD_DTM_v1.0_20260908.docx"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

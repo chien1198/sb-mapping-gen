@@ -1,6 +1,6 @@
 # FCT_LOS_SUB_PRODUCT
 
-Nguồn: docx section "4.2.7 Bảng FCT_LOS_SUB_PRODUCT"
+Nguồn: docx "Design_Database_PDTD_DTM_v1.0_20260908.docx"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

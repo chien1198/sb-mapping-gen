@@ -1,6 +1,6 @@
 # DIM_LOS_APPROVAL_GROUP
 
-Nguồn: xlsx sheet "DIM_LOS_APPROVAL_GROUP" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_APPROVAL_GROUP" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục cấp thẩm quyền phê duyệt tín dụng.
@@ -20,4 +20,3 @@ Nguồn: xlsx sheet "DIM_LOS_APPROVAL_GROUP" (DATAMODEL_DWH_LOS_20260907.xlsx)
 | 5 | APPROVAL_LEVEL | Thứ tự cấp phê duyệt, số nhỏ là cấp cao | NUMBER | 3 | N |  | PHÁI SINH |  |  | (đầu vào BC5.REF_PRODUCT) | DA_CHOT | PHÁI SINH — Thứ tự cấp phê duyệt theo giải thích của BA, số nhỏ là cấp cao: A1=1, A2=2, B1=3, B2=4, C1=5, C2=6, C3=7; các hội đồng nhận giá trị riêng. BC5 gom nhóm 'CGPD cấp B, C' bằng khoảng giá trị thay vì liệt kê mã |
 | 6 | EFF_DATE | Ngày bắt đầu hiệu lực của phiên bản bản ghi | DATE |  | Y |  | KỸ THUẬT |  |  |  | DA_CHOT | KỸ THUẬT — Ngày bắt đầu hiệu lực của phiên bản bản ghi, kiểu DATE. Bằng :P_DATE tức 00:00:00 của ngày ETL phát hiện bản ghi mới hoặc phát hiện thuộc tính thay đổi. |
 | 7 | EXP_DATE | Thời điểm hết hiệu lực của phiên bản, để trống là bản ghi hiện hành | DATE |  | N |  | KỸ THUẬT |  |  |  | DA_CHOT | KỸ THUẬT — Thời điểm hết hiệu lực của phiên bản, kiểu DATE. NULL = bản ghi hiện hành. Khi đóng thì gán :P_DATE - INTERVAL '1' SECOND, tức 23:59:59 của ngày hôm trước, để khoảng hiệu lực của bản cũ và bản mới nối liền nhau, không hở và không chồng lấn. Đóng trong hai trường hợp: thuộc tính thay đổi, hoặc bản ghi bị gỡ khỏi nguồn. |
-|  |  |  |  |  |  |  |  |  |  | Ư |  |  |

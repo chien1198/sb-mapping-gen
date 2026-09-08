@@ -29,7 +29,7 @@ The user names a **destination**, not a phase number — match on that:
 
 | User says / implies | Destination | Rules file |
 |---|---|---|
-| "SB_DWH", "gen mapping cho SB_DWH", table only exists in `extract/datamart/_index.json`, or no destination given for a table that's clearly source-system-to-DWH work | `SB_DWH` | `references/rules-sb_dwh.md` |
+| "SB_DWH", "gen mapping cho SB_DWH", table only exists in `extract/SB_DWH/_index.json`, or no destination given for a table that's clearly source-system-to-DWH work | `SB_DWH` | `references/rules-sb_dwh.md` |
 | "STG_DTM", "STG", table name already prefixed `STG_` | `STG_DTM` | `references/rules-stg_dtm.md` |
 | "PDTD_DTM", "PDTD", table name prefixed `DIM_PDTD_`/`FCT_PDTD_` | `PDTD_DTM` | `references/rules-pdtd_dtm.md` |
 | "Report", "báo cáo" | `Report` | not implemented — see below |

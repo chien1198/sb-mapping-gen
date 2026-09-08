@@ -23,7 +23,7 @@ matching/analysis like phase 1, not a same-schema copy.
 - `extract/database/<TABLE>.md` — the *only* input needed. It is both the
   target schema (STG_DTM's own columns are identical to SB_DWH's, since
   this is a 1:1 copy) and the schema of the single source table
-  (`SB_DWH.<TABLE>`). No need to read `extract/datamart/<TABLE>.md` — no
+  (`SB_DWH.<TABLE>`). No need to read `extract/SB_DWH/<TABLE>.md` — no
   lineage/business-logic analysis happens at this phase, that was already
   resolved in phase 1.
 - `references/Mapping_DIM_LOAN_template.xlsx` (DIM) or

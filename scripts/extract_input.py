@@ -1,13 +1,15 @@
 """Convert raw design docs in input/ into per-table Markdown files in extract/.
 
-Sources handled:
-  - Design_Database_PDTD_DTM_v1.0.docx  -> extract/database/<TABLE>.md
-  - DATAMODEL_DWH_LOS_*.xlsx            -> extract/datamart/<SHEET>.md
+Sources handled (only files directly under input/, not in subdirectories
+like input/oldversions/ or input/srs_report/):
+  - Design_Database_PDTD_DTM_*.docx  -> extract/database/<TABLE>.md
+  - DATAMODEL_DWH_LOS_*.xlsx         -> extract/SB_DWH/<SHEET>.md
+  - DATAMODEL_DTM_PDTD_*.xlsx        -> extract/PDTD_DTM/<SHEET>.md
 
 Each source also gets an _index.json listing every table/sheet extracted,
 so a later step can look up "where is table X" without reading every file.
 
-The xlsx source mixes real DIM/FCT table sheets with reference/explainer
+Each xlsx source mixes real DIM/FCT table sheets with reference/explainer
 sheets (design rationale, load order, business rules, glossaries — usually
 named "00_..." but not necessarily). Only sheets whose name matches a table
 already known from the docx (extract/database/_index.json) get extracted;
@@ -24,6 +26,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Callable
 
 import openpyxl
 from docx import Document
@@ -188,6 +191,68 @@ def load_known_table_names() -> set[str]:
     return {t["table"] for t in data.get("tables", [])}
 
 
+def extract_report_sheet(ws) -> dict:
+    """Report traceability sheets (Reports_*.xlsx): row1 title, row2 note,
+    row3 blank, row4 header, data from row5 — no metadata block, every
+    sheet is a real report (no reference/explainer sheets to filter out)."""
+    max_row = ws.max_row
+    max_col = ws.max_column
+
+    title = str(cell_value(ws, 1, 1) or "").strip()
+    note = str(cell_value(ws, 2, 1) or "").strip()
+
+    header_row = 4
+    headers = [str(cell_value(ws, header_row, c) or "").strip() for c in range(1, max_col + 1)]
+    while headers and headers[-1] == "":
+        headers.pop()
+
+    body_rows = []
+    for r in range(header_row + 1, max_row + 1):
+        vals = [cell_value(ws, r, c) for c in range(1, len(headers) + 1)]
+        if all(v is None for v in vals):
+            continue
+        body_rows.append(["" if v is None else str(v).strip().replace("\n", " ") for v in vals])
+
+    return {"title": title, "note": note, "headers": headers, "rows": body_rows}
+
+
+def report_sheet_to_markdown(sheet_name: str, data: dict, source_file: str) -> str:
+    lines = [f"# {data['title'] or sheet_name}", "", f"Nguồn: xlsx sheet \"{sheet_name}\" ({source_file})", ""]
+    if data["note"]:
+        lines.append(data["note"])
+        lines.append("")
+
+    headers = data["headers"]
+    if headers:
+        lines.append("| " + " | ".join(headers) + " |")
+        lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
+        for row in data["rows"]:
+            lines.append("| " + " | ".join(row) + " |")
+    return "\n".join(lines) + "\n"
+
+
+def extract_report_xlsx(xlsx_path: Path, out_dir: Path) -> list[dict]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+
+    index: list[dict] = []
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        data = extract_report_sheet(ws)
+        slug = slugify(sheet_name)
+        content = report_sheet_to_markdown(sheet_name, data, xlsx_path.name)
+        (out_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+        index.append(
+            {
+                "table": sheet_name,
+                "file": f"{slug}.md",
+                "source": xlsx_path.name,
+                "columns": len(data["rows"]),
+            }
+        )
+    return index
+
+
 def extract_xlsx(xlsx_path: Path, out_dir: Path) -> list[dict]:
     out_dir.mkdir(parents=True, exist_ok=True)
     wb = openpyxl.load_workbook(xlsx_path, data_only=True)
@@ -222,6 +287,24 @@ def extract_xlsx(xlsx_path: Path, out_dir: Path) -> list[dict]:
     return index
 
 
+XLSX_ROUTES = [
+    (re.compile(r"DATAMODEL_DWH_LOS", re.IGNORECASE), "SB_DWH", extract_xlsx),
+    (re.compile(r"DATAMODEL_DTM_PDTD", re.IGNORECASE), "PDTD_DTM", extract_xlsx),
+    (re.compile(r"^Reports", re.IGNORECASE), "Report", extract_report_xlsx),
+]
+
+
+def route_xlsx(xlsx_path: Path) -> tuple[str, Callable[[Path, Path], list[dict]]]:
+    for pattern, out_name, extractor in XLSX_ROUTES:
+        if pattern.search(xlsx_path.stem):
+            return out_name, extractor
+    raise ValueError(
+        f"Không xác định được thư mục output cho {xlsx_path.name} — "
+        f"tên file phải chứa 'DATAMODEL_DWH_LOS' (-> SB_DWH/), "
+        f"'DATAMODEL_DTM_PDTD' (-> PDTD_DTM/), hoặc bắt đầu bằng 'Reports' (-> Report/)."
+    )
+
+
 def main() -> None:
     docx_files = [p for p in INPUT_DIR.glob("*.docx") if not p.name.startswith("~$")]
     xlsx_files = [p for p in INPUT_DIR.glob("*.xlsx") if not p.name.startswith("~$")]
@@ -235,20 +318,25 @@ def main() -> None:
         tables = extract_docx(docx_path, out_dir)
         print(f"[docx] {docx_path.name}: {len(tables)} bảng -> {out_dir}/")
 
-    datamart_dir = EXTRACT_DIR / "datamart"
-    all_datamart_tables: list[dict] = []
+    xlsx_by_out_dir: dict[Path, list[tuple[Path, Callable[[Path, Path], list[dict]]]]] = {}
     for xlsx_path in xlsx_files:
-        tables = extract_xlsx(xlsx_path, datamart_dir)
-        print(f"[xlsx] {xlsx_path.name}: {len(tables)} sheet -> {datamart_dir}/")
-        all_datamart_tables.extend(tables)
+        out_name, extractor = route_xlsx(xlsx_path)
+        out_dir = EXTRACT_DIR / out_name
+        xlsx_by_out_dir.setdefault(out_dir, []).append((xlsx_path, extractor))
 
-    if xlsx_files:
-        clear_stale_markdown(datamart_dir, {t["file"] for t in all_datamart_tables})
-        (datamart_dir / "_index.json").write_text(
+    for out_dir, entries in xlsx_by_out_dir.items():
+        all_tables: list[dict] = []
+        for xlsx_path, extractor in entries:
+            tables = extractor(xlsx_path, out_dir)
+            print(f"[xlsx] {xlsx_path.name}: {len(tables)} sheet -> {out_dir}/")
+            all_tables.extend(tables)
+
+        clear_stale_markdown(out_dir, {t["file"] for t in all_tables})
+        (out_dir / "_index.json").write_text(
             json.dumps(
                 {
-                    "sources": sorted({t["source"] for t in all_datamart_tables}),
-                    "tables": all_datamart_tables,
+                    "sources": sorted({t["source"] for t in all_tables}),
+                    "tables": all_tables,
                 },
                 ensure_ascii=False,
                 indent=2,

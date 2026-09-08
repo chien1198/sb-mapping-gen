@@ -1,352 +1,354 @@
 {
-  "source": "Design_Database_PDTD_DTM_v1.0_20260907.docx",
+  "sources": [
+    "Design_Database_PDTD_DTM_v1.0_20260908.docx"
+  ],
   "tables": [
     {
       "table": "DIM_LOS_APPLICATION",
       "file": "DIM_LOS_APPLICATION.md",
-      "section": "4.1.1 Bảng DIM_LOS_APPLICATION",
-      "columns": 34
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
+      "columns": 29
     },
     {
       "table": "DIM_LOS_PRODUCT",
       "file": "DIM_LOS_PRODUCT.md",
-      "section": "4.1.2 Bảng DIM_LOS_PRODUCT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 9
     },
     {
       "table": "DIM_LOS_WORKSTEP",
       "file": "DIM_LOS_WORKSTEP.md",
-      "section": "4.1.3 Bảng DIM_LOS_WORKSTEP",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 6
     },
     {
       "table": "DIM_LOS_USER",
       "file": "DIM_LOS_USER.md",
-      "section": "4.1.4 Bảng DIM_LOS_USER",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 5
     },
     {
       "table": "DIM_LOS_DECISION",
       "file": "DIM_LOS_DECISION.md",
-      "section": "4.1.5 Bảng DIM_LOS_DECISION",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 7
     },
     {
       "table": "DIM_LOS_APPROVAL_GROUP",
       "file": "DIM_LOS_APPROVAL_GROUP.md",
-      "section": "4.1.6 Bảng DIM_LOS_APPROVAL_GROUP",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 7
     },
     {
       "table": "DIM_LOS_ORG_UNIT",
       "file": "DIM_LOS_ORG_UNIT.md",
-      "section": "4.1.7 Bảng DIM_LOS_ORG_UNIT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 9
     },
     {
       "table": "DIM_LOS_EXCEPTION_REASON",
       "file": "DIM_LOS_EXCEPTION_REASON.md",
-      "section": "4.1.8 Bảng DIM_LOS_EXCEPTION_REASON",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 10
     },
     {
       "table": "DIM_LOS_COLLATERAL_TYPE",
       "file": "DIM_LOS_COLLATERAL_TYPE.md",
-      "section": "4.1.9 Bảng DIM_LOS_COLLATERAL_TYPE",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 7
     },
     {
       "table": "DIM_LOS_GEO",
       "file": "DIM_LOS_GEO.md",
-      "section": "4.1.10 Bảng DIM_LOS_GEO",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 10
     },
     {
       "table": "DIM_LOS_CHANGE_TYPE",
       "file": "DIM_LOS_CHANGE_TYPE.md",
-      "section": "4.1.11 Bảng DIM_LOS_CHANGE_TYPE",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 9
     },
     {
       "table": "DIM_LOS_CARD_PROMOTION",
       "file": "DIM_LOS_CARD_PROMOTION.md",
-      "section": "4.1.12 Bảng DIM_LOS_CARD_PROMOTION",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 6
     },
     {
       "table": "FCT_LOS_APPLICATION_DAILY",
       "file": "FCT_LOS_APPLICATION_DAILY.md",
-      "section": "4.2.1 Bảng FCT_LOS_APPLICATION_DAILY",
-      "columns": 88
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
+      "columns": 93
     },
     {
       "table": "FCT_LOS_WORKSTEP_EVENT",
       "file": "FCT_LOS_WORKSTEP_EVENT.md",
-      "section": "4.2.2 Bảng FCT_LOS_WORKSTEP_EVENT",
-      "columns": 23
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
+      "columns": 24
     },
     {
       "table": "FCT_LOS_SLA_DAILY",
       "file": "FCT_LOS_SLA_DAILY.md",
-      "section": "4.2.3 Bảng FCT_LOS_SLA_DAILY",
-      "columns": 32
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
+      "columns": 34
     },
     {
       "table": "FCT_LOS_COLLATERAL",
       "file": "FCT_LOS_COLLATERAL.md",
-      "section": "4.2.4 Bảng FCT_LOS_COLLATERAL",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 22
     },
     {
       "table": "FCT_LOS_APPLICATION_PARTY",
       "file": "FCT_LOS_APPLICATION_PARTY.md",
-      "section": "4.2.5 Bảng FCT_LOS_APPLICATION_PARTY",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 20
     },
     {
       "table": "FCT_LOS_PARTY_DOCUMENT",
       "file": "FCT_LOS_PARTY_DOCUMENT.md",
-      "section": "4.2.6 Bảng FCT_LOS_PARTY_DOCUMENT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 11
     },
     {
       "table": "FCT_LOS_SUB_PRODUCT",
       "file": "FCT_LOS_SUB_PRODUCT.md",
-      "section": "4.2.7 Bảng FCT_LOS_SUB_PRODUCT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 11
     },
     {
       "table": "FCT_LOS_EXCEPTION",
       "file": "FCT_LOS_EXCEPTION.md",
-      "section": "4.2.8 Bảng FCT_LOS_EXCEPTION",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 12
     },
     {
       "table": "FCT_LOS_DEVIATION",
       "file": "FCT_LOS_DEVIATION.md",
-      "section": "4.2.9 Bảng FCT_LOS_DEVIATION",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 11
     },
     {
       "table": "DIM_DATE",
       "file": "DIM_DATE.md",
-      "section": "4.3.1 Bảng DIM_DATE",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 5
     },
     {
       "table": "DIM_PDTD_APPLICATION",
       "file": "DIM_PDTD_APPLICATION.md",
-      "section": "4.3.2 Bảng DIM_PDTD_APPLICATION",
-      "columns": 36
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
+      "columns": 30
     },
     {
       "table": "DIM_PDTD_GEO",
       "file": "DIM_PDTD_GEO.md",
-      "section": "4.3.3 Bảng DIM_PDTD_GEO",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 10
     },
     {
       "table": "DIM_PDTD_COLLATERAL_TYPE",
       "file": "DIM_PDTD_COLLATERAL_TYPE.md",
-      "section": "4.3.4 Bảng DIM_PDTD_COLLATERAL_TYPE",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 7
     },
     {
       "table": "DIM_PDTD_ORG_UNIT",
       "file": "DIM_PDTD_ORG_UNIT.md",
-      "section": "4.3.5 Bảng DIM_PDTD_ORG_UNIT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 9
     },
     {
       "table": "DIM_PDTD_PRODUCT",
       "file": "DIM_PDTD_PRODUCT.md",
-      "section": "4.3.6 Bảng DIM_PDTD_PRODUCT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 11
     },
     {
       "table": "DIM_PDTD_WORKSTEP",
       "file": "DIM_PDTD_WORKSTEP.md",
-      "section": "4.3.7 Bảng DIM_PDTD_WORKSTEP",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 7
     },
     {
       "table": "DIM_PDTD_USER",
       "file": "DIM_PDTD_USER.md",
-      "section": "4.3.8 Bảng DIM_PDTD_USER",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 5
     },
     {
       "table": "DIM_PDTD_DECISION",
       "file": "DIM_PDTD_DECISION.md",
-      "section": "4.3.9 Bảng DIM_PDTD_DECISION",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 7
     },
     {
       "table": "DIM_PDTD_CUSTOMER",
       "file": "DIM_PDTD_CUSTOMER.md",
-      "section": "4.3.10 Bảng DIM_PDTD_CUSTOMER",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 11
     },
     {
       "table": "DIM_PDTD_APPROVAL_GROUP",
       "file": "DIM_PDTD_APPROVAL_GROUP.md",
-      "section": "4.3.11 Bảng DIM_PDTD_APPROVAL_GROUP",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 7
     },
     {
       "table": "DIM_PDTD_EXCEPTION_REASON",
       "file": "DIM_PDTD_EXCEPTION_REASON.md",
-      "section": "4.3.12 Bảng DIM_PDTD_EXCEPTION_REASON",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 10
     },
     {
       "table": "DIM_PDTD_CHANGE_TYPE",
       "file": "DIM_PDTD_CHANGE_TYPE.md",
-      "section": "4.3.13 Bảng DIM_PDTD_CHANGE_TYPE",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 9
     },
     {
       "table": "DIM_PDTD_CARD_PROMOTION",
       "file": "DIM_PDTD_CARD_PROMOTION.md",
-      "section": "4.3.14 Bảng DIM_PDTD_CARD_PROMOTION",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 6
     },
     {
       "table": "FCT_PDTD_APPLICATION_DAILY",
       "file": "FCT_PDTD_APPLICATION_DAILY.md",
-      "section": "4.4.1 Bảng FCT_PDTD_APPLICATION_DAILY",
-      "columns": 100
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
+      "columns": 102
     },
     {
       "table": "FCT_PDTD_WORKSTEP_EVENT",
       "file": "FCT_PDTD_WORKSTEP_EVENT.md",
-      "section": "4.4.2 Bảng FCT_PDTD_WORKSTEP_EVENT",
-      "columns": 26
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
+      "columns": 27
     },
     {
       "table": "FCT_PDTD_SLA_DAILY",
       "file": "FCT_PDTD_SLA_DAILY.md",
-      "section": "4.4.3 Bảng FCT_PDTD_SLA_DAILY",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 55
     },
     {
       "table": "FCT_PDTD_COLLATERAL",
       "file": "FCT_PDTD_COLLATERAL.md",
-      "section": "4.4.4 Bảng FCT_PDTD_COLLATERAL",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 22
     },
     {
       "table": "FCT_PDTD_APPLICATION_PARTY",
       "file": "FCT_PDTD_APPLICATION_PARTY.md",
-      "section": "4.4.5 Bảng FCT_PDTD_APPLICATION_PARTY",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 21
     },
     {
       "table": "FCT_PDTD_PARTY_DOCUMENT",
       "file": "FCT_PDTD_PARTY_DOCUMENT.md",
-      "section": "4.4.6 Bảng FCT_PDTD_PARTY_DOCUMENT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 14
     },
     {
       "table": "FCT_PDTD_SUB_PRODUCT",
       "file": "FCT_PDTD_SUB_PRODUCT.md",
-      "section": "4.4.7 Bảng FCT_PDTD_SUB_PRODUCT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 11
     },
     {
       "table": "FCT_PDTD_DEVIATION",
       "file": "FCT_PDTD_DEVIATION.md",
-      "section": "4.4.8 Bảng FCT_PDTD_DEVIATION",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 12
     },
     {
       "table": "FCT_PDTD_EXCEPTION",
       "file": "FCT_PDTD_EXCEPTION.md",
-      "section": "4.4.9 Bảng FCT_PDTD_EXCEPTION",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 16
     },
     {
       "table": "FCT_PDTD_DISBURSEMENT",
       "file": "FCT_PDTD_DISBURSEMENT.md",
-      "section": "4.4.10 Bảng FCT_PDTD_DISBURSEMENT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 18
     },
     {
       "table": "FCT_PDTD_KPI_APPLICATION",
       "file": "FCT_PDTD_KPI_APPLICATION.md",
-      "section": "4.4.11 Bảng FCT_PDTD_KPI_APPLICATION",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 16
     },
     {
       "table": "FCT_PDTD_APPLICATION_MILESTONE",
       "file": "FCT_PDTD_APPLICATION_MILESTONE.md",
-      "section": "4.4.12 Bảng FCT_PDTD_APPLICATION_MILESTONE",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 8
     },
     {
       "table": "FCT_PDTD_KPI_USER_YEAR",
       "file": "FCT_PDTD_KPI_USER_YEAR.md",
-      "section": "4.4.13 Bảng FCT_PDTD_KPI_USER_YEAR",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 5
     },
     {
       "table": "FCT_PDTD_KPI_YTD_DAILY",
       "file": "FCT_PDTD_KPI_YTD_DAILY.md",
-      "section": "4.4.14 Bảng FCT_PDTD_KPI_YTD_DAILY",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 36
     },
     {
       "table": "Q_RLOS_REF_WORKSTEP_2SYSTEMS",
       "file": "Q_RLOS_REF_WORKSTEP_2SYSTEMS.md",
-      "section": "4.5.1 Bảng Q_RLOS_REF_WORKSTEP_2SYSTEMS",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 5
     },
     {
       "table": "REF_RLOS_FLOW",
       "file": "REF_RLOS_FLOW.md",
-      "section": "4.5.2 Bảng REF_RLOS_FLOW",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 2
     },
     {
       "table": "REF_CLOS_LEGAL",
       "file": "REF_CLOS_LEGAL.md",
-      "section": "4.5.3 Bảng REF_CLOS_LEGAL",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 2
     },
     {
       "table": "TMP_REF_COMPANY_REGION_KHCN",
       "file": "TMP_REF_COMPANY_REGION_KHCN.md",
-      "section": "4.5.4 Bảng TMP_REF_COMPANY_REGION_KHCN",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 4
     },
     {
       "table": "TMP_REF_COMPANY_REGION_KHDN",
       "file": "TMP_REF_COMPANY_REGION_KHDN.md",
-      "section": "4.5.5 Bảng TMP_REF_COMPANY_REGION_KHDN",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 4
     },
     {
       "table": "RLOS_REF_SLA_TDKHCN",
       "file": "RLOS_REF_SLA_TDKHCN.md",
-      "section": "4.5.6 Bảng RLOS_REF_SLA_TDKHCN",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 10
     },
     {
       "table": "CLOS_REF_SLA_TDKHDNL",
       "file": "CLOS_REF_SLA_TDKHDNL.md",
-      "section": "4.5.7 Bảng CLOS_REF_SLA_TDKHDNL",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 9
     },
     {
       "table": "CLOS_REF_SLA_TDKHDN_2",
       "file": "CLOS_REF_SLA_TDKHDN_2.md",
-      "section": "4.5.8 Bảng CLOS_REF_SLA_TDKHDN_2",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 9
     },
     {
       "table": "REF_SLA_NLTT",
       "file": "REF_SLA_NLTT.md",
-      "section": "4.5.9 Bảng REF_SLA_NLTT",
+      "source": "Design_Database_PDTD_DTM_v1.0_20260908.docx",
       "columns": 11
     }
   ]

@@ -1,15 +1,15 @@
 # FCT_LOS_DEVIATION
 
-Nguồn: xlsx sheet "FCT_LOS_DEVIATION" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "FCT_LOS_DEVIATION" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: FCT - bảng chi tiết
 - Mô tả: Các điều kiện chính sách bị lệch được ghi nhận trên hồ sơ.
 - Lưu gì: Lưu từng ngoại lệ chính sách của hồ sơ kèm tiêu chí kiểm tra, kết quả và nội dung đề xuất chấp thuận. BC6 cần danh sách chi tiết, còn BC5 và BC9 chỉ cần số đếm theo ngưỡng 2 và 3 - số đếm đó đã cộng sẵn lên bảng hồ sơ. Đây là bảng có rủi ro khóa cao nhất trong model.
 - Grain: 1 dòng = 1 ngoại lệ chính sách trong ảnh chụp của ngày DAYID
 - Khóa: PK = DAYID + WI_NAME + DEVIATION_BK
-- Quy tắc load: ẢNH CHỤP ĐẦY ĐỦ THEO NGÀY, dựng theo QUY TRÌNH A2 ở 00_Doc_STG_LOS. Cả 47 bảng nguồn nay đều về bằng CDC delta nên STG_LOS chỉ chứa những gì vừa đổi và KHÔNG có ảnh đầy đủ — đọc thẳng STG rồi coi đó là ảnh của ngày là SAI. Ảnh ngày D = ảnh ngày D − 1 CỦA CHÍNH BẢNG NÀY, gỡ các khóa mà commit thắng chỉ chứa DELETE, thay hoặc thêm các khóa còn sống, khóa không xuất hiện trong delta thì giữ nguyên. Ghi TOÀN BỘ kết quả vào phân vùng DAYID = :P_DATE. Đọc trạng thái ngày D chỉ cần WHERE DAYID = D. PHỤ THUỘC NGÀY TRƯỚC: sửa một ngày quá khứ thì phải chạy lại TUẦN TỰ mọi ngày sau đó. Đắp delta không tự chữa lành nên sai sót phải sửa ngay trong ngày. NGÀY CHẠY ĐẦU TIÊN phải mồi bằng full snapshot — xem 00_Chay_lan_dau. Nguồn: 2 bảng, đều không khai khóa CDC nên khóa dòng là hash toàn bộ cột không phải CLOB. HỆ QUẢ: hai dòng chỉ khác nhau ở nội dung CLOB sẽ ra cùng hash — xem việc #5 trong 00_Van_de_can_chot.
 - Nguồn: NG_SB_CLOS_CONDITON_CDGRID, NG_SB_RLOS_MANUAL_DEVIATION
 - Báo cáo sử dụng: BC5, BC6, BC9
+- Quy tắc load: ẢNH CHỤP ĐẦY ĐỦ THEO NGÀY, dựng theo QUY TRÌNH A2 ở 00_Doc_STG_LOS. Cả 47 bảng nguồn nay đều về bằng CDC delta nên STG_LOS chỉ chứa những gì vừa đổi và KHÔNG có ảnh đầy đủ — đọc thẳng STG rồi coi đó là ảnh của ngày là SAI. Ảnh ngày D = ảnh ngày D − 1 CỦA CHÍNH BẢNG NÀY, gỡ các khóa mà commit thắng chỉ chứa DELETE, thay hoặc thêm các khóa còn sống, khóa không xuất hiện trong delta thì giữ nguyên. Ghi TOÀN BỘ kết quả vào phân vùng DAYID = :P_DATE. Đọc trạng thái ngày D chỉ cần WHERE DAYID = D. PHỤ THUỘC NGÀY TRƯỚC: sửa một ngày quá khứ thì phải chạy lại TUẦN TỰ mọi ngày sau đó. Đắp delta không tự chữa lành nên sai sót phải sửa ngay trong ngày. NGÀY CHẠY ĐẦU TIÊN phải mồi bằng full snapshot — xem 00_Chay_lan_dau. Nguồn: 2 bảng, đều không khai khóa CDC nên khóa dòng là hash toàn bộ cột không phải CLOB. HỆ QUẢ: hai dòng chỉ khác nhau ở nội dung CLOB sẽ ra cùng hash — xem việc #5 trong 00_Van_de_can_chot.
 
 | STT | Tên cột | Ý nghĩa | Kiểu dữ liệu | Độ lớn | Notnull | Khóa | Loại | Bảng nguồn | Cột nguồn | Trường đích trên báo cáo | TRẠNG THÁI THIẾT KẾ | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

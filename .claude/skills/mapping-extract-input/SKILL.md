@@ -18,9 +18,16 @@ need to read the one file they need instead of the full docx/xlsx.
 
 ## How it works
 
-Sources handled by `scripts/extract_input.py`:
+Only files directly under `input/` are scanned (`input/*.docx`,
+`input/*.xlsx`) — subdirectories are never read, in particular
+**`input/oldversions/`** (superseded document versions, kept for history —
+never extract from here) and **`input/srs_report/`** (raw per-report SRS
+docx files, not yet extracted by this skill).
 
-- `input/*.docx` (database design) → `extract/database/<TABLE_NAME>.md`
+Sources handled by `scripts/extract_input.py`, each routed to its own
+output directory by filename pattern (`XLSX_ROUTES` in the script):
+
+- `input/Design_Database_*.docx` (database design) → `extract/database/<TABLE_NAME>.md`
   - Detected by heading pattern `"<n> Bảng <TABLE_NAME>"` (docx Heading 3)
     immediately followed by a table. Non-standard tables (revision history,
     sign-off block, glossary) are skipped automatically since they don't
@@ -28,13 +35,14 @@ Sources handled by `scripts/extract_input.py`:
   - `extract/database/_index.json` lists every table extracted: name, file,
     source section, column count.
 
-- `input/*.xlsx` (datamart/datamodel design) → `extract/datamart/<SHEET_NAME>.md`
+- `input/DATAMODEL_DWH_LOS_*.xlsx` (SB_DWH datamodel) → `extract/SB_DWH/<SHEET_NAME>.md`
+- `input/DATAMODEL_DTM_PDTD_*.xlsx` (PDTD_DTM datamodel) → `extract/PDTD_DTM/<SHEET_NAME>.md`
   - Each real table sheet has a metadata block (Loại bảng, Grain, Khóa, Bảng
     nguồn CDC, Quy tắc ghi, ...) followed by a blank row then the column
     table (`STT | Tên cột | Kiểu dữ liệu | ... | Mô tả`). The `Mô tả` column
     carries the actual transform/lineage logic (`1:1 —`, `PHÁI SINH —`,
     `KỸ THUẬT —`) — this is preserved verbatim, never summarized or cut.
-  - The xlsx also mixes in reference/explainer sheets that aren't tables at
+  - Each xlsx also mixes in reference/explainer sheets that aren't tables at
     all (design rationale, load order, business rules, glossaries — usually
     named `00_...` but not guaranteed to be). These are **skipped
     entirely**, not extracted in any form: a sheet only gets extracted if
@@ -46,14 +54,24 @@ Sources handled by `scripts/extract_input.py`:
     later — no hardcoded sheet-name list to maintain. Because of this, docx
     extraction always runs before xlsx in the same invocation (see
     `main()`); don't reorder that.
-  - `extract/datamart/_index.json` lists every sheet extracted: name, file,
-    table type (DIM/FCT), column count.
+  - Each output directory gets its own `_index.json` listing every sheet
+    extracted: name, file, table type (DIM/FCT), column count.
 
-Database and datamart are kept as **separate directories** — a table like
-`DIM_LOS_APPLICATION` that exists in both sources gets two files (one per
-source), not merged, since the docx only covers static schema while the
+- `input/Reports_*.xlsx` (report field traceability) → `extract/Report/<SHEET_NAME>.md`
+  - Different shape from the two datamodel xlsx above: no metadata block,
+    no table whitelist — every sheet (`00_Tong_hop`, `BC1`..`BC11`) is a
+    real report and gets extracted as-is (row1 title, row2 note, row3
+    blank, row4 header, data from row5). Handled by a separate function
+    (`extract_report_xlsx`), not the DIM/FCT sheet parser.
+  - `extract/Report/_index.json` lists every sheet extracted.
+
+Database and the three datamart-family directories (SB_DWH, PDTD_DTM,
+Report) are kept **separate** — a table like `DIM_LOS_APPLICATION` that
+exists in both `extract/database/` and `extract/SB_DWH/` gets two files (one
+per source), not merged, since the docx only covers static schema while the
 xlsx additionally covers lineage/transform logic and may cover a different
-table scope (e.g. the docx also has ~40 PDTD_DTM tables the xlsx doesn't).
+table scope (e.g. the docx also has PDTD_DTM tables the DWH_LOS xlsx
+doesn't).
 
 Temp/lock files (`~$*.xlsx`) and non-source files are ignored automatically.
 
@@ -67,8 +85,9 @@ extract run. This means re-running after the user uploads a revised
 - **Table content changed, name unchanged** → its `.md` file is overwritten
   with the new content. No stale data left behind.
 - **Table renamed or removed from the source doc** → the extractor detects
-  this: any `.md` file in `extract/database/` or `extract/datamart/` whose
-  name is not in the freshly extracted set gets deleted automatically
+  this: any `.md` file in `extract/database/`, `extract/SB_DWH/`,
+  `extract/PDTD_DTM/`, or `extract/Report/` whose name is not in the freshly
+  extracted set for that directory gets deleted automatically
   (`clear_stale_markdown` in the script), so old/renamed tables never linger
   alongside the new ones.
 - **New table added** → a new `.md` file simply appears.
@@ -95,11 +114,16 @@ file name and content both stay derived from the source of truth.
 
 ## After running
 
-- Point the user at `extract/database/_index.json` and
-  `extract/datamart/_index.json` to look up which file covers which table,
-  instead of listing the whole directory.
+- Point the user at `extract/database/_index.json`, `extract/SB_DWH/_index.json`,
+  `extract/PDTD_DTM/_index.json`, and `extract/Report/_index.json` to look up
+  which file covers which table, instead of listing the whole directory.
 - If the user later adds a new `input/` file or a table's layout doesn't
   match the expected pattern (extractor prints 0 tables for a source, or a
   table is missing from the index), inspect the actual heading/sheet
   structure with a quick Python check before touching the regex/parsing
   logic in `scripts/extract_input.py` — don't guess at the format.
+- A new xlsx file that doesn't match any pattern in `XLSX_ROUTES` (script)
+  makes the extractor raise rather than silently skip it or guess a
+  directory — add a new route (and, if its internal shape differs from the
+  DIM/FCT sheet format, a new extractor function) rather than force it
+  through an existing one.

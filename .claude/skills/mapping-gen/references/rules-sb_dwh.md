@@ -1,7 +1,7 @@
 # Rules — phase 1: CLOS/RLOS → SB_DWH
 
 Produces `mapping/SB_DWH/Mapping_<TABLE_NAME>.xlsx` for a table listed in
-`extract/datamart/_index.json`, in the exact layout of the sample templates
+`extract/SB_DWH/_index.json`, in the exact layout of the sample templates
 in `references/` (2 sheets: `Mapping`, `Variable`).
 
 This is the deepest phase: CLOS/RLOS source-system analysis, per-column
@@ -12,7 +12,7 @@ transform logic, and JOINs between multiple source tables per system.
 - `extract/database/<TABLE>.md` — official target schema: column name, Oracle
   type, nullability, size, PK marker. This is the source of truth for
   `Column type` in the output.
-- `extract/datamart/<TABLE>.md` — per-column lineage/business logic. Its
+- `extract/SB_DWH/<TABLE>.md` — per-column lineage/business logic. Its
   header metadata block gives the table's own natural key (`Khóa:` line,
   e.g. `DIMENSION_KEY (sequence). NK = WI_NAME`) and the full list of CDC
   source tables feeding it (`Nguồn:` line) — use these to work out JOIN
@@ -32,7 +32,7 @@ transform logic, and JOINs between multiple source tables per system.
     source system.
   Everything needed to generate a mapping lives inside this one file per
   table — there is no separate overview/reference file to cross-check
-  (`extract/datamart/` only ever contains real table files; non-table
+  (`extract/SB_DWH/` only ever contains real table files; non-table
   reference sheets from the xlsx are filtered out at extraction time, see
   `mapping-extract-input`).
 - `references/Mapping_DIM_LOAN_template.xlsx` (for DIM tables) or
@@ -164,12 +164,12 @@ these.
 ## Steps
 
 1. Confirm scope with the user if not already clear: one specific table, or
-   all tables in `extract/datamart/_index.json`. Default to one table at a
+   all tables in `extract/SB_DWH/_index.json`. Default to one table at a
    time unless the user explicitly asks for a batch — this keeps each
    output reviewable, per the user's workflow of testing one file before
    running the rest.
 2. Read `extract/database/<TABLE>.md` (official target schema) and
-   `extract/datamart/<TABLE>.md` (lineage, source tables/columns, and
+   `extract/SB_DWH/<TABLE>.md` (lineage, source tables/columns, and
    confirmation status — everything needed lives in this one file, see
    above).
 3. Work out the header block (sources per system + aliases), the per-column
@@ -186,7 +186,7 @@ these.
    used to have no lineage now has one); carrying it forward unchanged
    would leave a stale warning in the output about a problem that no longer
    exists. Every flag in the final output must trace to something you can
-   point to in the *current* `extract/datamart/<TABLE>.md`.
+   point to in the *current* `extract/SB_DWH/<TABLE>.md`.
 5. Pick the template: `references/Mapping_DIM_LOAN_template.xlsx` for a DIM
    table, `references/Mapping_FCT_LOAN_template .xlsx` (mind the trailing
    space in the filename) for a FCT table.

@@ -1,15 +1,15 @@
 # FCT_LOS_COLLATERAL
 
-Nguồn: xlsx sheet "FCT_LOS_COLLATERAL" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "FCT_LOS_COLLATERAL" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: FCT - bảng chi tiết
 - Mô tả: Ảnh số liệu thay đổi theo ngày của từng tài sản bảo đảm thuộc hồ sơ.
 - Lưu gì: Toàn bộ thuộc tính tài sản mà báo cáo cần, lưu THẲNG trên fact. Không có chiều tài sản riêng: cả năm bảng nguồn đều thuộc loại 2 không khai khóa, nên khóa dòng phải là hash toàn bộ cột — đổi bất kỳ thuộc tính nào là ra khóa mới, và một chiều mà danh tính đổi theo nội dung thì không theo dõi được lịch sử. Chỉ giữ COLLATERAL_TYPE_SK để tra danh mục loại tài sản, vì danh mục đó khóa theo MÃ ổn định nên vẫn đứng vững.
 - Grain: 1 dòng = 1 tài sản bảo đảm của 1 hồ sơ, trong ảnh chụp của ngày DAYID
 - Khóa: PK = DAYID + WI_NAME + COLLATERAL_BK
-- Quy tắc load: ẢNH CHỤP ĐẦY ĐỦ THEO NGÀY, dựng theo QUY TRÌNH A2 ở 00_Doc_STG_LOS. Cả 47 bảng nguồn nay đều về bằng CDC delta nên STG_LOS chỉ chứa những gì vừa đổi và KHÔNG có ảnh đầy đủ — đọc thẳng STG rồi coi đó là ảnh của ngày là SAI. Ảnh ngày D = ảnh ngày D − 1 CỦA CHÍNH BẢNG NÀY, gỡ các khóa mà commit thắng chỉ chứa DELETE, thay hoặc thêm các khóa còn sống, khóa không xuất hiện trong delta thì giữ nguyên. Ghi TOÀN BỘ kết quả vào phân vùng DAYID = :P_DATE. Đọc trạng thái ngày D chỉ cần WHERE DAYID = D. PHỤ THUỘC NGÀY TRƯỚC: sửa một ngày quá khứ thì phải chạy lại TUẦN TỰ mọi ngày sau đó. Đắp delta không tự chữa lành nên sai sót phải sửa ngay trong ngày. NGÀY CHẠY ĐẦU TIÊN phải mồi bằng full snapshot — xem 00_Chay_lan_dau. Nguồn: 5 bảng grid tài sản, đều không khai khóa CDC nên khóa dòng là hash toàn bộ cột không phải CLOB. Phạm vi ghi: các hồ sơ thuộc tập có action hoặc tồn đọng của ngày đó.
 - Nguồn: NG_SB_RLOS_COL_REALESTATE, NG_SB_RLOS_COL_TRANSPORT, NG_SB_RLOS_COL_VALPAPER, NG_SB_RLOS_COL_OTHER, NG_SB_CLOS_COLL_CD
 - Báo cáo sử dụng: BC1, BC2, BC3, BC9
+- Quy tắc load: ẢNH CHỤP ĐẦY ĐỦ THEO NGÀY, dựng theo QUY TRÌNH A2 ở 00_Doc_STG_LOS. Cả 47 bảng nguồn nay đều về bằng CDC delta nên STG_LOS chỉ chứa những gì vừa đổi và KHÔNG có ảnh đầy đủ — đọc thẳng STG rồi coi đó là ảnh của ngày là SAI. Ảnh ngày D = ảnh ngày D − 1 CỦA CHÍNH BẢNG NÀY, gỡ các khóa mà commit thắng chỉ chứa DELETE, thay hoặc thêm các khóa còn sống, khóa không xuất hiện trong delta thì giữ nguyên. Ghi TOÀN BỘ kết quả vào phân vùng DAYID = :P_DATE. Đọc trạng thái ngày D chỉ cần WHERE DAYID = D. PHỤ THUỘC NGÀY TRƯỚC: sửa một ngày quá khứ thì phải chạy lại TUẦN TỰ mọi ngày sau đó. Đắp delta không tự chữa lành nên sai sót phải sửa ngay trong ngày. NGÀY CHẠY ĐẦU TIÊN phải mồi bằng full snapshot — xem 00_Chay_lan_dau. Nguồn: 5 bảng grid tài sản, đều không khai khóa CDC nên khóa dòng là hash toàn bộ cột không phải CLOB. Phạm vi ghi: các hồ sơ thuộc tập có action hoặc tồn đọng của ngày đó.
 
 | STT | Tên cột | Ý nghĩa | Kiểu dữ liệu | Độ lớn | Notnull | Khóa | Loại | Bảng nguồn | Cột nguồn | Trường đích trên báo cáo | TRẠNG THÁI THIẾT KẾ | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

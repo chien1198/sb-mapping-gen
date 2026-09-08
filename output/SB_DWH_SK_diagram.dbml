@@ -1,0 +1,227 @@
+// SB_DWH — diagram STAR SCHEMA theo cac truong _SK (khoa ky thuat)
+// Nguon: extract/SB_DWH/*.md (DATAMODEL_DWH_LOS_20260907.xlsx)
+// Quy uoc: moi bang DIM chi lay DIMENSION_KEY (PK) + <ENTITY>_SK (ban sao gia tri cua DIMENSION_KEY).
+//          Moi bang FCT chi lay cac cot *_SK (FK toi DIM tuong ung).
+// Quyet dinh cung BA (2026-09-07): PRODUCT_SK/ORG_UNIT_SK/APPROVAL_GROUP_SK/CHANGE_TYPE_SK/
+//   CARD_PROMOTION_SK la quan he 1:1 voi DIM_LOS_APPLICATION (moi ho so dung 1 gia tri tai
+//   thoi diem hieu luc) nen duoc DUA THANG xuong FCT lam FK, khong con la outrigger tren DIM
+//   nua -> giu duoc star schema hoan chinh (FCT noi thang DIM, khong co canh DIM-DIM).
+//   Pham vi dua xuong FCT nao CHI theo truy vet tu 11 bao cao (Reports_20260907.xlsx):
+//   - FCT_LOS_APPLICATION_DAILY: ca 5 SK (BC1, BC2, BC9 dung PRODUCT/ORG_UNIT/APPROVAL_GROUP/
+//     CHANGE_TYPE/CARD_PROMOTION tren driving fact nay)
+//   - FCT_LOS_SLA_DAILY: PRODUCT_SK, APPROVAL_GROUP_SK (BC5.REF_PRODUCT, BC9.TAT_RLOS)
+//   - FCT_LOS_WORKSTEP_EVENT: PRODUCT_SK (BC9.TAT_RLOS join cung dong voi DIM_LOS_PRODUCT)
+//   6 FCT con lai KHONG co bao cao nao truy vet toi 5 DIM nay nen KHONG them SK thua.
+// Paste noi dung file nay vao dbdiagram.io (New Diagram > paste DBML).
+
+Table DIM_LOS_APPLICATION {
+  DIMENSION_KEY number [pk, note: 'Oracle sequence']
+  APPLICATION_SK number [unique, note: 'Ban sao gia tri DIMENSION_KEY']
+
+  Note: 'DIM - thuc the (SCD2). Grain: 1 dong = 1 phien ban cua 1 ho so (WI_NAME). Khong con FK sang DIM khac (da chuyen xuong FCT).'
+}
+
+Table DIM_LOS_PRODUCT {
+  DIMENSION_KEY number [pk]
+  PRODUCT_SK number [unique]
+
+  Note: 'DIM - danh muc san pham'
+}
+
+Table DIM_LOS_ORG_UNIT {
+  DIMENSION_KEY number [pk]
+  ORG_UNIT_SK number [unique]
+
+  Note: 'DIM - danh muc don vi kinh doanh'
+}
+
+Table DIM_LOS_APPROVAL_GROUP {
+  DIMENSION_KEY number [pk]
+  APPROVAL_GROUP_SK number [unique]
+
+  Note: 'DIM - danh muc cap tham quyen phe duyet'
+}
+
+Table DIM_LOS_CHANGE_TYPE {
+  DIMENSION_KEY number [pk]
+  CHANGE_TYPE_SK number [unique]
+
+  Note: 'DIM - danh muc loai thay doi dieu kien phe duyet'
+}
+
+Table DIM_LOS_CARD_PROMOTION {
+  DIMENSION_KEY number [pk]
+  CARD_PROMOTION_SK number [unique]
+
+  Note: 'DIM - danh muc chuong trinh uu dai phi the'
+}
+
+Table DIM_LOS_COLLATERAL_TYPE {
+  DIMENSION_KEY number [pk]
+  COLLATERAL_TYPE_SK number [unique]
+
+  Note: 'DIM - danh muc loai tai san bao dam'
+}
+
+Table DIM_LOS_DECISION {
+  DIMENSION_KEY number [pk]
+  DECISION_SK number [unique]
+
+  Note: 'DIM - danh muc quyet dinh xu ly'
+}
+
+Table DIM_LOS_EXCEPTION_REASON {
+  DIMENSION_KEY number [pk]
+  EXCEPTION_REASON_SK number [unique]
+
+  Note: 'DIM - danh muc ly do ngoai le'
+}
+
+Table DIM_LOS_GEO {
+  DIMENSION_KEY number [pk]
+  GEO_SK number [unique]
+
+  Note: 'DIM - danh muc dia ly'
+}
+
+Table DIM_LOS_USER {
+  DIMENSION_KEY number [pk]
+  USER_SK number [unique]
+
+  Note: 'DIM - danh muc nguoi dung'
+}
+
+Table DIM_LOS_WORKSTEP {
+  DIMENSION_KEY number [pk]
+  WORKSTEP_SK number [unique]
+
+  Note: 'DIM - danh muc buoc xu ly (workstep)'
+}
+
+// ===================== FCT =====================
+
+Table FCT_LOS_APPLICATION_DAILY {
+  APPLICATION_SK number [note: 'FK -> DIM_LOS_APPLICATION']
+  CURRENT_WORKSTEP_SK number [note: 'FK -> DIM_LOS_WORKSTEP']
+  LAST_WORKSTEP_SK number [note: 'FK -> DIM_LOS_WORKSTEP']
+  LAST_DECISION_SK number [note: 'FK -> DIM_LOS_DECISION']
+  LAST_USER_SK number [note: 'FK -> DIM_LOS_USER']
+  PRODUCT_SK number [note: 'FK -> DIM_LOS_PRODUCT. Chuyen tu DIM_LOS_APPLICATION (1:1 voi ho so). Dung boi BC1, BC2, BC9.']
+  ORG_UNIT_SK number [note: 'FK -> DIM_LOS_ORG_UNIT. Chuyen tu DIM_LOS_APPLICATION (1:1 voi ho so). Dung boi BC1, BC2.']
+  APPROVAL_GROUP_SK number [note: 'FK -> DIM_LOS_APPROVAL_GROUP. Chuyen tu DIM_LOS_APPLICATION (1:1 voi ho so). Dung boi BC1, BC2, BC9.']
+  CHANGE_TYPE_SK number [note: 'FK -> DIM_LOS_CHANGE_TYPE. Chuyen tu DIM_LOS_APPLICATION (1:1 voi ho so). Dung boi BC1, BC2.']
+  CARD_PROMOTION_SK number [note: 'FK -> DIM_LOS_CARD_PROMOTION. Chuyen tu DIM_LOS_APPLICATION (1:1 voi ho so). Dung boi BC1.']
+
+  Note: 'FCT - bang xuong song. Grain goc: DAYID + WI_NAME (khong the hien o day).'
+}
+
+Table FCT_LOS_APPLICATION_PARTY {
+  APPLICATION_SK number [note: 'FK -> DIM_LOS_APPLICATION']
+  GEO_SK number [note: 'FK -> DIM_LOS_GEO']
+
+  Note: 'FCT - ben lien quan ho so. Grain goc: DAYID+WI_NAME+APPLICATION_PARTY_BK.'
+}
+
+Table FCT_LOS_COLLATERAL {
+  APPLICATION_SK number [note: 'FK -> DIM_LOS_APPLICATION']
+  COLLATERAL_TYPE_SK number [note: 'FK -> DIM_LOS_COLLATERAL_TYPE']
+
+  Note: 'FCT - tai san bao dam. Grain goc: DAYID+WI_NAME+COLLATERAL_BK.'
+}
+
+Table FCT_LOS_DEVIATION {
+  APPLICATION_SK number [note: 'FK -> DIM_LOS_APPLICATION']
+
+  Note: 'FCT - ngoai le chinh sach. Grain goc: DAYID+WI_NAME+DEVIATION_BK.'
+}
+
+Table FCT_LOS_EXCEPTION {
+  APPLICATION_SK number [note: 'FK -> DIM_LOS_APPLICATION']
+  EXCEPTION_REASON_SK number [note: 'FK -> DIM_LOS_EXCEPTION_REASON']
+  RAISED_BY_USER_SK number [note: 'FK -> DIM_LOS_USER']
+
+  Note: 'FCT - ngoai le xu ly. Grain goc: DAYID+WI_NAME+DATASOURCE+EXCEPTION_CATEGORY+RAISED_BY+RAISED_DATE_TIME.'
+}
+
+Table FCT_LOS_PARTY_DOCUMENT {
+  APPLICATION_SK number [note: 'FK -> DIM_LOS_APPLICATION']
+
+  Note: 'FCT - giay to ben lien quan. Grain goc: DAYID+WI_NAME+PARTY_DOCUMENT_BK+APPLICATION_PARTY_BK.'
+}
+
+Table FCT_LOS_SLA_DAILY {
+  APPLICATION_SK number [note: 'FK -> DIM_LOS_APPLICATION']
+  PRODUCT_SK number [note: 'FK -> DIM_LOS_PRODUCT. Chuyen tu DIM_LOS_APPLICATION (1:1 voi ho so). Dung boi BC5.REF_PRODUCT, BC9.TAT_RLOS.']
+  APPROVAL_GROUP_SK number [note: 'FK -> DIM_LOS_APPROVAL_GROUP. Chuyen tu DIM_LOS_APPLICATION (1:1 voi ho so). Dung boi BC5.REF_PRODUCT.']
+
+  Note: 'FCT - SLA theo ngay. Grain goc: DAYID+WI_NAME.'
+}
+
+Table FCT_LOS_SUB_PRODUCT {
+  APPLICATION_SK number [note: 'FK -> DIM_LOS_APPLICATION']
+  PRODUCT_SK number [note: 'FK -> DIM_LOS_PRODUCT']
+
+  Note: 'FCT - san pham phu. Grain goc: DAYID+WI_NAME+SUB_PRODUCT_TYPE_CODE+SUB_PRODUCT_BK.'
+}
+
+Table FCT_LOS_WORKSTEP_EVENT {
+  WORKSTEP_SK number [note: 'FK -> DIM_LOS_WORKSTEP']
+  DECISION_SK number [note: 'FK -> DIM_LOS_DECISION']
+  USER_SK number [note: 'FK -> DIM_LOS_USER']
+  APPLICATION_SK number [note: 'FK -> DIM_LOS_APPLICATION']
+  PRODUCT_SK number [note: 'FK -> DIM_LOS_PRODUCT. Chuyen tu DIM_LOS_APPLICATION (1:1 voi ho so). Dung boi BC9.TAT_RLOS.']
+
+  Note: 'FCT - su kien workstep. Grain goc: DAYID+WI_NAME+WORKSTEP_CODE+ENTRYDATE.'
+}
+
+// ===================== Relationships (join qua *_SK) =====================
+// Khong con canh DIM -> DIM: FCT_LOS_APPLICATION_DAILY, FCT_LOS_SLA_DAILY,
+// FCT_LOS_WORKSTEP_EVENT noi thang toi DIM_LOS_PRODUCT/ORG_UNIT/APPROVAL_GROUP/
+// CHANGE_TYPE/CARD_PROMOTION (xem quyet dinh BA o dau file).
+
+// FCT_LOS_APPLICATION_DAILY
+Ref: DIM_LOS_APPLICATION.APPLICATION_SK < FCT_LOS_APPLICATION_DAILY.APPLICATION_SK
+Ref: DIM_LOS_WORKSTEP.WORKSTEP_SK < FCT_LOS_APPLICATION_DAILY.CURRENT_WORKSTEP_SK
+Ref: DIM_LOS_WORKSTEP.WORKSTEP_SK < FCT_LOS_APPLICATION_DAILY.LAST_WORKSTEP_SK
+Ref: DIM_LOS_DECISION.DECISION_SK < FCT_LOS_APPLICATION_DAILY.LAST_DECISION_SK
+Ref: DIM_LOS_USER.USER_SK < FCT_LOS_APPLICATION_DAILY.LAST_USER_SK
+Ref: DIM_LOS_PRODUCT.PRODUCT_SK < FCT_LOS_APPLICATION_DAILY.PRODUCT_SK
+Ref: DIM_LOS_ORG_UNIT.ORG_UNIT_SK < FCT_LOS_APPLICATION_DAILY.ORG_UNIT_SK
+Ref: DIM_LOS_APPROVAL_GROUP.APPROVAL_GROUP_SK < FCT_LOS_APPLICATION_DAILY.APPROVAL_GROUP_SK
+Ref: DIM_LOS_CHANGE_TYPE.CHANGE_TYPE_SK < FCT_LOS_APPLICATION_DAILY.CHANGE_TYPE_SK
+Ref: DIM_LOS_CARD_PROMOTION.CARD_PROMOTION_SK < FCT_LOS_APPLICATION_DAILY.CARD_PROMOTION_SK
+
+// FCT_LOS_APPLICATION_PARTY
+Ref: DIM_LOS_APPLICATION.APPLICATION_SK < FCT_LOS_APPLICATION_PARTY.APPLICATION_SK
+Ref: DIM_LOS_GEO.GEO_SK < FCT_LOS_APPLICATION_PARTY.GEO_SK
+
+// FCT_LOS_COLLATERAL
+Ref: DIM_LOS_APPLICATION.APPLICATION_SK < FCT_LOS_COLLATERAL.APPLICATION_SK
+Ref: DIM_LOS_COLLATERAL_TYPE.COLLATERAL_TYPE_SK < FCT_LOS_COLLATERAL.COLLATERAL_TYPE_SK
+
+// FCT_LOS_DEVIATION
+Ref: DIM_LOS_APPLICATION.APPLICATION_SK < FCT_LOS_DEVIATION.APPLICATION_SK
+
+// FCT_LOS_EXCEPTION
+Ref: DIM_LOS_APPLICATION.APPLICATION_SK < FCT_LOS_EXCEPTION.APPLICATION_SK
+Ref: DIM_LOS_EXCEPTION_REASON.EXCEPTION_REASON_SK < FCT_LOS_EXCEPTION.EXCEPTION_REASON_SK
+Ref: DIM_LOS_USER.USER_SK < FCT_LOS_EXCEPTION.RAISED_BY_USER_SK
+
+// FCT_LOS_PARTY_DOCUMENT
+Ref: DIM_LOS_APPLICATION.APPLICATION_SK < FCT_LOS_PARTY_DOCUMENT.APPLICATION_SK
+
+// FCT_LOS_SLA_DAILY
+Ref: DIM_LOS_APPLICATION.APPLICATION_SK < FCT_LOS_SLA_DAILY.APPLICATION_SK
+Ref: DIM_LOS_PRODUCT.PRODUCT_SK < FCT_LOS_SLA_DAILY.PRODUCT_SK
+Ref: DIM_LOS_APPROVAL_GROUP.APPROVAL_GROUP_SK < FCT_LOS_SLA_DAILY.APPROVAL_GROUP_SK
+
+// FCT_LOS_SUB_PRODUCT
+Ref: DIM_LOS_APPLICATION.APPLICATION_SK < FCT_LOS_SUB_PRODUCT.APPLICATION_SK
+Ref: DIM_LOS_PRODUCT.PRODUCT_SK < FCT_LOS_SUB_PRODUCT.PRODUCT_SK
+
+// FCT_LOS_WORKSTEP_EVENT
+Ref: DIM_LOS_WORKSTEP.WORKSTEP_SK < FCT_LOS_WORKSTEP_EVENT.WORKSTEP_SK
+Ref: DIM_LOS_DECISION.DECISION_SK < FCT_LOS_WORKSTEP_EVENT.DECISION_SK
+Ref: DIM_LOS_USER.USER_SK < FCT_LOS_WORKSTEP_EVENT.USER_SK
+Ref: DIM_LOS_APPLICATION.APPLICATION_SK < FCT_LOS_WORKSTEP_EVENT.APPLICATION_SK
+Ref: DIM_LOS_PRODUCT.PRODUCT_SK < FCT_LOS_WORKSTEP_EVENT.PRODUCT_SK

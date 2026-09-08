@@ -1,6 +1,6 @@
 # DIM_LOS_WORKSTEP
 
-Nguồn: xlsx sheet "DIM_LOS_WORKSTEP" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_WORKSTEP" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục bước xử lý trong quy trình BPM của hồ sơ tín dụng.

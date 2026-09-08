@@ -1,6 +1,6 @@
 # DIM_LOS_COLLATERAL_TYPE
 
-Nguồn: xlsx sheet "DIM_LOS_COLLATERAL_TYPE" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_COLLATERAL_TYPE" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục loại tài sản bảo đảm đã chuẩn hóa.

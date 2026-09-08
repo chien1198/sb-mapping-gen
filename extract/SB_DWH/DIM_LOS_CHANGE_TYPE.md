@@ -1,6 +1,6 @@
 # DIM_LOS_CHANGE_TYPE
 
-Nguồn: xlsx sheet "DIM_LOS_CHANGE_TYPE" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_CHANGE_TYPE" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục loại thay đổi điều kiện phê duyệt.

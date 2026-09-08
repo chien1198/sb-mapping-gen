@@ -1,6 +1,6 @@
 # Q_RLOS_REF_WORKSTEP_2SYSTEMS
 
-Nguồn: docx section "4.5.1 Bảng Q_RLOS_REF_WORKSTEP_2SYSTEMS"
+Nguồn: docx "Design_Database_PDTD_DTM_v1.0_20260908.docx"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

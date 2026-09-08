@@ -1,6 +1,6 @@
 # DIM_LOS_DECISION
 
-Nguồn: docx section "4.1.5 Bảng DIM_LOS_DECISION"
+Nguồn: docx "Design_Database_PDTD_DTM_v1.0_20260908.docx"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

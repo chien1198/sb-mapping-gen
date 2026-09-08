@@ -1,6 +1,6 @@
 # DIM_PDTD_APPLICATION
 
-Nguồn: docx section "4.3.2 Bảng DIM_PDTD_APPLICATION"
+Nguồn: docx "Design_Database_PDTD_DTM_v1.0_20260908.docx"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -32,11 +32,5 @@ Nguồn: docx section "4.3.2 Bảng DIM_PDTD_APPLICATION"
 | 26 | DEVIATION_FLAG | VARCHAR2 | N | 10 |  | Hồ sơ có ngoại lệ chính sách hay không |
 | 27 | CREATION_DATE | DATE | N | 50 |  | Ngày khởi tạo hồ sơ |
 | 28 | RESULT_MAIN_CARD_ID | VARCHAR2 | N | 100 |  | Mã thẻ chính do hệ thẻ trả về |
-| 29 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_ORG_UNIT. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 30 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_PRODUCT. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 31 | APPROVAL_GROUP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_APPROVAL_GROUP. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 32 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_CUSTOMER. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 33 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_CHANGE_TYPE. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 34 | CARD_PROMOTION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_CARD_PROMOTION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 35 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của bản ghi |
-| 36 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của bản ghi |
+| 29 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của bản ghi |
+| 30 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của bản ghi |

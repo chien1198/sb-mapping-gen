@@ -1,15 +1,15 @@
 # FCT_LOS_APPLICATION_PARTY
 
-Nguồn: xlsx sheet "FCT_LOS_APPLICATION_PARTY" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "FCT_LOS_APPLICATION_PARTY" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: FCT - bảng quan hệ
 - Mô tả: Quan hệ giữa hồ sơ và những người liên quan tới hồ sơ đó.
 - Lưu gì: Từng người tham gia hồ sơ kèm vai trò và toàn bộ thuộc tính cá nhân báo cáo cần, lưu THẲNG trên fact. Không có chiều người riêng: khóa dòng là hash trộn cả nguồn loại 2 (NG_SB_CLOS_CUST_INFO_LEGAL), nên danh tính chỉ bền bằng nguồn yếu nhất — chỉ cần một cột từ nguồn không khóa đổi giá trị là ra khóa mới. Giấy tờ tùy thân KHÔNG nằm ở đây mà ở FCT_LOS_PARTY_DOCUMENT vì một người có nhiều giấy tờ.
 - Grain: 1 dòng = 1 người liên quan của 1 hồ sơ, trong ảnh chụp của ngày DAYID
 - Khóa: PK = DAYID + WI_NAME + APPLICATION_PARTY_BK
-- Quy tắc load: ẢNH CHỤP ĐẦY ĐỦ THEO NGÀY, dựng theo QUY TRÌNH A2 ở 00_Doc_STG_LOS. Cả 47 bảng nguồn nay đều về bằng CDC delta nên STG_LOS chỉ chứa những gì vừa đổi và KHÔNG có ảnh đầy đủ — đọc thẳng STG rồi coi đó là ảnh của ngày là SAI. Ảnh ngày D = ảnh ngày D − 1 CỦA CHÍNH BẢNG NÀY, gỡ các khóa mà commit thắng chỉ chứa DELETE, thay hoặc thêm các khóa còn sống, khóa không xuất hiện trong delta thì giữ nguyên. Ghi TOÀN BỘ kết quả vào phân vùng DAYID = :P_DATE. Đọc trạng thái ngày D chỉ cần WHERE DAYID = D. PHỤ THUỘC NGÀY TRƯỚC: sửa một ngày quá khứ thì phải chạy lại TUẦN TỰ mọi ngày sau đó. Đắp delta không tự chữa lành nên sai sót phải sửa ngay trong ngày. NGÀY CHẠY ĐẦU TIÊN phải mồi bằng full snapshot — xem 00_Chay_lan_dau. Nguồn trộn: ba bảng khai khóa CDC nên giữ khóa gốc, NG_SB_CLOS_CUST_INFO_LEGAL không khai nên hash. Vì gộp nhiều nguồn có hình dạng khóa khác nhau nên bảng đích dùng một cột hash chung. Phạm vi ghi: cùng tập hồ sơ với FCT_LOS_APPLICATION_DAILY. RÀNG BUỘC: bảng này và FCT_LOS_PARTY_DOCUMENT phải sinh khóa từ CÙNG MỘT ảnh trong CÙNG MỘT lần chạy, nếu không giấy tờ mất đường nối về người.
 - Nguồn: NG_SB_RLOS_APPLICANT_GENERAL, NG_SB_RLOS_COREPAYER_GENERAL, NG_SB_CLOS_CUST_INFO, NG_SB_CLOS_CUST_INFO_LEGAL
 - Báo cáo sử dụng: BC1, BC2, BC3, BC4
+- Quy tắc load: ẢNH CHỤP ĐẦY ĐỦ THEO NGÀY, dựng theo QUY TRÌNH A2 ở 00_Doc_STG_LOS. Cả 47 bảng nguồn nay đều về bằng CDC delta nên STG_LOS chỉ chứa những gì vừa đổi và KHÔNG có ảnh đầy đủ — đọc thẳng STG rồi coi đó là ảnh của ngày là SAI. Ảnh ngày D = ảnh ngày D − 1 CỦA CHÍNH BẢNG NÀY, gỡ các khóa mà commit thắng chỉ chứa DELETE, thay hoặc thêm các khóa còn sống, khóa không xuất hiện trong delta thì giữ nguyên. Ghi TOÀN BỘ kết quả vào phân vùng DAYID = :P_DATE. Đọc trạng thái ngày D chỉ cần WHERE DAYID = D. PHỤ THUỘC NGÀY TRƯỚC: sửa một ngày quá khứ thì phải chạy lại TUẦN TỰ mọi ngày sau đó. Đắp delta không tự chữa lành nên sai sót phải sửa ngay trong ngày. NGÀY CHẠY ĐẦU TIÊN phải mồi bằng full snapshot — xem 00_Chay_lan_dau. Nguồn trộn: ba bảng khai khóa CDC nên giữ khóa gốc, NG_SB_CLOS_CUST_INFO_LEGAL không khai nên hash. Vì gộp nhiều nguồn có hình dạng khóa khác nhau nên bảng đích dùng một cột hash chung. Phạm vi ghi: cùng tập hồ sơ với FCT_LOS_APPLICATION_DAILY. RÀNG BUỘC: bảng này và FCT_LOS_PARTY_DOCUMENT phải sinh khóa từ CÙNG MỘT ảnh trong CÙNG MỘT lần chạy, nếu không giấy tờ mất đường nối về người.
 
 | STT | Tên cột | Ý nghĩa | Kiểu dữ liệu | Độ lớn | Notnull | Khóa | Loại | Bảng nguồn | Cột nguồn | Trường đích trên báo cáo | TRẠNG THÁI THIẾT KẾ | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

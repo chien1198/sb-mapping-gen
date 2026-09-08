@@ -1,6 +1,6 @@
 # DIM_LOS_GEO
 
-Nguồn: xlsx sheet "DIM_LOS_GEO" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_GEO" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục địa giới hành chính tỉnh/thành và quận/huyện.

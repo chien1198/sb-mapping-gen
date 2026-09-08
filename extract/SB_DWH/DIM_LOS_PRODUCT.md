@@ -1,6 +1,6 @@
 # DIM_LOS_PRODUCT
 
-Nguồn: xlsx sheet "DIM_LOS_PRODUCT" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_PRODUCT" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục sản phẩm tín dụng hợp nhất CLOS/RLOS. Một sản phẩm chỉ có một danh tính trong phạm vi hệ nguồn; vai trò sản phẩm chính hay sản phẩm phụ được xác định tại quan hệ với hồ sơ, không nhân đôi dimension.

@@ -1,15 +1,15 @@
 # FCT_LOS_EXCEPTION
 
-Nguồn: xlsx sheet "FCT_LOS_EXCEPTION" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "FCT_LOS_EXCEPTION" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: FCT - bảng sự kiện
 - Mô tả: Từng lần ghi nhận lý do khi hồ sơ chuyển bước, bị trả về hoặc yêu cầu bổ sung.
 - Lưu gì: Lưu mỗi lần một lý do được nêu ra. BA giải thích cơ chế: bước trả về chọn Raise để đưa ra lý do, bước nhận chọn Clear khi đã làm rõ hoặc bổ sung và đẩy lại. Một hồ sơ có thể phát sinh cùng một loại lý do nhiều lần, bởi nhiều người, ở nhiều thời điểm, nên khóa phải đủ để phân biệt từng lần.
 - Grain: 1 dòng = 1 lần ghi nhận lý do của 1 hồ sơ, trong ảnh chụp của ngày DAYID
 - Khóa: PK = DAYID + DATASOURCE + WI_NAME + EXCEPTION_CATEGORY + RAISED_BY + RAISED_DATE_TIME. Hai bảng nguồn đều thuộc LOẠI 1 và khóa CDC đã khai đủ tổ hợp này, các cột đều nằm sẵn trong bảng nên khai khóa thẳng trên cột gốc, KHÔNG hash. Khóa CDC không chứa EXCEPTION_NAME — xem việc #13 trong 00_Van_de_can_chot.
-- Quy tắc load: ẢNH CHỤP ĐẦY ĐỦ THEO NGÀY, dựng theo QUY TRÌNH A2 ở 00_Doc_STG_LOS. Cả 47 bảng nguồn nay đều về bằng CDC delta nên STG_LOS chỉ chứa những gì vừa đổi và KHÔNG có ảnh đầy đủ — đọc thẳng STG rồi coi đó là ảnh của ngày là SAI. Ảnh ngày D = ảnh ngày D − 1 CỦA CHÍNH BẢNG NÀY, gỡ các khóa mà commit thắng chỉ chứa DELETE, thay hoặc thêm các khóa còn sống, khóa không xuất hiện trong delta thì giữ nguyên. Ghi TOÀN BỘ kết quả vào phân vùng DAYID = :P_DATE. Đọc trạng thái ngày D chỉ cần WHERE DAYID = D. PHỤ THUỘC NGÀY TRƯỚC: sửa một ngày quá khứ thì phải chạy lại TUẦN TỰ mọi ngày sau đó. Đắp delta không tự chữa lành nên sai sót phải sửa ngay trong ngày. NGÀY CHẠY ĐẦU TIÊN phải mồi bằng full snapshot — xem 00_Chay_lan_dau. Cả hai bảng nguồn đều khai khóa CDC nên giữ nguyên khóa gốc, không hash. Phạm vi ghi: các hồ sơ thuộc tập có action hoặc tồn đọng của ngày đó.
 - Nguồn: NG_SB_CLOS_EXCEPTION, NG_SB_RLOS_EXCEPTION
 - Báo cáo sử dụng: BC7, BC8
+- Quy tắc load: ẢNH CHỤP ĐẦY ĐỦ THEO NGÀY, dựng theo QUY TRÌNH A2 ở 00_Doc_STG_LOS. Cả 47 bảng nguồn nay đều về bằng CDC delta nên STG_LOS chỉ chứa những gì vừa đổi và KHÔNG có ảnh đầy đủ — đọc thẳng STG rồi coi đó là ảnh của ngày là SAI. Ảnh ngày D = ảnh ngày D − 1 CỦA CHÍNH BẢNG NÀY, gỡ các khóa mà commit thắng chỉ chứa DELETE, thay hoặc thêm các khóa còn sống, khóa không xuất hiện trong delta thì giữ nguyên. Ghi TOÀN BỘ kết quả vào phân vùng DAYID = :P_DATE. Đọc trạng thái ngày D chỉ cần WHERE DAYID = D. PHỤ THUỘC NGÀY TRƯỚC: sửa một ngày quá khứ thì phải chạy lại TUẦN TỰ mọi ngày sau đó. Đắp delta không tự chữa lành nên sai sót phải sửa ngay trong ngày. NGÀY CHẠY ĐẦU TIÊN phải mồi bằng full snapshot — xem 00_Chay_lan_dau. Cả hai bảng nguồn đều khai khóa CDC nên giữ nguyên khóa gốc, không hash. Phạm vi ghi: các hồ sơ thuộc tập có action hoặc tồn đọng của ngày đó.
 
 | STT | Tên cột | Ý nghĩa | Kiểu dữ liệu | Độ lớn | Notnull | Khóa | Loại | Bảng nguồn | Cột nguồn | Trường đích trên báo cáo | TRẠNG THÁI THIẾT KẾ | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

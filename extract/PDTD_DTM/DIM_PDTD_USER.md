@@ -1,15 +1,15 @@
 # DIM_PDTD_USER
 
-Nguồn: xlsx sheet "DIM_PDTD_USER" (DATAMODEL_DTM_PDTD_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_PDTD_USER" (DATAMODEL_DTM_PDTD_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục tài khoản cán bộ xử lý hồ sơ trên workflow.
 - Lưu gì: Hiện chỉ có username. Giữ thành chiều riêng để mọi fact tham chiếu bằng khóa tự sinh đúng grain của nó, và để khi bổ sung master nhân sự (mã nhân viên, đơn vị, chức danh) thì chỉ thêm cột vào đây, không phải sửa lại các bảng fact.
 - Grain: 1 dòng = 1 phiên bản của 1 tài khoản người dùng
 - Khóa: PK = DIMENSION_KEY (Oracle sequence). UNIQUE (USERNAME, EFF_DATE). Kế thừa DIMENSION_KEY từ DWH. Có thêm cột USER_SK mang đúng giá trị DIMENSION_KEY theo quy chuẩn đặt tên sẵn có.
-- Quy tắc load: Bê 1:1 từ DWH.DIM_LOS_USER, GIỮ NGUYÊN DIMENSION_KEY và cặp EFF_DATE/EXP_DATE, KHÔNG sinh sequence mới và KHÔNG tự tính lại ngày hiệu lực ở DTM — toàn bộ logic SCD2 đã chạy xong ở tầng DWH, xem Quy tắc load của DIM_LOS_USER. Sau khi bê thì LEFT JOIN bảng map để bổ sung cột chuẩn hóa; mọi join vào bảng map phải là 1:1 hoặc 1:0, join làm nhân dòng là lỗi và phải chặn bằng kiểm tra chất lượng. Bản hiện hành là EXP_DATE IS NULL.
 - Nguồn: DWH.DIM_LOS_USER
 - Báo cáo sử dụng: BC1, BC2, BC3, BC4, BC7, BC8, BC9
+- Quy tắc load: Bê 1:1 từ DWH.DIM_LOS_USER, GIỮ NGUYÊN DIMENSION_KEY và cặp EFF_DATE/EXP_DATE, KHÔNG sinh sequence mới và KHÔNG tự tính lại ngày hiệu lực ở DTM — toàn bộ logic SCD2 đã chạy xong ở tầng DWH, xem Quy tắc load của DIM_LOS_USER. Sau khi bê thì LEFT JOIN bảng map để bổ sung cột chuẩn hóa; mọi join vào bảng map phải là 1:1 hoặc 1:0, join làm nhân dòng là lỗi và phải chặn bằng kiểm tra chất lượng. Bản hiện hành là EXP_DATE IS NULL.
 
 | STT | Tên cột | Ý nghĩa | Kiểu dữ liệu | Độ lớn | Notnull | Khóa | Loại | Bảng/cột nguồn | Trường đích trên báo cáo | TRẠNG THÁI THIẾT KẾ | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

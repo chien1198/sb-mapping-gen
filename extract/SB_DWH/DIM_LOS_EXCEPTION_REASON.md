@@ -1,6 +1,6 @@
 # DIM_LOS_EXCEPTION_REASON
 
-Nguồn: xlsx sheet "DIM_LOS_EXCEPTION_REASON" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_EXCEPTION_REASON" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục lý do quyết định và ngoại lệ được cấu hình cho từng bước xử lý.

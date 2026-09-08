@@ -1,6 +1,6 @@
 # TMP_REF_COMPANY_REGION_KHCN
 
-Nguồn: docx section "4.5.4 Bảng TMP_REF_COMPANY_REGION_KHCN"
+Nguồn: docx "Design_Database_PDTD_DTM_v1.0_20260908.docx"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

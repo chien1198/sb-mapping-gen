@@ -1,6 +1,6 @@
 # DIM_LOS_ORG_UNIT
 
-Nguồn: xlsx sheet "DIM_LOS_ORG_UNIT" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_ORG_UNIT" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục đơn vị kinh doanh khởi tạo hồ sơ, theo cách LOS ghi nhận.

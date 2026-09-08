@@ -1,6 +1,6 @@
 # DIM_LOS_APPLICATION
 
-Nguồn: docx section "4.1.1 Bảng DIM_LOS_APPLICATION"
+Nguồn: docx "Design_Database_PDTD_DTM_v1.0_20260908.docx"
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -31,10 +31,5 @@ Nguồn: docx section "4.1.1 Bảng DIM_LOS_APPLICATION"
 | 25 | EMPLOYEE_NAME | VARCHAR2 | N | 200 |  | Tên cán bộ quản lý hồ sơ |
 | 26 | CREATION_DATE | DATE | N | 10 |  | Ngày khởi tạo hồ sơ |
 | 27 | RESULT_MAIN_CARD_ID | VARCHAR2 | N | 100 |  | Mã thẻ chính do hệ thẻ trả về |
-| 28 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_PRODUCT. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 29 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_ORG_UNIT. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 30 | APPROVAL_GROUP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_APPROVAL_GROUP. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 31 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_CHANGE_TYPE. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 32 | CARD_PROMOTION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_CARD_PROMOTION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 33 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của bản ghi |
-| 34 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của bản ghi |
+| 28 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của bản ghi |
+| 29 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của bản ghi |

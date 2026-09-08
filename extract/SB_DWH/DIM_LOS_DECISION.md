@@ -1,6 +1,6 @@
 # DIM_LOS_DECISION
 
-Nguồn: xlsx sheet "DIM_LOS_DECISION" (DATAMODEL_DWH_LOS_20260907.xlsx)
+Nguồn: xlsx sheet "DIM_LOS_DECISION" (DATAMODEL_DWH_LOS_20260908.xlsx)
 
 - Loại bảng: DIM - danh mục
 - Mô tả: Danh mục quyết định có thể phát sinh tại một bước xử lý.
