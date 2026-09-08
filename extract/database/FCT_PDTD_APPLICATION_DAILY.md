@@ -27,7 +27,7 @@ Nguồn: docx section "4.4.1 Bảng FCT_PDTD_APPLICATION_DAILY"
 | 21 | APPROVER_USER | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý ở bước CreditApproval, lấy USERNAME của lần HOÀN TẤT GẦN NHẤT tại bước đó trên… |
 | 22 | COMMITTEE_USER | VARCHAR2 | N | 100 |  | User Hội đồng tín dụng |
 | 23 | HOS_USER | VARCHAR2 | N | 100 |  | User Hỗ trợ phê duyệt |
-| 24 | SYSTEM_CODE | VARCHAR2 | Y | 10 |  | Hệ nguồn của bản ghi, CLOS hoặc RLOS |
+| 24 | DATASOURCE | VARCHAR2 | Y | 10 |  | RLOS hoặc CLOS |
 | 25 | HAS_ACTION_IN_DAY | VARCHAR2 | Y | 1 |  | Hồ sơ có phát sinh xử lý trong ngày dữ liệu hay không |
 | 26 | PROCESSED_DATE | DATE | N | 5 |  | Ngày xử lý của hồ sơ |
 | 27 | PROCESSED_DATE_UWM | DATE | N | 8,4 |  | Ngày chốt của chu kỳ thẩm định hiện hành |

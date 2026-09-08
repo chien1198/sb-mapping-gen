@@ -22,7 +22,7 @@ Nguồn: docx section "4.2.1 Bảng FCT_LOS_APPLICATION_DAILY"
 | 16 | APPROVER_USER | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý ở bước CreditApproval, lấy USERNAME của lần HOÀN TẤT GẦN NHẤT tại bước đó trên… |
 | 17 | COMMITTEE_USER | VARCHAR2 | N | 100 |  | User Hội đồng tín dụng |
 | 18 | HOS_USER | VARCHAR2 | N | 100 |  | User Hỗ trợ phê duyệt |
-| 19 | SYSTEM_CODE | VARCHAR2 | Y | 10 |  | Hệ nguồn của bản ghi, CLOS hoặc RLOS |
+| 19 | DATASOURCE | VARCHAR2 | Y | 10 |  | CASE WHEN WI_NAME LIKE '%RLOS' THEN 'RLOS' WHEN LIKE '%CLOS' THEN 'CLOS' END |
 | 20 | PROCESSED_DATE | DATE | N | 1 |  | Ngày xử lý của hồ sơ |
 | 21 | LAST_UWM_ENTRYDATE | TIMESTAMP | N |  |  | Ngày hồ sơ vào bước thẩm định gần nhất |
 | 22 | PROCESSED_DATE_UWM | DATE | N | 5 |  | Ngày chốt của chu kỳ thẩm định hiện hành |

@@ -9,7 +9,7 @@ Nguồn: docx section "4.4.11 Bảng FCT_PDTD_KPI_APPLICATION"
 | 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_APPLICATION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 4 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_PRODUCT. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 5 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_ORG_UNIT. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 6 | SYSTEM_CODE | VARCHAR2 | Y | 10 |  | Hệ nguồn của bản ghi, CLOS hoặc RLOS |
+| 6 | DATASOURCE | VARCHAR2 | Y | 10 |  | RLOS hoặc CLOS |
 | 7 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ |
 | 8 | VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0 đến 1 |
 | 9 | POINT | NUMBER | N | 12,4 |  | Điểm KPI |

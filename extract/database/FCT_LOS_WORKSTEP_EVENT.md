@@ -12,7 +12,7 @@ Nguồn: docx section "4.2.2 Bảng FCT_LOS_WORKSTEP_EVENT"
 | 6 | DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_DECISION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 7 | USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_USER. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 8 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_APPLICATION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 9 | SYSTEM_CODE | VARCHAR2 | Y | 10 |  | Hệ nguồn của bản ghi, CLOS hoặc RLOS |
+| 9 | DATASOURCE | VARCHAR2 | Y | 10 |  | Gán theo tuyến bảng nguồn/STG_LOS ('RLOS' hoặc 'CLOS'); hậu tố WI_NAME chỉ là kiểm tra chất lượng |
 | 10 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý |
 | 11 | DECISION_CODE | VARCHAR2 | N | 200 |  | Mã quyết định tại bước xử lý |
 | 12 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý hồ sơ |

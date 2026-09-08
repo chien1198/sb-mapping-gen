@@ -7,7 +7,7 @@ Nguồn: docx section "4.2.3 Bảng FCT_LOS_SLA_DAILY"
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
 | 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng |
 | 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_APPLICATION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 4 | SYSTEM_CODE | VARCHAR2 | Y | 10 |  | Hệ nguồn của bản ghi, CLOS hoặc RLOS |
+| 4 | DATASOURCE | VARCHAR2 | Y | 10 |  | Hệ thống (CLOS/RLOS) |
 | 5 | STEP01_BRANCH_CL_HOUR | NUMBER | N | 18,6 |  | Thời gian bước chi nhánh theo lịch tự nhiên, đơn vị giờ |
 | 6 | STEP01_BRANCH_WK_HOUR | NUMBER | N | 18,6 |  | Thời gian bước chi nhánh theo giờ làm việc, đơn vị giờ |
 | 7 | STEP01_BRANCH_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian bước chi nhánh theo giờ cam kết SLA, đơn vị giờ |

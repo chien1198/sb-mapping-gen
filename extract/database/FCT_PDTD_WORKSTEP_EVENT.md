@@ -12,7 +12,7 @@ Nguồn: docx section "4.4.2 Bảng FCT_PDTD_WORKSTEP_EVENT"
 | 6 | WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_WORKSTEP. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 7 | DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_DECISION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 8 | USER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_USER. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 9 | SYSTEM_CODE | VARCHAR2 | Y | 10 |  | Hệ nguồn của bản ghi, CLOS hoặc RLOS |
+| 9 | DATASOURCE | VARCHAR2 | Y | 10 |  | RLOS hoặc CLOS |
 | 10 | EXITDATE | TIMESTAMP | N | 100 |  | Thời điểm hồ sơ ra khỏi bước xử lý |
 | 11 | DECISION_CODE | VARCHAR2 | N | 200 |  | Mã quyết định tại bước xử lý |
 | 12 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản của cán bộ xử lý hồ sơ |

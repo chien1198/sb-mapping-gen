@@ -9,7 +9,7 @@ Nguồn: docx section "4.4.5 Bảng FCT_PDTD_APPLICATION_PARTY"
 | 3 | APPLICATION_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng, còn để placeholder chờ chốt khóa nguồn |
 | 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_APPLICATION. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
 | 5 | GEO_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_PDTD_GEO. Giá trị mặc định = -1 nếu không có giá trị phù hợp |
-| 6 | SYSTEM_CODE | VARCHAR2 | Y | 10 |  | Hệ nguồn của bản ghi, CLOS hoặc RLOS |
+| 6 | DATASOURCE | VARCHAR2 | Y | 10 |  | RLOS hoặc CLOS |
 | 7 | PARTY_TYPE | VARCHAR2 | N | 20 |  | Loại đối tượng, cá nhân hoặc tổ chức |
 | 8 | PARTY_ROLE_CODE | VARCHAR2 | N | 30 |  | Vai trò của người trên hồ sơ |
 | 9 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên đầy đủ của người liên quan trên hồ sơ |

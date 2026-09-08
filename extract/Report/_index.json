@@ -1,0 +1,79 @@
+{
+  "sources": [
+    "Reports_20260907.xlsx"
+  ],
+  "tables": [
+    {
+      "table": "00_Tong_hop",
+      "file": "00_Tong_hop.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 12
+    },
+    {
+      "table": "BC1",
+      "file": "BC1.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 87
+    },
+    {
+      "table": "BC2",
+      "file": "BC2.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 71
+    },
+    {
+      "table": "BC3",
+      "file": "BC3.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 22
+    },
+    {
+      "table": "BC4",
+      "file": "BC4.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 11
+    },
+    {
+      "table": "BC5",
+      "file": "BC5.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 49
+    },
+    {
+      "table": "BC6",
+      "file": "BC6.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 7
+    },
+    {
+      "table": "BC7",
+      "file": "BC7.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 13
+    },
+    {
+      "table": "BC8",
+      "file": "BC8.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 8
+    },
+    {
+      "table": "BC9",
+      "file": "BC9.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 27
+    },
+    {
+      "table": "BC10",
+      "file": "BC10.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 19
+    },
+    {
+      "table": "BC11",
+      "file": "BC11.md",
+      "source": "Reports_20260907.xlsx",
+      "columns": 23
+    }
+  ]
+}
