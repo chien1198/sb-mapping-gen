@@ -1,7 +1,7 @@
 ﻿"target_table","target_column","nullable","data_type","key","description","etl_logic","etl_logic_type","source_table","source_column","note"
 "DIM_LOS_USER","DIMENSION_KEY","false","number","PK","PK — Driving: STG_DIM_LOS_USER","STG_DIM_LOS_USER.DIMENSION_KEY","direct","STG_DIM_LOS_USER","DIMENSION_KEY","Giữ nguyên giá trị từ SB_DWH qua vùng chìa STG_DTM, không sinh sequence mới"
 "DIM_LOS_USER","DATASOURCE","false","string(10)","","Nguồn hệ dùng chung cho cả hai hệ CLOS và RLOS","STG_DIM_LOS_USER.DATASOURCE","direct","STG_DIM_LOS_USER","DATASOURCE",""
-"DIM_LOS_USER","USER_SK","false","number","","Bằng đúng DIMENSION_KEY cùng dòng","STG_DIM_LOS_USER.USER_SK","direct","STG_DIM_LOS_USER","USER_SK",""
+"DIM_LOS_USER","USER_SK","false","number","","Bằng đúng DIMENSION_KEY cùng dòng — dùng để Fact lookup vào DIM này. Mặc định -1 (dòng Unknown) khi lookup không khớp","STG_DIM_LOS_USER.USER_SK","direct","STG_DIM_LOS_USER","USER_SK",""
 "DIM_LOS_USER","USERNAME","false","string(100)","NK","Business key — tên tài khoản cán bộ xử lý hồ sơ trên ứng dụng LOS","STG_DIM_LOS_USER.USERNAME","direct","STG_DIM_LOS_USER","USERNAME",""
 "DIM_LOS_USER","EMPLOYEE_NAME","true","string(200)","","Tên nhân viên","STG_DIM_LOS_USER.EMPLOYEE_NAME","direct","STG_DIM_LOS_USER","EMPLOYEE_NAME",""
 "DIM_LOS_USER","EMPLOYEE_STATUS","true","string(50)","","Trạng thái tài khoản","STG_DIM_LOS_USER.EMPLOYEE_STATUS","direct","STG_DIM_LOS_USER","EMPLOYEE_STATUS",""

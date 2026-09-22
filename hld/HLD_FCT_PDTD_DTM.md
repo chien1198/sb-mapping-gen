@@ -1,7 +1,7 @@
 # HLD — FCT tables (PDTD_DTM)
 
 **Trích xuất từ:** `hld/HLD_Table_Design.md` (nguồn tổng, giữ nguyên không xóa)
-**Phạm vi:** FCT_LOS_KPI_YTD_DAILY, FCT_LOS_KPI_APPLICATION (CHUNG), toàn bộ FCT CLOS (2.2.2.x), toàn bộ FCT RLOS (2.3.2.x) tại layer PDTD_DTM.
+**Phạm vi:** AGG_LOS_KPI_YTD_DAILY, AGG_LOS_KPI_APPLICATION (CHUNG), toàn bộ FCT CLOS (2.2.2.x), toàn bộ FCT RLOS (2.3.2.x) tại layer PDTD_DTM.
 **Quy ước đồng bộ:** sửa nội dung tại file này TRƯỚC, sau đó copy đoạn đã sửa về đúng vị trí tương ứng trong `hld/HLD_Table_Design.md`. Section 3 (Vấn đề mở) chỉ quản lý tại file tổng, không lặp ở đây.
 
 ---
@@ -10,17 +10,24 @@
 
 ### 2.1 Bộ bảng CHUNG
 
-##### 2.1.8 FCT_LOS_KPI_YTD_DAILY
+##### 2.1.8 AGG_LOS_KPI_YTD_DAILY — ĐỔI TIỀN TỐ FCT_ → AGG_ (review 2026-09-22)
+
+**Đổi tên `FCT_LOS_KPI_YTD_DAILY` → `AGG_LOS_KPI_YTD_DAILY`:** grain 1
+dòng/ngày (`DAYID`), toàn bộ 26 cột non-PK đều là SUM/COUNT/lũy kế từ
+`AGG_LOS_KPI_APPLICATION` (không còn thuộc tính mô tả hay FK nào) — đúng
+định nghĩa bảng tổng hợp (summary/aggregate fact), không phải transaction
+fact. Đổi tiền tố để phân biệt rõ với các FCT_ grain giao dịch/hồ sơ còn
+lại trong tài liệu.
 
 ```mermaid
 flowchart LR
     subgraph PDTD_DTM
-        A["FCT_LOS_KPI_APPLICATION"]
+        A["AGG_LOS_KPI_APPLICATION"]
         D1["DIM_RLOS_APPLICATION"]
         D3["DIM_CLOS_APPLICATION"]
         D2["DIM_LOS_ORG_UNIT"]
         M["REF_LOS_KPI_USER_YEAR"]
-        F["FCT_LOS_KPI_YTD_DAILY"]
+        F["AGG_LOS_KPI_YTD_DAILY"]
     end
     A -->|"SUM QUY_DOI theo PROCESSED_DATE=DAYID, loại IS_TEST_ACCOUNT='Y', tách RLOS/CLOS theo DATASOURCE — sinh QUY_DOI_*_DAY"| F
     A -->|"COUNT hồ sơ theo PROCESSED_DATE=DAYID, loại IS_TEST_ACCOUNT='Y', CLOS thêm VAR_STR12 IS NOT NULL — sinh SLHS_*_DAY, SLGN_*_DAY"| F
@@ -59,7 +66,7 @@ và loại trừ 3 chi nhánh khởi tạo hồ sơ `COMPANY_CODE NOT IN
 ('VN0010401','VN0010101','VN0010002')` (lookup qua `DIM_LOS_ORG_UNIT`,
 xem 2.1.1). Đã bổ sung cả 2 điều kiện vào công thức `SLHS_RLOS_DAY`/
 `SLGN_RLOS_DAY` (join thêm `DIM_RLOS_APPLICATION`/`DIM_LOS_ORG_UNIT` qua
-`APPLICATION_SK`/`ORG_UNIT_SK` đã có sẵn trên `FCT_LOS_KPI_APPLICATION`,
+`APPLICATION_SK`/`ORG_UNIT_SK` đã có sẵn trên `AGG_LOS_KPI_APPLICATION`,
 không cần thêm cột mới trên bảng đó).
 
 **Rà soát bổ sung — điều kiện `STREAM` còn thiếu ở `SLHS_CLOS_DAY`/
@@ -71,7 +78,7 @@ nguyên văn SRS BC9 cho `SLHS_CLOS`/`SLGN_CLOS`/`TAT_CLOS` phát hiện cả
 nhưng CLOS dùng khái niệm `STREAM` riêng (không qua `REF_*_FLOW`). Đã
 bổ sung vào công thức `SLHS_CLOS_DAY`/`SLGN_CLOS_DAY`/
 `TAT_CLOS_SUM_HOUR_DAY`/`TAT_CLOS_CASE_CNT_DAY` (join `DIM_CLOS_
-APPLICATION` qua `APPLICATION_SK` đã có sẵn trên `FCT_LOS_KPI_
+APPLICATION` qua `APPLICATION_SK` đã có sẵn trên `AGG_LOS_KPI_
 APPLICATION`, cột `STREAM` đã có sẵn trên DIM đó, không cần thêm cột
 mới). Riêng CLOS không có điều kiện tương đương `COMPANY_CODE NOT IN
 (...)` của RLOS — SRS BC9 (`SLHS_CLOS`/`SLGN_CLOS`/`TAT_CLOS`) không
@@ -111,12 +118,12 @@ duy nhất đã biết của `STG_FCT_MD` được giải quyết trọn vẹn n
 
 **Ghi chú — `QUY_DOI_*`/`TAT_*` không tính lại từ nguồn thô:** theo yêu
 cầu người dùng, `QUY_DOI_RLOS_DAY`/`QUY_DOI_CLOS_DAY` SUM lại từ
-`FCT_LOS_KPI_APPLICATION.QUY_DOI` (không tính lại công thức
+`AGG_LOS_KPI_APPLICATION.QUY_DOI` (không tính lại công thức
 `POINT*8/VOLUME` ở đây — sửa lại đúng chiều phép tính theo SRS BC9,
 review 2026-09-17, xem Section 3 dòng #33), lọc `IS_TEST_ACCOUNT != 'Y'`
 — tránh trùng logic giữa 2 bảng. Tương tự, `TAT_*_SUM_HOUR_DAY`/`TAT_*_CASE_CNT_DAY`
 (tử số/mẫu số thô của TAT, tách SEC/UNSEC cho RLOS theo đúng tài liệu
-gốc) SUM lại từ `FCT_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR`, cùng
+gốc) SUM lại từ `AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR`, cùng
 lọc `IS_TEST_ACCOUNT != 'Y'`. Các chỉ tiêu tỷ lệ/
 trung bình phái sinh (`TAT_RLOS`, `TAT_CLOS`, `TAT_TB`, `TY_LE_GN_RLOS`,
 `TY_LE_GN_CLOS`, `TY_LE_GN_TONG`, `SLHS_TONG`, `SLGN_TONG`, `NSLD`)
@@ -135,7 +142,16 @@ kiện trong năm — không trùng lặp vì `REF_LOS_KPI_USER_YEAR` chỉ INSE
 rồi cộng dồn `NHAN_SU(D) = NHAN_SU(D-1) + NEW_USER_CNT_DAY(D)`, reset
 về 0 vào ngày 1/1 mỗi năm.
 
-##### 2.1.9 FCT_LOS_KPI_APPLICATION
+##### 2.1.9 AGG_LOS_KPI_APPLICATION — ĐỔI TIỀN TỐ FCT_ → AGG_ (review 2026-09-22)
+
+**Đổi tên `FCT_LOS_KPI_APPLICATION` → `AGG_LOS_KPI_APPLICATION`:** grain vẫn
+giữ 1 dòng/hồ sơ/hệ (không đổi PK/grain), nhưng toàn bộ cột đều là chỉ tiêu
+KPI đã tính sẵn phục vụ thẳng báo cáo BC9 (`VOLUME`, `POINT`, `QUY_DOI`,
+`TAT_APPLICATION_HOUR`, `DEVIATION_G2/G3`, `TSBD_G2`...) — không đọc trực
+tiếp 1 sự kiện nghiệp vụ thô nào, bản chất là bảng chỉ tiêu tổng hợp/phái
+sinh (derived KPI), không phải transaction fact như các FCT_ khác. Đổi
+tiền tố cho nhất quán với `AGG_LOS_KPI_YTD_DAILY` (2.1.8) — bảng này là
+input trực tiếp duy nhất của bảng đó.
 
 ```mermaid
 flowchart LR
@@ -147,7 +163,7 @@ flowchart LR
         W["FCT_CLOS_WORKSTEP_EVENT / FCT_RLOS_WORKSTEP_EVENT"]
     end
     subgraph PDTD_DTM
-        K["FCT_LOS_KPI_APPLICATION"]
+        K["AGG_LOS_KPI_APPLICATION"]
     end
     A -->|PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, ORG_UNIT_SK, VAR_STR12 — nhánh CLOS| K
     B -->|PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, ORG_UNIT_SK — nhánh RLOS| K
@@ -159,9 +175,9 @@ flowchart LR
 **Ghi chú lineage — thay thế `FCT_LOS_APPLICATION_MILESTONE` đã loại
 bỏ:** bảng này giữ đúng vai trò "điểm KPI theo hồ sơ" đã ghi trong split
 proposal — grain **1 dòng/hồ sơ (`WI_NAME`)/hệ (`DATASOURCE`)**, là input
-duy nhất để `FCT_LOS_KPI_YTD_DAILY` (2.1.8) SUM/COUNT lên grain ngày.
+duy nhất để `AGG_LOS_KPI_YTD_DAILY` (2.1.8) SUM/COUNT lên grain ngày.
 Không có vai trò "pre-aggregate SLHS/SLGN/TAT" như ghi chú "chưa thiết
-kế" cũ từng viết — vai trò đó thuộc hẳn về `FCT_LOS_KPI_YTD_DAILY`
+kế" cũ từng viết — vai trò đó thuộc hẳn về `AGG_LOS_KPI_YTD_DAILY`
 (SLHS_*/SLGN_*/TAT_* là số lũy kế theo NGÀY, khác grain hồ sơ của bảng
 này). Cột `VOLUME`/`POINT`/`QUY_DOI`/`TAT_APPLICATION_HOUR` tính theo
 đúng công thức SRS BC9 (BR 1.2, STT 4-6, 20-21) — `POINT` đọc từ file
@@ -231,7 +247,7 @@ từ chối/gửi hỗ trợ/gửi giải ngân, hoặc đã hủy) mới đư�
 `WI_NAME` (grain của bảng này) hiện lấy nguồn từ `FCT_CLOS_APPLICATION_
 DAILY`/`FCT_RLOS_APPLICATION_DAILY` (đã có mọi hồ sơ, kể cả đang xử lý
 dở dang), cần bổ sung điều kiện lọc tương đương khi nạp
-`FCT_LOS_KPI_APPLICATION`: chỉ giữ hồ sơ có tồn tại bản ghi lịch sử
+`AGG_LOS_KPI_APPLICATION`: chỉ giữ hồ sơ có tồn tại bản ghi lịch sử
 (`NG_SB_CLOS/RLOS_ENTRY_EXIT`) thỏa `DECISION` hoặc `WORKSTEP` kể trên
 — hồ sơ đang xử lý dở (chưa tới quyết định cuối, chưa hủy) sẽ KHÔNG còn
 xuất hiện trong bảng này nữa (khác thiết kế trước đây, vốn nhận mọi hồ
@@ -254,7 +270,7 @@ sự kiện đơn lẻ). Điều kiện này trước đây chưa được đưa
 bất kỳ cột nào — bổ sung cờ `IS_TEST_ACCOUNT` (EXISTS trên UNION
 `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT` theo `USERNAME`,
 toàn bộ lịch sử hồ sơ, không chỉ sự kiện hoàn tất gần nhất) để
-`FCT_LOS_KPI_YTD_DAILY` loại hồ sơ này khỏi mọi phép COUNT/SUM `_DAY`.
+`AGG_LOS_KPI_YTD_DAILY` loại hồ sơ này khỏi mọi phép COUNT/SUM `_DAY`.
 Riêng nhánh CLOS của `SLHS_CLOS`/`SLGN_CLOS` còn thêm điều kiện lọc
 `WFINSTRUMENTTABLE.VAR_STR12 IS NOT NULL` (xem cột 61 tại `FCT_CLOS_
 APPLICATION_DAILY`, 1.2.2.1) — không áp dụng cho `TAT_CLOS`/`QUY_DOI_
@@ -335,21 +351,42 @@ flowchart LR
         C["FCT_CLOS_EXCEPTION"]
     end
     subgraph PDTD_DTM
+        REF(["REF_PHAN_LOAI_DDE"])
         D["FCT_CLOS_EXCEPTION"]
     end
     C -->|bê 1:1| D
+    REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='CLOS' — sinh PHAN_LOAI_DDE (review 2026-09-22, chuyển từ SB_DWH)"| D
 ```
 
 **Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain/PK (`DAYID +
 WI_NAME + EXCEPTION_CATEGORY + RAISED_BY + RAISED_DATE_TIME`), cùng đầy
-đủ 14 cột (11 cột gốc + `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
-`PHAN_LOAI_DDE` đã tính sẵn ở tầng SB_DWH — xem đánh giá kiến trúc tại
-Section 1 → 1. SB_DWH → 1.2.2.4). Không đọc thêm `NG_SB_CLOS_ENTRY_EXIT`
-hay bất kỳ bảng STG_LOS nào ở tầng này, giữ đúng nguyên tắc "DTM chỉ đọc
-DWH". Bổ sung duy nhất 1 cột phái sinh tại DTM: `LOANCASEID`, join qua
-`DIM_CLOS_APPLICATION.LOANCASEID` theo `APPLICATION_SK` (cùng cách
-`FCT_PDTD_EXCEPTION` gốc lấy "Tính ở DTM từ
-DIM_PDTD_APPLICATION.LOANCASEID").
+đủ 13 cột (11 cột gốc + `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` đã tính sẵn
+ở tầng SB_DWH — xem Section 1 → 1. SB_DWH → 1.2.2.4). Không đọc thêm
+`NG_SB_CLOS_ENTRY_EXIT` hay bất kỳ bảng STG_LOS nào ở tầng này, giữ đúng
+nguyên tắc "DTM chỉ đọc DWH". Bổ sung 2 cột phái sinh tại DTM:
+`LOANCASEID` (join qua `DIM_CLOS_APPLICATION.LOANCASEID` theo
+`APPLICATION_SK`, cùng cách `FCT_PDTD_EXCEPTION` gốc lấy "Tính ở DTM từ
+DIM_PDTD_APPLICATION.LOANCASEID") và **`PHAN_LOAI_DDE`** (review
+2026-09-22, chuyển tầng từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" bên
+dưới): `LEFT JOIN REF_PHAN_LOAI_DDE` theo `EXCEPTION_CATEGORY +
+SYSTEMNAME='CLOS'`, lấy `REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE`.
+
+**⚠️ Đánh giá kiến trúc — `PHAN_LOAI_DDE` chuyển từ SB_DWH sang đây
+(review 2026-09-22, sửa lỗi vi phạm layer boundary):** thiết kế ban đầu
+(SRS BC7 cập nhật 2026-09-18) đặt công thức `LEFT JOIN REF_PHAN_LOAI_DDE`
+ngay tại tầng SB_DWH (`FCT_CLOS_EXCEPTION`, xem `hld/HLD_FCT_SB_DWH.md`
+mục 1.2.2.4) — nhưng điều này sai kiến trúc: `hld/HLD_REF.md` (đầu
+Section 2.4) xác nhận `REF_PHAN_LOAI_DDE` (cùng 9 bảng REF_/TMP_REF_/
+Q_RLOS_REF_ khác) **chỉ tồn tại vật lý ở tầng PDTD_DTM**, BA insert/update
+thủ công trực tiếp tại đây, không qua STG_LOS/CDC — không có bản SB_DWH.
+Một bảng SB_DWH không thể JOIN trực tiếp một bảng chỉ tồn tại vật lý ở
+PDTD_DTM (vi phạm chiều dữ liệu chuẩn STG_LOS→SB_DWH→STG_DTM→PDTD_DTM).
+Đúng theo nguyên tắc thiết kế của tài liệu này (xem "PDTD_DTM copies 1:1
+from SB_DWH... **may then** LEFT JOIN REF_" — JOIN vào bảng REF_ là đặc
+quyền riêng của tầng PDTD_DTM), công thức đã chuyển hẳn sang tính tại
+đây, cùng cách `LOANCASEID` đang làm. `FCT_CLOS_EXCEPTION` ở tầng SB_DWH
+nay KHÔNG còn cột `PHAN_LOAI_DDE` (còn 14 cột, xem
+`hld/HLD_FCT_SB_DWH.md` mục 1.2.2.4).
 
 ###### 2.2.2.5 FCT_CLOS_DEVIATION
 
@@ -430,7 +467,7 @@ thức khác nhau theo hệ. Tách theo đúng nguyên tắc CLOS/RLOS đã áp 
 cho `FCT_LOS_WORKSTEP_EVENT` (2.2.2.6/2.3.2.7) — mỗi bảng chỉ còn đúng 1
 nhánh `APPLICATION_SK`. Đổi tên thêm `LOAN` (`FCT_CLOS_LOAN_DISBURSEMENT`)
 để phân biệt với khái niệm giải ngân bảo lãnh (`MD`, xử lý riêng tại
-`FCT_LOS_KPI_YTD_DAILY`, không có bảng vật lý) —
+`AGG_LOS_KPI_YTD_DAILY`, không có bảng vật lý) —
 `LOAN` = hợp đồng vay, `MD` = hợp đồng bảo lãnh.
 
 **Ghi chú lineage — bảng đặc thù, nguồn T24 giống `DIM_T24_CUSTOMER`:**
@@ -607,20 +644,27 @@ flowchart LR
         C["FCT_RLOS_EXCEPTION"]
     end
     subgraph PDTD_DTM
+        REF(["REF_PHAN_LOAI_DDE"])
         D["FCT_RLOS_EXCEPTION"]
     end
     C -->|bê 1:1| D
+    REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='RLOS' — sinh PHAN_LOAI_DDE (review 2026-09-22, chuyển từ SB_DWH)"| D
 ```
 
 **Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain/PK (`DAYID +
 WI_NAME + EXCEPTION_CATEGORY + RAISED_BY + RAISED_DATE_TIME`), cùng đầy
-đủ 14 cột (11 cột gốc + `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
-`PHAN_LOAI_DDE` đã tính sẵn ở tầng SB_DWH — xem đánh giá kiến trúc tại
-Section 1 → 1. SB_DWH → 1.3.2.5). Không đọc thêm `NG_SB_RLOS_ENTRY_EXIT`
-hay bất kỳ bảng STG_LOS nào ở tầng này, giữ đúng nguyên tắc "DTM chỉ đọc
-DWH". Bổ sung duy nhất 1 cột phái sinh tại DTM: `LOANCASEID`, join qua
-`DIM_RLOS_APPLICATION.LOANCASEID` theo `APPLICATION_SK` — cùng cách
-`FCT_CLOS_EXCEPTION` (2.2.2.4) đã làm.
+đủ 13 cột (11 cột gốc + `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` đã tính sẵn
+ở tầng SB_DWH — xem Section 1 → 1. SB_DWH → 1.3.2.5). Không đọc thêm
+`NG_SB_RLOS_ENTRY_EXIT` hay bất kỳ bảng STG_LOS nào ở tầng này, giữ đúng
+nguyên tắc "DTM chỉ đọc DWH". Bổ sung 2 cột phái sinh tại DTM:
+`LOANCASEID` (join qua `DIM_RLOS_APPLICATION.LOANCASEID` theo
+`APPLICATION_SK` — cùng cách `FCT_CLOS_EXCEPTION`, 2.2.2.4, đã làm) và
+**`PHAN_LOAI_DDE`** (review 2026-09-22, chuyển tầng từ SB_DWH, cùng lý do
+đã áp dụng cho CLOS — xem "⚠️ Đánh giá kiến trúc" tại 2.2.2.4): `LEFT
+JOIN REF_PHAN_LOAI_DDE` theo `EXCEPTION_CATEGORY + SYSTEMNAME='RLOS'`,
+lấy `REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE` — cùng bảng REF_ dùng chung với
+CLOS. `FCT_RLOS_EXCEPTION` ở tầng SB_DWH nay KHÔNG còn cột
+`PHAN_LOAI_DDE` (còn 14 cột, xem `hld/HLD_FCT_SB_DWH.md` mục 1.3.2.5).
 
 ###### 2.3.2.6 FCT_RLOS_DEVIATION
 
@@ -768,22 +812,22 @@ Section 2), giảm từ 16 xuống 15 cột.
 
 ### 2.1 Bộ bảng CHUNG
 
-##### 2.1.8 FCT_LOS_KPI_YTD_DAILY
+##### 2.1.8 AGG_LOS_KPI_YTD_DAILY — ĐỔI TIỀN TỐ FCT_ → AGG_ (review 2026-09-22, xem lý do ở Section 1)
 
-**Bảng cũ (trước tách):** `FCT_PDTD_KPI_YTD_DAILY` (36 cột, gồm 14 cột `_DAY` + 22 cột lũy kế/phái sinh) — đánh giá lại theo yêu cầu người dùng: chỉ giữ daily+lũy kế cho các chỉ tiêu đếm/tổng thật sự cần cộng dồn, bỏ hẳn cột đã là tỷ lệ/trung bình phái sinh (tính tại report), sửa lại nguồn `SLGN_CLOS`/`SLHS_*` theo đúng công thức SRS BC9 (không dùng cơ chế milestone-per-day của `FCT_PDTD_APPLICATION_MILESTONE` đã loại bỏ). Rà soát lại toàn bộ điều kiện lọc SRS BC9 (2026-09-15) phát hiện 2 điều kiện chưa đưa vào thiết kế trước đó — bổ sung `IS_TEST_ACCOUNT`/`VAR_STR12` (từ `FCT_LOS_KPI_APPLICATION`, 2.1.9) vào mọi công thức `_DAY` liên quan.
+**Bảng cũ (trước tách):** `FCT_PDTD_KPI_YTD_DAILY` (36 cột, gồm 14 cột `_DAY` + 22 cột lũy kế/phái sinh) — đánh giá lại theo yêu cầu người dùng: chỉ giữ daily+lũy kế cho các chỉ tiêu đếm/tổng thật sự cần cộng dồn, bỏ hẳn cột đã là tỷ lệ/trung bình phái sinh (tính tại report), sửa lại nguồn `SLGN_CLOS`/`SLHS_*` theo đúng công thức SRS BC9 (không dùng cơ chế milestone-per-day của `FCT_PDTD_APPLICATION_MILESTONE` đã loại bỏ). Rà soát lại toàn bộ điều kiện lọc SRS BC9 (2026-09-15) phát hiện 2 điều kiện chưa đưa vào thiết kế trước đó — bổ sung `IS_TEST_ACCOUNT`/`VAR_STR12` (từ `AGG_LOS_KPI_APPLICATION`, 2.1.9) vào mọi công thức `_DAY` liên quan.
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
-| 2 | SLHS_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS được phê duyệt, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên FCT_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', thỏa điều kiện DECISION đã phê duyệt, VÀ (join DIM_RLOS_APPLICATION qua APPLICATION_SK) BI_FLOW IN ('BL','KHCN_HO'), VÀ (join DIM_LOS_ORG_UNIT qua ORG_UNIT_SK) COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (theo đúng công thức SLHS_RLOS của SRS BC9 — SLHS(Nhóm 1)+SLHS(Nhóm 2), 2 nhóm bù trừ hoàn toàn theo SUB_PRODUCT/PRODUCT_NAME nên tổng bằng COUNT trên toàn bộ điều kiện lọc chung, không cần tách nhóm khi tính) |
+| 2 | SLHS_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS được phê duyệt, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', thỏa điều kiện DECISION đã phê duyệt, VÀ (join DIM_RLOS_APPLICATION qua APPLICATION_SK) BI_FLOW IN ('BL','KHCN_HO'), VÀ (join DIM_LOS_ORG_UNIT qua ORG_UNIT_SK) COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (theo đúng công thức SLHS_RLOS của SRS BC9 — SLHS(Nhóm 1)+SLHS(Nhóm 2), 2 nhóm bù trừ hoàn toàn theo SUB_PRODUCT/PRODUCT_NAME nên tổng bằng COUNT trên toàn bộ điều kiện lọc chung, không cần tách nhóm khi tính) |
 | 3 | SLHS_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_RLOS(D) = SLHS_RLOS(D-1) + SLHS_RLOS_DAY(D), reset vào 1/1. Trường SLHS_RLOS của BC9 |
-| 4 | SLGN_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS đã giải ngân (tồn tại hợp đồng trên STG_FCT_LOAN), phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên FCT_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', BI_FLOW IN ('BL','KHCN_HO'), COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (cùng 2 join như SLHS_RLOS_DAY), VÀ EXISTS hợp đồng STG_FCT_LOAN theo SEAB_LOS_ID |
+| 4 | SLGN_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS đã giải ngân (tồn tại hợp đồng trên STG_FCT_LOAN), phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', BI_FLOW IN ('BL','KHCN_HO'), COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (cùng 2 join như SLHS_RLOS_DAY), VÀ EXISTS hợp đồng STG_FCT_LOAN theo SEAB_LOS_ID |
 | 5 | SLGN_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_RLOS(D) = SLGN_RLOS(D-1) + SLGN_RLOS_DAY(D), reset vào 1/1. Trường SLGN_RLOS của BC9 |
 | 6 | SLHS_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS được phê duyệt, phát sinh trong ngày — cùng cách SLHS_RLOS_DAY, DATASOURCE='CLOS', IS_TEST_ACCOUNT != 'Y' VÀ VAR_STR12 IS NOT NULL, VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — điều kiện tương đương BI_FLOW của RLOS, SRS BC9 dùng STREAM trên NG_SB_CLOS_APPROVAL riêng cho CLOS), theo công thức SLHS_CLOS của SRS BC9 |
 | 7 | SLHS_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_CLOS(D) = SLHS_CLOS(D-1) + SLHS_CLOS_DAY(D), reset vào 1/1. Trường SLHS_CLOS của BC9 |
-| 8 | SLGN_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS đã giải ngân, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên FCT_LOS_KPI_APPLICATION (DATASOURCE='CLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', VAR_STR12 IS NOT NULL, VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17, cùng lý do SLHS_CLOS_DAY), VÀ EXISTS hợp đồng trên STG_FCT_LOAN (nhánh LD, review 2026-09-18: SRS BC9 cập nhật đổi khóa nối từ SEAB_LOS_ID+CUSTOMER_CODE sang nối theo VAR_STR12 — xem PENDING mới) HOẶC STG_DTM.STG_FCT_MD (nhánh MD, bảo lãnh) theo SEAB_LOS_ID+CUSTOMER — đúng công thức SLGN_CLOS của SRS BC9. Xem Section 3 dòng #18 (đã giải quyết, cập nhật nhánh LD) |
+| 8 | SLGN_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS đã giải ngân, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='CLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', VAR_STR12 IS NOT NULL, VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17, cùng lý do SLHS_CLOS_DAY), VÀ EXISTS hợp đồng trên STG_FCT_LOAN (nhánh LD, review 2026-09-18: SRS BC9 cập nhật đổi khóa nối từ SEAB_LOS_ID+CUSTOMER_CODE sang nối theo VAR_STR12 — xem PENDING mới) HOẶC STG_DTM.STG_FCT_MD (nhánh MD, bảo lãnh) theo SEAB_LOS_ID+CUSTOMER — đúng công thức SLGN_CLOS của SRS BC9. Xem Section 3 dòng #18 (đã giải quyết, cập nhật nhánh LD) |
 | 9 | SLGN_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_CLOS(D) = SLGN_CLOS(D-1) + SLGN_CLOS_DAY(D), reset vào 1/1. Trường SLGN_CLOS của BC9 |
-| 10 | TAT_RLOS_SEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS CÓ tài sản bảo đảm, phát sinh trong ngày — SUM lại từ FCT_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR theo PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', lọc SEC theo COLLREQUIRE |
+| 10 | TAT_RLOS_SEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS CÓ tài sản bảo đảm, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR theo PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', lọc SEC theo COLLREQUIRE |
 | 11 | TAT_RLOS_SEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS có tài sản bảo đảm, phát sinh trong ngày — mẫu số của TAT_RLOS_SEC, cùng điều kiện lọc trên |
 | 12 | TAT_RLOS_SEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_SUM_HOUR_DAY(D), reset vào 1/1 |
 | 13 | TAT_RLOS_SEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_CASE_CNT_DAY(D), reset vào 1/1 |
@@ -791,11 +835,11 @@ Section 2), giảm từ 16 xuống 15 cột.
 | 15 | TAT_RLOS_UNSEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS không có tài sản bảo đảm, phát sinh trong ngày |
 | 16 | TAT_RLOS_UNSEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 |
 | 17 | TAT_RLOS_UNSEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 |
-| 18 | TAT_CLOS_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ CLOS, phát sinh trong ngày — SUM lại từ FCT_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (DATASOURCE='CLOS') theo PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y' (không lọc VAR_STR12 — SRS không nhắc điều kiện này cho TAT_CLOS), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — SRS BC9 có điều kiện này riêng cho TAT_CLOS) |
+| 18 | TAT_CLOS_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ CLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (DATASOURCE='CLOS') theo PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y' (không lọc VAR_STR12 — SRS không nhắc điều kiện này cho TAT_CLOS), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — SRS BC9 có điều kiện này riêng cho TAT_CLOS) |
 | 19 | TAT_CLOS_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS, phát sinh trong ngày — mẫu số của TAT_CLOS, cùng điều kiện lọc trên (bao gồm STREAM) |
 | 20 | TAT_CLOS_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 |
 | 21 | TAT_CLOS_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 |
-| 22 | QUY_DOI_RLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ RLOS, phát sinh trong ngày — SUM lại từ FCT_LOS_KPI_APPLICATION.QUY_DOI (DATASOURCE='RLOS') theo PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', KHÔNG tính lại công thức POINT*8/VOLUME ở đây |
+| 22 | QUY_DOI_RLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ RLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.QUY_DOI (DATASOURCE='RLOS') theo PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', KHÔNG tính lại công thức POINT*8/VOLUME ở đây |
 | 23 | QUY_DOI_RLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_RLOS(D) = QUY_DOI_RLOS(D-1) + QUY_DOI_RLOS_DAY(D), reset vào 1/1. Trường QUY_DOI_RLOS của BC9 |
 | 24 | QUY_DOI_CLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ CLOS, phát sinh trong ngày — cùng cách trên (IS_TEST_ACCOUNT != 'Y'), DATASOURCE='CLOS' |
 | 25 | QUY_DOI_CLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_CLOS(D) = QUY_DOI_CLOS(D-1) + QUY_DOI_CLOS_DAY(D), reset vào 1/1. Trường QUY_DOI_CLOS của BC9 |
@@ -824,7 +868,7 @@ mục "chưa thiết kế" cũ của 2.1.9):** tài liệu lineage gốc dùng
 FIRST_VALID_APPROVAL/FIRST_DISBURSEMENT trong ngày". Đối chiếu lại công
 thức SRS BC9 gốc (`SLHS_*`, `SLGN_*`) xác nhận điều kiện lọc thực tế là
 `PROCESSED_DATE` (ngày phê duyệt/từ chối hồ sơ, đã có sẵn trên
-`FCT_LOS_KPI_APPLICATION.PROCESSED_DATE`, xem 2.1.9) trong khoảng từ đầu
+`AGG_LOS_KPI_APPLICATION.PROCESSED_DATE`, xem 2.1.9) trong khoảng từ đầu
 năm đến ngày hiện tại — không cần bảng milestone riêng, không cần biết
 ngày giải ngân T24 thực tế của hợp đồng. Người dùng xác nhận mục tiêu
 là tính lũy kế đến ngày hiện tại theo đúng công thức SRS — nên bỏ hẳn
@@ -876,9 +920,9 @@ trong ngày". Tạm giữ nguyên thiết kế cột (nối theo `SEAB_LOS_ID`+
 cho tới khi có xác nhận, xem Section 3 dòng #47 (file tổng
 `hld/HLD_Table_Design.md`).
 
-##### 2.1.9 FCT_LOS_KPI_APPLICATION
+##### 2.1.9 AGG_LOS_KPI_APPLICATION — ĐỔI TIỀN TỐ FCT_ → AGG_ (review 2026-09-22, xem lý do ở Section 1)
 
-**Bảng cũ (trước tách):** `FCT_PDTD_KPI_APPLICATION` (16 cột) — giữ nguyên phạm vi, xác nhận lại vai trò: input duy nhất theo grain hồ sơ cho `FCT_LOS_KPI_YTD_DAILY` (2.1.8) SUM/COUNT lên grain ngày, không tự mình pre-aggregate SLHS/SLGN/TAT
+**Bảng cũ (trước tách):** `FCT_PDTD_KPI_APPLICATION` (16 cột) — giữ nguyên phạm vi, xác nhận lại vai trò: input duy nhất theo grain hồ sơ cho `AGG_LOS_KPI_YTD_DAILY` (2.1.8) SUM/COUNT lên grain ngày, không tự mình pre-aggregate SLHS/SLGN/TAT
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -887,20 +931,20 @@ cho tới khi có xác nhận, xem Section 3 dòng #47 (file tổng
 | 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION hoặc DIM_RLOS_APPLICATION tùy DATASOURCE. Mặc định -1 |
 | 4 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT hoặc DIM_RLOS_PRODUCT tùy DATASOURCE. Mặc định -1 |
 | 5 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_ORG_UNIT. Mặc định -1 |
-| 6 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — nguồn FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE/FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE. Là mốc để FCT_LOS_KPI_YTD_DAILY (2.1.8) xếp hồ sơ vào đúng DAYID khi SUM/COUNT lên grain ngày |
+| 6 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — nguồn FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE/FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE. Là mốc để AGG_LOS_KPI_YTD_DAILY (2.1.8) xếp hồ sơ vào đúng DAYID khi SUM/COUNT lên grain ngày |
 | 7 | VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH: theo DECISION nếu đã phê duyệt/từ chối = 1.0; nếu đã CancelRevoke/CancelPermanent thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại NULL. Tính từ UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT toàn bộ lịch sử hồ sơ |
 | 8 | POINT | NUMBER | N | 12,4 |  | Điểm KPI — RLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCT_LINE_NAME qua DIM_RLOS_PRODUCT + SYSTEM_CODE='RLOS', review 2026-09-21: không còn đọc từ DIM_RLOS_APPLICATION) + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER (từ RLOS_REF_SLA_TDKHCN, vẫn đọc qua DIM_RLOS_APPLICATION như cũ); CLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCT_LINE_NAME+PRODUCT_NAME qua DIM_CLOS_PRODUCT+CHANGE_REQUEST qua DIM_CLOS_APPLICATION + SYSTEM_CODE='CLOS', review 2026-09-21: đóng gap CLOS chưa từng có thiết kế) + NVL(SLA_CREDIT_OFFICER theo CLOS_REF_SLA_TDKHDN/TDKHDNL) + NVL(SLA_CREDIT_APPROVER...), riêng APP_GRP='C1' cộng thêm hằng số 4 giờ (xem 2.4.7) |
-| 9 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi — PHÁI SINH: POINT*8/VOLUME (sửa lại đúng chiều phép tính theo nguyên văn SRS BC9, review 2026-09-17 — bản cũ ghi nhầm POINT/8*VOLUME, sai lệch tới 64 lần), NULL nếu VOLUME NULL. Là đầu vào duy nhất của QUY_DOI_RLOS_DAY/QUY_DOI_CLOS_DAY ở FCT_LOS_KPI_YTD_DAILY (2.1.8) |
+| 9 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi — PHÁI SINH: POINT*8/VOLUME (sửa lại đúng chiều phép tính theo nguyên văn SRS BC9, review 2026-09-17 — bản cũ ghi nhầm POINT/8*VOLUME, sai lệch tới 64 lần), NULL nếu VOLUME NULL. Là đầu vào duy nhất của QUY_DOI_RLOS_DAY/QUY_DOI_CLOS_DAY ở AGG_LOS_KPI_YTD_DAILY (2.1.8) |
 | 10 | TAT_APPLICATION_HOUR | NUMBER | N | 18,6 |  | Tổng thời gian xử lý của hồ sơ, đơn vị giờ — RLOS = DDE+QC+UWM+UWC+APPROVER; CLOS = như RLOS cộng thêm COMMITTEE. Loại trừ ngày nghỉ/giờ ngoài hành chính (get_business_minute). CHỈ tính các sự kiện có `BI_FLAG_APPROVAL = 'First Approval'` trên `FCT_CLOS/RLOS_WORKSTEP_EVENT` (review 2026-09-17 — đúng công thức "chỉ lấy hồ sơ được phê duyệt lần đầu" của SRS BC9, khớp 100% điều kiện WORKSTEP/DECISION đã dùng để tính `BI_FLAG_APPROVAL` cho BC5, xem 1.2.2.6/1.3.2.7 cột 20/22) — loại trừ thời gian của vòng làm lại (rework) sau lần EXIT đầu tiên khỏi CreditApproval/CreditCommittee |
 | 11 | TSBD_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 2 tài sản bảo đảm trở lên (RLOS-only — SRS BC9 chỉ định nghĩa field này trong khối "Nguồn RLOS", không có bản sao ở khối "Nguồn CLOS" (5 field cơ bản, không gồm TSBD_G2) và không có báo cáo nào khác trong BC1-BC11 cần TSBD_G2 cho CLOS — để NULL nhánh CLOS, review 2026-09-17: bản cũ tính cả CLOS là thiết kế thừa, không phục vụ báo cáo nào, đã bỏ, nhất quán với INCOM_3/BUSINESS_INCOM) — PHÁI SINH đúng nguyên văn SRS: UNION 4 bảng NG_SB_RLOS_COL_OTHER/COL_REALESTATE/COL_TRANSPORT/COL_VALPAPER (qua FCT_RLOS_COLLATERAL), CHỈ lấy DAYID = MAX(DAYID) của từng WI_NAME (ảnh chụp gần nhất — nguồn là full-snapshot-mỗi-ngày theo PK DAYID+WI_NAME+COLLATERAL_BK, review 2026-09-17: không lọc DAYID sẽ đếm nhân theo số ngày tài sản còn tồn tại), rồi COUNT(*) theo WI_NAME trên các dòng đã lọc (review 2026-09-17: sửa từ COUNT DISTINCT COLLATERAL_BK — SRS chỉ nói "đếm số lượng dòng", không có khái niệm loại trùng theo nội dung/hash), >= 2 thì 'YES' (review 2026-09-17: SRS Ý nghĩa field ghi "từ 02 trở lên" nhưng Cách lấy dữ liệu ghi literal "=2" — áp dụng >=2 theo đúng ý nghĩa nghiệp vụ, nhiều khả năng "=2" là lỗi soạn thảo SRS) |
 | 12 | INCOM_3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 nguồn thu trở lên (RLOS-only — SRS không định nghĩa cho CLOS, để NULL nhánh CLOS) — đếm cờ REPAYFLAGS >= 3 thì 'YES' |
 | 13 | BUSINESS_INCOM | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh, không áp dụng SeAPro/SeALand (RLOS-only — để NULL nhánh CLOS) — PHÁI SINH đúng nguyên văn SRS BC9: 'YES' nếu (`UPPER(NG_SB_RLOS_EXTTABLE.PRODUCT_NAME) NOT LIKE '%SEAPRO%' AND NOT LIKE '%SEALAND%'`) AND (`NVL(NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG,'No')='Yes' OR NVL(.ENTERPRISSEFLAG,'No')='Yes' OR NVL(.NONLICFLAG,'No')='Yes'`); còn lại 'NO'. Cùng công thức với FCT_RLOS_APPLICATION_DAILY.FLAG_BUSINESS_INCOME (1.3.2.1) |
 | 14 | DEVIATION_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có đúng 2 ngoại lệ — PHÁI SINH: đếm dòng trên bảng ngoại lệ tương ứng (FCT_CLOS_DEVIATION/FCT_RLOS_DEVIATION), CHỈ lấy DAYID = MAX(DAYID) của từng WI_NAME (ảnh chụp gần nhất — 2 bảng nguồn là full-snapshot-mỗi-ngày theo PK DAYID+WI_NAME+DEVIATION_BK, review 2026-09-17: không lọc DAYID sẽ đếm nhân theo số ngày ngoại lệ còn tồn tại), rồi COUNT(*) theo WI_NAME trên các dòng đã lọc (review 2026-09-17: sửa từ COUNT DISTINCT DEVIATION_BK — nguyên văn SRS BC9 dùng "Đếm số lượng dòng (sl_condition) theo WI_NAME", không có khái niệm loại trùng theo nội dung/hash; DEVIATION_BK loại trừ cột REASON khỏi hash nên 2 ngoại lệ thật khác nhau chỉ khác REASON sẽ bị đếm hụt nếu dùng COUNT DISTINCT), = 2 thì 'YES' |
 | 15 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ trở lên — cùng cách lọc DAYID mới nhất + COUNT(*) theo WI_NAME trên các dòng đã lọc (review 2026-09-17: sửa từ COUNT DISTINCT DEVIATION_BK, cùng lý do cột DEVIATION_G2 — khớp nguyên văn SRS BC9/BC5 "Count số dòng"), >= 3 thì 'YES' |
-| 16 | IS_TEST_ACCOUNT | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có tồn tại (bất kỳ dòng lịch sử nào) USERNAME thuộc 2 tài khoản test/kỹ thuật ('hanh.nh2','hai.bt2') — EXISTS trên UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT, toàn bộ lịch sử hồ sơ. FCT_LOS_KPI_YTD_DAILY (2.1.8) loại các hồ sơ IS_TEST_ACCOUNT='Y' khỏi MỌI phép COUNT/SUM _DAY (SLHS/SLGN/TAT/QUY_DOI) |
-| 17 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE (CLOS-only, RLOS luôn NULL) — nguồn FCT_CLOS_APPLICATION_DAILY.VAR_STR12 (1.2.2.1, cột 61). Dùng làm điều kiện lọc IS NOT NULL riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY tại FCT_LOS_KPI_YTD_DAILY — KHÔNG áp dụng cho TAT_CLOS_DAY/QUY_DOI_CLOS_DAY |
+| 16 | IS_TEST_ACCOUNT | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có tồn tại (bất kỳ dòng lịch sử nào) USERNAME thuộc 2 tài khoản test/kỹ thuật ('hanh.nh2','hai.bt2') — EXISTS trên UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT, toàn bộ lịch sử hồ sơ. AGG_LOS_KPI_YTD_DAILY (2.1.8) loại các hồ sơ IS_TEST_ACCOUNT='Y' khỏi MỌI phép COUNT/SUM _DAY (SLHS/SLGN/TAT/QUY_DOI) |
+| 17 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE (CLOS-only, RLOS luôn NULL) — nguồn FCT_CLOS_APPLICATION_DAILY.VAR_STR12 (1.2.2.1, cột 61). Dùng làm điều kiện lọc IS NOT NULL riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY tại AGG_LOS_KPI_YTD_DAILY — KHÔNG áp dụng cho TAT_CLOS_DAY/QUY_DOI_CLOS_DAY |
 
-- Bảng FACT chấm điểm KPI, lưu điểm KPI của từng hồ sơ, phục vụ BC9 (là input pre-aggregate duy nhất cho `FCT_LOS_KPI_YTD_DAILY`, 2.1.8, không tự thân hiển thị lũy kế). Grain: 1 dòng = 1 hồ sơ (WI_NAME) × 1 hệ nguồn (DATASOURCE).
+- Bảng FACT chấm điểm KPI, lưu điểm KPI của từng hồ sơ, phục vụ BC9 (là input pre-aggregate duy nhất cho `AGG_LOS_KPI_YTD_DAILY`, 2.1.8, không tự thân hiển thị lũy kế). Grain: 1 dòng = 1 hồ sơ (WI_NAME) × 1 hệ nguồn (DATASOURCE).
 - Khóa chính của bảng (PK): **WI_NAME, DATASOURCE**.
 
 **So với thiết kế cũ (`FCT_PDTD_KPI_APPLICATION`, 16 cột):** bỏ `DAYID`
@@ -992,27 +1036,29 @@ cột nào ở layer này, không có REF_ nào join thêm.
 **Bảng cũ (trước tách):** `FCT_PDTD_EXCEPTION` → tách phần CLOS thành `FCT_CLOS_EXCEPTION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.2 Bộ bảng CLOS → 1.2.2.4 FCT_CLOS_EXCEPTION — 15 cột (đã gồm
-`DATASOURCE`), đã có sẵn `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
-`PHAN_LOAI_DDE`), bổ sung:
+1.2 Bộ bảng CLOS → 1.2.2.4 FCT_CLOS_EXCEPTION — 14 cột (đã gồm
+`DATASOURCE`), đã có sẵn `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`), bổ sung:
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
+| 15 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (review 2026-09-22, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" tại Section 1 → 2.2.2.4): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='CLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE |
 | 16 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ — PHÁI SINH: JOIN sang DIM_CLOS_APPLICATION theo APPLICATION_SK, lấy LOANCASEID |
 
-- Bảng FACT chi tiết (nhân dòng), bê 1:1 từ SB_DWH, bổ sung LOANCASEID cho BC7/BC11.
+- Bảng FACT chi tiết (nhân dòng), bê 1:1 từ SB_DWH, bổ sung PHAN_LOAI_DDE/LOANCASEID cho BC7/BC11.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME** (giữ nguyên như SB_DWH).
 
 **So với thiết kế cũ (`FCT_PDTD_EXCEPTION` gộp, 16 cột):** bỏ `DATASOURCE`
-(luôn cố định 'CLOS'). Còn 15 cột — 14 cột bê 1:1 từ SB_DWH (đã gồm
-`CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE` tính sẵn ở đó, xem
-đánh giá kiến trúc tại Section 1/2 → 1.2.2.4) + 1 cột phái sinh riêng của
-tầng DTM (`LOANCASEID`). Không đọc thêm STG_LOS nào ở tầng này — giữ đúng
-nguyên tắc "DTM chỉ đọc DWH".
+(luôn cố định 'CLOS'). Còn 15 cột — 13 cột bê 1:1 từ SB_DWH (đã gồm
+`CHECK_FTR`/`FIRST_WORKSTEP_RETURN` tính sẵn ở đó, xem Section 1/2 →
+1.2.2.4) + 2 cột phái sinh riêng của tầng DTM (`PHAN_LOAI_DDE` — chuyển
+từ SB_DWH, review 2026-09-22 — và `LOANCASEID`). Không đọc thêm STG_LOS
+nào ở tầng này — giữ đúng nguyên tắc "DTM chỉ đọc DWH" (`PHAN_LOAI_DDE`
+đọc `REF_PHAN_LOAI_DDE`, một bảng PDTD_DTM, không phải STG_LOS).
 
 **Đối chiếu SRS (BC7):** `CHECK_FTR`, `FIRST_WORKSTEP_RETURN`,
-`PHAN_LOAI_DDE`, `LOANCASEID` khớp đúng công thức SRS nêu (3 cột đầu bê
-nguyên từ SB_DWH, đã đối chiếu tại 1.2.2.4; `LOANCASEID` join
+`PHAN_LOAI_DDE`, `LOANCASEID` khớp đúng công thức SRS nêu (2 cột đầu bê
+nguyên từ SB_DWH, đã đối chiếu tại 1.2.2.4; `PHAN_LOAI_DDE` tính tại đây
+theo REF_PHAN_LOAI_DDE, xem cột 15 ở trên; `LOANCASEID` join
 `DIM_CLOS_APPLICATION` không đổi so với thiết kế gốc).
 
 ###### 2.2.2.5 FCT_CLOS_DEVIATION
@@ -1059,7 +1105,7 @@ polymorphic; `CUST_GROUP`/`LOANCASEID`/`APPROVAL_WINAME_LOS` chỉ CLOS có
 giá trị; `APPROVAL_DATE` 2 công thức khác nhau) — tách thành
 `FCT_CLOS_LOAN_DISBURSEMENT`/`FCT_RLOS_LOAN_DISBURSEMENT`, đổi tên thêm
 `LOAN` để phân biệt với khái niệm giải ngân bảo lãnh (`MD`, xử lý riêng
-tại `FCT_LOS_KPI_YTD_DAILY`, không có bảng vật lý). Xem lý
+tại `AGG_LOS_KPI_YTD_DAILY`, không có bảng vật lý). Xem lý
 do tách đầy đủ tại Section 1 → 2.2.2.7.
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
@@ -1176,28 +1222,31 @@ cột nào ở layer này, không có REF_ nào join thêm.
 **Bảng cũ (trước tách):** `FCT_PDTD_EXCEPTION` → tách phần RLOS thành `FCT_RLOS_EXCEPTION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.2.5 FCT_RLOS_EXCEPTION — 15 cột (đã gồm
-`DATASOURCE`), đã có sẵn `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
-`PHAN_LOAI_DDE` tính sẵn ở tầng SB_DWH), bổ sung:
+1.3 Bộ bảng RLOS → 1.3.2.5 FCT_RLOS_EXCEPTION — 14 cột (đã gồm
+`DATASOURCE`), đã có sẵn `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` tính sẵn ở
+tầng SB_DWH), bổ sung:
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
+| 15 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (review 2026-09-22, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" tại Section 1 → 2.2.2.4): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='RLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE |
 | 16 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ — PHÁI SINH: JOIN sang DIM_RLOS_APPLICATION theo APPLICATION_SK, lấy LOANCASEID |
 
-- Bảng FACT chi tiết (nhân dòng), bê 1:1 từ SB_DWH, bổ sung LOANCASEID cho BC7/BC11.
+- Bảng FACT chi tiết (nhân dòng), bê 1:1 từ SB_DWH, bổ sung PHAN_LOAI_DDE/LOANCASEID cho BC7/BC11.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME** (giữ nguyên như SB_DWH).
 
 **So với thiết kế cũ (`FCT_PDTD_EXCEPTION` gộp, 16 cột):** bỏ `DATASOURCE`
-(luôn cố định 'RLOS'). Còn 15 cột — 14 cột bê 1:1 từ SB_DWH (đã gồm
-`CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE` tính sẵn ở đó, xem
-đánh giá kiến trúc tại Section 1/2 → 1.3.2.5) + 1 cột phái sinh riêng của
-tầng DTM (`LOANCASEID`). Không đọc thêm STG_LOS nào ở tầng này — giữ đúng
-nguyên tắc "DTM chỉ đọc DWH".
+(luôn cố định 'RLOS'). Còn 15 cột — 13 cột bê 1:1 từ SB_DWH (đã gồm
+`CHECK_FTR`/`FIRST_WORKSTEP_RETURN` tính sẵn ở đó, xem Section 1/2 →
+1.3.2.5) + 2 cột phái sinh riêng của tầng DTM (`PHAN_LOAI_DDE` — chuyển
+từ SB_DWH, review 2026-09-22 — và `LOANCASEID`). Không đọc thêm STG_LOS
+nào ở tầng này — giữ đúng nguyên tắc "DTM chỉ đọc DWH" (`PHAN_LOAI_DDE`
+đọc `REF_PHAN_LOAI_DDE`, một bảng PDTD_DTM, không phải STG_LOS).
 
 **Đối chiếu SRS (BC7):** `CHECK_FTR`, `FIRST_WORKSTEP_RETURN`,
 `PHAN_LOAI_DDE`, `LOANCASEID` khớp đúng công thức SRS nêu cho nhánh RLOS
-(3 cột đầu bê nguyên từ SB_DWH, đã đối chiếu tại 1.3.2.5; `LOANCASEID`
-join `DIM_RLOS_APPLICATION` không đổi so với thiết kế gốc).
+(2 cột đầu bê nguyên từ SB_DWH, đã đối chiếu tại 1.3.2.5; `PHAN_LOAI_DDE`
+tính tại đây theo REF_PHAN_LOAI_DDE, xem cột 15 ở trên; `LOANCASEID` join
+`DIM_RLOS_APPLICATION` không đổi so với thiết kế gốc).
 
 ###### 2.3.2.6 FCT_RLOS_DEVIATION
 

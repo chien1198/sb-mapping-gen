@@ -641,7 +641,7 @@ flowchart LR
 (`TAT_RLOS`) cho thấy đây không phải 2 thuộc tính bền vững của sản phẩm
 mà là **quy tắc phân nhóm SEC/UNSEC riêng của `TAT_RLOS`** (dùng danh
 sách `PRODUCT_NAME` cố định + điều kiện `COLLREQUIRE`, đã cài trực tiếp
-ở `TAT_RLOS_SEC_*`/`TAT_RLOS_UNSEC_*` của `FCT_LOS_KPI_YTD_DAILY`, 2.1.8
+ở `TAT_RLOS_SEC_*`/`TAT_RLOS_UNSEC_*` của `AGG_LOS_KPI_YTD_DAILY`, 2.1.8
 — join `PRODUCT_NAME`/`SUB_PRODUCT_CODE` qua `DIM_RLOS_PRODUCT`), không
 tạo cột cờ trên DIM.
 
@@ -652,7 +652,7 @@ Card/SeAHome-Fast), nhưng 2 nhóm đó **bù trừ hoàn toàn** (điều kiệ
 lập chính xác) nên `SLHS(Nhóm 1) + SLHS(Nhóm 2)` luôn bằng COUNT trên
 toàn bộ hồ sơ thỏa điều kiện lọc chung — không cần tách nhóm khi tính,
 không phải cùng 1 loại rule với `TAT_RLOS`. Xem chi tiết đối chiếu SRS
-đầy đủ tại `FCT_LOS_KPI_YTD_DAILY` (2.1.8, Section 1). Xem Section 3
+đầy đủ tại `AGG_LOS_KPI_YTD_DAILY` (2.1.8, Section 1). Xem Section 3
 dòng #3.
 
 ###### 2.3.1.3 DIM_RLOS_WORKSTEP — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_RLOS_MAS_DECISION từ SB_DWH, review 2026-09-18)
@@ -978,7 +978,7 @@ PENDING mới.
 | 2 | IS_WORKING_DAY | VARCHAR2 | Y | 1 |  | 'Y' nếu là ngày làm việc — đầu vào của hàm tính TAT theo giờ làm việc (get_business_minute). Nguồn SB_DWH.DIM_DATE.IS_WORKING_DAY |
 | 3 | REPORT_WEEK | VARCHAR2 | Y | 17 |  | Tuần báo cáo — khoảng ngày đầu tuần-cuối tuần (Thứ 2 đến Chủ nhật), dạng YYYYMMDD-YYYYMMDD (review 2026-09-17: sửa lại đúng định dạng SRS BC4, bản cũ ghi nhầm "YYYY-WW" số tuần ISO). Trường REPORT_WEEK của BC4. Nguồn SB_DWH.DIM_DATE.REPORT_WEEK |
 | 4 | YEAR_MONTH | VARCHAR2 | Y | 6 |  | Cột kỹ thuật group-theo-tháng của ngày (dạng YYYY-MM), phái sinh từ DAYID — dùng chuẩn cho các bảng chiều ngày. Nguồn SB_DWH.DIM_DATE.YEAR_MONTH (review 2026-09-17: bỏ tham chiếu "Trường YEAR_MONTH của BC9" — đối chiếu SRS xác nhận field YEAR_MONTH của BC9 thực chất là ngày đại diện cho tham số lọc "Năm báo cáo" do người dùng chọn, khác hẳn khái niệm cột tháng YYYY-MM này, không phải căn cứ nghiệp vụ hợp lệ cho cột) |
-| 5 | YEAR_ID | NUMBER | Y | 4 |  | Năm của ngày này — mốc reset các phép lũy kế YTD (khớp `KPI_YEAR` trên `REF_LOS_KPI_USER_YEAR`/`FCT_LOS_KPI_YTD_DAILY`, 2.1.7/2.1.8). Nguồn SB_DWH.DIM_DATE.YEAR_ID |
+| 5 | YEAR_ID | NUMBER | Y | 4 |  | Năm của ngày này — mốc reset các phép lũy kế YTD (khớp `KPI_YEAR` trên `REF_LOS_KPI_USER_YEAR`/`AGG_LOS_KPI_YTD_DAILY`, 2.1.7/2.1.8). Nguồn SB_DWH.DIM_DATE.YEAR_ID |
 
 - Bảng DIM chiều ngày dùng chung toàn ngân hàng, bê nguyên 1:1 từ `SB_DWH.DIM_DATE` — không tính lại `IS_WORKING_DAY` hay bất kỳ cột nào ở tầng PDTD_DTM. Phục vụ BC4, BC9, và mọi báo cáo lọc theo khoảng ngày.
 - Khóa chính của bảng (PK): **DAYID**.
@@ -1260,7 +1260,7 @@ SRS BC9 gốc xác nhận `TAT_RLOS` phân nhóm SEC/UNSEC bằng danh sách
 `SeAHome-Fast`, `SeAHome-Woman`, `SeAHome-Teacher`, `SeAFast_KTSBD_KD`,
 `SeAHome-Pro`) + điều kiện `COLLREQUIRE` — không phải 2 thuộc tính bền
 vững của sản phẩm, không đặt cột cờ trên DIM. Rule này đã cài trực tiếp
-tại `TAT_RLOS_SEC_*`/`TAT_RLOS_UNSEC_*` của `FCT_LOS_KPI_YTD_DAILY`
+tại `TAT_RLOS_SEC_*`/`TAT_RLOS_UNSEC_*` của `AGG_LOS_KPI_YTD_DAILY`
 (2.1.8, join `PRODUCT_NAME`/`SUB_PRODUCT_CODE` qua `DIM_RLOS_PRODUCT`).
 
 **Đính chính — `SLHS_RLOS`/`SLGN_RLOS` KHÔNG dùng điều kiện phân nhóm
@@ -1271,7 +1271,7 @@ lập chính xác) nên `SLHS(Nhóm 1) + SLHS(Nhóm 2)` luôn bằng COUNT trên
 toàn bộ hồ sơ thỏa điều kiện lọc chung — không cần tách nhóm khi tính,
 khác hẳn rule SEC/UNSEC của `TAT_RLOS`. Xem chi tiết đối chiếu SRS đầy
 đủ (gồm 2 điều kiện lọc bổ sung `BI_FLOW`/`COMPANY_CODE`) tại
-`FCT_LOS_KPI_YTD_DAILY` (2.1.8, Section 1). Xem Section 3 dòng #3.
+`AGG_LOS_KPI_YTD_DAILY` (2.1.8, Section 1). Xem Section 3 dòng #3.
 
 ###### 2.3.1.3 DIM_RLOS_WORKSTEP — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_DECISION, review 2026-09-18)
 

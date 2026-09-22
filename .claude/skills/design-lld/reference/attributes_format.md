@@ -112,8 +112,17 @@ SB_DWH. Tên bảng đích luôn nối thêm tiền tố `STG_` vào đúng tên
 
 | Loại bảng đích | Điều kiện cắt lát | Ghi ở dòng PK |
 |---|---|---|
-| Fact (`FCT_*`) | Chỉ lấy đúng 1 ngày = ngày ETL chạy (`etl_date`) | `etl_logic = <TÊN_BẢNG_SB_DWH>.<CỘT_PK> WHERE <cột ngày nghiệp vụ> = :ETL_DATE (hoặc tương đương DAYID/created ngày ETL)`; `note = "Cắt lát Fact: ..."` |
-| Dimension (`DIM_*`) | Lấy toàn bộ bản ghi đang hiệu lực (`EXP_DATE IS NULL`) **cộng thêm** mọi bản ghi có `EXP_DATE` rơi trong 3 ngày quá khứ gần nhất tính từ `etl_date` (để vẫn còn nhìn thấy version vừa đóng gần đây) | `etl_logic = <TÊN_BẢNG_SB_DWH>.<CỘT_PK> WHERE <TÊN_BẢNG_SB_DWH>.EXP_DATE IS NULL OR <TÊN_BẢNG_SB_DWH>.EXP_DATE >= :ETL_DATE - 3`; `note = "Cắt lát Dim: ..."` |
+| Fact (`FCT_*`) | Chỉ lấy đúng 1 ngày = ngày ETL chạy (`v_batch_date`) | `etl_logic = <TÊN_BẢNG_SB_DWH>.<CỘT_PK> WHERE <cột ngày nghiệp vụ> = v_batch_date (hoặc tương đương DAYID/created ngày ETL)`; `note = "Cắt lát Fact: ..."` |
+| Dimension (`DIM_*`) | Lấy toàn bộ bản ghi đang hiệu lực (`EXP_DATE IS NULL`) **cộng thêm** mọi bản ghi có `EXP_DATE` rơi trong 3 ngày quá khứ gần nhất tính từ `v_batch_date` (để vẫn còn nhìn thấy version vừa đóng gần đây) | `etl_logic = <TÊN_BẢNG_SB_DWH>.<CỘT_PK> WHERE <TÊN_BẢNG_SB_DWH>.EXP_DATE IS NULL OR <TÊN_BẢNG_SB_DWH>.EXP_DATE >= v_batch_date - 3`; `note = "Cắt lát Dim: ..."` |
+
+> **Tên biến tham số ngày ETL:** LUÔN dùng `v_batch_date` (biến batch ngày
+> chạy ETL hiện tại) — KHÔNG dùng `:ETL_DATE`/`:P_DATE` (2 ký hiệu cũ, coi
+> như lỗi thời kể từ review 2026-09-22, xem `self_review.md` mục "RV — Biến
+> tham số ngày ETL phải là `v_batch_date`"). Áp dụng cho MỌI chỗ dùng biến
+> ngày ETL trong `etl_logic`, không chỉ 2 mẫu cắt lát ở trên — bao gồm gán
+> trực tiếp `EFF_DATE` khi CDC phát hiện thay đổi (mục `scd2` bên dưới) và
+> mọi điều kiện JOIN theo hiệu lực thời gian (`BETWEEN EFF_DATE AND
+> NVL(EXP_DATE, v_batch_date)`).
 
 Mỗi cột `direct` từ SB_DWH sang STG_DTM giữ nguyên `etl_logic =
 <TÊN_BẢNG_SB_DWH>.<CỘT>` (copy nguyên giá trị, không biến đổi) —
@@ -242,41 +251,62 @@ là `PK` ở Dimension).
 | `etl_logic_type` | Khi dùng | `etl_logic` format |
 |---|---|---|
 | `direct` | Map thẳng 1 cột nguồn có sẵn trên **driving table**, không biến đổi | `source_table.source_column` |
-| `computed` | Cần tính toán trên chính driving table (CASE WHEN, arithmetic, TRUNC, hàm string, hash bằng `STANDARD_HASH`...) — mọi input đều từ driving table | `CASE WHEN driving.col = 'X' THEN ... END` |
-| `join` | Cần JOIN sang 1 bảng khác driving table để lấy thêm thông tin (kể cả LEFT JOIN, EXISTS, self-join, UNION nhiều bảng, join sang `REF_*`) | `JOIN other_table ON other_table.key = driving.key → other_table.target_col` |
+| `computed` | Cần tính toán trên chính driving table (CASE WHEN, arithmetic, TRUNC, hàm string, hash bằng `STANDARD_HASH`...) — mọi input đều từ driving table | `CASE WHEN <DRIVING_TABLE>.col = 'X' THEN ... END` (thay `<DRIVING_TABLE>` bằng tên bảng driving thật) |
+| `join` | Cần JOIN sang 1 bảng khác driving table để lấy thêm thông tin (kể cả LEFT JOIN, EXISTS, self-join, UNION nhiều bảng, join sang `REF_*`) | `LEFT JOIN other_table ON other_table.key = <DRIVING_TABLE>.key → other_table.target_col` (thay `<DRIVING_TABLE>` bằng tên bảng driving thật, KHÔNG viết nguyên văn chữ `driving`) |
 | `pending` | Chưa xác định được nguồn/công thức (HLD còn đánh dấu PENDING hoặc "⚠️ cần xác nhận BA") | *(để trống)*, `note` ghi rõ lý do PENDING lấy nguyên văn từ HLD Section 3 |
 | `generated` | Cột tự sinh, không map trực tiếp 1 nguồn cụ thể — dùng cho **mọi** cột `DIMENSION_KEY` (sequence) và **mọi** cột `_SK` (kể cả `<ENTITY>_SK` bằng đúng `DIMENSION_KEY` cùng dòng, và cột khóa nghiệp vụ hash như `COLLATERAL_BK` trên Fact khi nguồn không khai CDC key) | *(để trống)*, ghi rõ cách sinh trong `description`/`note` |
-| `scd2` | Cột `EFF_DATE`/`EXP_DATE` trên Dimension | `EFF_DATE`: `source_table.EFF_DATE` (hoặc `:P_DATE` tùy nguồn); `EXP_DATE`: luôn literal `NULL` (xem mục riêng bên dưới) |
+| `scd2` | Cột `EFF_DATE`/`EXP_DATE` trên Dimension | `EFF_DATE`: `source_table.EFF_DATE` (hoặc `v_batch_date` tùy nguồn); `EXP_DATE`: luôn literal `NULL` (xem mục riêng bên dưới) |
 
 **Quy tắc bắt buộc `table.column` prefix:** mọi tham chiếu cột trong
 `etl_logic` phải có tiền tố `<table>.` — trừ literal value, hàm SQL
-(`TRUNC(...)`, `COUNT(...)`), `NULL`, tham số runtime ETL (`:P_DATE`).
+(`TRUNC(...)`, `COUNT(...)`), `NULL`, tham số runtime ETL (`v_batch_date`
+— KHÔNG dùng `:ETL_DATE`/`:P_DATE`, xem ghi chú ở mục "Quy tắc lọc theo
+loại bảng" phía trên).
 
 **Quy tắc thứ tự JOIN trong `etl_logic` (khi `etl_logic_type = join`):**
-JOIN clause viết trước, dấu `→`, cột giá trị cuối cùng sau `→`:
+JOIN clause viết trước, dấu `→`, cột giá trị cuối cùng sau `→`. Mọi tham
+chiếu cột viết đầy đủ `table_name.column_name`, KHÔNG dùng alias rút gọn
+(`driving`, `ee`, `ext`...) — driving table của dòng CSV đó luôn viết tên
+bảng thật; nếu subquery cần alias cho derived table, đặt trùng tên bảng
+nguồn bên trong nó (trừ trường hợp self-join lại chính driving table —
+xem `self_review.md` mục "RV — Self-join lại chính driving table"):
 ```
-✅ JOIN DIM_CLOS_WORKSTEP ON DIM_CLOS_WORKSTEP.WORKSTEP_CODE = driving.WORKSTEP_CODE
-   AND :P_DATE BETWEEN DIM_CLOS_WORKSTEP.EFF_DATE AND NVL(DIM_CLOS_WORKSTEP.EXP_DATE, :P_DATE)
+✅ LEFT JOIN DIM_CLOS_WORKSTEP ON DIM_CLOS_WORKSTEP.WORKSTEP_CODE = NG_SB_CLOS_ENTRY_EXIT.WORKSTEP_CODE
+   AND v_batch_date BETWEEN DIM_CLOS_WORKSTEP.EFF_DATE AND NVL(DIM_CLOS_WORKSTEP.EXP_DATE, v_batch_date)
    → DIM_CLOS_WORKSTEP.WORKSTEP_SK
 ❌ DIM_CLOS_WORKSTEP.WORKSTEP_SK JOIN DIM_CLOS_WORKSTEP ON ...  (đọc ngược)
+❌ JOIN DIM_CLOS_WORKSTEP ON WORKSTEP_CODE=<current>.WORKSTEP_CODE ...  (ký hiệu <current> đã lỗi thời,
+   xem self_review.md mục "RV — etl_logic dùng ký hiệu <current>")
 ```
+
+**Aggregate lookup phụ trợ (MAX/MIN/SUM/COUNT trên bảng khác driving
+table):** viết dạng `LEFT JOIN (subquery aggregate) <alias> ON
+<alias>.<col> = <DRIVING_TABLE>.<col>` — điều kiện lọc phụ đặt trong
+`WHERE` của subquery (trước `GROUP BY`), KHÔNG đặt sau JOIN (nếu đặt sai
+chỗ, LEFT JOIN sẽ biến tướng thành INNER JOIN và làm mất các dòng driving
+không khớp điều kiện). Xem test case đầy đủ trong `self_review.md` mục
+"RV — etl_logic dùng ký hiệu `<current>`".
 
 **Multi-hop JOIN (2 tầng trở lên):** nối các JOIN clause liên tiếp bằng
 dấu `→` trước hop kế tiếp, chỉ hop cuối cùng dẫn ra cột giá trị:
 ```
-JOIN STG_DIM_COMPANY ON STG_DIM_COMPANY.COMPANY_CODE = driving.CO_CODE
+JOIN STG_DIM_COMPANY ON STG_DIM_COMPANY.COMPANY_CODE = <DRIVING_TABLE>.CO_CODE
   AND STG_DIM_COMPANY.COMPANY_EXP_DATE IS NULL
-→ LEFT JOIN TMP_REF_COMPANY_REGION_KHDN ON TMP_REF_COMPANY_REGION_KHDN.COMPANY_CODE = driving.CO_CODE
+→ LEFT JOIN TMP_REF_COMPANY_REGION_KHDN ON TMP_REF_COMPANY_REGION_KHDN.COMPANY_CODE = <DRIVING_TABLE>.CO_CODE
 → TMP_REF_COMPANY_REGION_KHDN.VUNG
 ```
 `source_table`/`source_column` trong trường hợp multi-hop ghi bảng/cột của
-**hop cuối cùng** (nơi giá trị thực sự lấy ra).
+**hop cuối cùng** (nơi giá trị thực sự lấy ra). `<DRIVING_TABLE>` ở đây là
+ký hiệu giải thích trong tài liệu này — khi viết `etl_logic` thật, luôn
+thay bằng tên bảng driving thật của dòng CSV đó (VD `NG_SB_CLOS_EXTTABLE`),
+không viết nguyên văn chữ `driving`.
 
 **Lookup sang DIM có hiệu lực theo thời gian (SCD2):** mọi `join` sang 1
 `DIM_*` để lấy `_SK` đều phải có điều kiện thời gian
-`:P_DATE BETWEEN EFF_DATE AND NVL(EXP_DATE, :P_DATE)` trong JOIN — không chỉ
-so khớp business key trần, trừ khi HLD nói rõ đây là lookup "current state
-only" (VD `STG_DIM_COMPANY` lookup `COMPANY_EXP_DATE IS NULL`).
+`v_batch_date BETWEEN EFF_DATE AND NVL(EXP_DATE, v_batch_date)` trong JOIN
+— không chỉ so khớp business key trần, trừ khi HLD nói rõ đây là lookup
+"current state only" (VD `STG_DIM_COMPANY` lookup `COMPANY_EXP_DATE IS
+NULL`).
 
 ---
 
@@ -330,8 +360,46 @@ nguồn thành 1 giá trị (VD `ADD_ID`/`ADD_ID_OTHER` trên `DIM_RLOS_APPLICAN
 `ID_TYPE` bằng dấu `;`) — đây **vẫn là 1 dòng CSV duy nhất**, không tách
 thành nhiều dòng. Dùng `etl_logic_type = computed` (hoặc `join` nếu bảng
 nguồn khác driving table), viết công thức LISTAGG/nối chuỗi đầy đủ trong
-`etl_logic`, ghi rõ điều kiện lọc nhóm trong `description`. Không có
-trường hợp pivot tách 1 attribute HLD thành nhiều dòng CSV trong dự án này.
+`etl_logic`, ghi rõ điều kiện lọc nhóm trong `description`. Đây là quy tắc
+cho pivot 1 attribute thật sự — KHÔNG áp dụng cho bảng UNION nhiều nguồn
+(xem mục ngay dưới).
+
+---
+
+## Bảng UNION nhiều nguồn không có driving table chung — lặp lại `target_column` theo từng khối nguồn
+
+Khác với pivot 1 cột (mục trên, vẫn 1 dòng CSV), có trường hợp **cả bảng
+đích build từ UNION nhiều bảng nguồn cùng cấp** (không bảng nào là driving
+table áp dụng cho toàn bộ dòng — mỗi bảng nguồn tự sinh ra 1 nhóm dòng
+FCT riêng, chỉ 1 tập con cột đích được populate, các cột khác NULL/không
+áp dụng). VD `FCT_RLOS_SUB_PRODUCT` (SB_DWH, 1.3.2.4): UNION 6 bảng
+(`NG_SB_RLOS_SUB_PRODUCT`/`CREDIT_CARD_APP`/`SEABUY_APP`/`CIVIL_APP`/
+`TEACHER_APP`/`WOMAN_APP`), mỗi bảng có cấu trúc cột khác nhau và sinh
+dòng độc lập.
+
+**Cách xử lý (đã thống nhất với người dùng, review 2026-09-22):** viết
+NHIỀU dòng CSV cho cùng 1 `target_column`, mỗi dòng ứng với 1 khối nguồn —
+nhóm các dòng liền kề nhau theo từng khối nguồn (toàn bộ cột PK + cột mô
+tả áp dụng cho nguồn A, rồi tới toàn bộ cột PK + cột mô tả áp dụng cho
+nguồn B, ...) thay vì tách thành nhiều file riêng theo nguồn. Quy tắc:
+- Cột PK phải lặp lại ở MỌI khối nguồn (VD `WI_NAME`, `SUB_PRODUCT_TYPE_CODE`,
+  `SUB_PRODUCT_BK` đều xuất hiện 6 lần, mỗi lần ứng 1 nguồn) — vì mỗi khối
+  nguồn tự sinh dòng PK riêng.
+- Cột mô tả chỉ lặp lại ở khối nguồn có cột tương ứng (VD `SUB_PRODUCT_LINE`
+  chỉ có ở khối `NG_SB_RLOS_SUB_PRODUCT`, `CARD_TYPE_CODE` chỉ có ở khối
+  `NG_SB_RLOS_CREDIT_CARD_APP`) — không lặp ở khối không có nguồn cho nó,
+  ghi rõ trong `note` "NULL ở mọi khối nguồn khác" nếu cần làm rõ.
+- Cột dùng chung cho MỌI khối nguồn không phân biệt (VD `DATASOURCE`,
+  `APPLICATION_SK` join theo `WI_NAME` của chính dòng FCT đã build) chỉ
+  cần 1 dòng duy nhất, đặt sau toàn bộ các khối — `note` ghi "Áp dụng
+  chung cho mọi khối nguồn".
+- Mỗi dòng trong `description`/`note` phải ghi rõ "Nguồn: <TÊN_BẢNG>" /
+  "Khối nguồn <TÊN_BẢNG>" để người đọc phân biệt được dòng nào thuộc khối
+  nào khi nhiều dòng cùng `target_column` xuất hiện trong file.
+- Đây KHÔNG phải pivot 1 attribute (quy tắc concat ở mục trên vẫn giữ
+  nguyên — 1 cột nối nhiều dòng nguồn CÙNG 1 bảng vẫn viết 1 dòng CSV) —
+  chỉ áp dụng khi cả bảng đích là UNION nhiều bảng nguồn KHÁC NHAU về cấu
+  trúc cột, không có driving table chung cho toàn bộ dòng.
 
 ---
 
@@ -351,11 +419,11 @@ trường hợp pivot tách 1 attribute HLD thành nhiều dòng CSV trong dự 
 "DIM_CLOS_WORKSTEP","DIMENSION_KEY","false","number","PK","PK — Driving: MAP_CLOS_WORKSTEP","","generated","","",""
 "DIM_CLOS_WORKSTEP","WORKSTEP_SK","false","number","","Bằng đúng DIMENSION_KEY cùng dòng — dùng để Fact lookup vào DIM này","= DIMENSION_KEY (cùng dòng)","generated","","",""
 "DIM_CLOS_WORKSTEP","WORKSTEP_CODE","false","string(200)","","Business key — mã bước xử lý trên workflow CLOS, dùng làm join-anchor. UNIQUE (WORKSTEP_CODE, EFF_DATE)","MAP_CLOS_WORKSTEP.WORKSTEP_CODE","direct","MAP_CLOS_WORKSTEP","WORKSTEP_CODE",""
-"DIM_CLOS_WORKSTEP","EFF_DATE","false","date","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","MAP_CLOS_WORKSTEP.EFF_DATE","scd2","MAP_CLOS_WORKSTEP","EFF_DATE","Bằng đúng EFF_DATE khai báo tay trên MAP_CLOS_WORKSTEP — người sửa nhập trực tiếp ngày hiệu lực thực tế, không phải ngày ETL chạy (:P_DATE)"
+"DIM_CLOS_WORKSTEP","EFF_DATE","false","date","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","MAP_CLOS_WORKSTEP.EFF_DATE","scd2","MAP_CLOS_WORKSTEP","EFF_DATE","Bằng đúng EFF_DATE khai báo tay trên MAP_CLOS_WORKSTEP — người sửa nhập trực tiếp ngày hiệu lực thực tế, không phải ngày ETL chạy (v_batch_date)"
 "DIM_CLOS_WORKSTEP","EXP_DATE","true","date","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","NULL","scd2","","","Đóng bằng EFF_DATE(seed mới) - 1 giây khi phát hiện thay đổi/khóa mới ở MAP_CLOS_WORKSTEP — đây là logic UPDATE khi đóng bản cũ, không phải giá trị khởi tạo khi INSERT"
 "DIM_CLOS_APPLICATION","APP_GRP","true","string(50)","","Cấp thẩm quyền phê duyệt hồ sơ (A1-C3, BOD, CC...)","NG_SB_CLOS_APPROVAL.APP_GRP","direct","NG_SB_CLOS_APPROVAL","APP_GRP",""
 "DIM_CLOS_APPLICATION","CREATION_DATE","true","date","","Ngày khởi tạo hồ sơ","TRUNC(MIN(NG_SB_CLOS_ENTRY_EXIT.ENTRYDATE)) theo WI_NAME","computed","NG_SB_CLOS_ENTRY_EXIT","ENTRYDATE",""
-"FCT_CLOS_APPLICATION_DAILY","PRODUCT_SK","false","number","","Khóa ngoại — tra DIM_CLOS_PRODUCT","JOIN DIM_CLOS_PRODUCT ON DIM_CLOS_PRODUCT.PRODUCT_LINE_CODE = driving.PRODUCT_LINE_CODE AND :P_DATE BETWEEN DIM_CLOS_PRODUCT.EFF_DATE AND NVL(DIM_CLOS_PRODUCT.EXP_DATE,:P_DATE) → DIM_CLOS_PRODUCT.PRODUCT_SK","join","DIM_CLOS_PRODUCT","PRODUCT_SK",""
+"FCT_CLOS_APPLICATION_DAILY","PRODUCT_SK","false","number","","Khóa ngoại — tra DIM_CLOS_PRODUCT","LEFT JOIN DIM_CLOS_PRODUCT ON DIM_CLOS_PRODUCT.PRODUCT_LINE_CODE = NG_SB_CLOS_ENTRY_EXIT.PRODUCT_LINE_CODE AND v_batch_date BETWEEN DIM_CLOS_PRODUCT.EFF_DATE AND NVL(DIM_CLOS_PRODUCT.EXP_DATE, v_batch_date) → DIM_CLOS_PRODUCT.PRODUCT_SK","join","DIM_CLOS_PRODUCT","PRODUCT_SK",""
 "FCT_CLOS_COLLATERAL","COLLATERAL_BK","false","string","PK","Khóa nghiệp vụ của dòng tài sản, hash toàn bộ cột vì nguồn không khai CDC key","STANDARD_HASH(NG_SB_CLOS_COLL_CD.COLLTYPE || ... , 'SHA256')","generated","NG_SB_CLOS_COLL_CD","(toàn bộ cột không phải CLOB)","Nguồn NG_SB_CLOS_COLL_CD không khai KEY CDC trong DS_BANG_202608.xlsx (LOẠI 2)"
 "DIM_CLOS_APPLICATION","CREDIT_PROFILE","true","string(50)","","Cấp tín dụng của hồ sơ (TVTD/CTD)","","pending","NG_SB_CLOS_EXTTABLE","CREDIT_PROFILE","DQ-11 — SRS BC2 chỉ đích danh cột này nhưng metadata Column Review không liệt kê; nếu HLD đã ĐÃ GIẢI QUYẾT thì không dùng pending nữa, đây chỉ là ví dụ minh họa format"
 ```

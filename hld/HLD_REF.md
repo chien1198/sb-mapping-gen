@@ -60,7 +60,7 @@ trước đó chỉ mới thiết kế 2 (8 workstep + loại 2 tài khoản tes
   `FCT_CLOS/RLOS_WORKSTEP_EVENT`) sang `DIM_CLOS_APPLICATION.BI_FLOW`/
   `DIM_RLOS_APPLICATION.BI_FLOW` (2.2.1.1/2.3.1.1) — cùng cột `BI_FLOW`
   đã dùng cho điều kiện lọc `SLHS_RLOS_DAY`/`SLGN_RLOS_DAY` tại
-  `FCT_LOS_KPI_YTD_DAILY` (2.1.8).
+  `AGG_LOS_KPI_YTD_DAILY` (2.1.8).
 
 Thiếu 2 điều kiện này sẽ làm `NHAN_SU` đếm dư user chỉ xử lý hồ sơ ngoài
 phạm vi luồng BL/KHCN_HO hoặc hồ sơ chưa có quyết định hợp lệ (đang xử lý
@@ -70,7 +70,7 @@ năng suất lao động (`NSLD`) của cả Khối PDTD.
 **Loại 2 tài khoản test/kỹ thuật
 `USERNAME NOT IN ('hanh.nh2','hai.bt2')`** ngay tại nguồn UNION — theo
 đúng công thức `NHAN_SU` gốc, đây là loại trực tiếp DÒNG có username
-đó (đếm theo user), khác với `IS_TEST_ACCOUNT` trên `FCT_LOS_KPI_
+đó (đếm theo user), khác với `IS_TEST_ACCOUNT` trên `AGG_LOS_KPI_
 APPLICATION` (2.1.9, loại theo HỒ SƠ cho `SLHS_*`/`SLGN_*`/`TAT_*`) —
 2 tài khoản này không bao giờ được INSERT vào bảng, không phải lọc khi
 đếm. Quy tắc load: mỗi lần chạy, với mỗi `USERNAME` mới xuất hiện
@@ -90,9 +90,9 @@ tiên trong năm user đó thỏa điều kiện; đã có thì bỏ qua, không
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | KPI_YEAR | NUMBER | Y | 4 | PK | Năm KPI — tập user reset vào 1/1 hằng năm |
 | 2 | USERNAME | VARCHAR2 | Y | 100 | PK | Tên tài khoản cán bộ xử lý hồ sơ — nguồn UNION FCT_CLOS_WORKSTEP_EVENT.USERNAME/FCT_RLOS_WORKSTEP_EVENT.USERNAME |
-| 3 | FIRST_ELIGIBLE_TS | TIMESTAMP | Y |  |  | Thời điểm đầu tiên trong năm user xử lý 1 bước thuộc phạm vi tính nhân sự (8 workstep) — quyết định user được tính vào năm nào và ngày nào trên FCT_LOS_KPI_YTD_DAILY.NEW_USER_CNT_DAY |
+| 3 | FIRST_ELIGIBLE_TS | TIMESTAMP | Y |  |  | Thời điểm đầu tiên trong năm user xử lý 1 bước thuộc phạm vi tính nhân sự (8 workstep) — quyết định user được tính vào năm nào và ngày nào trên AGG_LOS_KPI_YTD_DAILY.NEW_USER_CNT_DAY |
 
-- Bảng danh mục (registry) lưu tập user phân biệt đã tham gia xử lý hồ sơ, lũy kế theo năm — để `NHAN_SU` không phải đếm lại DISTINCT từ đầu năm mỗi ngày. Không phải bảng sự kiện đo lường theo `DAYID`. Phục vụ BC9 (đầu vào `NHAN_SU`/`NEW_USER_CNT_DAY` của `FCT_LOS_KPI_YTD_DAILY`, 2.1.8).
+- Bảng danh mục (registry) lưu tập user phân biệt đã tham gia xử lý hồ sơ, lũy kế theo năm — để `NHAN_SU` không phải đếm lại DISTINCT từ đầu năm mỗi ngày. Không phải bảng sự kiện đo lường theo `DAYID`. Phục vụ BC9 (đầu vào `NHAN_SU`/`NEW_USER_CNT_DAY` của `AGG_LOS_KPI_YTD_DAILY`, 2.1.8).
 - Khóa chính của bảng (PK): **KPI_YEAR, USERNAME**. UNIQUE tự nhiên (đúng bằng PK).
 
 **Đã bỏ `USER_SK` (review 2026-09-17):** người dùng xác nhận mục đích
@@ -280,7 +280,7 @@ Section 1 → 2.3.1.1) — nhánh CLOS chưa từng có bất kỳ đường JOI
 bảng này dù SRS BC5/BC9 yêu cầu rõ (đọc trực tiếp từ bảng lồng "Các
 bảng sử dụng" BR 1.2 của SRS BC5, trước đây bị bỏ sót vì chỉ đọc dòng
 RLOS liền kề). Quyết định người dùng: bỏ hẳn việc denormalize cho cả 2
-hệ — báo cáo (BC5, và `POINT` của BC9 tại `FCT_LOS_KPI_APPLICATION`)
+hệ — báo cáo (BC5, và `POINT` của BC9 tại `AGG_LOS_KPI_APPLICATION`)
 tự `LEFT JOIN` bảng này **tại thời điểm truy vấn**, theo đúng khóa đã
 xác nhận từ dữ liệu seed thật (`input/BC5TAT(REF_SLA).xlsx`, sheet
 "cam kết SLA NLTT"):

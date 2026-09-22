@@ -28,6 +28,8 @@ flowchart LR
         G(["NG_SB_CLOS_APPROVAL"])
         H(["NG_SB_CLOS_USER_MAKE_WORK_STEP"])
         M(["NG_SB_CLOS_CUST_INFO"])
+        MW(["NG_SB_CLOS_MAS_DECISION"])
+        U(["NG_SB_RLOS_MAS_USER"])
     end
     subgraph SB_DWH
         K["DIM_CLOS_CUSTOMER"]
@@ -54,6 +56,9 @@ flowchart LR
     OU -.->|"ORG_UNIT_SK, lookup COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, SCD2 hiệu lực tại DAYID (review 2026-09-21, bổ sung vào lineage — công thức đã có ở Section 2 → 1.2.2.1 cột 10, chỉ thiếu vẽ)"| E
     M -->|"PRODUCT_LINE/SUB_PRODUCT — input của PRODUCT_SK ở trên"| PR
     M -->|"COMPANY_CODE — input của ORG_UNIT_SK ở trên"| OU
+    MW -->|"DISTINCT QUEUE_NAME — CDC xác định thay đổi (nguồn của DIM_CLOS_WORKSTEP, xem 1.2.1.3)"| WS
+    MW -->|"DISTINCT DECISION — CDC xác định thay đổi (nguồn của DIM_CLOS_DECISION, xem 1.2.1.4)"| DC
+    U -->|"grain 1 dòng/LOGIN_ID, CDC xác định thay đổi (nguồn của DIM_LOS_USER, xem 1.1.2)"| US
 ```
 
 **Ghi chú lineage:** giữ nguyên grain `1 dòng = 1 hồ sơ x 1 ngày dữ liệu`,
@@ -296,7 +301,6 @@ flowchart LR
         K1(["NG_SB_CLOS_CHANGEREQ"])
         N(["NG_SB_CLOS_CREDITINFO_COMM"])
         U(["NG_SB_RLOS_MAS_USER"])
-        REF(["REF_PHAN_LOAI_DDE"])
     end
     subgraph SB_DWH
         B["DIM_CLOS_EXCEPTION_REASON"]
@@ -310,7 +314,6 @@ flowchart LR
     F -.->|RAISED_BY_USER_SK, lookup theo RAISED_BY| C
     E -.->|"PHÁI SINH CHECK_FTR (whitelist theo CUST_GROUP)/FIRST_WORKSTEP_RETURN + EXISTS-filter ACTIVITYNAME/DECISION cho EXCEPTION_REASON_SK (review 2026-09-18)"| C
     H -.->|"CUST_GROUP — điều kiện chọn nhóm whitelist CHECK_FTR (review 2026-09-18)"| C
-    REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='CLOS' — sinh PHAN_LOAI_DDE (review 2026-09-18, thay CASE-WHEN cũ)"| C
     R -->|1:1 ACTIVITYNAME, DECISION_CODE, EXCEPTION_CATEGORY, EXCEPTION_NAME| B
     H -->|1:1 WI_NAME, CUST_GROUP, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME| D
     I -->|1:1 STREAM, APPROVAL_TYPE, APP_GRP| D
@@ -383,20 +386,24 @@ báo cáo (nếu cần) tính trực tiếp ở tầng report/OAS từ bảng ch
 cần cột đếm trung gian trên `FCT_CLOS_APPLICATION_DAILY` (xem đánh giá
 kiến trúc tại 1.2.2.1).
 
-**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
-`PHAN_LOAI_DDE` chuyển từ `FCT_CLOS_APPLICATION_DAILY` sang đây:** thiết
-kế gốc đặt 3 cột này (tên gốc `FLAG_FTR`, `FIRST_WORKSTEP_RETURN`,
+**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` (và ban
+đầu cả `PHAN_LOAI_DDE`) chuyển từ `FCT_CLOS_APPLICATION_DAILY` sang đây:**
+thiết kế gốc đặt 3 cột này (tên gốc `FLAG_FTR`, `FIRST_WORKSTEP_RETURN`,
 `PHAN_LOAI_DDE`) trên `FCT_LOS_APPLICATION_DAILY` — nhưng chính "Trường
 đích trên báo cáo" của tài liệu gốc ghi rõ cả 3 chỉ phục vụ `BC7`
 (`BC7.CHECK_FTR`, `BC7.FIRST_WORKSTEP_RETURN`, `BC7.PHAN_LOAI_DDE`); rà
 soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào khác dùng tới. Vì
 BC7 đúng grain của `FCT_CLOS_EXCEPTION` (1 dòng/lần nêu lý do), không phải
-grain hồ sơ/ngày của `FCT_CLOS_APPLICATION_DAILY`, nên chuyển hẳn 3 cột
-này sang tính trực tiếp tại đây, đọc thêm `NG_SB_CLOS_ENTRY_EXIT` (không
-qua JOIN ngược `FCT_CLOS_APPLICATION_DAILY`) — tính ngay ở tầng SB_DWH,
-giữ đúng nguyên tắc "DTM chỉ đọc DWH" cho tầng PDTD_DTM (xem 2.2.2.4).
-`FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (1.2.2.1/1.3.2.1)
-đã bỏ cả 3 cột này.
+grain hồ sơ/ngày của `FCT_CLOS_APPLICATION_DAILY`, nên `CHECK_FTR`/
+`FIRST_WORKSTEP_RETURN` chuyển hẳn sang tính trực tiếp tại đây, đọc thêm
+`NG_SB_CLOS_ENTRY_EXIT` (không qua JOIN ngược `FCT_CLOS_APPLICATION_DAILY`)
+— tính ngay ở tầng SB_DWH, giữ đúng nguyên tắc "DTM chỉ đọc DWH" cho tầng
+PDTD_DTM (xem 2.2.2.4). `FCT_CLOS_APPLICATION_DAILY`/
+`FCT_RLOS_APPLICATION_DAILY` (1.2.2.1/1.3.2.1) đã bỏ cả 3 cột gốc này.
+`PHAN_LOAI_DDE` riêng KHÔNG tính tại SB_DWH — xem "Đánh giá kiến trúc —
+`PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" ngay dưới đây (review
+2026-09-22): bảng danh mục `REF_PHAN_LOAI_DDE` nó lookup vào chỉ tồn tại
+vật lý ở tầng PDTD_DTM, nên công thức JOIN cũng phải đặt ở đó.
 
 **Review 2026-09-18 — SRS BC7 cập nhật đổi hẳn công thức `CHECK_FTR` và
 `PHAN_LOAI_DDE` (không còn khớp bản SRS trước, `FIRST_WORKSTEP_RETURN`
@@ -440,15 +447,33 @@ chỉ bổ sung thêm điều kiện lọc):**
   hiện trong công thức cũ của cột này.
 - **`PHAN_LOAI_DDE` — đổi từ CASE-WHEN tính trực tiếp sang lookup bảng
   danh mục mới `REF_PHAN_LOAI_DDE`:** SRS mới bỏ hẳn công thức CASE-WHEN
-  cũ, thay bằng `LEFT JOIN REF_PHAN_LOAI_DDE (g)` theo
-  `a.EXCEPTION_CATEGORY = g.EXCEPTION_CATEGORY AND g.SYSTEMNAME='CLOS'`,
-  lấy `g.PHAN_LOAI_DDE`. Đây là bảng REF_ tĩnh mới (giống 9 bảng REF_
-  hiện có tại `hld/HLD_REF.md`) — cấu trúc và dữ liệu mẫu do người dùng
-  cung cấp (`input/REF_PHAN_LOAI_DDE.xlsx`, 19 dòng: `EXCEPTION_CATEGORY`
-  + `PHAN_LOAI_DDE` + `SYSTEMNAME`), xem thiết kế đầy đủ tại
-  `hld/HLD_REF.md` mục 2.4.10. Ưu điểm: mọi `EXCEPTION_CATEGORY` mới
-  phát sinh chỉ cần BA thêm 1 dòng vào bảng REF_, không cần sửa công
-  thức ETL — nhất quán với cách các bảng REF_ SLA khác đã thiết kế.
+  cũ, thay bằng `LEFT JOIN REF_PHAN_LOAI_DDE` theo
+  `EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND
+  REF_PHAN_LOAI_DDE.SYSTEMNAME='CLOS'`, lấy
+  `REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE`. Đây là bảng REF_ tĩnh mới (giống 9
+  bảng REF_ hiện có tại `hld/HLD_REF.md`) — cấu trúc và dữ liệu mẫu do
+  người dùng cung cấp (`input/REF_PHAN_LOAI_DDE.xlsx`, 19 dòng:
+  `EXCEPTION_CATEGORY` + `PHAN_LOAI_DDE` + `SYSTEMNAME`), xem thiết kế
+  đầy đủ tại `hld/HLD_REF.md` mục 2.4.10.
+
+**⚠️ Đánh giá kiến trúc — `PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM (review
+2026-09-22, sửa lỗi vi phạm layer boundary):** công thức trên (`LEFT JOIN
+REF_PHAN_LOAI_DDE` ngay tại tầng SB_DWH) đã bị phát hiện sai kiến trúc —
+`hld/HLD_REF.md` (đầu Section 2.4) xác nhận rõ **cả 10 bảng REF_/TMP_REF_/
+Q_RLOS_REF_ (gồm cả `REF_PHAN_LOAI_DDE`) chỉ tồn tại vật lý ở tầng
+PDTD_DTM, không có bản SB_DWH** — BA insert/update thủ công trực tiếp tại
+PDTD_DTM, không qua STG_LOS/CDC. Một bảng ở tầng SB_DWH không thể JOIN
+trực tiếp một bảng chỉ tồn tại vật lý ở PDTD_DTM (vi phạm chiều dữ liệu
+chuẩn STG_LOS→SB_DWH→STG_DTM→PDTD_DTM); nguyên tắc `design-method.md`
+của skill `design-hld` cũng xác nhận: JOIN vào bảng REF_ chỉ được phép
+xảy ra ở bước "PDTD_DTM copies 1:1 from SB_DWH... **may then** LEFT JOIN
+REF_" — là đặc quyền riêng của tầng PDTD_DTM. **`FCT_CLOS_EXCEPTION` ở
+tầng SB_DWH (bảng này) KHÔNG còn cột `PHAN_LOAI_DDE`** — cột này bị bỏ
+khỏi Section 2 → 1.2.2.4, chỉ còn 14 cột. Công thức `LEFT JOIN
+REF_PHAN_LOAI_DDE` ở trên được giữ lại trong đoạn văn này chỉ để lưu lại
+lịch sử quyết định SRS BC7 cập nhật 2026-09-18 (đổi từ CASE-WHEN sang
+lookup REF_) — công thức thực tế đã chuyển hẳn sang tính tại
+`hld/HLD_FCT_PDTD_DTM.md` mục 2.2.2.4 (xem đánh giá kiến trúc tại đó).
 
 ###### 1.2.2.5 FCT_CLOS_DEVIATION
 
@@ -556,6 +581,7 @@ flowchart LR
     MW -->|"DISTINCT QUEUE_NAME, CDC xác định thay đổi (review 2026-09-18)"| WS
     MW -->|"DISTINCT DECISION, CDC xác định thay đổi (review 2026-09-18)"| DC
     U -->|"grain 1 dòng/LOGIN_ID, CDC xác định thay đổi (review 2026-09-18)"| US
+    H -->|"1:1 CUSTOMER_NAME → FULL_NAME (nguồn của DIM_CLOS_CUSTOMER, xem 1.2.1.7)"| KC
     H -->|1:1 WI_NAME, CUST_GROUP, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME| AP
     I -->|1:1 STREAM, APPROVAL_TYPE, APP_GRP| AP
     J -->|1:1 LOANCASEID, CREDIT_PROFILE| AP
@@ -642,6 +668,8 @@ flowchart LR
         P2(["NG_SB_RLOS_APPLICANT_DETAIL"])
         P3(["NG_SB_RLOS_APPLICANT_IDGRID"])
         P4(["NG_SB_RLOS_CBS"])
+        MW(["NG_SB_RLOS_MAS_DECISION"])
+        U(["NG_SB_RLOS_MAS_USER"])
     end
     subgraph SB_DWH
         K["DIM_RLOS_APPLICANT"]
@@ -670,6 +698,9 @@ flowchart LR
     WS -.->|"CURRENT_WORKSTEP_SK/LAST_WORKSTEP_SK, lookup WORKSTEP_CODE theo thời gian (review 2026-09-21, bổ sung vào lineage — 2 FK đã có sẵn trên cột nhưng thiếu vẽ)"| E
     DC -.->|"LAST_DECISION_SK, lookup DECISION_CODE theo thời gian (review 2026-09-21, bổ sung vào lineage)"| E
     US -.->|"LAST_USER_SK, lookup theo USERNAME (review 2026-09-21, bổ sung vào lineage)"| E
+    MW -->|"DISTINCT QUEUE_NAME — CDC xác định thay đổi (nguồn của DIM_RLOS_WORKSTEP, xem 1.3.1.3)"| WS
+    MW -->|"DISTINCT DECISION — CDC xác định thay đổi (nguồn của DIM_RLOS_DECISION, xem 1.3.1.4)"| DC
+    U -->|"grain 1 dòng/LOGIN_ID, CDC xác định thay đổi (nguồn của DIM_LOS_USER, xem 1.1.2)"| US
     PR -.->|"PRODUCT_SK, lookup PRODUCT_LINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, SCD2 hiệu lực tại DAYID (review 2026-09-21, bổ sung công thức + lineage — cột trước đây chỉ ghi 'Khóa tới DIM_RLOS_PRODUCT', chưa có công thức lookup, xem ghi chú bên dưới)"| E
     OU -.->|"ORG_UNIT_SK, lookup COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, SCD2 hiệu lực tại DAYID (review 2026-09-21, bổ sung vào lineage — công thức đã có ở Section 2 → 1.3.2.1 cột 10, chỉ thiếu vẽ)"| E
     CT -.->|"CHANGE_TYPE_SK, lookup CHANGE_TYPE=NG_SB_RLOS_EXTTABLE.CHANGE_TYPE (review 2026-09-21, bổ sung vào lineage)"| E
@@ -981,7 +1012,6 @@ flowchart LR
         P5(["NG_SB_RLOS_SENT_CBS_LOG"])
         P7(["NG_SB_RLOS_MANUAL_DEVIATION"])
         U(["NG_SB_RLOS_MAS_USER"])
-        REF(["REF_PHAN_LOAI_DDE"])
     end
     subgraph SB_DWH
         B["DIM_RLOS_EXCEPTION_REASON"]
@@ -996,7 +1026,6 @@ flowchart LR
     A -.->|"PHÁI SINH CHECK_FTR — whitelist theo BI_SUB_PRODUCT (review 2026-09-18)"| C
     P1 -.->|"SUB_PRODUCT — derive BI_SUB_PRODUCT (Credit Card hay không) cho whitelist CHECK_FTR (review 2026-09-18)"| C
     E -.->|"PHÁI SINH FIRST_WORKSTEP_RETURN (review 2026-09-18: thêm nhánh Send_Back to BranchSupport) + EXISTS-filter ACTIVITYNAME/DECISION cho EXCEPTION_REASON_SK"| C
-    REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='RLOS' — sinh PHAN_LOAI_DDE (review 2026-09-18, thay CASE-WHEN cũ)"| C
     R -->|1:1 ACTIVITYNAME, DECISION_CODE, EXCEPTION_CATEGORY, EXCEPTION_NAME| B
     P1 -->|1:1 WI_NAME, POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG| D
     P2 -->|1:1 CUS_SEGMENT| D
@@ -1033,12 +1062,16 @@ EXCEPTION_NAME`; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại
 nhiều người, nhiều thời điểm, qua các vòng Raise/Clear), BC7 cần liệt kê
 chi tiết từng lần chứ không phải rollup. Giữ bảng riêng.
 
-**Đánh giá kiến trúc — `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
-`PHAN_LOAI_DDE` chuyển từ `FCT_RLOS_APPLICATION_DAILY` sang đây, cùng lý
+**Đánh giá kiến trúc — `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` (và ban đầu cả
+`PHAN_LOAI_DDE`) chuyển từ `FCT_RLOS_APPLICATION_DAILY` sang đây, cùng lý
 do đã áp dụng cho CLOS (xem 1.2.2.4):** rà soát SRS BC7 xác nhận cả 3 cột
-chỉ phục vụ đúng BC7, đúng grain của bảng này. Tính ngay ở tầng SB_DWH,
-giữ nguyên tắc "DTM chỉ đọc DWH" cho tầng PDTD_DTM (xem 2.3.2.5).
-`FCT_RLOS_APPLICATION_DAILY` (1.3.2.1) đã bỏ cả 3 cột này từ trước.
+gốc chỉ phục vụ đúng BC7, đúng grain của bảng này. `CHECK_FTR`/
+`FIRST_WORKSTEP_RETURN` tính ngay ở tầng SB_DWH, giữ nguyên tắc "DTM chỉ
+đọc DWH" cho tầng PDTD_DTM (xem 2.3.2.5). `FCT_RLOS_APPLICATION_DAILY`
+(1.3.2.1) đã bỏ cả 3 cột gốc này từ trước. `PHAN_LOAI_DDE` riêng KHÔNG
+tính tại SB_DWH — đã chuyển hẳn sang tính tại PDTD_DTM (review
+2026-09-22), cùng lý do đã áp dụng cho CLOS: xem "⚠️ Đánh giá kiến trúc —
+`PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" tại 1.2.2.4.
 
 **Review 2026-09-18 — SRS BC7 cập nhật đổi hẳn công thức `CHECK_FTR` và
 `PHAN_LOAI_DDE` (không còn khớp bản SRS trước, `FIRST_WORKSTEP_RETURN`
@@ -1070,6 +1103,14 @@ xem 1.2.2.4):**
   EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='RLOS'`, lấy
   `REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE` — cùng bảng REF_ mới dùng chung với
   CLOS (khác `SYSTEMNAME`), xem `hld/HLD_REF.md` mục 2.4.10.
+
+**⚠️ Đánh giá kiến trúc — `PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM (review
+2026-09-22, cùng lý do đã áp dụng cho CLOS tại 1.2.2.4):** công thức trên
+bị phát hiện sai kiến trúc — `REF_PHAN_LOAI_DDE` chỉ tồn tại vật lý ở
+PDTD_DTM (xem `hld/HLD_REF.md` đầu Section 2.4), không có bản SB_DWH, nên
+không thể JOIN trực tiếp từ tầng SB_DWH. **`FCT_RLOS_EXCEPTION` ở tầng
+SB_DWH (bảng này) KHÔNG còn cột `PHAN_LOAI_DDE`** — chỉ còn 14 cột. Công
+thức đã chuyển hẳn sang tính tại `hld/HLD_FCT_PDTD_DTM.md` mục 2.3.2.5.
 
 ###### 1.3.2.6 FCT_RLOS_DEVIATION
 
@@ -1184,6 +1225,8 @@ flowchart LR
     MW -->|"DISTINCT QUEUE_NAME, CDC xác định thay đổi (review 2026-09-18)"| WS
     MW -->|"DISTINCT DECISION, CDC xác định thay đổi (review 2026-09-18)"| DC
     U -->|"grain 1 dòng/LOGIN_ID, CDC xác định thay đổi (review 2026-09-18)"| US
+    P1 -->|"1:1 FULL_NAME, GENDER, DOB (nguồn của DIM_RLOS_APPLICANT, xem 1.3.1.10)"| AC
+    P2 -->|"1:1 MARR_STATUS, EDU_LEVEL, PERM_ADD, CITY/DISTRICT/WARD/HOUSNO_CURR_RES (nguồn của DIM_RLOS_APPLICANT, xem 1.3.1.10)"| AC
     P1 -->|1:1 WI_NAME, POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG| AP
     P2 -->|1:1 CUS_SEGMENT| AP
     P3 -->|1:1 STREAM, APP_GRP| AP
@@ -1316,8 +1359,8 @@ Không phát hiện lệch tài liệu, không phát sinh PENDING mới.
 | 57 | RETURN_CNT_DATAENTRY | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu nhập liệu |
 | 58 | RETURN_CNT_UNDERWRITING | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu thẩm định |
 | 59 | RETURN_CNT_APPROVAL | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu phê duyệt |
-| 60 | KPI_VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH: theo DECISION nếu đã phê duyệt/từ chối = 1.0; nếu đã CancelRevoke/CancelPermanent thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại NULL. Cùng công thức đã chốt ở FCT_LOS_KPI_APPLICATION.VOLUME (2.1.9), tính từ toàn bộ lịch sử hồ sơ trên FCT_CLOS_WORKSTEP_EVENT |
-| 62 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (KHÔNG lọc CREATEDBY, khác điều kiện join của WORKSTEP_FLAG — nay chỉ còn trên FCT_CLOS_WORKSTEP_EVENT, đã bỏ khỏi bảng này, xem 1.2.2.6). Dùng làm điều kiện lọc `IS NOT NULL` cho SLHS_CLOS/SLGN_CLOS (FCT_LOS_KPI_YTD_DAILY, 2.1.8) — CLOS-only, RLOS không có cột tương ứng vì SRS BC9 không nhắc WFINSTRUMENTTABLE ở nhánh KPI Khối (RLOS) |
+| 60 | KPI_VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH: theo DECISION nếu đã phê duyệt/từ chối = 1.0; nếu đã CancelRevoke/CancelPermanent thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại NULL. Cùng công thức đã chốt ở AGG_LOS_KPI_APPLICATION.VOLUME (2.1.9), tính từ toàn bộ lịch sử hồ sơ trên FCT_CLOS_WORKSTEP_EVENT |
+| 62 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (KHÔNG lọc CREATEDBY, khác điều kiện join của WORKSTEP_FLAG — nay chỉ còn trên FCT_CLOS_WORKSTEP_EVENT, đã bỏ khỏi bảng này, xem 1.2.2.6). Dùng làm điều kiện lọc `IS NOT NULL` cho SLHS_CLOS/SLGN_CLOS (AGG_LOS_KPI_YTD_DAILY, 2.1.8) — CLOS-only, RLOS không có cột tương ứng vì SRS BC9 không nhắc WFINSTRUMENTTABLE ở nhánh KPI Khối (RLOS) |
 | 63 | UNDERWRITERMAKER_TAKERESPON | VARCHAR2 | N | 100 |  | CV Thẩm định chịu trách nhiệm (BC1/BC2) — PHÁI SINH theo nguyên văn SRS: COALESCE(CASE WHEN m.WORK_STEP='UnderwriterMaker' THEN m.USER_MAKE END, i.UWMAKERUSER) với i=NG_SB_CLOS_EXTTABLE, m=NG_SB_CLOS_USER_MAKE_WORK_STEP (LEFT JOIN theo WI_NAME=m.WI_NAME AND WORKSTEP=m.WORK_STEP). ✅ Bảng nguồn `NG_SB_CLOS_USER_MAKE_WORK_STEP` không có trong `DS_BANG_202608.xlsx` nhưng đã xác nhận tồn tại thật qua `input/CLOS - Metadata.xlsx` (review 2026-09-21, Section 3 dòng #20) |
 | 64 | UNDERWRITERCHECKER_TAKERESPON | VARCHAR2 | N | 100 |  | Kiểm soát thẩm định chịu trách nhiệm (BC1/BC2) — PHÁI SINH: cùng cơ chế trên, COALESCE(CASE WHEN m.WORK_STEP='UnderwriterChecker' THEN m.USER_MAKE END, i.UWCHKRUSER). Cùng nguồn `NG_SB_CLOS_USER_MAKE_WORK_STEP` đã xác nhận tồn tại thật (Section 3 dòng #20) |
 | 65 | APPROVAL_TAKERESPON | VARCHAR2 | N | 100 |  | Chuyên gia phê duyệt chịu trách nhiệm (BC1/BC2) — PHÁI SINH theo nguyên văn SRS: COALESCE(m.USER_MAKE, CASE e.APP_GRP WHEN 'A1' THEN 'long.lq' WHEN 'CC' THEN 'UBTD' WHEN 'BOD' THEN 'HDQT' END) với e=NG_SB_CLOS_APPROVAL, m=NG_SB_CLOS_USER_MAKE_WORK_STEP. Có hằng số hardcode theo APP_GRP (khác hẳn công thức RLOS dùng CREDAPPRUSER/CCOMMITUSER, xem 1.3.2.1) — cùng nguồn đã xác nhận tồn tại thật, xem Section 3 dòng #20 |
@@ -1539,7 +1582,6 @@ tờ có giá) không áp dụng được. Giữ `COLL_MGMT_METHOD` (chỉ có �
 | 12 | RCTYPE | VARCHAR2 | N | 20 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_CLOS_EXCEPTION.RCTYPE |
 | 13 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật đổi hẳn công thức): mặc định 'Not First Time Right'; là 'First Time Right' CHỈ KHI mọi dòng NG_SB_CLOS_EXCEPTION (a) của hồ sơ đều khớp 1 tổ hợp ngoại lệ miễn trừ theo (join NG_SB_CLOS_ENTRY_EXIT (h) qua h.WINAME=a.WI_NAME AND h.WORKSTEP=d.ACTIVITYNAME AND h.DECISION=d.DECISION, d=NG_SB_CLOS_MAS_EXCEPTION), phân theo NG_SB_CLOS_CUST_INFO.CUST_GROUP: nhóm KHDN (MSME/SME/USME) và nhóm KHDNL/ĐT&ĐCTC (FDI/SOC/JSC/NBFI/BANK/STR) — mỗi nhóm có 4 tổ hợp WORKSTEP+DECISION với danh sách EXCEPTION_CATEGORY miễn trừ riêng, xem đầy đủ literal tại SRS BC7 BR 1.2 |
 | 14 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật): WORKSTEP của bản ghi NG_SB_CLOS_ENTRY_EXIT tại MIN(EXITDATE) theo WI_NAME, với điều kiện EXITDATE IS NOT NULL AND ((WORKSTEP='DetailDataEntry' AND DECISION='Send_Back') OR (WORKSTEP IN ('DataInputerChecker','UnderwriterMaker','CreditApproval') AND DECISION='Additional_Doc_Required') OR (WORKSTEP='UnderwriterMaker' AND DECISION='Send_Back to BranchSupport')) — bổ sung nhánh thứ 3 (UnderwriterMaker+Send_Back to BranchSupport) so với công thức cũ |
-| 15 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật đổi hẳn công thức): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='CLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE — thay thế công thức CASE-WHEN cũ, xem hld/HLD_REF.md mục 2.4.10 |
 
 - Bảng FACT chi tiết (nhân dòng), lưu mỗi lần một lý do được nêu ra trên hồ sơ CLOS, trong ảnh chụp của ngày DAYID. Phục vụ BC7, BC8.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME**.
@@ -1548,22 +1590,26 @@ tờ có giá) không áp dụng được. Giữ `COLL_MGMT_METHOD` (chỉ có �
 (luôn cố định 'CLOS' sau khi tách vật lý, cũng loại khỏi PK theo ghi chú
 thiết kế khóa của split-proposal), 11 cột gốc giữ nguyên cấu trúc, vẫn đọc
 trực tiếp từ `NG_SB_CLOS_EXCEPTION` (LOẠI 1, khóa CDC khai đủ). Thêm mới
-3 cột `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE` — vốn nằm trên
+2 cột `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` — vốn nằm trên
 `FCT_LOS_APPLICATION_DAILY` (bản gộp cũ, dưới tên `FLAG_FTR`) nhưng đã
 đánh giá lại và dời sang đây (xem đánh giá kiến trúc bên dưới); sau đó
 thêm lại `DATASOURCE` làm cột kỹ thuật cố định 'CLOS' — tổng
-**15 cột**.
+**14 cột**. `PHAN_LOAI_DDE` (cột thứ 3 từng dự kiến chuyển sang đây) đã
+được đánh giá lại (review 2026-09-22) và chuyển hẳn sang tính tại
+`hld/HLD_FCT_PDTD_DTM.md` mục 2.2.2.4 — xem "⚠️ Đánh giá kiến trúc —
+`PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" ở Section 1 phía trên.
 
 **Đối chiếu SRS (BC7, BC8):** BC7 dùng trực tiếp `EXCEPTION_CATEGORY`,
 `EXCEPTION_NAME`, `EXCEPTION_REMARKS`, `RAISED_BY`, `RAISED_DATE_TIME`,
-`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE`. Đã đối chiếu công
-thức `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE` trực tiếp với
-bảng field-list của SRS BC7 bản cập nhật (review 2026-09-18, cả nhánh
-CLOS và RLOS) — xem công thức mới đầy đủ tại Section 1 → 1.2.2.4 và cột
-tương ứng ở trên. `RCTYPE` **không còn** là điều kiện lọc của `CHECK_FTR`
-theo SRS mới (khác bản trước, xem ghi chú cột `RCTYPE` phía trên) — vẫn
-giữ cột này vì BC7 hiển thị trực tiếp `RCTYPE` (Raise/Clear) làm trường
-riêng trên báo cáo.
+`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE` (cột này tính ở
+PDTD_DTM, xem `hld/HLD_FCT_PDTD_DTM.md` mục 2.2.2.4). Đã đối chiếu công
+thức `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` trực tiếp với bảng field-list của
+SRS BC7 bản cập nhật (review 2026-09-18, cả nhánh CLOS và RLOS) — xem
+công thức mới đầy đủ tại Section 1 → 1.2.2.4 và cột tương ứng ở trên.
+`RCTYPE` **không còn** là điều kiện lọc của `CHECK_FTR` theo SRS mới
+(khác bản trước, xem ghi chú cột `RCTYPE` phía trên) — vẫn giữ cột này vì
+BC7 hiển thị trực tiếp `RCTYPE` (Raise/Clear) làm trường riêng trên báo
+cáo.
 
 **Đánh giá kiến trúc — vì sao không gộp vào `FCT_CLOS_APPLICATION_DAILY`
 (1.2.2.1):** xem ghi chú đầy đủ tại Section 1 → 1. SB_DWH → 1.2.2.4 —
@@ -1571,18 +1617,25 @@ giữ bảng riêng vì khác grain (1 dòng/lần nêu lý do, không phải 1 
 sơ/ngày), BC7 cần liệt kê chi tiết từng lần chứ không phải rollup. Cùng
 pattern detail-fact/aggregate-fact với `FCT_CLOS_COLLATERAL` (1.2.2.3).
 
-**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
-`PHAN_LOAI_DDE` chuyển về đây:** rà soát toàn bộ SRS BC1-BC11 xác nhận cả
-3 cột chỉ phục vụ đúng `BC7` (đúng như "Trường đích trên báo cáo" của tài
-liệu gốc đã ghi `BC7.CHECK_FTR`/`BC7.FIRST_WORKSTEP_RETURN`/
-`BC7.PHAN_LOAI_DDE`, không báo cáo nào khác dùng) — nên thuộc về đúng
-grain của bảng này (1 dòng/lần nêu lý do), không phải grain hồ sơ/ngày
-của `FCT_CLOS_APPLICATION_DAILY`. Đã bỏ cả 3 cột khỏi
-`FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (1.2.2.1/
-1.3.2.1) tương ứng — quyết định kiến trúc này (đọc thẳng `ENTRY_EXIT` tại
-đây thay vì gián tiếp qua `FCT_CLOS_APPLICATION_DAILY`) không đổi qua lần
-review 2026-09-18; chỉ bản thân công thức 3 cột đã đổi theo SRS BC7 cập
-nhật (xem Section 1 → 1.2.2.4 và cột tương ứng ở trên).
+**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`
+chuyển về đây:** rà soát toàn bộ SRS BC1-BC11 xác nhận cả 3 cột gốc
+(`CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE`) chỉ phục vụ đúng
+`BC7` (đúng như "Trường đích trên báo cáo" của tài liệu gốc đã ghi
+`BC7.CHECK_FTR`/`BC7.FIRST_WORKSTEP_RETURN`/`BC7.PHAN_LOAI_DDE`, không
+báo cáo nào khác dùng) — nên thuộc về đúng grain của bảng này (1 dòng/lần
+nêu lý do), không phải grain hồ sơ/ngày của `FCT_CLOS_APPLICATION_DAILY`.
+Đã bỏ cả 3 cột khỏi `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY`
+(1.2.2.1/1.3.2.1) tương ứng — quyết định kiến trúc này (đọc thẳng
+`ENTRY_EXIT` tại đây thay vì gián tiếp qua `FCT_CLOS_APPLICATION_DAILY`)
+không đổi qua lần review 2026-09-18; chỉ bản thân công thức 3 cột đã đổi
+theo SRS BC7 cập nhật (xem Section 1 → 1.2.2.4 và cột tương ứng ở trên).
+Riêng `PHAN_LOAI_DDE`: dù cùng phục vụ BC7 và cùng lý do "khác grain
+FCT_CLOS_APPLICATION_DAILY", cột này KHÔNG dừng lại ở tầng SB_DWH (bảng
+này) mà tiếp tục chuyển sang tính hẳn tại PDTD_DTM (review 2026-09-22) —
+vì bảng danh mục nó lookup (`REF_PHAN_LOAI_DDE`) chỉ tồn tại vật lý ở
+PDTD_DTM, xem "⚠️ Đánh giá kiến trúc — `PHAN_LOAI_DDE` chuyển hẳn sang
+PDTD_DTM" ở Section 1 phía trên. Bảng này (SB_DWH) chỉ còn 2 cột
+`CHECK_FTR`/`FIRST_WORKSTEP_RETURN` trong nhóm 3 cột gốc.
 
 ###### 1.2.2.5 FCT_CLOS_DEVIATION
 
@@ -1826,7 +1879,7 @@ copy/JOIN từ đó. Cho phép BC4 (và mọi truy vấn khác) lookup
 | 71 | INCOME_SOURCE_CNT | NUMBER | N | 5 |  | Số nguồn thu nhập của hồ sơ — đếm số cờ 'Yes' trong 10 cột trên |
 | 72 | REPAYMENT_SOURCE | VARCHAR2 | N | 500 |  | Danh sách nguồn trả nợ, nối tên tiếng Việt các nguồn thu đang bật |
 | 73 | FLAG_BUSINESS_INCOME | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh hay không (không áp dụng SeAPro/SeALand) — PHÁI SINH đúng nguyên văn SRS BC9 (`BUSINESS_INCOM`): 'YES' nếu (`UPPER(NG_SB_RLOS_EXTTABLE.PRODUCT_NAME) NOT LIKE '%SEAPRO%' AND NOT LIKE '%SEALAND%'`) AND (`NVL(NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG,'No')='Yes' OR NVL(.ENTERPRISSEFLAG,'No')='Yes' OR NVL(.NONLICFLAG,'No')='Yes'`); còn lại 'NO' |
-| 74 | KPI_VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH: theo DECISION nếu đã phê duyệt/từ chối = 1.0; nếu đã CancelRevoke/CancelPermanent thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại NULL. Cùng công thức đã chốt ở FCT_LOS_KPI_APPLICATION.VOLUME (2.1.9), tính từ toàn bộ lịch sử hồ sơ trên FCT_RLOS_WORKSTEP_EVENT |
+| 74 | KPI_VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH: theo DECISION nếu đã phê duyệt/từ chối = 1.0; nếu đã CancelRevoke/CancelPermanent thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại NULL. Cùng công thức đã chốt ở AGG_LOS_KPI_APPLICATION.VOLUME (2.1.9), tính từ toàn bộ lịch sử hồ sơ trên FCT_RLOS_WORKSTEP_EVENT |
 | 76 | UNDERWRITERMAKER_TAKERESPON | VARCHAR2 | N | 100 |  | CV Thẩm định chịu trách nhiệm (BC1) — PHÁI SINH theo nguyên văn SRS: COALESCE(CASE WHEN ak.WORK_STEP='UnderwriterMaker' THEN ak.USER_MAKE END, g.UWMAKERUSER) với g=NG_SB_RLOS_EXTTABLE, ak=NG_SB_RLOS_USER_MAKE_WORK_STEP (LEFT JOIN theo WI_NAME=ak.WI_NAME AND WORKSTEP=ak.WORK_STEP). ✅ Bảng nguồn `NG_SB_RLOS_USER_MAKE_WORK_STEP` không có trong `DS_BANG_202608.xlsx` nhưng đã xác nhận tồn tại thật qua `input/RLOS - Metadata.xlsx` (review 2026-09-21, Section 3 dòng #20, dùng chung với nhánh CLOS) |
 | 77 | UNDERWRITERCHECKER_TAKERESPON | VARCHAR2 | N | 100 |  | Kiểm soát thẩm định chịu trách nhiệm (BC1) — PHÁI SINH: cùng cơ chế trên, COALESCE(CASE WHEN ak.WORK_STEP='UnderwriterChecker' THEN ak.USER_MAKE END, g.UWCHKRUSER). Cùng nguồn `NG_SB_RLOS_USER_MAKE_WORK_STEP` đã xác nhận tồn tại thật (Section 3 dòng #20) |
 | 78 | APPROVAL_TAKERESPON | VARCHAR2 | N | 100 |  | Chuyên gia phê duyệt chịu trách nhiệm (BC1) — PHÁI SINH theo nguyên văn SRS: COALESCE(CASE WHEN ak.WORK_STEP IN ('CreditCommittee','CreditApproval') THEN ak.USER_MAKE END, g.CREDAPPRUSER, g.CCOMMITUSER) — khác hẳn công thức CLOS (không hardcode theo APP_GRP, dùng 2 cột fallback CREDAPPRUSER/CCOMMITUSER trên chính NG_SB_RLOS_EXTTABLE thay vì hằng số, xem 1.2.2.1). Cùng nguồn đã xác nhận tồn tại thật, xem Section 3 dòng #20 |
@@ -2014,7 +2067,6 @@ K_TYPE qua bảng thẻ T24 ở DTM" của lineage doc gốc, không phát hiệ
 | 12 | RCTYPE | VARCHAR2 | N | 20 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_RLOS_EXCEPTION.RCTYPE. Review 2026-09-18: SRS BC7 cập nhật KHÔNG còn dùng cột này làm điều kiện lọc CHECK_FTR (khác bản SRS trước) — vẫn giữ cột vì BC7 hiển thị trực tiếp làm trường riêng trên báo cáo |
 | 13 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật đổi hẳn công thức): **công thức RIÊNG của RLOS, không dùng chung với CLOS** — mặc định 'Not First Time Right'; là 'First Time Right' CHỈ KHI mọi dòng NG_SB_RLOS_EXCEPTION (a) có EXCEPTION_CATEGORY LIKE '%BR%' đều khớp 1 trong 5 điều kiện miễn trừ theo EXCEPTION_NAME (một số điều kiện phụ theo BI_SUB_PRODUCT — PHÁI SINH: CASE WHEN NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT LIKE '%Phát hành%' OR LIKE '%TTD%' THEN 'Credit Card' ELSE SUB_PRODUCT END), xem đầy đủ literal tại SRS BC7 BR 1.2 |
 | 14 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật): WORKSTEP của bản ghi NG_SB_RLOS_ENTRY_EXIT tại MIN(EXITDATE) theo WI_NAME, với điều kiện EXITDATE IS NOT NULL AND ((WORKSTEP='DetailDataEntry' AND DECISION='Send_Back') OR (WORKSTEP IN ('DataInputerChecker','UnderwriterMaker','CreditApproval') AND DECISION='Additional_Doc_Required') OR (WORKSTEP='UnderwriterMaker' AND DECISION='Send_Back to BranchSupport')) — bổ sung nhánh thứ 3 so với công thức cũ, giống CLOS |
-| 15 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật đổi hẳn công thức): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='RLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE — thay thế công thức CASE-WHEN cũ, cùng bảng REF_ mới dùng chung với CLOS, xem hld/HLD_REF.md mục 2.4.10 |
 
 - Bảng FACT chi tiết (nhân dòng), lưu mỗi lần một lý do được nêu ra trên hồ sơ RLOS, trong ảnh chụp của ngày DAYID. Phục vụ BC7, BC8.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME**.
@@ -2024,14 +2076,18 @@ K_TYPE qua bảng thẻ T24 ở DTM" của lineage doc gốc, không phát hiệ
 khi tách vật lý, loại khỏi PK theo ghi chú
 thiết kế khóa của split-proposal), 11 cột gốc giữ nguyên cấu trúc, vẫn đọc
 trực tiếp từ `NG_SB_RLOS_EXCEPTION` (LOẠI 1, khóa CDC khai đủ, cùng tổ
-hợp khóa với `NG_SB_CLOS_EXCEPTION`). Thêm mới 3 cột `CHECK_FTR`/
-`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE` — vốn nằm trên
-`FCT_LOS_APPLICATION_DAILY` (bản gộp cũ) nhưng đã đánh giá lại và dời sang
-đây (xem đánh giá kiến trúc bên dưới) — tổng **15 cột**.
+hợp khóa với `NG_SB_CLOS_EXCEPTION`). Thêm mới 2 cột `CHECK_FTR`/
+`FIRST_WORKSTEP_RETURN` — vốn nằm trên `FCT_LOS_APPLICATION_DAILY` (bản
+gộp cũ) nhưng đã đánh giá lại và dời sang đây (xem đánh giá kiến trúc bên
+dưới) — tổng **14 cột**. `PHAN_LOAI_DDE` (cột thứ 3 từng dự kiến chuyển
+sang đây) đã được đánh giá lại (review 2026-09-22) và chuyển hẳn sang
+tính tại `hld/HLD_FCT_PDTD_DTM.md` mục 2.3.2.5 — xem "⚠️ Đánh giá kiến
+trúc — `PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" ở Section 1 phía trên.
 
 **Đối chiếu SRS (BC7, BC8):** BC7 dùng trực tiếp `EXCEPTION_CATEGORY`,
 `EXCEPTION_NAME`, `EXCEPTION_REMARKS`, `RAISED_BY`, `RAISED_DATE_TIME`,
-`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE`. Đã đối chiếu công
+`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE` (cột này tính ở
+PDTD_DTM, xem `hld/HLD_FCT_PDTD_DTM.md` mục 2.3.2.5). Đã đối chiếu công
 thức trực tiếp với bảng field-list của SRS BC7 bản cập nhật (review
 2026-09-18), nhánh "Nguồn RLOS" — xem công thức mới đầy đủ tại Section 1
 → 1.3.2.5 và cột tương ứng ở trên. Vẫn giữ điểm khác biệt quan trọng:
@@ -2043,12 +2099,18 @@ theo `BI_SUB_PRODUCT` thay vì `CUST_GROUP`) — 2 định nghĩa tách biệt c
 (1.3.2.1):** cùng lý do khác grain đã áp dụng cho `FCT_CLOS_EXCEPTION`
 (1.2.2.4) — không gộp vào grain 1 dòng/hồ sơ/ngày.
 
-**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
-`PHAN_LOAI_DDE` chuyển về đây:** rà soát SRS BC1-BC11 xác nhận cả 3 cột
-chỉ phục vụ BC7, đúng grain của bảng này — cùng lý do đã áp dụng cho
-`FCT_CLOS_EXCEPTION` (1.2.2.4). Riêng `CHECK_FTR`, công thức đọc thẳng
-`NG_SB_RLOS_EXCEPTION` (chính là nguồn của FCT này) nên không cần join
-thêm bảng nào khác — đơn giản hơn cả CLOS (vốn phải đọc `ENTRY_EXIT`).
+**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` chuyển
+về đây:** rà soát SRS BC1-BC11 xác nhận cả 3 cột gốc (`CHECK_FTR`/
+`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE`) chỉ phục vụ BC7, đúng grain của
+bảng này — cùng lý do đã áp dụng cho `FCT_CLOS_EXCEPTION` (1.2.2.4).
+Riêng `CHECK_FTR`, công thức đọc thẳng `NG_SB_RLOS_EXCEPTION` (chính là
+nguồn của FCT này) nên không cần join thêm bảng nào khác — đơn giản hơn
+cả CLOS (vốn phải đọc `ENTRY_EXIT`). Riêng `PHAN_LOAI_DDE`: dù cùng lý do
+"khác grain" và cùng phục vụ BC7, cột này KHÔNG dừng ở tầng SB_DWH mà
+chuyển tiếp sang tính hẳn tại PDTD_DTM (review 2026-09-22, cùng lý do đã
+áp dụng cho CLOS) — vì bảng danh mục nó lookup (`REF_PHAN_LOAI_DDE`) chỉ
+tồn tại vật lý ở PDTD_DTM. Bảng này (SB_DWH) chỉ còn 2 cột `CHECK_FTR`/
+`FIRST_WORKSTEP_RETURN` trong nhóm 3 cột gốc.
 
 ###### 1.3.2.6 FCT_RLOS_DEVIATION
 
@@ -2066,7 +2128,7 @@ thêm bảng nào khác — đơn giản hơn cả CLOS (vốn phải đọc `EN
 | 8 | DEVIATION_REASON | VARCHAR2 | N | 4000 |  | Lý do lệch chính sách — nguồn NG_SB_RLOS_MANUAL_DEVIATION.REASON (đổi tên cho rõ nghĩa vì tên gốc quá chung) |
 | 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — PHÁI SINH: tính độc lập từ NG_SB_RLOS_ENTRY_EXIT theo cùng công thức 3 mức ưu tiên (ngày phê duyệt cuối/ngày hủy/ngày thoát bước gần nhất) đã dùng cho FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE (1.3.2.1) — không JOIN sang FCT_RLOS_APPLICATION_DAILY để tránh tham chiếu chéo giữa 2 bảng (xem đánh giá kiến trúc bên dưới) |
 
-- Bảng FACT chi tiết (nhân dòng), lưu ảnh số liệu thay đổi theo ngày của từng ngoại lệ chính sách thuộc hồ sơ RLOS. Không có chiều riêng — toàn bộ thuộc tính lưu thẳng trên fact vì nguồn không khai khóa CDC. Phục vụ BC6 (chi tiết); đồng thời là nguồn trực tiếp cho `FCT_LOS_KPI_APPLICATION.DEVIATION_G2`/`DEVIATION_G3` (2.1.9, phục vụ BC9 — review 2026-09-17: sửa lại cho đúng, bản cũ ghi nhầm "tính trực tiếp ở tầng report/OAS" không có căn cứ SRS và bỏ sót liên kết thật này). Riêng `DIM_RLOS_APPLICATION.DEVIATION_G3` (1.3.1.1) là 1 thiết kế song song khác, đọc thẳng `NG_SB_RLOS_MANUAL_DEVIATION` không qua bảng này — xem đối chiếu công thức tại "Đối chiếu SRS" bên dưới.
+- Bảng FACT chi tiết (nhân dòng), lưu ảnh số liệu thay đổi theo ngày của từng ngoại lệ chính sách thuộc hồ sơ RLOS. Không có chiều riêng — toàn bộ thuộc tính lưu thẳng trên fact vì nguồn không khai khóa CDC. Phục vụ BC6 (chi tiết); đồng thời là nguồn trực tiếp cho `AGG_LOS_KPI_APPLICATION.DEVIATION_G2`/`DEVIATION_G3` (2.1.9, phục vụ BC9 — review 2026-09-17: sửa lại cho đúng, bản cũ ghi nhầm "tính trực tiếp ở tầng report/OAS" không có căn cứ SRS và bỏ sót liên kết thật này). Riêng `DIM_RLOS_APPLICATION.DEVIATION_G3` (1.3.1.1) là 1 thiết kế song song khác, đọc thẳng `NG_SB_RLOS_MANUAL_DEVIATION` không qua bảng này — xem đối chiếu công thức tại "Đối chiếu SRS" bên dưới.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, DEVIATION_BK**.
 
 **So với thiết kế cũ (`FCT_LOS_DEVIATION` gộp, 11 cột):** giữ lại
@@ -2090,7 +2152,7 @@ hiện lỗi đánh máy bên dưới), `DEVIATION_REASON` (→ `REASON`),
 report/OAS" (review 2026-09-17):** câu này sai và đã được sửa (xem mô tả
 bảng ở trên) — SRS chỉ nói đến nguồn thô `NG_SB_RLOS_MANUAL_DEVIATION`,
 không hề nhắc "report/OAS". Cơ chế thật trong tài liệu này: `DEVIATION_G2`
-và `DEVIATION_G3` (phục vụ BC9) được tính tại `FCT_LOS_KPI_APPLICATION`
+và `DEVIATION_G3` (phục vụ BC9) được tính tại `AGG_LOS_KPI_APPLICATION`
 (2.1.9) bằng `COUNT DISTINCT DEVIATION_BK` trên chính bảng
 `FCT_RLOS_DEVIATION` này (đã lọc `DAYID=MAX(DAYID)` để tránh đếm nhân do
 full-snapshot-mỗi-ngày) — tức bảng này **là nguồn trực tiếp ở tầng
@@ -2102,11 +2164,11 @@ trên `DIM_RLOS_APPLICATION` (1.3.1.1), đọc thẳng
 **Rủi ro lệch kết quả giữa 2 thiết kế song song của DEVIATION_G3 (review
 2026-09-17):** `DEVIATION_BK` là hash loại trừ cột `REASON` (xem trên) —
 nên 2 dòng ngoại lệ thật khác nhau nhưng chỉ khác nội dung `REASON` sẽ bị
-hash trùng, khiến `COUNT DISTINCT DEVIATION_BK` (tại `FCT_LOS_KPI_
+hash trùng, khiến `COUNT DISTINCT DEVIATION_BK` (tại `AGG_LOS_KPI_
 APPLICATION`) đếm THẤP hơn `COUNT(*)` thô (tại `DIM_RLOS_APPLICATION`) —
 2 nơi có thể trả về YES/NO khác nhau cho cùng 1 hồ sơ. Đã tra cứu nguyên
 văn SRS BC9 để xác định công thức đúng — xem kết luận và phương án thống
-nhất tại `DIM_RLOS_APPLICATION` (1.3.1.1) và `FCT_LOS_KPI_APPLICATION`
+nhất tại `DIM_RLOS_APPLICATION` (1.3.1.1) và `AGG_LOS_KPI_APPLICATION`
 (2.1.9).
 
 **Phát hiện khi đối chiếu SRS — nghi vấn lỗi đánh máy ở khối RLOS của

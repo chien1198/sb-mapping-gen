@@ -1,7 +1,7 @@
 ﻿"target_table","target_column","nullable","data_type","key","description","etl_logic","etl_logic_type","source_table","source_column","note"
 "DIM_CLOS_DECISION","DIMENSION_KEY","false","number","PK","PK — Driving: STG_DIM_CLOS_DECISION","STG_DIM_CLOS_DECISION.DIMENSION_KEY","direct","STG_DIM_CLOS_DECISION","DIMENSION_KEY","Giữ nguyên giá trị từ SB_DWH qua vùng chìa STG_DTM, không sinh sequence mới"
 "DIM_CLOS_DECISION","DATASOURCE","false","string(10)","","Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS'","STG_DIM_CLOS_DECISION.DATASOURCE","direct","STG_DIM_CLOS_DECISION","DATASOURCE",""
-"DIM_CLOS_DECISION","DECISION_SK","false","number","","Bằng đúng DIMENSION_KEY cùng dòng","STG_DIM_CLOS_DECISION.DECISION_SK","direct","STG_DIM_CLOS_DECISION","DECISION_SK",""
+"DIM_CLOS_DECISION","DECISION_SK","false","number","","Bằng đúng DIMENSION_KEY cùng dòng — dùng để Fact lookup vào DIM này. Mặc định -1 (dòng Unknown) khi lookup không khớp","STG_DIM_CLOS_DECISION.DECISION_SK","direct","STG_DIM_CLOS_DECISION","DECISION_SK",""
 "DIM_CLOS_DECISION","DECISION_CODE","false","string(200)","NK","Business key — mã quyết định tại bước xử lý trên workflow CLOS","STG_DIM_CLOS_DECISION.DECISION_CODE","direct","STG_DIM_CLOS_DECISION","DECISION_CODE",""
 "DIM_CLOS_DECISION","EFF_DATE","false","date","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","STG_DIM_CLOS_DECISION.EFF_DATE","direct","STG_DIM_CLOS_DECISION","EFF_DATE",""
 "DIM_CLOS_DECISION","EXP_DATE","true","date","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","STG_DIM_CLOS_DECISION.EXP_DATE","direct","STG_DIM_CLOS_DECISION","EXP_DATE",""

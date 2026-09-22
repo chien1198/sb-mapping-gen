@@ -5,7 +5,6 @@
 "FCT_RLOS_SUB_PRODUCT","SUB_PRODUCT_BK","false","string(64)","PK","PK (4/4) — khóa nghiệp vụ của 1 lần đăng ký sản phẩm phụ","STG_FCT_RLOS_SUB_PRODUCT.SUB_PRODUCT_BK","direct","STG_FCT_RLOS_SUB_PRODUCT","SUB_PRODUCT_BK",""
 "FCT_RLOS_SUB_PRODUCT","DATASOURCE","false","string(10)","","Cột kỹ thuật đánh dấu nguồn hệ","STG_FCT_RLOS_SUB_PRODUCT.DATASOURCE","direct","STG_FCT_RLOS_SUB_PRODUCT","DATASOURCE",""
 "FCT_RLOS_SUB_PRODUCT","APPLICATION_SK","false","number","","Khóa tới DIM_RLOS_APPLICATION","STG_FCT_RLOS_SUB_PRODUCT.APPLICATION_SK","direct","STG_FCT_RLOS_SUB_PRODUCT","APPLICATION_SK",""
-"FCT_RLOS_SUB_PRODUCT","PRODUCT_SK","false","number","","Khóa tới DIM_RLOS_PRODUCT của sản phẩm phụ tương ứng","STG_FCT_RLOS_SUB_PRODUCT.PRODUCT_SK","direct","STG_FCT_RLOS_SUB_PRODUCT","PRODUCT_SK",""
 "FCT_RLOS_SUB_PRODUCT","SUB_PRODUCT_LINE","true","string(200)","","Dòng của sản phẩm phụ","STG_FCT_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE","direct","STG_FCT_RLOS_SUB_PRODUCT","SUB_PRODUCT_LINE",""
 "FCT_RLOS_SUB_PRODUCT","SPP_AMOUNT","true","number(20,2)","","Hạn mức của sản phẩm phụ","STG_FCT_RLOS_SUB_PRODUCT.SPP_AMOUNT","direct","STG_FCT_RLOS_SUB_PRODUCT","SPP_AMOUNT",""
 "FCT_RLOS_SUB_PRODUCT","SPP_TERM","true","number(5)","","Thời hạn của sản phẩm phụ, đơn vị tháng","STG_FCT_RLOS_SUB_PRODUCT.SPP_TERM","direct","STG_FCT_RLOS_SUB_PRODUCT","SPP_TERM",""
