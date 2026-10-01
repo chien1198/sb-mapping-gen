@@ -147,7 +147,7 @@ SB_DWH không cần.
 | DIM | `DIM_CLOS_COLLATERAL_TYPE` | Cùng cấu trúc gốc. |
 | DIM | `DIM_CLOS_CHANGE_TYPE` | Cùng cấu trúc gốc. |
 | FCT | `FCT_CLOS_APPLICATION_DAILY` | Bổ sung cột chuẩn hóa cho báo cáo (`BI_FLOW` qua `REF_CLOS_LEGAL`/luồng nghiệp vụ, `ZONE` qua `TMP_REF_COMPANY_REGION_KHDN`) phục vụ BC2, BC11. |
-| FCT | `FCT_CLOS_APPLICATION_PARTY` | Cùng cấu trúc gốc, có thể bổ sung `LEGAL_TYPE` map qua `REF_CLOS_LEGAL`. |
+| FCT | `FCT_CLOS_APPLICATION_PARTY` | ⚠️ Đề xuất ban đầu tại đây — HLD chi tiết sau đó (`hld/HLD_Table_Design.md`) tách bảng cầu nối này thành `FCT_CLOS_APPLICATION_PARTY` (SB_DWH, giữ nguyên) và bản PDTD_DTM cùng tên; **review 2026-09-26 (theo yêu cầu người dùng): bản PDTD_DTM đã bị xóa hẳn**, hợp nhất vào `FCT_CLOS_LEGAL_PARTY` (2.2.2.8, thêm `DAYID` vào PK) — xem `hld/HLD_Table_Design.md` 2.2.2.2/2.2.2.8 và `hld/hld_review/HLD_FCT_PDTD_DTM_review.md` mục 4/9a. Bản SB_DWH (1.2.2.2) không đổi. |
 | FCT | `FCT_CLOS_PARTY_DOCUMENT` | Bổ sung `LEGAL_TYPE` map qua `REF_CLOS_LEGAL` (tương tự thiết kế `FCT_PDTD_PARTY_DOCUMENT` hiện tại). |
 | FCT | `FCT_CLOS_COLLATERAL` | Cùng cấu trúc gốc. |
 | FCT | `FCT_CLOS_EXCEPTION` | Cùng cấu trúc gốc. |

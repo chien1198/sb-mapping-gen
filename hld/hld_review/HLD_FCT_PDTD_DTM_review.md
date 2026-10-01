@@ -3,7 +3,7 @@
 ## 1. AGG_LOS_KPI_YTD_DAILY
 
 ### 1.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** Bảng chỉ số KPI lũy kế theo ngày cho toàn khối PDTD (RLOS và CLOS là 2 nhóm cột song song trên cùng một dòng, không tách bảng), phục vụ phần "KPI Khối" của Báo cáo KPI (BC9). Toàn bộ 26 cột non-PK đều là SUM/COUNT/lũy kế tính từ `AGG_LOS_KPI_APPLICATION` — không còn thuộc tính mô tả hay FK nào, đúng định nghĩa bảng tổng hợp (aggregate), không phải transaction fact. Quy tắc load: chỉ tiêu cộng được thì `TRƯỜNG(D) = TRƯỜNG(D-1) + TRƯỜNG_DAY(D)`, reset về 0 vào ngày 1/1 hằng năm; sửa dữ liệu ngày quá khứ thì phải chạy lại tuần tự đến ngày cuối đã load trong cùng năm.
+- **Ý nghĩa bảng:** Bảng chỉ số KPI lũy kế theo ngày cho toàn khối PDTD (RLOS và CLOS là 2 nhóm cột song song trên cùng một dòng, không tách bảng), phục vụ phần "KPI Khối" của Báo cáo KPI (BC9).
 - **Khóa chính của bảng (PK):** DAYID.
 - **Độ chi tiết (grain):** 1 dòng = 1 ngày dữ liệu, cho toàn khối (không tách theo hệ RLOS/CLOS).
 - **Phục vụ báo cáo:**
@@ -17,258 +17,266 @@ flowchart LR
         A["AGG_LOS_KPI_APPLICATION"]
         D1["DIM_RLOS_APPLICATION"]
         D3["DIM_CLOS_APPLICATION"]
-        D2["DIM_LOS_ORG_UNIT"]
-        M["REF_LOS_KPI_USER_YEAR"]
+        D2["DIM_LOS_COMPANY"]
+        M["AGG_LOS_KPI_USER_YEAR"]
         F["AGG_LOS_KPI_YTD_DAILY"]
     end
-    A -->|"SUM QUY_DOI theo PROCESSED_DATE=DAYID, loại IS_TEST_ACCOUNT='Y', tách RLOS/CLOS theo DATASOURCE — sinh QUY_DOI_*_DAY"| F
-    A -->|"COUNT hồ sơ theo PROCESSED_DATE=DAYID, loại IS_TEST_ACCOUNT='Y', CLOS thêm VAR_STR12 IS NOT NULL — sinh SLHS_*_DAY, SLGN_*_DAY"| F
-    D1 -.->|"BI_FLOW IN ('BL','KHCN_HO'), lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
-    D2 -.->|"COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002'), lookup qua ORG_UNIT_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
-    D3 -.->|"STREAM = 'Phê duyệt tín dụng', lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY/TAT_CLOS_*_DAY (tương đương BI_FLOW của RLOS)"| F
-    A -->|"SUM/COUNT TAT_APPLICATION_HOUR theo PROCESSED_DATE=DAYID, loại IS_TEST_ACCOUNT='Y' — sinh TAT_*_SUM_HOUR_DAY, TAT_*_CASE_CNT_DAY"| F
+    A -->|"SUM QUY_DOI theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date, loại IS_TEST_ACCOUNT='Y', tách RLOS/CLOS theo DATASOURCE — sinh QUY_DOI_*_DAY"| F
+    A -->|"COUNT hồ sơ theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date, loại IS_TEST_ACCOUNT='Y', CLOS thêm VAR_STR12 IS NOT NULL — sinh SLHS_*_DAY, SLGN_*_DAY"| F
+    D1 -.->|"BUSINESS_FLOW IN ('BL','KHCN_HO'), lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
+    D2 -.->|"COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002'), lookup qua COMPANY_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
+    D3 -.->|"STREAM = 'Phê duyệt tín dụng', lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY/TAT_CLOS_*_DAY (tương đương BUSINESS_FLOW của RLOS)"| F
+    A -->|"SUM/COUNT TAT_APPLICATION_HOUR theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập), loại IS_TEST_ACCOUNT='Y' — sinh TAT_*_SUM_HOUR_DAY, TAT_*_CASE_CNT_DAY"| F
     M -->|"COUNT theo FIRST_ELIGIBLE_TS=DAYID (đã loại 2 tài khoản test tại nguồn) — sinh NEW_USER_CNT_DAY"| F
 ```
+
 
 ### 1.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | Báo cáo KPI (BC9) — điều kiện lọc/khóa để phái sinh YEAR_MONTH tại tầng report | Năm báo cáo (phái sinh từ DAYID) |
-| 2 | SLHS_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS được phê duyệt, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', thỏa điều kiện DECISION đã phê duyệt, và BI_FLOW/COMPANY_CODE lọc theo đúng công thức SRS | Báo cáo KPI (BC9) — nguồn cho SLHS_RLOS lũy kế (cột 3) | Nguồn cho chỉ tiêu SLHS_RLOS |
-| 3 | SLHS_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_RLOS(D) = SLHS_RLOS(D-1) + SLHS_RLOS_DAY(D), reset vào 1/1 | Báo cáo KPI (BC9) — hiển thị trực tiếp | Số lượng hồ sơ phê duyệt RLOS (SLHS_RLOS) |
-| 4 | SLGN_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS đã giải ngân (tồn tại hợp đồng trên STG_FCT_LOAN), phát sinh trong ngày — cùng điều kiện lọc SLHS_RLOS_DAY, thêm EXISTS hợp đồng theo SEAB_LOS_ID | Báo cáo KPI (BC9) — nguồn cho SLGN_RLOS lũy kế (cột 5) | Nguồn cho chỉ tiêu SLGN_RLOS |
-| 5 | SLGN_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_RLOS(D) = SLGN_RLOS(D-1) + SLGN_RLOS_DAY(D), reset vào 1/1 | Báo cáo KPI (BC9) — hiển thị trực tiếp | Số lượng hồ sơ giải ngân RLOS (SLGN_RLOS) |
-| 6 | SLHS_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS được phê duyệt, phát sinh trong ngày — cùng cách SLHS_RLOS_DAY, DATASOURCE='CLOS', thêm VAR_STR12 IS NOT NULL và STREAM = 'Phê duyệt tín dụng' | Báo cáo KPI (BC9) — nguồn cho SLHS_CLOS lũy kế (cột 7) | Nguồn cho chỉ tiêu SLHS_CLOS |
-| 7 | SLHS_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_CLOS(D) = SLHS_CLOS(D-1) + SLHS_CLOS_DAY(D), reset vào 1/1 | Báo cáo KPI (BC9) — hiển thị trực tiếp | Số lượng hồ sơ phê duyệt CLOS (SLHS_CLOS) |
-| 8 | SLGN_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS đã giải ngân, phát sinh trong ngày — cùng điều kiện lọc SLHS_CLOS_DAY, thêm EXISTS hợp đồng trên STG_FCT_LOAN (nhánh LD) hoặc STG_DTM.STG_FCT_MD (nhánh MD, bảo lãnh) | Báo cáo KPI (BC9) — nguồn cho SLGN_CLOS lũy kế (cột 9) | Nguồn cho chỉ tiêu SLGN_CLOS |
-| 9 | SLGN_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_CLOS(D) = SLGN_CLOS(D-1) + SLGN_CLOS_DAY(D), reset vào 1/1 | Báo cáo KPI (BC9) — hiển thị trực tiếp | Số lượng hồ sơ giải ngân CLOS (SLGN_CLOS) |
-| 10 | TAT_RLOS_SEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS CÓ tài sản bảo đảm, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR, lọc SEC theo COLLREQUIRE | Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_SEC_SUM_HOUR_YTD lũy kế (cột 12), qua đó nguồn cho chỉ tiêu TAT_RLOS phái sinh tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS |
-| 11 | TAT_RLOS_SEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS có tài sản bảo đảm, phát sinh trong ngày — mẫu số của TAT_RLOS_SEC, cùng điều kiện lọc trên | Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_SEC_CASE_CNT_YTD lũy kế (cột 13), qua đó nguồn cho chỉ tiêu TAT_RLOS phái sinh tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS |
-| 12 | TAT_RLOS_SEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_SUM_HOUR_DAY(D), reset vào 1/1 | Báo cáo KPI (BC9) — thành phần AVG_SEC = SUM_HOUR_YTD/CASE_CNT_YTD, dùng phái sinh chỉ tiêu TAT_RLOS tại tầng report (không lưu vật lý) | Nguồn cho chỉ tiêu TAT_RLOS (AVG_SEC) |
-| 13 | TAT_RLOS_SEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_CASE_CNT_DAY(D), reset vào 1/1 | Báo cáo KPI (BC9) — thành phần AVG_SEC, dùng phái sinh chỉ tiêu TAT_RLOS tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS (AVG_SEC) |
-| 14 | TAT_RLOS_UNSEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS KHÔNG có tài sản bảo đảm, phát sinh trong ngày — cùng cách trên, lọc UNSEC | Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_UNSEC_SUM_HOUR_YTD lũy kế (cột 16) | Nguồn cho chỉ tiêu TAT_RLOS |
-| 15 | TAT_RLOS_UNSEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS không có tài sản bảo đảm, phát sinh trong ngày | Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_UNSEC_CASE_CNT_YTD lũy kế (cột 17) | Nguồn cho chỉ tiêu TAT_RLOS |
-| 16 | TAT_RLOS_UNSEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 | Báo cáo KPI (BC9) — thành phần AVG_UNSEC = SUM_HOUR_YTD/CASE_CNT_YTD, dùng phái sinh chỉ tiêu TAT_RLOS tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS (AVG_UNSEC) |
-| 17 | TAT_RLOS_UNSEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 | Báo cáo KPI (BC9) — thành phần AVG_UNSEC, dùng phái sinh chỉ tiêu TAT_RLOS tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS (AVG_UNSEC) |
-| 18 | TAT_CLOS_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ CLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (DATASOURCE='CLOS'), không lọc VAR_STR12, thêm STREAM = 'Phê duyệt tín dụng' | Báo cáo KPI (BC9) — nguồn cho TAT_CLOS_SUM_HOUR_YTD lũy kế (cột 20), qua đó nguồn cho chỉ tiêu TAT_CLOS phái sinh tại tầng report | Nguồn cho chỉ tiêu TAT_CLOS |
-| 19 | TAT_CLOS_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS, phát sinh trong ngày — mẫu số của TAT_CLOS, cùng điều kiện lọc trên (bao gồm STREAM) | Báo cáo KPI (BC9) — nguồn cho TAT_CLOS_CASE_CNT_YTD lũy kế (cột 21) | Nguồn cho chỉ tiêu TAT_CLOS |
-| 20 | TAT_CLOS_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 | Báo cáo KPI (BC9) — dùng trực tiếp để phái sinh chỉ tiêu TAT_CLOS = TAT_CLOS_SUM_HOUR_YTD/TAT_CLOS_CASE_CNT_YTD tại tầng report (không lưu vật lý) | TAT CLOS (TAT_CLOS, phái sinh tầng report) |
-| 21 | TAT_CLOS_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 | Báo cáo KPI (BC9) — dùng trực tiếp để phái sinh chỉ tiêu TAT_CLOS tại tầng report | TAT CLOS (TAT_CLOS, phái sinh tầng report) |
-| 22 | QUY_DOI_RLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ RLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.QUY_DOI (DATASOURCE='RLOS'), IS_TEST_ACCOUNT != 'Y' | Báo cáo KPI (BC9) — nguồn cho QUY_DOI_RLOS lũy kế (cột 23) | Nguồn cho chỉ tiêu QUY_DOI_RLOS |
-| 23 | QUY_DOI_RLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_RLOS(D) = QUY_DOI_RLOS(D-1) + QUY_DOI_RLOS_DAY(D), reset vào 1/1 | Báo cáo KPI (BC9) — hiển thị trực tiếp | Điểm KPI RLOS quy đổi (QUY_DOI_RLOS) |
-| 24 | QUY_DOI_CLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ CLOS, phát sinh trong ngày — cùng cách trên, DATASOURCE='CLOS' | Báo cáo KPI (BC9) — nguồn cho QUY_DOI_CLOS lũy kế (cột 25) | Nguồn cho chỉ tiêu QUY_DOI_CLOS |
-| 25 | QUY_DOI_CLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_CLOS(D) = QUY_DOI_CLOS(D-1) + QUY_DOI_CLOS_DAY(D), reset vào 1/1 | Báo cáo KPI (BC9) — hiển thị trực tiếp | Điểm KPI CLOS quy đổi (QUY_DOI_CLOS) |
-| 26 | NEW_USER_CNT_DAY | NUMBER | N | 8 |  | Số USERNAME mới đủ điều kiện tính nhân sự trong ngày — PHÁI SINH: COUNT trên REF_LOS_KPI_USER_YEAR có KPI_YEAR = năm(DAYID) và TRUNC(FIRST_ELIGIBLE_TS) = DAYID | Báo cáo KPI (BC9) — nguồn cho NHAN_SU lũy kế (cột 27) | Nguồn cho chỉ tiêu NHAN_SU |
-| 27 | NHAN_SU | NUMBER | N | 8 |  | Lũy kế từ 1/1: NHAN_SU(D) = NHAN_SU(D-1) + NEW_USER_CNT_DAY(D), reset vào 1/1 — tương đương COUNT DISTINCT USERNAME lũy kế | Báo cáo KPI (BC9) — hiển thị trực tiếp | Nhân sự Khối PDTD (NHAN_SU) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — gán = v_batch_date của lần chạy ETL. BẢNG HOÀN TOÀN MỚI TẠI PDTD_DTM (aggregate/pre-tổng hợp), không có bảng SB_DWH tương ứng — nguồn là PDTD_DTM.AGG_LOS_KPI_APPLICATION/AGG_LOS_KPI_USER_YEAR (cũng là bảng chỉ tồn tại ở PDTD_DTM) | Báo cáo KPI (BC9) — điều kiện lọc/khóa để phái sinh YEAR_MONTH tại tầng report | Năm báo cáo (phái sinh từ DAYID) |
+| 2 | SLHS_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS được phê duyệt, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM: COUNT hồ sơ trên PDTD_DTM.AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, IS_TEST_ACCOUNT != 'Y', thỏa điều kiện DECISION đã phê duyệt, và BUSINESS_FLOW/COMPANY_CODE lọc theo đúng công thức SRS — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho SLHS_RLOS lũy kế (cột 3) | Nguồn cho chỉ tiêu SLHS_RLOS |
+| 3 | SLHS_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_RLOS(D) = SLHS_RLOS(D-1) + SLHS_RLOS_DAY(D), reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input SLHS_RLOS_DAY lấy từ cột 2, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | Số lượng hồ sơ phê duyệt RLOS (SLHS_RLOS) |
+| 4 | SLGN_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS đã giải ngân (tồn tại hợp đồng trên STG_FCT_LOAN), phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM, cùng điều kiện lọc SLHS_RLOS_DAY (cột 2, bao gồm DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date), thêm EXISTS hợp đồng theo SEAB_LOS_ID — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho SLGN_RLOS lũy kế (cột 5) | Nguồn cho chỉ tiêu SLGN_RLOS |
+| 5 | SLGN_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_RLOS(D) = SLGN_RLOS(D-1) + SLGN_RLOS_DAY(D), reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input SLGN_RLOS_DAY lấy từ cột 4, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | Số lượng hồ sơ giải ngân RLOS (SLGN_RLOS) |
+| 6 | SLHS_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS được phê duyệt, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM, cùng cách SLHS_RLOS_DAY (cột 2, bao gồm DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date), DATASOURCE='CLOS', thêm VAR_STR12 IS NOT NULL và STREAM = 'Phê duyệt tín dụng' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho SLHS_CLOS lũy kế (cột 7) | Nguồn cho chỉ tiêu SLHS_CLOS |
+| 7 | SLHS_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_CLOS(D) = SLHS_CLOS(D-1) + SLHS_CLOS_DAY(D), reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input SLHS_CLOS_DAY lấy từ cột 6, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | Số lượng hồ sơ phê duyệt CLOS (SLHS_CLOS) |
+| 8 | SLGN_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS đã giải ngân, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM, cùng điều kiện lọc SLHS_CLOS_DAY (cột 6, bao gồm DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date), thêm EXISTS hợp đồng trên STG_FCT_LOAN (nhánh LD) hoặc STG_DTM.STG_FCT_MD (nhánh MD, bảo lãnh) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho SLGN_CLOS lũy kế (cột 9) | Nguồn cho chỉ tiêu SLGN_CLOS |
+| 9 | SLGN_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_CLOS(D) = SLGN_CLOS(D-1) + SLGN_CLOS_DAY(D), reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input SLGN_CLOS_DAY lấy từ cột 8, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | Số lượng hồ sơ giải ngân CLOS (SLGN_CLOS) |
+| 10 | TAT_RLOS_SEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS CÓ tài sản bảo đảm, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM: SUM lại từ PDTD_DTM.AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR có DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date, lọc SEC theo COLLREQUIRE — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_SEC_SUM_HOUR_YTD lũy kế (cột 12), qua đó nguồn cho chỉ tiêu TAT_RLOS phái sinh tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS |
+| 11 | TAT_RLOS_SEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS có tài sản bảo đảm, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM, mẫu số của TAT_RLOS_SEC, cùng điều kiện lọc trên (cột 10) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_SEC_CASE_CNT_YTD lũy kế (cột 13), qua đó nguồn cho chỉ tiêu TAT_RLOS phái sinh tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS |
+| 12 | TAT_RLOS_SEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_SUM_HOUR_DAY(D), reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input từ cột 10, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — thành phần AVG_SEC = SUM_HOUR_YTD/CASE_CNT_YTD, dùng phái sinh chỉ tiêu TAT_RLOS tại tầng report (không lưu vật lý) | Nguồn cho chỉ tiêu TAT_RLOS (AVG_SEC) |
+| 13 | TAT_RLOS_SEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_CASE_CNT_DAY(D), reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input từ cột 11, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — thành phần AVG_SEC, dùng phái sinh chỉ tiêu TAT_RLOS tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS (AVG_SEC) |
+| 14 | TAT_RLOS_UNSEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS KHÔNG có tài sản bảo đảm, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM, cùng cách trên (cột 10, DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date), lọc UNSEC — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_UNSEC_SUM_HOUR_YTD lũy kế (cột 16) | Nguồn cho chỉ tiêu TAT_RLOS |
+| 15 | TAT_RLOS_UNSEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS không có tài sản bảo đảm, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM, cùng nguồn PDTD_DTM.AGG_LOS_KPI_APPLICATION như cột 14 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_UNSEC_CASE_CNT_YTD lũy kế (cột 17) | Nguồn cho chỉ tiêu TAT_RLOS |
+| 16 | TAT_RLOS_UNSEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input từ cột 14, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — thành phần AVG_UNSEC = SUM_HOUR_YTD/CASE_CNT_YTD, dùng phái sinh chỉ tiêu TAT_RLOS tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS (AVG_UNSEC) |
+| 17 | TAT_RLOS_UNSEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input từ cột 15, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — thành phần AVG_UNSEC, dùng phái sinh chỉ tiêu TAT_RLOS tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS (AVG_UNSEC) |
+| 18 | TAT_CLOS_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ CLOS, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM: SUM lại từ PDTD_DTM.AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (DATASOURCE='CLOS') có DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date , không lọc VAR_STR12, thêm STREAM = 'Phê duyệt tín dụng' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho TAT_CLOS_SUM_HOUR_YTD lũy kế (cột 20), qua đó nguồn cho chỉ tiêu TAT_CLOS phái sinh tại tầng report | Nguồn cho chỉ tiêu TAT_CLOS |
+| 19 | TAT_CLOS_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM, mẫu số của TAT_CLOS, cùng điều kiện lọc trên (cột 18, bao gồm STREAM) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho TAT_CLOS_CASE_CNT_YTD lũy kế (cột 21) | Nguồn cho chỉ tiêu TAT_CLOS |
+| 20 | TAT_CLOS_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input từ cột 18, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — dùng trực tiếp để phái sinh chỉ tiêu TAT_CLOS = TAT_CLOS_SUM_HOUR_YTD/TAT_CLOS_CASE_CNT_YTD tại tầng report (không lưu vật lý) | TAT CLOS (TAT_CLOS, phái sinh tầng report) |
+| 21 | TAT_CLOS_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input từ cột 19, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — dùng trực tiếp để phái sinh chỉ tiêu TAT_CLOS tại tầng report | TAT CLOS (TAT_CLOS, phái sinh tầng report) |
+| 22 | QUY_DOI_RLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ RLOS, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM: SUM lại từ PDTD_DTM.AGG_LOS_KPI_APPLICATION.QUY_DOI (DATASOURCE='RLOS') có DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date, IS_TEST_ACCOUNT != 'Y' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho QUY_DOI_RLOS lũy kế (cột 23) | Nguồn cho chỉ tiêu QUY_DOI_RLOS |
+| 23 | QUY_DOI_RLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_RLOS(D) = QUY_DOI_RLOS(D-1) + QUY_DOI_RLOS_DAY(D), reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input từ cột 22, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | Điểm KPI RLOS quy đổi (QUY_DOI_RLOS) |
+| 24 | QUY_DOI_CLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ CLOS, phát sinh trong ngày — PHÁI SINH TẠI PDTD_DTM, cùng cách trên (cột 22, DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date), DATASOURCE='CLOS' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho QUY_DOI_CLOS lũy kế (cột 25) | Nguồn cho chỉ tiêu QUY_DOI_CLOS |
+| 25 | QUY_DOI_CLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_CLOS(D) = QUY_DOI_CLOS(D-1) + QUY_DOI_CLOS_DAY(D), reset vào 1/1 — PHÁI SINH TẠI PDTD_DTM, input từ cột 24, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | Điểm KPI CLOS quy đổi (QUY_DOI_CLOS) |
+| 26 | NEW_USER_CNT_DAY | NUMBER | N | 8 |  | Số USERNAME mới đủ điều kiện tính nhân sự trong ngày — PHÁI SINH TẠI PDTD_DTM: COUNT trên PDTD_DTM.AGG_LOS_KPI_USER_YEAR có KPI_YEAR = năm(DAYID) và TRUNC(FIRST_ELIGIBLE_TS) = DAYID — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho NHAN_SU lũy kế (cột 27) | Nguồn cho chỉ tiêu NHAN_SU |
+| 27 | NHAN_SU | NUMBER | N | 8 |  | Lũy kế từ 1/1: NHAN_SU(D) = NHAN_SU(D-1) + NEW_USER_CNT_DAY(D), reset vào 1/1 — tương đương COUNT DISTINCT USERNAME lũy kế — PHÁI SINH TẠI PDTD_DTM, input từ cột 26, cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | Nhân sự Khối PDTD (NHAN_SU) |
 
-Ghi chú: 9 chỉ tiêu tỷ lệ/trung bình phái sinh của BC9 (`TAT_RLOS`, `TAT_TB`, `TY_LE_GN_RLOS`, `TY_LE_GN_CLOS`, `TY_LE_GN_TONG`, `SLHS_TONG`, `SLGN_TONG`, `NSLD`, và `YEAR_MONTH`) được tính hoàn toàn tại tầng report (OAS) từ các cột lũy kế đã lưu ở trên — không lưu vật lý trên bảng này, theo quyết định đã thống nhất với người dùng (tránh trùng dữ liệu suy ra được).
 
-## 2. AGG_LOS_KPI_APPLICATION
+## 2. AGG_LOS_KPI_USER_YEAR
+
 
 ### 2.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** Bảng FACT chấm điểm KPI theo từng hồ sơ, là input pre-aggregate duy nhất cho `AGG_LOS_KPI_YTD_DAILY` (SUM/COUNT lên grain ngày) — bản thân bảng này không tự hiển thị số lũy kế. Toàn bộ cột đều là chỉ tiêu KPI đã tính sẵn phục vụ thẳng Báo cáo KPI (BC9) (`VOLUME`, `POINT`, `QUY_DOI`, `TAT_APPLICATION_HOUR`, `TSBD_G2`, `DEVIATION_G2/G3`...) — không đọc trực tiếp 1 sự kiện nghiệp vụ thô nào, bản chất là bảng chỉ tiêu tổng hợp/phái sinh (derived KPI), không phải transaction fact.
-- **Khóa chính của bảng (PK):** WI_NAME, DATASOURCE.
-- **Độ chi tiết (grain):** 1 dòng = 1 hồ sơ (WI_NAME) × 1 hệ nguồn (DATASOURCE).
+- **Ý nghĩa bảng:** bảng danh mục lưu tập `USERNAME` phân
+  biệt đã tham gia xử lý hồ sơ đủ điều kiện tính nhân sự Khối PDTD, lũy
+  kế theo năm — để `NHAN_SU` (BC9) không phải `COUNT(DISTINCT
+  USERNAME)` lại từ đầu năm mỗi ngày. Không phải bảng sự kiện đo lường
+  theo `DAYID`.
+- **Khóa nghiệp vụ (BK):** composite `KPI_YEAR`+`USERNAME` — hash vào
+  cột `USER_YEAR_BK`
+- **Khóa chính của bảng (PK):** USER_YEAR_BK.
+- **Độ chi tiết (grain):** 1 dòng = 1 user × 1 năm KPI (reset vào 1/1
+  hằng năm).
 - **Phục vụ báo cáo:**
-  - Báo cáo KPI (BC9) — nguồn trực tiếp cho phần "Nguồn RLOS"/"Nguồn CLOS" của báo cáo, đồng thời là input pre-aggregate duy nhất cho AGG_LOS_KPI_YTD_DAILY
+  - Báo cáo KPI (BC9) — đầu vào duy nhất của `NHAN_SU`/`NEW_USER_CNT_DAY`
+    tại `AGG_LOS_KPI_YTD_DAILY` (mục 1)
 
 ### 2.2 Sơ đồ lineage
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        A["FCT_CLOS_APPLICATION_DAILY"]
-        B["FCT_RLOS_APPLICATION_DAILY"]
-        L["FCT_RLOS_COLLATERAL"]
-        V["FCT_CLOS_DEVIATION / FCT_RLOS_DEVIATION"]
-        W["FCT_CLOS_WORKSTEP_EVENT / FCT_RLOS_WORKSTEP_EVENT"]
+        C["FCT_CLOS_WORKSTEP_EVENT"]
+        D["FCT_RLOS_WORKSTEP_EVENT"]
     end
     subgraph PDTD_DTM
-        K["AGG_LOS_KPI_APPLICATION"]
+        E["AGG_LOS_KPI_USER_YEAR"]
     end
-    A -->|PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, ORG_UNIT_SK, VAR_STR12 — nhánh CLOS| K
-    B -->|PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, ORG_UNIT_SK — nhánh RLOS| K
-    L -.->|"RLOS-only, lọc DAYID=MAX(DAYID) mỗi WI_NAME (ảnh chụp gần nhất), COUNT(*) theo WI_NAME — sinh TSBD_G2, NULL nhánh CLOS"| K
-    V -->|"UNION theo WI_NAME, lọc DAYID=MAX(DAYID) mỗi WI_NAME (ảnh chụp gần nhất), COUNT(*) theo WI_NAME — sinh DEVIATION_G2/DEVIATION_G3"| K
-    W -->|"EXISTS USERNAME thuộc 2 tài khoản test toàn bộ lịch sử hồ sơ — sinh IS_TEST_ACCOUNT; tổng thời gian xử lý theo nhóm bước, chỉ tính event BI_FLAG_APPROVAL='First Approval' — sinh TAT_APPLICATION_HOUR"| K
+    C -->|"UNION theo USERNAME, lọc 8 workstep + APPLICATION_STATUS + BUSINESS_FLOW IN ('BL','KHCN_HO') (join APPLICATION_SK), loại 2 tài khoản test, MIN(EXITDATE) trong năm — chỉ INSERT nếu (KPI_YEAR, USERNAME) chưa tồn tại"| E
+    D -->|"UNION theo USERNAME, cùng điều kiện lọc — chỉ INSERT nếu (KPI_YEAR, USERNAME) chưa tồn tại"| E
 ```
 
 ### 2.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS hoặc RLOS — nguồn FCT_CLOS_APPLICATION_DAILY.WI_NAME/FCT_RLOS_APPLICATION_DAILY.WI_NAME | Báo cáo KPI (BC9) — khóa JOIN, đồng thời hiển thị trực tiếp làm mã hồ sơ | Mã hồ sơ (WI_NAME) |
-| 2 | DATASOURCE | VARCHAR2 | Y | 10 | PK | RLOS hoặc CLOS — quyết định công thức TAT/POINT/nhóm phân loại áp dụng | Báo cáo KPI (BC9) — khóa phân biệt nhánh "Nguồn RLOS"/"Nguồn CLOS" của báo cáo, đồng thời điều kiện lọc DATASOURCE khi tổng hợp SLHS/SLGN/TAT/QUY_DOI_*_DAY tại AGG_LOS_KPI_YTD_DAILY | Phân nhánh RLOS/CLOS của báo cáo |
-| 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION hoặc DIM_RLOS_APPLICATION tùy DATASOURCE. Mặc định -1 | Báo cáo KPI (BC9) — khóa JOIN tới DIM_RLOS_APPLICATION/DIM_CLOS_APPLICATION để lấy điều kiện lọc ẩn BI_FLOW (RLOS)/STREAM (CLOS) dùng trong công thức SLHS/SLGN/TAT_*_DAY tại AGG_LOS_KPI_YTD_DAILY | Nguồn cho chỉ tiêu SLHS_RLOS/SLGN_RLOS/SLHS_CLOS/SLGN_CLOS/TAT_CLOS (điều kiện lọc BI_FLOW/STREAM) |
-| 4 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT hoặc DIM_RLOS_PRODUCT tùy DATASOURCE. Mặc định -1 | Báo cáo KPI (BC9) — khóa JOIN report-time tới DIM_RLOS_PRODUCT/DIM_CLOS_PRODUCT để tra PRODUCT_LINE_NAME (+PRODUCT_NAME với CLOS) dùng tính cột POINT trên chính bảng này | Nguồn cho chỉ tiêu POINT |
-| 5 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_ORG_UNIT. Mặc định -1 | Báo cáo KPI (BC9) — khóa JOIN tới DIM_LOS_ORG_UNIT để lấy điều kiện lọc ẩn COMPANY_CODE NOT IN (...) dùng trong công thức SLHS_RLOS_DAY/SLGN_RLOS_DAY tại AGG_LOS_KPI_YTD_DAILY | Nguồn cho chỉ tiêu SLHS_RLOS/SLGN_RLOS (điều kiện lọc loại trừ chi nhánh) |
-| 6 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — nguồn FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE/FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE. Là mốc để AGG_LOS_KPI_YTD_DAILY xếp hồ sơ vào đúng DAYID khi SUM/COUNT lên grain ngày | Báo cáo KPI (BC9) — khóa lọc theo ngày, đồng thời hiển thị trực tiếp làm ngày dữ liệu | Ngày dữ liệu (PROCESSED_DATE) |
-| 7 | VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH theo DECISION/WORKSTEP xa nhất đã đạt, tính từ UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT toàn bộ lịch sử hồ sơ | Báo cáo KPI (BC9) — hiển thị trực tiếp (Tỷ lệ KPI), đồng thời là mẫu số của QUY_DOI (cột 9) | Tỷ lệ KPI (VOLUME) |
-| 8 | POINT | NUMBER | N | 12,4 |  | Điểm KPI — RLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT qua DIM_RLOS_PRODUCT + SYSTEM_CODE='RLOS') + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER; CLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT qua DIM_CLOS_PRODUCT+DIM_CLOS_APPLICATION + SYSTEM_CODE='CLOS') + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER, riêng APP_GRP='C1' cộng thêm hằng số 4 giờ | Báo cáo KPI (BC9) — hiển thị trực tiếp (Điểm KPI), đồng thời là tử số của QUY_DOI (cột 9) | Điểm KPI (POINT) |
-| 9 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi — PHÁI SINH: POINT*8/VOLUME, NULL nếu VOLUME NULL. Là đầu vào duy nhất của QUY_DOI_RLOS_DAY/QUY_DOI_CLOS_DAY ở AGG_LOS_KPI_YTD_DAILY | Báo cáo KPI (BC9) — hiển thị trực tiếp, đồng thời nguồn cho QUY_DOI_RLOS/QUY_DOI_CLOS lũy kế tại AGG_LOS_KPI_YTD_DAILY | Điểm KPI quy đổi (QUY_DOI) |
-| 10 | TAT_APPLICATION_HOUR | NUMBER | N | 18,6 |  | Tổng thời gian xử lý của hồ sơ, đơn vị giờ — RLOS = DDE+QC+UWM+UWC+APPROVER; CLOS = như RLOS cộng thêm COMMITTEE. Chỉ tính sự kiện BI_FLAG_APPROVAL='First Approval', loại trừ ngày nghỉ/giờ ngoài hành chính và thời gian rework | Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_SEC/UNSEC_SUM_HOUR_DAY và TAT_CLOS_SUM_HOUR_DAY tại AGG_LOS_KPI_YTD_DAILY, qua đó nguồn cho chỉ tiêu TAT_RLOS/TAT_CLOS/TAT_TB phái sinh tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS/TAT_CLOS |
-| 11 | TSBD_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 2 tài sản bảo đảm trở lên (RLOS-only, NULL nhánh CLOS) — PHÁI SINH: UNION 4 bảng collateral qua FCT_RLOS_COLLATERAL, lọc DAYID=MAX(DAYID)/WI_NAME (ảnh chụp gần nhất), COUNT(*) theo WI_NAME >= 2 thì 'YES' | Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có từ 02 TSBĐ trở lên (TSBD_G2) |
-| 12 | INCOM_3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 nguồn thu trở lên (RLOS-only, NULL nhánh CLOS) — đếm cờ REPAYFLAGS >= 3 thì 'YES' | Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có từ 03 nguồn thu trở lên (INCOM_3) |
-| 13 | BUSINESS_INCOM | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh, không áp dụng SeAPro/SeALand (RLOS-only, NULL nhánh CLOS) — PHÁI SINH theo PRODUCT_NAME loại trừ SeAPro/SeALand VÀ cờ FAIMILYFLAG/ENTERPRISSEFLAG/NONLICFLAG | Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có nguồn thu từ kinh doanh (BUSINESS_INCOM) |
-| 14 | DEVIATION_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có đúng 2 ngoại lệ — PHÁI SINH: đếm dòng trên FCT_CLOS_DEVIATION/FCT_RLOS_DEVIATION, lọc DAYID=MAX(DAYID)/WI_NAME (ảnh chụp gần nhất), COUNT(*) theo WI_NAME = 2 thì 'YES' | Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có 2 ngoại lệ (DEVIATION_G2) |
-| 15 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ trở lên — cùng cách lọc DAYID mới nhất + COUNT(*) theo WI_NAME, >= 3 thì 'YES' | Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có từ 3 ngoại lệ trở lên (DEVIATION_G3) |
-| 16 | IS_TEST_ACCOUNT | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có tồn tại (bất kỳ dòng lịch sử nào) USERNAME thuộc 2 tài khoản test/kỹ thuật ('hanh.nh2','hai.bt2') — EXISTS trên UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT, toàn bộ lịch sử hồ sơ | Báo cáo KPI (BC9) — điều kiện lọc ẩn: AGG_LOS_KPI_YTD_DAILY loại các hồ sơ IS_TEST_ACCOUNT='Y' khỏi MỌI phép COUNT/SUM _DAY (SLHS/SLGN/TAT/QUY_DOI) | Nguồn cho chỉ tiêu SLHS/SLGN/TAT/QUY_DOI (điều kiện lọc loại tài khoản test) |
-| 17 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE (CLOS-only, RLOS luôn NULL) — nguồn FCT_CLOS_APPLICATION_DAILY.VAR_STR12 | Báo cáo KPI (BC9) — điều kiện lọc ẩn IS NOT NULL riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY tại AGG_LOS_KPI_YTD_DAILY (không áp dụng cho TAT_CLOS_DAY/QUY_DOI_CLOS_DAY) | Nguồn cho chỉ tiêu SLHS_CLOS/SLGN_CLOS (điều kiện lọc) |
+| 1 | USER_YEAR_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng user×năm KPI — PHÁI SINH TẠI PDTD_DTM: STANDARD_HASH(TO_CHAR(KPI_YEAR) \|\| '~' \|\| USERNAME, 'SHA256') — gộp 2 cột PK tự nhiên cũ (KPI_YEAR, USERNAME) thành 1 khóa đơn. BẢNG HOÀN TOÀN MỚI TẠI PDTD_DTM, không có ở SB_DWH — nguồn UNION SB_DWH.FCT_CLOS_WORKSTEP_EVENT/SB_DWH.FCT_RLOS_WORKSTEP_EVENT | — (cột kỹ thuật, khóa chính) | — |
+| 2 | KPI_YEAR | NUMBER | Y | 4 |  | Năm KPI — tập user reset vào 1/1 hằng năm — PHÁI SINH TẠI PDTD_DTM: trích năm từ MIN(EXITDATE) của user đó trong UNION SB_DWH.FCT_CLOS_WORKSTEP_EVENT/SB_DWH.FCT_RLOS_WORKSTEP_EVENT (cùng nguồn cột 4) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa lọc theo năm khi tính NEW_USER_CNT_DAY | — |
+| 3 | USERNAME | VARCHAR2 | Y | 100 |  | Tên tài khoản cán bộ xử lý hồ sơ — bê 1:1 từ UNION SB_DWH.FCT_CLOS_WORKSTEP_EVENT.USERNAME/SB_DWH.FCT_RLOS_WORKSTEP_EVENT.USERNAME, qua 4 điều kiện lọc mô tả tại mục 2.2 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | — (cột kỹ thuật — không hiển thị trực tiếp, chỉ dùng đếm DISTINCT) | — |
+| 4 | FIRST_ELIGIBLE_TS | TIMESTAMP | Y |  |  | Thời điểm đầu tiên trong năm user xử lý 1 bước thuộc phạm vi tính nhân sự (8 workstep, đã qua đủ 4 điều kiện lọc) — PHÁI SINH TẠI PDTD_DTM: MIN(EXITDATE) của user đó trong năm, từ UNION SB_DWH.FCT_CLOS_WORKSTEP_EVENT.EXITDATE/SB_DWH.FCT_RLOS_WORKSTEP_EVENT.EXITDATE — quyết định user được tính vào năm nào và ngày nào trên AGG_LOS_KPI_YTD_DAILY.NEW_USER_CNT_DAY — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — nguồn cho NEW_USER_CNT_DAY (AGG_LOS_KPI_YTD_DAILY, mục 1) | Nguồn cho chỉ tiêu NHAN_SU |
 
-Ghi chú: cần BA/DEV xác nhận `VAR_STR12` (cột generic của WFINSTRUMENTTABLE, không tự mô tả ý nghĩa) thực chất chứa giá trị gì và liệu nhóm LISTAGG(CONTRACT) theo cột này có tương đương 1-1 với nhóm theo hồ sơ hay không trước khi sinh LLD (xem Section 3 dòng #47 tại `hld/HLD_Table_Design.md`).
 
-## 3. FCT_CLOS_APPLICATION_DAILY
+## 3. AGG_LOS_KPI_APPLICATION
 
 ### 3.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** bảng FACT xương sống của CLOS tại PDTD_DTM — bê nguyên
-  1:1 từ `FCT_CLOS_APPLICATION_DAILY` (SB_DWH), lưu ảnh trạng thái cuối
-  ngày của từng hồ sơ tín dụng doanh nghiệp (CLOS), kèm các mốc thời gian
-  xử lý, người phụ trách từng bước, số tiền/lãi suất phê duyệt, và các chỉ
-  tiêu lũy kế (số lần return...). Bổ sung tại tầng này khóa kỹ thuật
-  `T24_CUSTOMER_SK` (chân khách hàng T24, tra qua `DIM_CLOS_CUSTOMER`,
-  tách riêng khỏi chân khách hàng LOS `CUSTOMER_SK`) và cột `LAST_WORKSTEP`
-  (tên bước hoàn tất gần nhất, đã chuẩn hóa dùng chung CLOS/RLOS).
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME.
-- **Độ chi tiết (grain):** 1 dòng = 1 hồ sơ x 1 ngày dữ liệu (sinh dòng khi
-  có action trong ngày hoặc hồ sơ còn trong chu kỳ thẩm định chưa chốt,
-  theo quy tắc load T-1).
+- **Ý nghĩa bảng:** Bảng FACT chấm điểm KPI theo từng hồ sơ TẠI MỖI NGÀY, là input pre-aggregate duy nhất cho `AGG_LOS_KPI_YTD_DAILY` (SUM/COUNT lên grain ngày) — bản thân bảng này không tự hiển thị số lũy kế. Toàn bộ cột đều là chỉ tiêu KPI đã tính sẵn phục vụ thẳng Báo cáo KPI (BC9) (`VOLUME`, `POINT`, `QUY_DOI`, `TAT_APPLICATION_HOUR`, `TSBD_G2`, `DEVIATION_G2/G3`...) — không đọc trực tiếp 1 sự kiện nghiệp vụ thô nào, bản chất là bảng chỉ tiêu tổng hợp/phái sinh (derived KPI), không phải transaction fact.
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`DATASOURCE` — hash vào
+  cột `APPLICATION_BK`
+- **Khóa chính của bảng (PK):** DAYID, APPLICATION_BK.
+- **Độ chi tiết (grain):** 1 dòng = 1 hồ sơ (WI_NAME) × 1 hệ nguồn (DATASOURCE) × 1 ngày (DAYID).
 - **Phục vụ báo cáo:**
-  - Báo cáo CLOS APPLICATION (BC2)
-  - Báo cáo Tuần Chuyên viên Thẩm định (BC4)
-  - Báo cáo SLA - TAT (BC5)
-  - Báo cáo RETURN (BC8)
-  - Báo cáo KPI (BC9)
-  - Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua T24_CUSTOMER_SK
+  - Báo cáo KPI (BC9) — nguồn trực tiếp cho phần "Nguồn RLOS"/"Nguồn CLOS" của báo cáo, đồng thời là input pre-aggregate duy nhất cho AGG_LOS_KPI_YTD_DAILY
 
 ### 3.2 Sơ đồ lineage
 
 ```mermaid
 flowchart LR
-    subgraph SB_DWH
-        C["FCT_CLOS_APPLICATION_DAILY"]
-    end
     subgraph PDTD_DTM
-        D["FCT_CLOS_APPLICATION_DAILY"]
+        A["FCT_CLOS_APPLICATION"]
+        B["FCT_RLOS_APPLICATION"]
+        L["FCT_RLOS_COLLATERAL"]
+        V["FCT_CLOS_DEVIATION / FCT_RLOS_DEVIATION"]
+        W["FCT_CLOS_WORKSTEP_EVENT / FCT_RLOS_WORKSTEP_EVENT"]
+        K["AGG_LOS_KPI_APPLICATION"]
     end
-    C -->|bê 1:1, thêm khóa T24_CUSTOMER_SK| D
+    A -->|"driving table CLOS — lọc DAYID=v_batch_date (full snapshot, KHÔNG lọc hồ sơ đã kết thúc): DAYID, WI_NAME, PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, COMPANY_SK, VAR_STR12"| K
+    B -->|"driving table RLOS — lọc DAYID=v_batch_date (full snapshot): DAYID, WI_NAME, PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, COMPANY_SK"| K
+    L -.->|"RLOS-only, lọc DAYID=v_batch_date trực tiếp (point-in-time, KHÔNG còn MAX(DAYID) toàn lịch sử), COUNT(*) theo WI_NAME — sinh TSBD_G2, NULL nhánh CLOS"| K
+    V -->|"UNION theo WI_NAME, lọc DAYID=v_batch_date trực tiếp (point-in-time), COUNT(*) theo WI_NAME — sinh DEVIATION_G2/DEVIATION_G3"| K
+    W -->|"EXISTS USERNAME thuộc 2 tài khoản test trong lịch sử CÓ ENTRYDATE<=v_batch_date — sinh IS_TEST_ACCOUNT; tổng thời gian xử lý theo nhóm bước CÓ EXITDATE<=v_batch_date, chỉ tính event APPROVAL_FLAG='First Approval' — sinh TAT_APPLICATION_HOUR; VOLUME tính theo lịch sử bước xa nhất đã đạt VỚI ENTRYDATE/EXITDATE<=v_batch_date (point-in-time)"| K
 ```
+
 
 ### 3.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | Báo cáo CLOS APPLICATION (BC2) — một phần khóa chính<br>Báo cáo SLA - TAT (BC5) — khóa chính | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp, khóa chính<br>Báo cáo SLA - TAT (BC5) — khóa chính | WINAME (Mã hồ sơ) |
-| 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SYSTEMNAME (Hệ thống CLOS/RLOS) |
-| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION. Mặc định -1 nếu không khớp | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN | — |
-| 5 | CURRENT_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP, bước hồ sơ đang đứng tại ngày DAYID. Mặc định -1 | Thiết kế dư thừa | — |
-| 6 | LAST_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP của sự kiện hoàn tất gần nhất. Mặc định -1 | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN, nguồn cho chỉ tiêu/trường LAST_WORKSTEP (Bước hồ sơ cuối, tính ở PDTD_DTM) | — |
-| 7 | LAST_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_DECISION của sự kiện hoàn tất gần nhất. Mặc định -1 | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN | LAST_DECISION (Quyết định bước cuối) |
-| 8 | LAST_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER của người xử lý sự kiện hoàn tất gần nhất. Mặc định -1 | Thiết kế dư thừa | — |
-| 9 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT — lookup theo PRODUCT_LINE_CODE=NG_SB_CLOS_CUST_INFO.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới PRODUCT_LINE/SUB_PRODUCT<br>Báo cáo SLA - TAT (BC5) — khóa JOIN điều kiện SLA_DE<br>Báo cáo KPI (BC9) — điều kiện lọc STREAM khi tính SLGN_CLOS | — |
-| 10 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_ORG_UNIT — lookup theo COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới BRANCH_CODE/COMPANY_CODE/COMPANY_NAME | — |
-| 11 | RI_USER | VARCHAR2 | N | 100 |  | User khởi tạo hồ sơ (bước RequestInitiate) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | RI_USER (User khởi tạo hồ sơ) |
-| 12 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BRANCH_USER (User Chi nhánh) |
-| 13 | DDE_USER | VARCHAR2 | N | 100 |  | User xử lý bước DetailDataEntry, HOÀN TẤT gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | DDE_USER (User Chuyên viên nhập liệu) |
-| 14 | QC_USER | VARCHAR2 | N | 100 |  | User xử lý bước DataInputerChecker, HOÀN TẤT gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | QUALITY_CHECKER (User Kiểm soát nhập liệu) |
-| 15 | UND_MAKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterMaker, HOÀN TẤT gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | UND_MAKER (User Chuyên viên thẩm định) |
-| 16 | UND_CHECKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterChecker, HOÀN TẤT gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | UND_CHECKER (User Kiểm soát thẩm định) |
-| 17 | PHV_USER | VARCHAR2 | N | 100 |  | User xử lý bước PhoneVerification, HOÀN TẤT gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | PHV_USER (User Chuyên viên Thẩm định điện thoại) |
-| 18 | FA_USER | VARCHAR2 | N | 100 |  | User Chuyên viên Thực địa | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | FA_USER (User Chuyên viên Thực địa) |
-| 19 | APPROVER_USER | VARCHAR2 | N | 100 |  | User xử lý bước CreditApproval, HOÀN TẤT gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BI_APPROVER (User Chuyên gia phê duyệt) |
-| 20 | COMMITTEE_USER | VARCHAR2 | N | 100 |  | User Hội đồng tín dụng | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BI_COMMITTEE (User Hội đồng tín dụng) |
-| 21 | HOS_USER | VARCHAR2 | N | 100 |  | User Hỗ trợ phê duyệt | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BI_HOS_USER (User Hỗ trợ phê duyệt) |
-| 22 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy / hoàn tất gần nhất) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — nguồn cho AGG_LOS_KPI_APPLICATION.PROCESSED_DATE, mốc xếp hồ sơ vào đúng DAYID khi SUM/COUNT lên grain ngày | PROCESSED_DATE (Ngày dữ liệu báo cáo) |
-| 23 | LAST_UWM_ENTRYDATE | TIMESTAMP | N |  |  | MAX(ENTRYDATE) tại UnderwriterMaker <= DAYID — mốc mở chu kỳ thẩm định hiện hành | Nguồn cho chỉ tiêu/trường PROCESSED_DATE_UWM (cột 24, cùng bảng) | — |
-| 24 | PROCESSED_DATE_UWM | DATE | N |  |  | Ngày chốt chu kỳ thẩm định hiện hành, tính tương đối theo LAST_UWM_ENTRYDATE | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — REPORT_DATE (dùng thay DAYID khi báo cáo cần mốc theo chu kỳ thẩm định) | REPORT_DATE (Ngày báo cáo) |
-| 25 | CREATION_DATE | DATE | N |  |  | TRUNC(MIN(ENTRYDATE)) theo WI_NAME | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CREATION_DATE (Ngày hồ sơ khởi tạo) |
-| 26 | FIRST_APPROVAL_DATE | DATE | N |  |  | MIN(EXITDATE) tại bước phê duyệt hợp lệ | Thiết kế dư thừa | — |
-| 27 | LAST_APPROVAL_DATE | DATE | N |  |  | MAX(EXITDATE) tại bước phê duyệt (nhóm quyết định đã định nghĩa) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | LAST_APPROVAL_DATE (Thời gian phê duyệt cuối cùng) |
-| 28 | MIN_UWM | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại UnderwriterMaker | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | MIN_UWM (Thời gian hồ sơ lên CV thẩm định) |
-| 29 | MIN_APP | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại CreditApproval/CreditCommittee | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | MIN_APP (Thời gian hồ sơ lên cấp phê duyệt) |
-| 30 | AUTO_CANCEL_DATE | DATE | N |  |  | Ngày hồ sơ bị hệ thống tự hủy (theo quy tắc CancelRevoke rỗng liên tiếp) | Nguồn cho chỉ tiêu/trường FLAG_AUTO_CANCEL (cột 40, cùng bảng) | — |
-| 31 | CANCEL_USER_DATE | DATE | N |  |  | EXITDATE tại bản ghi DECISION='Cancel' và USERNAME khác NULL | Thiết kế dư thừa | — |
-| 32 | BI_CAN_DATE | DATE | N |  |  | ENTRYDATE tại bước CancelRevoke | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BI_CAN_DATE (Thời gian hồ sơ vào vùng CancelRevoke) |
-| 33 | LAST_ENTRYDATE | TIMESTAMP | N |  |  | ENTRYDATE của sự kiện hoàn tất gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | LAST_ENTRYDATE (Thời gian vào bước cuối) |
-| 34 | LAST_EXITDATE | TIMESTAMP | N |  |  | EXITDATE của cùng sự kiện hoàn tất gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | LAST_EXITDATE (Thời gian kết thúc bước cuối) |
-| 35 | BI_APPSTATUS | VARCHAR2 | N | 50 |  | Trạng thái hồ sơ chuẩn hóa (Approved/Rejected/Cancelled/Processing) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BI_APPSTATUS (Trạng thái cuối của hồ sơ) |
-| 36 | HAS_ACTION_IN_DAY | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có phát sinh xử lý trong ngày DAYID | Thiết kế dư thừa | — |
-| 37 | LAST_ACTION_DATE | DATE | Y |  |  | Ngày business action gần nhất tính đến cuối DAYID | Thiết kế dư thừa | — |
-| 38 | INACTIVE_DAY_CNT | NUMBER | Y | 5 |  | TRUNC(DAYID) - TRUNC(LAST_ACTION_DATE) | Thiết kế dư thừa | — |
-| 39 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước (LAG theo ENTRYDATE) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | PRE_WORKSTEP (Bước hồ sơ trước đó) |
-| 40 | FLAG_AUTO_CANCEL | VARCHAR2 | N | 10 |  | 'YES' nếu AUTO_CANCEL_DATE khác NULL | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | FLAG_AUTO_CAN (Hồ sơ bị tự động hủy — YES/NO) |
-| 41 | LAST_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của sự kiện hoàn tất gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | LAST_REMARKS (Ghi chú ý kiến bước cuối) |
-| 42 | LAST_REMARK_DDE | VARCHAR2 | N | 4000 |  | Ghi chú tại bước DetailDataEntry | Thiết kế dư thừa | — |
-| 43 | LAST_CAN_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại lần hủy hồ sơ | Thiết kế dư thừa | — |
-| 44 | HAS_REACHED_DDE | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước DetailDataEntry hay chưa | Thiết kế dư thừa | — |
-| 45 | HAS_REACHED_QC | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước DataInputerChecker hay chưa | Thiết kế dư thừa | — |
-| 46 | HAS_REACHED_UWM | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước UnderwriterMaker hay chưa | Thiết kế dư thừa | — |
-| 47 | HAS_REACHED_UWC | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước UnderwriterChecker hay chưa | Thiết kế dư thừa | — |
-| 48 | HAS_REACHED_APPROVAL | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước CreditApproval/CreditCommittee hay chưa | Thiết kế dư thừa | — |
-| 49 | PROPOSED_AMT | NUMBER | N | 20,2 |  | Số tiền đề xuất — nguồn NG_SB_CLOS_CREDITINFO_COMM.PRECREDITLIMIT | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | ST_YEUCAU (Số tiền đề xuất vay) |
-| 50 | CREDIT_LIMIT_APPROVAL | NUMBER | N | 20,2 |  | Hạn mức do chuyên gia phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_CD.CREDIT_LIMIT | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | ST_PHEDUYET (Số tiền phê duyệt chính thức) |
-| 51 | CREDIT_LIMIT_COMMITTEE | NUMBER | N | 20,2 |  | Hạn mức do hội đồng phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_LIMIT | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — nguồn cho chỉ tiêu/trường CREDIT_LIMIT (đặt bản dư thừa có chủ đích trên DIM_CLOS_APPLICATION để BC3 lookup thẳng qua APPLICATION_SK) | CREDIT_LIMITS (Hạn mức cấp) |
-| 52 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_LIMIT, map thẳng 1 nguồn | Báo cáo Thông tin phê duyệt (BC3) — CREDIT_LIMIT (giá trị hạn mức phê duyệt cuối theo đúng công thức SRS BC3) | CREDIT_LIMIT (Số tiền phê duyệt) |
-| 53 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_TERM | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CREDIT_TERM (Thời hạn cấp tín dụng) |
-| 54 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%), chỉ nhận khi nguồn là số | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp (chọn thay cho INTEREST_RATE_DESC theo quyết định người dùng, review 2026-09-21) | INTEREST_RATE (Lãi suất phê duyệt) |
-| 55 | INTEREST_RATE_DESC | VARCHAR2 | N | 1600 |  | Diễn giải lãi suất nguyên văn — nguồn NG_SB_CLOS_CREDITINFO_COMM.INTEREST_RATE (có thể là công thức nhiều giai đoạn) | Thiết kế dư thừa | — |
-| 57 | RETURN_CNT_DATAENTRY | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu nhập liệu | Báo cáo RETURN (BC8) — hiển thị trực tiếp | SL_RETURN_NHAPLIEU (Số lần return tại Nhập liệu) |
-| 58 | RETURN_CNT_UNDERWRITING | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu thẩm định | Báo cáo RETURN (BC8) — hiển thị trực tiếp | SL_RETURN_THAMDINH (Số lần return tại Thẩm định) |
-| 59 | RETURN_CNT_APPROVAL | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu phê duyệt | Báo cáo RETURN (BC8) — hiển thị trực tiếp | SL_RETURN_PHEDUYET (Số lần return tại Cấp Phê duyệt) |
-| 60 | KPI_VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — theo DECISION nếu đã phê duyệt/từ chối = 1.0; nếu đã CancelRevoke/CancelPermanent thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại NULL | Thiết kế dư thừa | — |
-| 62 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (không lọc CREATEDBY) | Báo cáo KPI (BC9) — điều kiện lọc IS NOT NULL cho SLHS_CLOS_DAY/SLGN_CLOS_DAY (AGG_LOS_KPI_YTD_DAILY) | — |
-| 63 | UNDERWRITERMAKER_TAKERESPON | VARCHAR2 | N | 100 |  | CV Thẩm định chịu trách nhiệm — COALESCE(CASE WHEN m.WORK_STEP='UnderwriterMaker' THEN m.USER_MAKE END, i.UWMAKERUSER) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | UNDERWRITERMAKER_TAKERESPON (CV Thẩm định chịu trách nhiệm) |
-| 64 | UNDERWRITERCHECKER_TAKERESPON | VARCHAR2 | N | 100 |  | Kiểm soát thẩm định chịu trách nhiệm — COALESCE(CASE WHEN m.WORK_STEP='UnderwriterChecker' THEN m.USER_MAKE END, i.UWCHKRUSER) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | UNDERWRITERCHECKER_TAKERESPON (Kiểm soát thẩm định chịu trách nhiệm) |
-| 65 | APPROVAL_TAKERESPON | VARCHAR2 | N | 100 |  | Chuyên gia phê duyệt chịu trách nhiệm — COALESCE(m.USER_MAKE, CASE e.APP_GRP WHEN 'A1' THEN 'long.lq' WHEN 'CC' THEN 'UBTD' WHEN 'BOD' THEN 'HDQT' END) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | APPROVAL_TAKERESPON (Chuyên gia phê duyệt chịu trách nhiệm) |
-| 66 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — quan hệ 1:1 với hồ sơ qua WI_NAME, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK (chân T24, bổ sung riêng tại PDTD_DTM) | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới ZONE (DIM_CLOS_CUSTOMER.ZONE) | — |
-| 67 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), tra qua ORG_LEGAL_ID trên DIM_CLOS_CUSTOMER. Mặc định -1 (review 2026-09-17: đổi tên từ CUSTOMER_SK để phân biệt rõ với khách hàng LOS — DIM_CLOS_CUSTOMER là chân khách hàng LOS, đây là chân khách hàng T24 riêng, link qua FCT theo đúng nguyên tắc không link DIM sang DIM) | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN sang DIM_T24_CUSTOMER (CUSTOMER_ID — ID khách hàng/Mã CIF) | — |
-| 68 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước hoàn tất gần nhất, chuẩn hóa dùng chung 2 hệ — LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS theo bước/quyết định của sự kiện hoàn tất gần nhất | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp (khác LAST_WORKSTEP_SK — khóa nội bộ tới DIM_CLOS_WORKSTEP) | LAST_WORKSTEP (Bước hồ sơ cuối) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — gán = v_batch_date của lần chạy ETL (KHÔNG suy ra từ đối chiếu DAYID khác trên chính bảng này hay AGG_LOS_KPI_YTD_DAILY). Kế thừa trực tiếp DAYID=v_batch_date đã lọc sẵn trên driving table PDTD_DTM.FCT_CLOS_APPLICATION/PDTD_DTM.FCT_RLOS_APPLICATION. BẢNG HOÀN TOÀN MỚI TẠI PDTD_DTM (aggregate), không có ở SB_DWH | Báo cáo KPI (BC9) — khóa JOIN sang AGG_LOS_KPI_YTD_DAILY (điều kiện DAYID=v_batch_date, tách biệt điều kiện PROCESSED_DATE=v_batch_date) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | RLOS hoặc CLOS — quyết định công thức TAT/POINT/nhóm phân loại áp dụng — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.DATASOURCE/PDTD_DTM.FCT_RLOS_APPLICATION.DATASOURCE — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa phân biệt nhánh "Nguồn RLOS"/"Nguồn CLOS" của báo cáo, đồng thời điều kiện lọc DATASOURCE khi tổng hợp SLHS/SLGN/TAT/QUY_DOI_*_DAY tại AGG_LOS_KPI_YTD_DAILY | Phân nhánh RLOS/CLOS của báo cáo |
+| 3 | APPLICATION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng chấm điểm KPI hồ sơ: STANDARD_HASH(WI_NAME \|\| '~' \|\| DATASOURCE, 'SHA256') — gộp 2 cột PK tự nhiên cũ (WI_NAME, DATASOURCE) thành 1 khóa đơn, input lấy từ cột 7/2 cùng bảng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | — (cột kỹ thuật, một phần khóa chính) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION hoặc DIM_RLOS_APPLICATION tùy DATASOURCE. Mặc định -1 — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.APPLICATION_SK/PDTD_DTM.FCT_RLOS_APPLICATION.APPLICATION_SK — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa JOIN tới DIM_RLOS_APPLICATION/DIM_CLOS_APPLICATION để lấy điều kiện lọc ẩn BUSINESS_FLOW (RLOS)/STREAM (CLOS) dùng trong công thức SLHS/SLGN/TAT_*_DAY tại AGG_LOS_KPI_YTD_DAILY | Nguồn cho chỉ tiêu SLHS_RLOS/SLGN_RLOS/SLHS_CLOS/SLGN_CLOS/TAT_CLOS (điều kiện lọc BUSINESS_FLOW/STREAM) |
+| 5 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT hoặc DIM_RLOS_PRODUCT tùy DATASOURCE. Mặc định -1 — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.PRODUCT_SK/PDTD_DTM.FCT_RLOS_APPLICATION.PRODUCT_SK — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa JOIN report-time tới DIM_RLOS_PRODUCT/DIM_CLOS_PRODUCT để tra PRODUCT_LINE_NAME (+PRODUCT_NAME với CLOS) dùng tính cột POINT trên chính bảng này | Nguồn cho chỉ tiêu POINT |
+| 6 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY. Mặc định -1 — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.COMPANY_SK/PDTD_DTM.FCT_RLOS_APPLICATION.COMPANY_SK — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa JOIN tới DIM_LOS_COMPANY để lấy điều kiện lọc ẩn COMPANY_CODE NOT IN (...) dùng trong công thức SLHS_RLOS_DAY/SLGN_RLOS_DAY tại AGG_LOS_KPI_YTD_DAILY | Nguồn cho chỉ tiêu SLHS_RLOS/SLGN_RLOS (điều kiện lọc loại trừ chi nhánh) |
+| 7 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng CLOS hoặc RLOS — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.WI_NAME/PDTD_DTM.FCT_RLOS_APPLICATION.WI_NAME (đã lọc DAYID=v_batch_date) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa JOIN, đồng thời hiển thị trực tiếp làm mã hồ sơ | Mã hồ sơ (WI_NAME) |
+| 8 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.PROCESSED_DATE/PDTD_DTM.FCT_RLOS_APPLICATION.PROCESSED_DATE (cùng DAYID=v_batch_date đã lọc). Là THUỘC TÍNH CỐ ĐỊNH của hồ sơ (ngày hồ sơ thực sự chốt/hủy, KHÁC DAYID — không đổi ngược theo thời gian một khi hồ sơ đã chốt), là mốc để AGG_LOS_KPI_YTD_DAILY xếp hồ sơ vào đúng ngày phát sinh khi SUM/COUNT lên grain ngày — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa lọc theo ngày, đồng thời hiển thị trực tiếp làm ngày dữ liệu | Ngày dữ liệu (PROCESSED_DATE) |
+| 9 | VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1| Báo cáo KPI (BC9) — hiển thị trực tiếp (Tỷ lệ KPI), đồng thời là mẫu số của QUY_DOI (cột 10) | Tỷ lệ KPI (VOLUME) |
+| 10 | POINT | NUMBER | N | 12,4 |  | Điểm KPI — PHÁI SINH TẠI PDTD_DTM: RLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT qua DIM_RLOS_PRODUCT + SYSTEM_CODE='RLOS') + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER; CLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT qua DIM_CLOS_PRODUCT+DIM_CLOS_APPLICATION + SYSTEM_CODE='CLOS') + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER, riêng APP_GRP='C1' cộng thêm hằng số 4 giờ. Không phụ thuộc DAYID — khóa tra ổn định theo hồ sơ, không đổi theo point-in-time — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp (Điểm KPI), đồng thời là tử số của QUY_DOI (cột 10) | Điểm KPI (POINT) |
+| 11 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi — PHÁI SINH TẠI PDTD_DTM: POINT*8/VOLUME (input từ cột 10/9, cùng bảng), NULL nếu VOLUME NULL. Là đầu vào duy nhất của QUY_DOI_RLOS_DAY/QUY_DOI_CLOS_DAY ở AGG_LOS_KPI_YTD_DAILY — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp, đồng thời nguồn cho QUY_DOI_RLOS/QUY_DOI_CLOS lũy kế tại AGG_LOS_KPI_YTD_DAILY | Điểm KPI quy đổi (QUY_DOI) |
+| 12 | TAT_APPLICATION_HOUR | NUMBER | N | 18,6 |  | Tổng thời gian xử lý của hồ sơ, đơn vị giờ| Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_SEC/UNSEC_SUM_HOUR_DAY và TAT_CLOS_SUM_HOUR_DAY tại AGG_LOS_KPI_YTD_DAILY, qua đó nguồn cho chỉ tiêu TAT_RLOS/TAT_CLOS/TAT_TB phái sinh tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS/TAT_CLOS |
+| 13 | TSBD_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 2 tài sản bảo đảm trở lên (RLOS-only, NULL nhánh CLOS)| Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có từ 02 TSBĐ trở lên (TSBD_G2) |
+| 14 | INCOM_3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 nguồn thu trở lên (RLOS-only, NULL nhánh CLOS) — PHÁI SINH TẠI PDTD_DTM: đếm cờ REPAYFLAGS (nguồn PDTD_DTM.FCT_RLOS_APPLICATION đã lọc DAYID=v_batch_date) >= 3 thì 'YES' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có từ 03 nguồn thu trở lên (INCOM_3) |
+| 15 | BUSINESS_INCOM | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh, không áp dụng SeAPro/SeALand (RLOS-only, NULL nhánh CLOS) — PHÁI SINH TẠI PDTD_DTM theo PRODUCT_NAME loại trừ SeAPro/SeALand VÀ cờ FAIMILYFLAG/ENTERPRISSEFLAG/NONLICFLAG (nguồn PDTD_DTM.FCT_RLOS_APPLICATION.PRODUCT_NAME và 3 cờ tương ứng — chính là input của FLAG_BUSINESS_INCOME cột 57 trên FCT_RLOS_APPLICATION mục 11) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có nguồn thu từ kinh doanh (BUSINESS_INCOM) |
+| 16 | DEVIATION_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có đúng 2 ngoại lệ| Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có 2 ngoại lệ (DEVIATION_G2) |
+| 17 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ trở lên — PHÁI SINH TẠI PDTD_DTM, cùng cách lọc DAYID=v_batch_date + COUNT(*) theo WI_NAME (cùng nguồn cột 16), >= 3 thì 'YES' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp | HS có từ 3 ngoại lệ trở lên (DEVIATION_G3) |
+| 18 | IS_TEST_ACCOUNT | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có tồn tại (bất kỳ dòng lịch sử nào TÍNH ĐẾN v_batch_date) USERNAME thuộc 2 tài khoản test/kỹ thuật ('hanh.nh2','hai.bt2') — PHÁI SINH TẠI PDTD_DTM: EXISTS trên UNION PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT/PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT, lọc ENTRYDATE<=v_batch_date | Báo cáo KPI (BC9) — điều kiện lọc ẩn: AGG_LOS_KPI_YTD_DAILY loại các hồ sơ IS_TEST_ACCOUNT='Y' khỏi MỌI phép COUNT/SUM _DAY (SLHS/SLGN/TAT/QUY_DOI) | Nguồn cho chỉ tiêu SLHS/SLGN/TAT/QUY_DOI (điều kiện lọc loại tài khoản test) |
+| 19 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE (CLOS-only, RLOS luôn NULL) — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.VAR_STR12, đã lọc DAYID=v_batch_date — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — điều kiện lọc ẩn IS NOT NULL riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY tại AGG_LOS_KPI_YTD_DAILY (không áp dụng cho TAT_CLOS_DAY/QUY_DOI_CLOS_DAY) | Nguồn cho chỉ tiêu SLHS_CLOS/SLGN_CLOS (điều kiện lọc) |
 
-## 4. FCT_CLOS_APPLICATION_PARTY
+
+## 4. FCT_CLOS_APPLICATION
 
 ### 4.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** bảng FACT quan hệ (factless fact) tại PDTD_DTM — bê
-  nguyên 1:1 từ `FCT_CLOS_APPLICATION_PARTY` (SB_DWH), không mang thuộc
-  tính mô tả, chỉ nối lại quan hệ giữa 1 hồ sơ, khách hàng chính và người
-  liên quan pháp lý sau khi tách DIM_CLOS_CUSTOMER/DIM_CLOS_LEGAL_PARTY
-  ra khỏi FCT gốc. Là cầu nối để DIM_CLOS_CUSTOMER LEFT JOIN lấy các
-  thuộc tính từ người liên quan pháp lý (mã số ĐKKD/MST, người đại diện
-  pháp luật) hiển thị trên báo cáo. Không có bổ sung nào riêng tại tầng
-  PDTD_DTM.
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, LEGAL_PARTY_SK.
-- **Độ chi tiết (grain):** 1 dòng = 1 hồ sơ x 1 người liên quan pháp lý
-  (dòng trên DIM_CLOS_LEGAL_PARTY), join đủ N dòng cho cả 5 vai trò
-  (CUSTOMER, LEGAL_REPRESENTATIVE, COLLATERAL_OWNER,
-  MAIN_CONTRIBUTING_MEMBERS, OTHER).
+- **Ý nghĩa bảng:** bảng FACT xương sống của CLOS tại PDTD_DTM — bê nguyên
+  1:1 từ `FCT_CLOS_APPLICATION` (SB_DWH), lưu ảnh trạng thái cuối
+  ngày của từng hồ sơ tín dụng doanh nghiệp (CLOS), kèm các mốc thời gian
+  xử lý, người phụ trách từng bước, số tiền/lãi suất phê duyệt, và các chỉ
+  tiêu lũy kế (số lần return...).
+- **Khóa nghiệp vụ (BK):** `WI_NAME`
+- **Khóa chính của bảng (PK):** DAYID, WI_NAME.
+- **Độ chi tiết (grain):** 1 dòng = 1 hồ sơ x 1 ngày dữ liệu
 - **Phục vụ báo cáo:**
-  - Báo cáo CLOS APPLICATION (BC2) — gián tiếp, làm cầu nối để
-    DIM_CLOS_CUSTOMER lookup ORG_LEGAL_ID/LEGAL_REPRESENTATIVE từ
-    DIM_CLOS_LEGAL_PARTY
+  - Báo cáo CLOS APPLICATION (BC2) — nay đọc `LEGAL_REPRESENTATIVE`/
+    `ADD_ID_REPRESENTATIVE`/`APPROVAL_TYPE` từ đây thay vì qua
+    `DIM_CLOS_CUSTOMER`/`DIM_CLOS_APPLICATION`; `ORG_LEGAL_ID` không còn
+    ETL, báo cáo tự JOIN report-time `CUSTOMER_SK` →
+    `DIM_CLOS_CUSTOMER.ID_NUMBER` khi cần
+  - Báo cáo Tuần Chuyên viên Thẩm định (BC4)
+  - Báo cáo SLA - TAT (BC5) — nay đọc `REF_PRODUCT`/`SLA_*` từ đây thay
+    vì qua `DIM_CLOS_APPLICATION`
+  - Báo cáo RETURN (BC8) — `RETURN_CNT_*` không còn ETL sẵn trên bảng
+    này, báo cáo tự SUM/COUNT report-time từ `FCT_CLOS_WORKSTEP_EVENT`
+  - Báo cáo KPI (BC9) — nay đọc `REF_PRODUCT`/`SLA_*` (điểm `POINT`) từ
+    đây thay vì qua `DIM_CLOS_APPLICATION`
+  - Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua T24_CUSTOMER_SK
 
 ### 4.2 Sơ đồ lineage
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        C["FCT_CLOS_APPLICATION_PARTY"]
+        C["FCT_CLOS_APPLICATION"]
+        SK["DIM_CLOS_CUSTOMER"]
+        SH["DIM_CLOS_PRODUCT"]
+        SCA["DIM_CLOS_APPLICATION"]
+        SLP["FCT_CLOS_LEGAL_PARTY"]
     end
     subgraph PDTD_DTM
-        D["FCT_CLOS_APPLICATION_PARTY"]
+        R{{"CLOS_REF_SLA_TDKHDNL / CLOS_REF_SLA_TDKHDN"}}
+        D["FCT_CLOS_APPLICATION"]
     end
-    C -->|bê 1:1| D
+    C -->|"bê 1:1 (driving table đổi sang NG_SB_CLOS_EXTTABLE, full snapshot), thêm khóa T24_CUSTOMER_SK"| D
+    SK -.->|"CUSTOMER_SK — cấp CUST_GROUP, JOIN ngay tại SB_DWH (đúng luồng ETL SB_DWH→PDTD_DTM), kết quả là thành phần khóa chọn bảng TDKHDNL/TDKHDN"| C
+    SH -.->|"PRODUCT_SK — cấp PRODUCT_LINE_NAME/SUB_PRODUCT_NAME, JOIN ngay tại SB_DWH"| C
+    SCA -.->|"APPLICATION_SK — cấp HAVE_ANY_DEVIATION và APP_GRP (quy đổi CASE WHEN → FLAG_APP_GRP ngay tại bước JOIN), JOIN ngay tại SB_DWH"| C
+    C -->|"CUST_GROUP/PRODUCT_LINE_NAME/SUB_PRODUCT_NAME/HAVE_ANY_DEVIATION/FLAG_APP_GRP đã tính sẵn tại SB_DWH — LEFT JOIN R"| R
+    R -->|"LEFT JOIN theo CUST_GROUP, PRODUCT_LINE, SUB_PRODUCT, HAVE_ANY_DEVIATION, APP_GRP — sinh REF_PRODUCT, SLA"| D
+    SCA -->|"WI_NAME (qua APPLICATION_SK) → FCT_CLOS_LEGAL_PARTY (SB_DWH) lọc OBJ_TYPE='Người đại diện theo pháp luật' — sinh LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE"| SLP
+    SLP -->|"nối chuỗi FULL_NAME/ID_NUMBER bằng ';' nếu nhiều đại diện"| D
+    SCA -.->|"APPLICATION_SK — cấp STREAM (giữ nguyên giá trị gốc trên DIM) — PHÁI SINH tại PDTD_DTM: CASE WHEN STREAM IN ('Phê duyệt tín dụng','Sent To Disbursement Request') THEN STREAM ELSE NULL END, sinh APPROVAL_TYPE"| D
 ```
 
 ### 4.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | — (cột kỹ thuật, một phần khóa chính) | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS | — (cột kỹ thuật, một phần khóa chính) | — |
-| 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION. Mặc định -1 | — (khóa liên kết nội bộ, không xuất trực tiếp lên báo cáo) | — |
-| 4 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER. Mặc định -1 | — (khóa liên kết nội bộ, không xuất trực tiếp lên báo cáo) | — |
-| 5 | LEGAL_PARTY_SK | NUMBER | Y | 18 | PK | Khóa tới DIM_CLOS_LEGAL_PARTY — join đủ N dòng cho cả 5 vai trò (CUSTOMER, LEGAL_REPRESENTATIVE, COLLATERAL_OWNER, MAIN_CONTRIBUTING_MEMBERS, OTHER), đúng grain "1 dòng = 1 hồ sơ × 1 người liên quan pháp lý". Mặc định -1 chỉ dùng cho trường hợp dữ liệu thiếu/không khớp được (Unknown) — CLOS luôn có đúng 1 dòng LEGAL_PARTY ứng với chính khách hàng | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN để DIM_CLOS_CUSTOMER lấy ORG_LEGAL_ID (vai trò CUSTOMER) và LEGAL_REPRESENTATIVE (vai trò LEGAL_REPRESENTATIVE) từ DIM_CLOS_LEGAL_PARTY | ID_NUMBER (Số ĐKKD/MST doanh nghiệp); LEGAL_REPRESENTATIVE (Người đại diện pháp luật) |
-| 6 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS | — (cột kỹ thuật) | — |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.DAYID | Báo cáo CLOS APPLICATION (BC2) — một phần khóa chính<br>Báo cáo SLA - TAT (BC5) — khóa chính | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.DATASOURCE | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SYSTEMNAME (Hệ thống CLOS/RLOS) |
+| 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPLICATION_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN | — |
+| 4 | LAST_WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP_DECISION. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.LAST_WORKSTEP_DECISION_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN, nguồn cho chỉ tiêu/trường LAST_WORKSTEP (Bước hồ sơ cuối, tính ở PDTD_DTM) và LAST_DECISION (Quyết định bước cuối) | LAST_DECISION (Quyết định bước cuối) |
+| 5 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT — lookup theo PRODUCT_LINE_CODE=NG_SB_CLOS_CUST_INFO.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.PRODUCT_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới PRODUCT_LINE/SUB_PRODUCT<br>Báo cáo SLA - TAT (BC5) — khóa JOIN điều kiện SLA_DE<br>Báo cáo KPI (BC9) — điều kiện lọc STREAM khi tính SLGN_CLOS | — |
+| 6 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY — lookup theo COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.COMPANY_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới BRANCH_CODE/COMPANY_CODE/COMPANY_NAME | — |
+| 7 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — quan hệ 1:1 với hồ sơ qua WI_NAME, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK (chân T24, bổ sung riêng tại PDTD_DTM) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CUSTOMER_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới ZONE (DIM_CLOS_CUSTOMER.ZONE) | — |
+| 8 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), tra qua ORG_LEGAL_ID trên DIM_CLOS_CUSTOMER. Mặc định -1| Báo cáo CLOS APPLICATION (BC2) — khóa JOIN sang DIM_T24_CUSTOMER (CUSTOMER_ID — ID khách hàng/Mã CIF) | — |
+| 9 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.WI_NAME (nguồn gốc xa: NG_SB_CLOS_EXTTABLE.WI_NAME, driving table tại SB_DWH) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp, khóa chính<br>Báo cáo SLA - TAT (BC5) — khóa chính | WINAME (Mã hồ sơ) |
+| 10 | RI_USER | VARCHAR2 | N | 100 |  | User khởi tạo hồ sơ (bước RequestInitiate) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.RI_USER (nguồn gốc xa: NG_SB_CLOS_ENTRY_EXIT.USERNAME tại WORKSTEP='RequestInitiate') | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | RI_USER (User khởi tạo hồ sơ) |
+| 11 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.BRANCH_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BRANCH_USER (User Chi nhánh) |
+| 12 | DDE_USER | VARCHAR2 | N | 100 |  | User xử lý bước DetailDataEntry, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.DDE_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | DDE_USER (User Chuyên viên nhập liệu) |
+| 13 | QC_USER | VARCHAR2 | N | 100 |  | User xử lý bước DataInputerChecker, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.QC_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | QUALITY_CHECKER (User Kiểm soát nhập liệu) |
+| 14 | UND_MAKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterMaker, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.UND_MAKER_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | UND_MAKER (User Chuyên viên thẩm định) |
+| 15 | UND_CHECKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterChecker, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.UND_CHECKER_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | UND_CHECKER (User Kiểm soát thẩm định) |
+| 16 | PHV_USER | VARCHAR2 | N | 100 |  | User xử lý bước PhoneVerification, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.PHV_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | PHV_USER (User Chuyên viên Thẩm định điện thoại) |
+| 17 | FA_USER | VARCHAR2 | N | 100 |  | User Chuyên viên Thực địa — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.FA_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | FA_USER (User Chuyên viên Thực địa) |
+| 18 | APPROVER_USER | VARCHAR2 | N | 100 |  | User xử lý bước CreditApproval, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPROVER_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BI_APPROVER (User Chuyên gia phê duyệt) |
+| 19 | COMMITTEE_USER | VARCHAR2 | N | 100 |  | User Hội đồng tín dụng — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.COMMITTEE_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BI_COMMITTEE (User Hội đồng tín dụng) |
+| 20 | HOS_USER | VARCHAR2 | N | 100 |  | User Hỗ trợ phê duyệt — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.HOS_USER | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BI_HOS_USER (User Hỗ trợ phê duyệt) |
+| 21 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy / hoàn tất gần nhất) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.PROCESSED_DATE | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — nguồn cho AGG_LOS_KPI_APPLICATION.PROCESSED_DATE, mốc xếp hồ sơ vào đúng DAYID khi SUM/COUNT lên grain ngày | PROCESSED_DATE (Ngày dữ liệu báo cáo) |
+| 22 | CREATION_DATE | DATE | N |  |  | TRUNC(MIN(ENTRYDATE)) theo WI_NAME — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CREATION_DATE | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CREATION_DATE (Ngày hồ sơ khởi tạo) |
+| 23 | LAST_APPROVAL_DATE | DATE | N |  |  | MAX(EXITDATE) tại bước phê duyệt (nhóm quyết định đã định nghĩa) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.LAST_APPROVAL_DATE | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | LAST_APPROVAL_DATE (Thời gian phê duyệt cuối cùng) |
+| 24 | FIRST_APPROVED_DATE | DATE | N |  |  | Ngày phê duyệt (BC11.APPROVAL_DATE) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.FIRST_APPROVED_DATE| Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FCT_CLOS_LOAN_DISBURSEMENT.APPROVAL_DATE | APPROVAL_DATE (Ngày phê duyệt) |
+| 25 | MIN_UWM | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại UnderwriterMaker — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.MIN_UWM | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | MIN_UWM (Thời gian hồ sơ lên CV thẩm định) |
+| 26 | MIN_APP | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại CreditApproval/CreditCommittee — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.MIN_APP | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | MIN_APP (Thời gian hồ sơ lên cấp phê duyệt) |
+| 27 | CANCEL_DATE | DATE | N |  |  | ENTRYDATE tại bước CancelRevoke. Input giữ nguyên bê từ SB_DWH — `FLAG_AUTO_CANCEL` (business rule dựa trên cột này) nay tính tại chính bảng này — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CANCEL_DATE | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CANCEL_DATE (Thời gian hồ sơ vào vùng CancelRevoke) |
+| 28 | LAST_ENTRYDATE | TIMESTAMP | N |  |  | ENTRYDATE của sự kiện hoàn tất gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.LAST_ENTRYDATE | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | LAST_ENTRYDATE (Thời gian vào bước cuối) |
+| 29 | LAST_EXITDATE | TIMESTAMP | N |  |  | EXITDATE của cùng sự kiện hoàn tất gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.LAST_EXITDATE | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | LAST_EXITDATE (Thời gian kết thúc bước cuối) |
+| 30 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước (LAG theo ENTRYDATE) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.PRE_WORKSTEP_CODE | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | PRE_WORKSTEP (Bước hồ sơ trước đó) |
+| 31 | LAST_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của sự kiện hoàn tất gần nhất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.LAST_REMARKS | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | LAST_REMARKS (Ghi chú ý kiến bước cuối) |
+| 32 | PROPOSED_AMT | NUMBER | N | 20,2 |  | Số tiền đề xuất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.PROPOSED_AMT (nguồn gốc xa: NG_SB_CLOS_CREDITINFO_COMM.PRECREDITLIMIT) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | ST_YEUCAU (Số tiền đề xuất vay) |
+| 33 | CREDIT_LIMIT_APPROVAL | NUMBER | N | 20,2 |  | Hạn mức do chuyên gia phê duyệt — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CREDIT_LIMIT_APPROVAL| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | ST_PHEDUYET (Số tiền phê duyệt chính thức) |
+| 34 | CREDIT_LIMIT_COMMITTEE | NUMBER | N | 20,2 |  | Hạn mức do hội đồng phê duyệt — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CREDIT_LIMIT_COMMITTEE | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — nguồn cho chỉ tiêu/trường CREDIT_LIMIT (đặt bản dư thừa có chủ đích trên DIM_CLOS_APPLICATION để BC3 lookup thẳng qua APPLICATION_SK) | CREDIT_LIMITS (Hạn mức cấp) |
+| 35 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPROVED_AMT_FINAL | Báo cáo Thông tin phê duyệt (BC3) — CREDIT_LIMIT (giá trị hạn mức phê duyệt cuối theo đúng công thức SRS BC3) | CREDIT_LIMIT (Số tiền phê duyệt) |
+| 36 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPROVED_TERM| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CREDIT_TERM (Thời hạn cấp tín dụng) |
+| 37 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%), chỉ nhận khi nguồn là số — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.INTEREST_RATE_PCT | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | INTEREST_RATE (Lãi suất phê duyệt) |
+| 38 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CURRENCY_CODE (nguồn gốc xa: NG_SB_CLOS_CREDITINFO_COMM.CURRENCY) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CURRENCY (Loại tiền tệ áp dụng) |
+| 39 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (không lọc CREATEDBY) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.VAR_STR12 | Báo cáo KPI (BC9) — điều kiện lọc IS NOT NULL cho SLHS_CLOS_DAY/SLGN_CLOS_DAY (AGG_LOS_KPI_YTD_DAILY) | — |
+| 40 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.UNDERWRITERMAKER_USERMAKE: COALESCE(CASE WHEN NG_SB_CLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterMaker' THEN NG_SB_CLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_CLOS_EXTTABLE.UWMAKERUSER) | Báo cáo CLOS APPLICATION (BC2) — BC2 map thẳng vào cột này| — |
+| 41 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.UNDERWRITERCHECKER_USERMAKE: COALESCE(CASE WHEN NG_SB_CLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterChecker' THEN NG_SB_CLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_CLOS_EXTTABLE.UWCHKRUSER) | Báo cáo CLOS APPLICATION (BC2) — BC2 map thẳng vào cột này.| — |
+| 42 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPROVAL_USERMAKE: COALESCE(NG_SB_CLOS_USER_MAKE_WORK_STEP.USER_MAKE, CASE NG_SB_CLOS_APPROVAL.APP_GRP WHEN 'A1' THEN 'long.lq' WHEN 'CC' THEN 'UBTD' WHEN 'BOD' THEN 'HDQT' END) | Báo cáo CLOS APPLICATION (BC2) — BC2 map thẳng vào cột này.| — |
+| 43 | LG_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu bảo lãnh (Letter of Guarantee) phát sinh theo hồ sơ — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.LG_REQ | — | Thiết kế dư thừa |
+| 44 | FI_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu (tương tự LG_REQ) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.FI_REQ| — | Thiết kế dư thừa |
+| 45 | PHONE_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu xác minh điện thoại (tương tự LG_REQ) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.PHONE_REQ| — | Thiết kế dư thừa |
+| 46 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước hoàn tất gần nhất, chuẩn hóa dùng chung 2 hệ — PHÁI SINH TẠI PDTD_DTM: LEFT JOIN PDTD_DTM.Q_RLOS_REF_WORKSTEP_2SYSTEMS (bảng REF_, chỉ tồn tại ở PDTD_DTM) theo WORKSTEP_CODE/DECISION_CODE tra qua LAST_WORKSTEP_DECISION_SK (cột 4, đã bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION) → SB_DWH.DIM_CLOS_WORKSTEP_DECISION | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp (khác LAST_WORKSTEP_DECISION_SK — khóa nội bộ tới DIM_CLOS_WORKSTEP_DECISION) | LAST_WORKSTEP (Bước hồ sơ cuối) |
+| 47 | BUSINESS_FLOW | VARCHAR2 | N | 50 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BUSINESS_FLOW (Phân khúc hồ sơ) |
+| 48 | REF_PRODUCT | NVARCHAR2 | N | 200 |  | Nhóm sản phẩm dùng để tra cam kết SLA (BC5) | Báo cáo SLA - TAT (BC5) — khóa tra cam kết SLA | — |
+| 49 | SLA_CREDIT_OFFICER | NUMBER | N | 10,2 |  | Cam kết giờ cho chuyên viên tín dụng | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_CREDIT_OFFICER (Cam kết SLA chuyên viên tín dụng) |
+| 50 | SLA_MARKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước lập hồ sơ thẩm định | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_MARKER (Cam kết SLA lập hồ sơ thẩm định) |
+| 51 | SLA_CHECKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát thẩm định| Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_CHECKER (Cam kết SLA kiểm soát thẩm định) |
+| 52 | SLA_CREDIT_APPROVER | NUMBER | N | 10,2 |  | Cam kết giờ cho cấp phê duyệt | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_CREDIT_APPROVER (Cam kết SLA cấp phê duyệt) |
+| 53 | LEGAL_REPRESENTATIVE | VARCHAR2 | N | 1000 |  | Người đại diện theo pháp luật (BC2) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | LEGAL_REPRESENTATIVE (Người đại diện theo pháp luật) |
+| 54 | ADD_ID_REPRESENTATIVE | VARCHAR2 | N | 1000 |  | Số giấy tờ tùy thân của người đại diện theo pháp luật (BC2)| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | ADD_ID_REPRESENTATIVE (Số giấy tờ người đại diện) |
+| 55 | APPLICATION_STATUS | VARCHAR2 | N | 50 |  | Trạng thái hồ sơ chuẩn hóa (BC2) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | APPLICATION_STATUS (Trạng thái cuối của hồ sơ) |
+| 56 | FLAG_AUTO_CANCEL | VARCHAR2 | N | 10 |  | 'YES'/'NO' theo nguyên văn SRS BC2 field FLAG_AUTO_CAN (BC2)| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | FLAG_AUTO_CAN (Hồ sơ bị tự động hủy — YES/NO) |
+| 57 | APPROVAL_TYPE | VARCHAR2 | N | 200 |  | Loại luồng phê duyệt (BC2)| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | APPROVAL_TYPE (Loại luồng phê duyệt) |
+
 
 ## 5. FCT_CLOS_COLLATERAL
 
@@ -279,7 +287,11 @@ flowchart LR
   tài sản riêng — toàn bộ thuộc tính lưu thẳng trên fact vì nguồn
   NG_SB_CLOS_COLL_CD không khai khóa CDC, nên không đủ điều kiện tách
   DIM theo SCD2. Không có bổ sung nào riêng tại tầng PDTD_DTM.
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, COLLATERAL_BK.
+- **Khóa nghiệp vụ (BK):** composite toàn bộ cột không phải CLOB của
+  `NG_SB_CLOS_COLL_CD` (loại trừ `COLL_MGMT_APP`, `DESCRIPTION`) +
+  `DATASOURCE` + tên bảng nguồn — hash vào cột `COLLATERAL_BK`, bê 1:1
+  từ SB_DWH
+- **Khóa chính của bảng (PK):** DAYID, COLLATERAL_BK.
 - **Độ chi tiết (grain):** 1 dòng = 1 tài sản bảo đảm của 1 hồ sơ x 1 ngày
   dữ liệu (ảnh chụp đầy đủ theo ngày).
 - **Phục vụ báo cáo:**
@@ -305,38 +317,35 @@ flowchart LR
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | — (cột kỹ thuật, một phần khóa chính) | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS | — (cột kỹ thuật, một phần khóa chính) | — |
-| 3 | COLLATERAL_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng tài sản — hash SHA256 trên toàn bộ cột không phải CLOB của NG_SB_CLOS_COLL_CD (loại trừ COLL_MGMT_APP, DESCRIPTION), cộng DATASOURCE và tên bảng nguồn | — (cột kỹ thuật, một phần khóa chính) | — |
-| 4 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS | — (cột kỹ thuật) | — |
-| 5 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ, không xuất trực tiếp lên báo cáo) | — |
-| 6 | COLLATERAL_TYPE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_COLLATERAL_TYPE, lookup theo COLLATERAL_TYPE_CODE. Mặc định -1 | — (khóa liên kết nội bộ; DIM_CLOS_COLLATERAL_TYPE hiện chỉ còn COLLATERAL_TYPE_CODE — đã có sẵn trực tiếp trên fact này ở cột 7 — nên khóa này không mang thêm giá trị hiển thị nào cho báo cáo) | — |
-| 7 | COLLATERAL_TYPE_CODE | VARCHAR2 | N | 100 |  | Mã loại tài sản bảo đảm — nguồn NG_SB_CLOS_COLL_CD.COLLTYPE | Báo cáo CLOS APPLICATION (BC2) — nguồn cho 9 cờ TSDB_NHOM_0/TSDB_BDS/TSDB_PTVT/TSDB_MMTB/TSDB_KPT/TSDB_HTK/TSDB_TIN_CHAP/TIN_CHAP_TQD/TSDB_CP_TP (so sánh CASE trực tiếp giá trị COLLTYPE gốc)<br>Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | TSDB_NHOM_0/TSDB_BDS/TSDB_PTVT/TSDB_MMTB/TSDB_KPT/TSDB_HTK/TSDB_TIN_CHAP/TIN_CHAP_TQD/TSDB_CP_TP (các cờ TSBĐ theo nhóm — BC2); TYPES_OF_COLLATERALS (Loại TSBĐ — BC3) |
-| 8 | DESCRIPTION | VARCHAR2 | N | 4000 |  | Diễn giải tài sản bảo đảm — nguồn NG_SB_CLOS_COLL_CD.DESCRIPTION (CLOB) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | DESCRIPTION (Mô tả TSBĐ) |
-| 9 | OWNER_NAME | VARCHAR2 | N | 200 |  | Chủ sở hữu tài sản — nguồn NG_SB_CLOS_COLL_CD.COLL_OWNER | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | OWNER (Chủ TSBĐ) |
-| 10 | COLL_MGMT_METHOD | VARCHAR2 | N | 4000 |  | Phương thức quản lý tài sản — nguồn NG_SB_CLOS_COLL_CD.COLL_MGMT_APP. Người dùng thường không nhập trường này trên live nên phần lớn sẽ rỗng, nhưng BC3 vẫn liệt kê nên phải nạp | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | COLLATERA_MANAGEMENT (Phương thức quản lý TSBĐ) |
-| 11 | APPRAISED_VALUE | NUMBER | N | 20,2 |  | Giá trị định giá của tài sản — nguồn NG_SB_CLOS_COLL_CD.APPRAISED_VAL_FIG. Ép kiểu số từ text theo định dạng Việt Nam, DEFAULT NULL ON CONVERSION ERROR | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | APPRAISED_VALUE (Giá trị định giá) |
-| 12 | LOAN_RATE_LTV | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị tài sản — nguồn NG_SB_CLOS_COLL_CD.LTV. Cùng quy tắc ép kiểu, đơn vị phần trăm | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | LTV (Tỷ lệ cho vay của TSBĐ) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.DAYID | — (cột kỹ thuật, một phần khóa chính) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | COLLATERAL_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng tài sản — hash SHA256 trên toàn bộ cột không phải CLOB của NG_SB_CLOS_COLL_CD (loại trừ COLL_MGMT_APP, DESCRIPTION), cộng DATASOURCE và tên bảng nguồn — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.COLLATERAL_BK | — (cột kỹ thuật, một phần khóa chính) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.APPLICATION_SK | — (khóa liên kết nội bộ, không xuất trực tiếp lên báo cáo) | — |
+| 5 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng CLOS — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.WI_NAME (nguồn gốc xa: NG_SB_CLOS_COLL_CD.WI_NAME, direct) | — (cột kỹ thuật, một phần khóa chính) | — |
+| 6 | COLLATERAL_TYPE_CODE | VARCHAR2 | N | 100 |  | Mã loại tài sản bảo đảm — DENORMALIZE TRỰC TIẾP, bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.COLLATERAL_TYPE_CODE | Báo cáo CLOS APPLICATION (BC2) — nguồn cho 9 cờ TSDB_NHOM_0/TSDB_BDS/TSDB_PTVT/TSDB_MMTB/TSDB_KPT/TSDB_HTK/TSDB_TIN_CHAP/TIN_CHAP_TQD/TSDB_CP_TP (so sánh CASE trực tiếp giá trị COLLTYPE gốc)<br>Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | TSDB_NHOM_0/TSDB_BDS/TSDB_PTVT/TSDB_MMTB/TSDB_KPT/TSDB_HTK/TSDB_TIN_CHAP/TIN_CHAP_TQD/TSDB_CP_TP (các cờ TSBĐ theo nhóm — BC2); TYPES_OF_COLLATERALS (Loại TSBĐ — BC3) |
+| 7 | DESCRIPTION | VARCHAR2 | N | 4000 |  | Diễn giải tài sản bảo đảm — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.DESCRIPTION | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | DESCRIPTION (Mô tả TSBĐ) |
+| 8 | OWNER_NAME | VARCHAR2 | N | 200 |  | Chủ sở hữu tài sản — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.OWNER_NAME| Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | OWNER (Chủ TSBĐ) |
+| 9 | COLL_MGMT_METHOD | VARCHAR2 | N | 4000 |  | Phương thức quản lý tài sản — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.COLL_MGMT_METHOD | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | COLLATERA_MANAGEMENT (Phương thức quản lý TSBĐ) |
+| 10 | APPRAISED_VALUE | NUMBER | N | 20,2 |  | Giá trị định giá của tài sản — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.APPRAISED_VALUE (nguồn gốc xa: NG_SB_CLOS_COLL_CD.APPRAISED_VAL_FIG| Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | APPRAISED_VALUE (Giá trị định giá) |
+| 11 | LOAN_RATE_LTV | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị tài sản — bê 1:1 từ SB_DWH.FCT_CLOS_COLLATERAL.LOAN_RATE_LTV| Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | LTV (Tỷ lệ cho vay của TSBĐ) |
 
 ## 6. FCT_CLOS_EXCEPTION
 
 ### 6.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** bảng FACT chi tiết tại PDTD_DTM — bê nguyên 1:1 từ
-  `FCT_CLOS_EXCEPTION` (SB_DWH, 13 cột nghiệp vụ + `CHECK_FTR`/
-  `FIRST_WORKSTEP_RETURN` đã tính sẵn), lưu mỗi lần một lý do (ngoại lệ)
-  được nêu ra trên hồ sơ CLOS trong quá trình xử lý — bao gồm cả lần nêu
-  lý do (Raise) lẫn lần đã làm rõ/bổ sung (Clear). Bổ sung tại tầng này 2
-  cột phái sinh: `LOANCASEID` (join `DIM_CLOS_APPLICATION.LOANCASEID`
-  theo APPLICATION_SK) và `PHAN_LOAI_DDE` (LEFT JOIN `REF_PHAN_LOAI_DDE`
-  theo EXCEPTION_CATEGORY + SYSTEMNAME='CLOS'). Riêng `PHAN_LOAI_DDE`
-  vốn thiết kế ban đầu đặt tại SB_DWH nhưng đã chuyển hẳn về PDTD_DTM
-  (review 2026-09-22) vì `REF_PHAN_LOAI_DDE` chỉ tồn tại vật lý ở tầng
-  PDTD_DTM (BA nhập tay, không qua STG_LOS/CDC) — một bảng SB_DWH không
-  được phép JOIN thẳng một bảng chỉ có ở PDTD_DTM, nên công thức phải
-  tính ở đây, đúng nguyên tắc "JOIN vào bảng REF_ là đặc quyền riêng của
-  tầng PDTD_DTM".
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, EXCEPTION_CATEGORY,
-  RAISED_BY, RAISED_DATE_TIME.
+  `FCT_CLOS_EXCEPTION`,
+  lưu mỗi lần một lý do (ngoại lệ) được nêu ra trên hồ sơ CLOS trong quá
+  trình xử lý — bao gồm cả lần nêu lý do (Raise) lẫn lần đã làm rõ/bổ
+  sung (Clear). Bổ sung tại tầng này 3 cột phái sinh: `CHECK_FTR`/
+  `FIRST_WORKSTEP_RETURN` và `PHAN_LOAI_DDE` (LEFT JOIN `REF_PHAN_LOAI_DDE`
+  theo EXCEPTION_CATEGORY + SYSTEMNAME='CLOS').
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`EXCEPTION_CATEGORY`+
+  `RAISED_BY`+`RAISED_DATE_TIME` — hash vào cột `EXCEPTION_BK`, bê 1:1
+  từ SB_DWH (xem `HLD_FCT_SB_DWH_review.md` mục 3)
+- **Khóa chính của bảng (PK):** DAYID, EXCEPTION_BK — bê 1:1 từ SB_DWH
+  (xem `HLD_FCT_SB_DWH_review.md` mục 3): `EXCEPTION_BK` gộp 4 cột PK tự
+  nhiên cũ (WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME)
+  thành 1 khóa hash duy nhất.
 - **Độ chi tiết (grain):** 1 dòng = 1 lần ghi nhận lý do của 1 hồ sơ,
   trong ảnh chụp của ngày DAYID. Một hồ sơ có thể phát sinh cùng 1 loại lý
   do nhiều lần, bởi nhiều người, ở nhiều thời điểm khác nhau.
@@ -350,6 +359,9 @@ flowchart LR
 flowchart LR
     subgraph SB_DWH
         C["FCT_CLOS_EXCEPTION"]
+        WE["FCT_CLOS_WORKSTEP_EVENT"]
+        DE["DIM_CLOS_EXCEPTION"]
+        KC["DIM_CLOS_CUSTOMER"]
     end
     subgraph REF_DTM["Bảng REF tại PDTD_DTM"]
         REF(["REF_PHAN_LOAI_DDE"])
@@ -358,29 +370,34 @@ flowchart LR
         D["FCT_CLOS_EXCEPTION"]
     end
     C -->|bê 1:1| D
-    REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='CLOS' — sinh PHAN_LOAI_DDE (review 2026-09-22, chuyển từ SB_DWH)"| D
+    REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='CLOS' — sinh PHAN_LOAI_DDE"| D
+    WE -.->|"JOIN theo WI_NAME (không phải STG_LOS) — sinh FIRST_WORKSTEP_RETURN: WORKSTEP_CODE tại MIN(EXITDATE) thỏa 3 nhánh WORKSTEP/DECISION_CODE"| D
+    DE -.->|"EXCEPTION_SK → ACTIVITYNAME/DECISION_CODE, dùng làm điều kiện EXISTS-check với WE — sinh CHECK_FTR"| D
+    KC -.->|"CUSTOMER_SK → CUST_GROUP, phân nhóm whitelist miễn trừ CHECK_FTR"| D
 ```
 
 ### 6.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | — (cột kỹ thuật) | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN<br>Báo cáo RETURN (BC8) — khóa JOIN | WINAME (Mã hồ sơ) |
-| 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_CLOS_APPLICATION, đồng thời là nguồn cho chỉ tiêu/trường LOANCASEID (cột 16, cùng bảng) | — |
-| 4 | EXCEPTION_REASON_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_EXCEPTION_REASON — PHÁI SINH 2 bước đúng SRS BC7 (không phải lookup 1 cột): (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME, có thể khớp nhiều dòng DIM cùng category+name khác ACTIVITYNAME/DECISION_CODE; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_CLOS_ENTRY_EXIT (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó) — chỉ giữ tổ hợp đã thực sự xảy ra trong lịch sử xử lý hồ sơ. Mặc định -1 nếu không còn dòng nào khớp | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_CLOS_EXCEPTION_REASON | — |
-| 5 | RAISED_BY_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_LOS_USER | — |
-| 6 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 | PK | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_CATEGORY | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, đồng thời là khóa JOIN sang REF_PHAN_LOAI_DDE để sinh PHAN_LOAI_DDE (cột 15, cùng bảng) | EXCEPTION_CATEGORY (Nhóm nội dung ngoại lệ) |
-| 7 | EXCEPTION_NAME | VARCHAR2 | N | 500 |  | Tên nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_NAME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_NAME (Tên nội dung ngoại lệ) |
-| 8 | EXCEPTION_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_REMARKS | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_REMARKS (Ghi chú ngoại lệ) |
-| 9 | RAISED_BY | VARCHAR2 | N | 100 | PK | Người nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_BY. Cột RAISED_BY_USER_SK bên cạnh giữ khóa tới DIM | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RAISED_BY (Người nêu) |
-| 10 | RAISED_DATE_TIME | TIMESTAMP | N |  | PK | Thời điểm nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_DATE_TIME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, đồng thời là nguồn tính PROCESSED_DATE (TRUNC ở tầng report) | RAISED_DATE_TIME (Thời điểm nêu); nguồn cho chỉ tiêu/trường PROCESSED_DATE (Ngày dữ liệu, BC7) |
-| 11 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS | — (cột kỹ thuật) | — |
-| 12 | RCTYPE | VARCHAR2 | N | 20 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_CLOS_EXCEPTION.RCTYPE | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RCTYPE (Raise/Clear) |
-| 13 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật đổi hẳn công thức): mặc định 'Not First Time Right'; là 'First Time Right' CHỈ KHI mọi dòng NG_SB_CLOS_EXCEPTION của hồ sơ đều khớp 1 tổ hợp ngoại lệ miễn trừ (join NG_SB_CLOS_ENTRY_EXIT qua WINAME/WORKSTEP/DECISION), phân theo NG_SB_CLOS_CUST_INFO.CUST_GROUP: nhóm KHDN (MSME/SME/USME) và nhóm KHDNL/ĐT&ĐCTC (FDI/SOC/JSC/NBFI/BANK/STR) — mỗi nhóm có 4 tổ hợp WORKSTEP+DECISION với danh sách EXCEPTION_CATEGORY miễn trừ riêng | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | CHECK_FTR (First Time Right) |
-| 14 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật): WORKSTEP của bản ghi NG_SB_CLOS_ENTRY_EXIT tại MIN(EXITDATE) theo WI_NAME, với điều kiện EXITDATE IS NOT NULL AND ((WORKSTEP='DetailDataEntry' AND DECISION='Send_Back') OR (WORKSTEP IN ('DataInputerChecker','UnderwriterMaker','CreditApproval') AND DECISION='Additional_Doc_Required') OR (WORKSTEP='UnderwriterMaker' AND DECISION='Send_Back to BranchSupport')) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | FIRST_WORKSTEP_RETURN (Bước trả về đầu tiên) |
-| 15 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (review 2026-09-22, chuyển từ SB_DWH vì REF_PHAN_LOAI_DDE chỉ tồn tại vật lý ở PDTD_DTM): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='CLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | PHAN_LOAI_DDE (Lỗi Nhập liệu/Thiếu Checklist) |
-| 16 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ — PHÁI SINH: JOIN sang DIM_CLOS_APPLICATION theo APPLICATION_SK, lấy LOANCASEID | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp (cột trực tiếp trên bảng này, ưu tiên dùng thay vì join lại qua DIM_CLOS_APPLICATION) | LOANCASEID (Mã LOANCASEID) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.DAYID | — (cột kỹ thuật) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | EXCEPTION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng ngoại lệ — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.EXCEPTION_BK: STANDARD_HASH(WI_NAME \|\| '~' \|\| EXCEPTION_CATEGORY \|\| '~' \|\| RAISED_BY \|\| '~' \|\| TO_CHAR(RAISED_DATE_TIME,'YYYY-MM-DD HH24:MI:SS.FF6') \|\| '~' \|\| DATASOURCE, 'SHA256') — gộp 4 cột PK tự nhiên cũ thành 1 khóa đơn | — (cột kỹ thuật, một phần khóa chính) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.APPLICATION_SK | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_CLOS_APPLICATION, report-time tự tra LOANCASEID khi cần (không còn ETL sẵn trên bảng này) | — |
+| 5 | EXCEPTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_EXCEPTION — PHÁI SINH 2 bước đúng SRS BC7 (không phải lookup 1 cột), ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.EXCEPTION_SK: (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME, có thể khớp nhiều dòng DIM cùng category+name khác ACTIVITYNAME/DECISION_CODE; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_CLOS_ENTRY_EXIT (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó) — chỉ giữ tổ hợp đã thực sự xảy ra trong lịch sử xử lý hồ sơ. Mặc định -1 nếu không còn dòng nào khớp | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_CLOS_EXCEPTION, đồng thời là nguồn tra ACTIVITYNAME/DECISION_CODE để tính CHECK_FTR (cột 15, cùng bảng) | — |
+| 6 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do (khớp naming convention DIM_LOS_USER.USER_SK đã dùng ở FCT_CLOS_WORKSTEP_EVENT). Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.USER_SK | — (cột kỹ thuật, khóa JOIN nội bộ — BC7 dùng cột RAISED_BY gốc để hiển thị, khớp bản RLOS) | — |
+| 7 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.CUSTOMER_SK)| — (cột kỹ thuật, khóa JOIN nội bộ phục vụ tính CHECK_FTR) | — |
+| 8 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng CLOS — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.WI_NAME| Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN<br>Báo cáo RETURN (BC8) — khóa JOIN | WINAME (Mã hồ sơ) |
+| 9 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 |  | Phân nhóm nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.EXCEPTION_CATEGORY| Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, đồng thời là khóa JOIN sang REF_PHAN_LOAI_DDE để sinh PHAN_LOAI_DDE (cột 17, cùng bảng), và điều kiện whitelist miễn trừ khi tính CHECK_FTR (cột 15) | EXCEPTION_CATEGORY (Nhóm nội dung ngoại lệ) |
+| 10 | RAISED_BY | VARCHAR2 | N | 100 |  | Người nêu nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.RAISED_BY | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RAISED_BY (Người nêu) |
+| 11 | RAISED_DATE_TIME | TIMESTAMP | N |  |  | Thời điểm nêu nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.RAISED_DATE_TIME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, đồng thời là nguồn tính PROCESSED_DATE (TRUNC ở tầng report) | RAISED_DATE_TIME (Thời điểm nêu); nguồn cho chỉ tiêu/trường PROCESSED_DATE (Ngày dữ liệu, BC7) |
+| 12 | EXCEPTION_NAME | VARCHAR2 | N | 500 |  | Tên nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.EXCEPTION_NAME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_NAME (Tên nội dung ngoại lệ) |
+| 13 | EXCEPTION_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.EXCEPTION_REMARKS (nguồn gốc xa: NG_SB_CLOS_EXCEPTION.EXCEPTION_REMARKS) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_REMARKS (Ghi chú ngoại lệ) |
+| 14 | RCTYPE | VARCHAR2 | N | 20 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — bê 1:1 từ SB_DWH.FCT_CLOS_EXCEPTION.RCTYPE (nguồn gốc xa: NG_SB_CLOS_EXCEPTION.RCTYPE) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RCTYPE (Raise/Clear) |
+| 15 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH TẠI PDTD_DTM: mặc định 'Not First Time Right'; là 'First Time Right' CHỈ KHI mọi dòng cùng WI_NAME đều tồn tại (EXISTS) dòng khớp trong SB_DWH.FCT_CLOS_WORKSTEP_EVENT (WORKSTEP_CODE=DIM_CLOS_EXCEPTION.ACTIVITYNAME AND DECISION_CODE=DIM_CLOS_EXCEPTION.DECISION_CODE, tra qua EXCEPTION_SK) VÀ EXCEPTION_CATEGORY nằm trong whitelist miễn trừ theo CUST_GROUP (tra qua CUSTOMER_SK), phân theo nhóm KHDN (MSME/SME/USME) và nhóm KHDNL/ĐT&ĐCTC (FDI/SOC/JSC/NBFI/BANK/STR) — mỗi nhóm 4 tổ hợp WORKSTEP+DECISION với danh sách EXCEPTION_CATEGORY miễn trừ riêng, xem đầy đủ literal tại SRS BC7 BR 1.2 | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | CHECK_FTR (First Time Right) |
+| 16 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH TẠI PDTD_DTM (xem ghi chú kiến trúc tại mục 6.1): WORKSTEP_CODE của dòng SB_DWH.FCT_CLOS_WORKSTEP_EVENT tại MIN(EXITDATE) theo WI_NAME, với điều kiện EXITDATE IS NOT NULL AND ((WORKSTEP_CODE='DetailDataEntry' AND DECISION_CODE='Send_Back') OR (WORKSTEP_CODE IN ('DataInputerChecker','UnderwriterMaker','CreditApproval') AND DECISION_CODE='Additional_Doc_Required') OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send_Back to BranchSupport')) — DECISION_CODE tra qua WORKSTEP_DECISION_SK → DIM_CLOS_WORKSTEP_DECISION | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | FIRST_WORKSTEP_RETURN (Bước trả về đầu tiên) |
+| 17 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (vì REF_PHAN_LOAI_DDE chỉ tồn tại vật lý ở PDTD_DTM): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='CLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | PHAN_LOAI_DDE (Lỗi Nhập liệu/Thiếu Checklist) |
+
 
 ## 7. FCT_CLOS_DEVIATION
 
@@ -390,7 +407,11 @@ flowchart LR
   sinh trên hồ sơ CLOS. Không có cột phái sinh riêng ở tầng DTM — toàn bộ
   9 cột đã tính sẵn tại SB_DWH, tầng này chỉ đọc thẳng, không JOIN thêm
   bảng nào, giữ đúng nguyên tắc "DTM chỉ đọc DWH".
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, DEVIATION_BK.
+- **Khóa nghiệp vụ (BK):** composite toàn bộ cột không phải CLOB của
+  `NG_SB_CLOS_CONDITON_CDGRID` (loại trừ `AS_REGULAR`, `DEV_PROPOSAL`) +
+  `DATASOURCE` + tên bảng nguồn — hash vào cột `DEVIATION_BK`, bê 1:1 từ
+  SB_DWH
+- **Khóa chính của bảng (PK):** DAYID, DEVIATION_BK.
 - **Độ chi tiết (grain):** 1 dòng = 1 ngoại lệ chính sách trong ảnh chụp
   của ngày DAYID (ảnh chụp đầy đủ mỗi ngày, không phải ghi thêm khi có
   thay đổi).
@@ -414,35 +435,33 @@ flowchart LR
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | Thiết kế dư thừa | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS | Báo cáo NGOẠI LỆ (BC6) — khóa JOIN | WINAME (Mã hồ sơ) |
-| 3 | DEVIATION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng ngoại lệ — PHÁI SINH: STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB của NG_SB_CLOS_CONDITON_CDGRID (loại trừ AS_REGULAR, DEV_PROPOSAL), cộng DATASOURCE và tên bảng nguồn. Chuẩn hóa trước khi hash: TRIM chuỗi, NULL quy về '<NULL>', DATE/NUMBER dùng format cố định không phụ thuộc NLS | Thiết kế dư thừa | — |
-| 4 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS | Thiết kế dư thừa | — |
-| 5 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp | Báo cáo NGOẠI LỆ (BC6) — khóa JOIN sang DIM_CLOS_APPLICATION | — |
-| 6 | DEVIATION_TYPE_CODE | VARCHAR2 | N | 300 |  | Mã loại lệch chính sách — nguồn NG_SB_CLOS_CONDITON_CDGRID.DEVIATION_TYPE | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | DEVIATION_TYPE (Loại ngoại lệ) |
-| 7 | DEV_PROPOSAL | VARCHAR2 | N | 4000 |  | Đề xuất xử lý lệch chính sách — nguồn NG_SB_CLOS_CONDITON_CDGRID.DEV_PROPOSAL | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | DEV_PROPOSAL (Nội dung ngoại lệ) |
-| 8 | AS_REGULAR | VARCHAR2 | N | 4000 |  | Quy định chuẩn liên quan tới lệch chính sách — nguồn NG_SB_CLOS_CONDITON_CDGRID.AS_REGULAR. Không báo cáo nào hiển thị trực tiếp; BA từng đề xuất đưa vào khóa nghiệp vụ nhưng bị từ chối vì là trường nhập tùy biến (free-text) — vẫn phải nạp vì là thuộc tính gốc của bảng nguồn | Thiết kế dư thừa | — |
-| 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — PHÁI SINH: tính độc lập từ NG_SB_CLOS_ENTRY_EXIT theo cùng công thức 3 mức ưu tiên (ngày phê duyệt cuối/ngày hủy/ngày thoát bước gần nhất) đã dùng cho FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE — không JOIN sang FCT_CLOS_APPLICATION_DAILY để tránh tham chiếu chéo giữa 2 bảng | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | PROCESSED_DATE (Ngày dữ liệu báo cáo) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_CLOS_DEVIATION.DAYID | Báo cáo KPI (BC9) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_CLOS_DEVIATION.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | DEVIATION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng ngoại lệ — bê 1:1 từ SB_DWH.FCT_CLOS_DEVIATION.DEVIATION_BK: PHÁI SINH STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB của NG_SB_CLOS_CONDITON_CDGRID (loại trừ AS_REGULAR, DEV_PROPOSAL), cộng DATASOURCE và tên bảng nguồn. Chuẩn hóa trước khi hash: TRIM chuỗi, NULL quy về '<NULL>', DATE/NUMBER dùng format cố định không phụ thuộc NLS | Nguồn cho chỉ tiêu/trường DEVIATION_G2/DEVIATION_G3 (điều kiện đếm số dòng phân biệt, BC9) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_DEVIATION.APPLICATION_SK | Báo cáo NGOẠI LỆ (BC6) — khóa JOIN sang DIM_CLOS_APPLICATION | — |
+| 5 | WI_NAME | VARCHAR2 | Y | 100 | | Mã hồ sơ tín dụng CLOS — bê 1:1 từ SB_DWH.FCT_CLOS_DEVIATION.WI_NAME (nguồn gốc xa: NG_SB_CLOS_CONDITON_CDGRID.WI_NAME, direct) | Báo cáo NGOẠI LỆ (BC6) — khóa JOIN<br>Báo cáo KPI (BC9) — khóa GROUP BY khi đếm DEVIATION_G2/DEVIATION_G3 trên AGG_LOS_KPI_APPLICATION | WINAME (Mã hồ sơ) |
+| 6 | DEVIATION_TYPE_CODE | VARCHAR2 | N | 300 |  | Mã loại lệch chính sách — bê 1:1 từ SB_DWH.FCT_CLOS_DEVIATION.DEVIATION_TYPE_CODE (nguồn gốc xa: NG_SB_CLOS_CONDITON_CDGRID.DEVIATION_TYPE) | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | DEVIATION_TYPE (Loại ngoại lệ) |
+| 7 | DEV_PROPOSAL | VARCHAR2 | N | 4000 |  | Đề xuất xử lý lệch chính sách — bê 1:1 từ SB_DWH.FCT_CLOS_DEVIATION.DEV_PROPOSAL (nguồn gốc xa: NG_SB_CLOS_CONDITON_CDGRID.DEV_PROPOSAL) | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | DEV_PROPOSAL (Nội dung ngoại lệ) |
+| 8 | AS_REGULAR | VARCHAR2 | N | 4000 |  | Quy định chuẩn liên quan tới lệch chính sách — bê 1:1 từ SB_DWH.FCT_CLOS_DEVIATION.AS_REGULAR (nguồn gốc xa: NG_SB_CLOS_CONDITON_CDGRID.AS_REGULAR). Không báo cáo nào hiển thị trực tiếp; BA từng đề xuất đưa vào khóa nghiệp vụ nhưng bị từ chối vì là trường nhập tùy biến (free-text) — vẫn phải nạp vì là thuộc tính gốc của bảng nguồn | Không có report sử dụng — giữ có chủ đích (khác nhóm cột dư thừa đã xóa, đây là thuộc tính gốc bắt buộc nạp để bảo toàn dữ liệu nguồn) | — |
+| 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — bê 1:1 từ SB_DWH.FCT_CLOS_DEVIATION.PROCESSED_DATE (PHÁI SINH TẠI SB_DWH: tính độc lập từ NG_SB_CLOS_ENTRY_EXIT theo cùng công thức 3 mức ưu tiên — ngày phê duyệt cuối/ngày hủy/ngày thoát bước gần nhất — đã dùng cho FCT_CLOS_APPLICATION.PROCESSED_DATE, không JOIN sang FCT_CLOS_APPLICATION để tránh tham chiếu chéo giữa 2 bảng) | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | PROCESSED_DATE (Ngày dữ liệu báo cáo) |
 
 ## 8. FCT_CLOS_WORKSTEP_EVENT
 
 ### 8.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** bảng FACT nhật ký workflow mức nguyên tử của hệ CLOS,
-  bê nguyên 1:1 từ SB_DWH, giữ hết mọi sự kiện "vào bước — ra bước" của
-  hồ sơ (không bao giờ xóa, không chép lại nhật ký mỗi ngày). Là nguồn
-  duy nhất để tính mọi mốc thời gian, TAT, số lần trả về và người xử lý
-  theo từng bước, nhánh CLOS. Không có REF_ nào join thêm ở tầng DTM —
-  cấu trúc giữ nguyên như bản SB_DWH.
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, WORKSTEP_CODE, ENTRYDATE.
+  bê nguyên 1:1 từ SB_DWH
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`WORKSTEP_CODE`+
+  `ENTRYDATE` — hash vào cột `WORKSTEP_EVENT_BK`, bê 1:1 từ SB_DWH
+- **Khóa chính của bảng (PK):** DAYID, WORKSTEP_EVENT_BK
 - **Độ chi tiết (grain):** 1 dòng = 1 phiên bản của 1 logical event (hồ sơ
   x workstep x lần vào bước) — hồ sơ quay lại cùng 1 bước nhiều lần thì
   mỗi lần là 1 sự kiện riêng.
 - **Phục vụ báo cáo:**
   - Báo cáo Thông tin phê duyệt (BC3)
-  - Báo cáo Tuần Chuyên viên Thẩm định (BC4)
-  - Báo cáo SLA - TAT (BC5)
+  - Báo cáo Tuần Chuyên viên Thẩm định (BC4) — `WORKSTEP_FLAG` (BC4.FLAG)
+  - Báo cáo SLA - TAT (BC5) — `APPROVAL_FLAG`
   - Báo cáo RETURN (BC8)
-  - Báo cáo KPI (BC9) — nguồn tính VOLUME/NHAN_SU/TAT_CLOS qua UNION với FCT_RLOS_WORKSTEP_EVENT
+  - Báo cáo KPI (BC9) — nguồn tính VOLUME/NHAN_SU/TAT_CLOS qua UNION với FCT_RLOS_WORKSTEP_EVENT, `APPROVAL_FLAG='First Approval'` điều kiện lọc TAT_APPLICATION_HOUR
   - Nguồn cho FCT_CLOS_EXCEPTION.FIRST_WORKSTEP_RETURN (BC7)
 
 ### 8.2 Sơ đồ lineage
@@ -455,36 +474,38 @@ flowchart LR
     subgraph PDTD_DTM
         D["FCT_CLOS_WORKSTEP_EVENT"]
     end
-    C -->|bê 1:1, cùng grain/PK| D
+    C -->|"bê 1:1, cùng grain/PK — tự EXISTS-check qua các dòng cùng WI_NAME để sinh APPROVAL_FLAG + WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY đã bê 1:1 để sinh WORKSTEP_FLAG "| D
 ```
 
 ### 8.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — nguồn NG_SB_CLOS_ENTRY_EXIT, TRUNC về 00:00:00. Là ngày phiên bản được ghi nhận, KHÔNG phải ảnh chụp lại toàn bộ nhật ký mỗi ngày | Thiết kế dư thừa | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS — nguồn NG_SB_CLOS_ENTRY_EXIT.WINAME (đổi tên WINAME→WI_NAME cho thống nhất với các bảng khác) | Báo cáo Thông tin phê duyệt (BC3) — khóa JOIN, cũng là khóa lọc tập dòng event<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — khóa JOIN, cũng là khóa lọc tập dòng event | WINAME (Mã hồ sơ) |
-| 3 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | PK | Mã bước xử lý trên workflow — nguồn ENTRY_EXIT.WORKSTEP (đổi tên thêm hậu tố CODE), đã cắt tiền tố hệ nguồn nếu có | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp, cũng là điều kiện lọc chọn dòng event (CreditApproval/CreditCommittee)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp, cũng là điều kiện lọc (UnderwriterMaker/UnderwriterChecker)<br>Báo cáo SLA - TAT (BC5) — điều kiện lọc khi SUM TAT_CALENDAR_HOUR/TAT_WORKING_HOUR/TAT_CPC_HOUR theo từng bước<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp | WORKSTEP (Bước hồ sơ) |
-| 4 | ENTRYDATE | TIMESTAMP | Y |  | PK | Thời điểm hồ sơ vào bước xử lý — nguồn ENTRY_EXIT.ENTRYDATE. Bắt buộc nằm trong khóa vì 1 hồ sơ có thể quay lại cùng 1 bước nhiều lần | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp (ENTRYDATE của dòng event đã lọc) | ENTRYDATE (Thời gian lên bước thẩm định) |
-| 5 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | SYSTEMNAME (Hệ thống CLOS/RLOS) |
-| 6 | WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP, lookup bằng WORKSTEP_CODE theo điều kiện thời gian (EFF_DATE/EXP_DATE). Mặc định -1 nếu không khớp | Thiết kế dư thừa | — |
-| 7 | DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_DECISION, lookup bằng DECISION_CODE theo điều kiện thời gian. DECISION null/không khớp dùng -1. KHÔNG nằm trong PK — chỉ để tra cứu thêm thuộc tính | Thiết kế dư thừa | — |
-| 8 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người xử lý của chính sự kiện này. ĐÚNG GRAIN của bảng — 1 lần vào bước có đúng 1 người xử lý. Mặc định -1. KHÔNG nằm trong PK | Thiết kế dư thừa | — |
-| 9 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 | Báo cáo Thông tin phê duyệt (BC3) — khóa JOIN sang DIM_CLOS_APPLICATION để lấy STREAM | — |
-| 10 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý — nguồn ENTRY_EXIT.EXITDATE. NULL nghĩa là hồ sơ đang nằm tại bước này | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp, đồng thời là nguồn tính PROCESSED_DATE (BC8) | EXITDATE (Thời gian tạo quyết định / kết thúc bước) |
-| 11 | DECISION_CODE | VARCHAR2 | N | 200 |  | Mã quyết định tại bước xử lý — nguồn ENTRY_EXIT.DECISION (đổi tên thêm hậu tố CODE) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp, cũng là điều kiện lọc chọn dòng event (Submit/Reject/Send To HOSupport/Send To PostSanction)<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp | DECISION (Quyết định) |
-| 12 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản người xử lý hồ sơ — nguồn ENTRY_EXIT.USERNAME. Giữ nguyên giá trị gốc để báo cáo hiển thị thẳng, không phải join qua DIM_LOS_USER | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp theo điều kiện WORKSTEP_CODE (BI_APPROVER/BI_COMMITTEE)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp theo điều kiện WORKSTEP_CODE (UND_MAKER)<br>Báo cáo KPI (BC9) — đếm DISTINCT theo danh sách WORKSTEP cho NHAN_SU | USERNAME (User xử lý — BI_APPROVER/BI_COMMITTEE/UND_MAKER tùy báo cáo) |
-| 13 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — nguồn ENTRY_EXIT.REMARKS | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REMARKS (Ghi chú) |
-| 14 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — nguồn ENTRY_EXIT.TAT. Giữ lại để đối soát với 3 cột TAT tính lại bên dưới. Đơn vị "giây" kế thừa từ extract gốc, chưa chốt chính thức | Nguồn cho chỉ tiêu/trường TAT_CALENDAR_HOUR (điều kiện tính khi có giá trị, thay công thức lệch ngày) | — |
-| 15 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ. NULL nếu chưa có EXITDATE | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước (STEP01_BRANCH_CL_TAT, STEP02_DDE_CL_TAT...)<br>Báo cáo KPI (BC9) — SUM theo nhóm bước cho TAT_CLOS | TAT_CALENDAR_HOUR (TAT theo giờ lịch tự nhiên) |
-| 16 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật; giờ tính 8-12 và 13-17. NULL nếu chưa có EXITDATE | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước (STEP01_BRANCH_WK_TAT, STEP02_DDE_WK_TAT...)<br>Báo cáo KPI (BC9) — SUM theo nhóm bước cho TAT_CLOS | TAT_WORKING_HOUR (TAT theo giờ làm việc) |
-| 17 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30. NULL nếu chưa có EXITDATE | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước, so sánh với REF_SLA_* để ra kết quả đạt/không đạt SLA | TAT_CPC_HOUR (TAT theo giờ cam kết SLA) |
-| 18 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN); chiều giảm dần (mới→cũ) khi cần có thể tự suy bằng COUNT(*) OVER (PARTITION BY WI_NAME) - EVENT_SEQ_ASC + 1, không cần cột riêng | Nguồn cho chỉ tiêu/trường FIRST_WORKSTEP_RETURN (xác định sự kiện trả về đầu tiên, BC7, trên FCT_CLOS_EXCEPTION) | — |
-| 19 | BI_FLAG_APPROVAL | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH: 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ), ngược lại 'From Second Approval'. Dùng cho BC5.BI_FLAG_APPROVAL | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc chỉ tính sự kiện 'First Approval' khi tính TAT_APPLICATION_HOUR | BI_FLAG_APPROVAL (Phê duyệt lần đầu/từ lần thứ 2) |
-| 20 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước — PHÁI SINH: LAG(WORKSTEP_CODE) OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE). Dùng cho BC1.PRE_WORKSTEP, BC2.PRE_WORKSTEP | Nguồn cho chỉ tiêu/trường PRE_WORKSTEP_CODE (BC1/BC2, tính sẵn trên FCT_CLOS_APPLICATION_DAILY/FCT_RLOS_APPLICATION_DAILY, không đọc trực tiếp từ đây) | — |
-| 21 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH TRỰC TIẾP trên bảng này, KHÔNG copy/JOIN từ FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE: MAX(EXITDATE) window theo WI_NAME WHERE WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') AND DECISION_CODE IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker'); nếu rỗng → EXITDATE tại WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Cancel'; nếu vẫn rỗng → ngày dữ liệu hệ thống (DAYID) | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REPORT_DATE (Ngày báo cáo) |
-| 22 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4) — PHÁI SINH TRỰC TIẾP trên bảng này, KHÔNG copy/JOIN từ FCT_CLOS_APPLICATION_DAILY (cột tương ứng đã bị xóa khỏi bảng đó): LEFT JOIN WFINSTRUMENTTABLE theo WI_NAME=PROCESSINSTANCEID AND CREATEDBY NOT IN ('10000380','10000020','10000420','10000140','10000100'), sau đó 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE của TOÀN BỘ lịch sử WI_NAME kết hợp PROCESSNAME='CLOS'/ACTIVITYNAME | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
-| 23 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — PHÁI SINH TRỰC TIẾP trên bảng này (theo yêu cầu người dùng: cho phép khai thác lookup DIM qua surrogate key thay vì qua WI_NAME natural key, nhất quán với WORKSTEP_SK/DECISION_SK/USER_SK/APPLICATION_SK đã có sẵn trên bảng): join theo WI_NAME + điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL), quan hệ 1:1 với hồ sơ. Mặc định -1 nếu không khớp | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — khóa JOIN sang DIM_CLOS_CUSTOMER để lấy CUSTOMER_NAME | — |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — nguồn NG_SB_CLOS_ENTRY_EXIT, TRUNC về 00:00:00. Là ngày phiên bản được ghi nhận, KHÔNG phải ảnh chụp lại toàn bộ nhật ký mỗi ngày — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.DAYID | Thiết kế dư thừa | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.DATASOURCE | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | SYSTEMNAME (Hệ thống CLOS/RLOS) |
+| 3 | WORKSTEP_EVENT_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng sự kiện — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WORKSTEP_EVENT_BK: STANDARD_HASH(WI_NAME \|\| '~' \|\| WORKSTEP_CODE \|\| '~' \|\| TO_CHAR(ENTRYDATE,'YYYY-MM-DD HH24:MI:SS.FF6') \|\| '~' \|\| DATASOURCE, 'SHA256') — gộp 3 cột PK tự nhiên cũ thành 1 khóa đơn | — (cột kỹ thuật, một phần khóa chính) | — |
+| 4 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP_DECISION (gộp từ WORKSTEP_SK+DECISION_SK), lookup theo cặp WORKSTEP_CODE (cột 9, chính dòng event) + DECISION_CODE điều kiện thời gian (EFF_DATE/EXP_DATE). Mặc định -1 nếu không khớp. KHÔNG nằm trong PK — chỉ để tra cứu thêm thuộc tính (kể cả DECISION_CODE, đã xóa denormalize khỏi fact) — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WORKSTEP_DECISION_SK | Báo cáo Thông tin phê duyệt (BC3) — khóa JOIN thay cho cột DECISION_CODE denormalize đã xóa, cũng là điều kiện lọc chọn dòng event (Submit/Reject/Send To HOSupport/Send To PostSanction)<br>Báo cáo RETURN (BC8) — khóa JOIN thay cho cột DECISION_CODE denormalize đã xóa | DECISION (Quyết định) |
+| 5 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người xử lý của chính sự kiện này. ĐÚNG GRAIN của bảng — 1 lần vào bước có đúng 1 người xử lý. Mặc định -1. KHÔNG nằm trong PK — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.USER_SK | Thiết kế dư thừa | — |
+| 6 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.APPLICATION_SK | Báo cáo Thông tin phê duyệt (BC3) — khóa JOIN sang DIM_CLOS_APPLICATION để lấy STREAM | — |
+| 7 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — PHÁI SINH TRỰC TIẾP tại SB_DWH (cho phép khai thác lookup DIM qua surrogate key thay vì qua WI_NAME natural key, nhất quán với WORKSTEP_DECISION_SK/USER_SK/APPLICATION_SK đã có sẵn trên bảng): join theo WI_NAME + điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL), quan hệ 1:1 với hồ sơ. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.CUSTOMER_SK | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — khóa JOIN sang DIM_CLOS_CUSTOMER để lấy CUSTOMER_NAME | — |
+| 8 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng CLOS — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WI_NAME (nguồn gốc xa: NG_SB_CLOS_ENTRY_EXIT.WINAME, đổi tên WINAME→WI_NAME) | Báo cáo Thông tin phê duyệt (BC3) — khóa JOIN, cũng là khóa lọc tập dòng event<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — khóa JOIN, cũng là khóa lọc tập dòng event | WINAME (Mã hồ sơ) |
+| 9 | WORKSTEP_CODE | VARCHAR2 | Y | 200 |  | Mã bước xử lý trên workflow — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WORKSTEP_CODE (nguồn gốc xa: ENTRY_EXIT.WORKSTEP, đổi tên thêm hậu tố CODE, đã cắt tiền tố hệ nguồn nếu có) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp, cũng là điều kiện lọc chọn dòng event (CreditApproval/CreditCommittee)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp, cũng là điều kiện lọc (UnderwriterMaker/UnderwriterChecker)<br>Báo cáo SLA - TAT (BC5) — điều kiện lọc khi SUM TAT_CALENDAR_HOUR/TAT_WORKING_HOUR/TAT_CPC_HOUR theo từng bước<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp | WORKSTEP (Bước hồ sơ) |
+| 10 | ENTRYDATE | TIMESTAMP | Y |  |  | Thời điểm hồ sơ vào bước xử lý — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.ENTRYDATE (nguồn gốc xa: ENTRY_EXIT.ENTRYDATE). Bắt buộc nằm trong khóa nghiệp vụ vì 1 hồ sơ có thể quay lại cùng 1 bước nhiều lần | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp (ENTRYDATE của dòng event đã lọc) | ENTRYDATE (Thời gian lên bước thẩm định) |
+| 11 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.EXITDATE (nguồn gốc xa: ENTRY_EXIT.EXITDATE). NULL nghĩa là hồ sơ đang nằm tại bước này | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp, đồng thời là nguồn tính PROCESSED_DATE (BC8) | EXITDATE (Thời gian tạo quyết định / kết thúc bước) |
+| 12 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản người xử lý hồ sơ — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.USERNAME (nguồn gốc xa: ENTRY_EXIT.USERNAME). Giữ nguyên giá trị gốc để báo cáo hiển thị thẳng, không phải join qua DIM_LOS_USER | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp theo điều kiện WORKSTEP_CODE (BI_APPROVER/BI_COMMITTEE)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp theo điều kiện WORKSTEP_CODE (UND_MAKER)<br>Báo cáo KPI (BC9) — đếm DISTINCT theo danh sách WORKSTEP cho NHAN_SU | USERNAME (User xử lý — BI_APPROVER/BI_COMMITTEE/UND_MAKER tùy báo cáo) |
+| 13 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.REMARKS (nguồn gốc xa: ENTRY_EXIT.REMARKS) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REMARKS (Ghi chú) |
+| 14 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.TAT_SOURCE_SEC (nguồn gốc xa: ENTRY_EXIT.TAT). Giữ lại để đối soát với 3 cột TAT tính lại bên dưới. Đơn vị "giây" kế thừa từ extract gốc, chưa chốt chính thức | Nguồn cho chỉ tiêu/trường TAT_CALENDAR_HOUR (điều kiện tính khi có giá trị, thay công thức lệch ngày) | — |
+| 15 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.TAT_CALENDAR_HOUR: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ. NULL nếu chưa có EXITDATE | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước (STEP01_BRANCH_CL_TAT, STEP02_DDE_CL_TAT...)<br>Báo cáo KPI (BC9) — SUM theo nhóm bước cho TAT_CLOS | TAT_CALENDAR_HOUR (TAT theo giờ lịch tự nhiên) |
+| 16 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.TAT_WORKING_HOUR: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật; giờ tính 8-12 và 13-17. NULL nếu chưa có EXITDATE | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước (STEP01_BRANCH_WK_TAT, STEP02_DDE_WK_TAT...)<br>Báo cáo KPI (BC9) — SUM theo nhóm bước cho TAT_CLOS | TAT_WORKING_HOUR (TAT theo giờ làm việc) |
+| 17 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.TAT_CPC_HOUR: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30. NULL nếu chưa có EXITDATE | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước, so sánh với REF_SLA_* để ra kết quả đạt/không đạt SLA | TAT_CPC_HOUR (TAT theo giờ cam kết SLA) |
+| 18 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.EVENT_SEQ_ASC: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN); chiều giảm dần (mới→cũ) khi cần có thể tự suy bằng COUNT(*) OVER (PARTITION BY WI_NAME) - EVENT_SEQ_ASC + 1, không cần cột riêng | Nguồn cho chỉ tiêu/trường FIRST_WORKSTEP_RETURN (xác định sự kiện trả về đầu tiên, BC7, trên FCT_CLOS_EXCEPTION) | — |
+| 19 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH (KHÔNG copy/JOIN từ FCT_CLOS_APPLICATION.PROCESSED_DATE), bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.PROCESSED_DATE: MAX(EXITDATE) window theo WI_NAME WHERE WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') AND DECISION_CODE IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker') — DECISION_CODE ở đây tra qua JOIN WORKSTEP_DECISION_SK sang DIM_CLOS_WORKSTEP_DECISION; nếu rỗng → EXITDATE tại WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Cancel' (cùng cách tra); nếu vẫn rỗng → ngày dữ liệu hệ thống (DAYID) | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REPORT_DATE (Ngày báo cáo) |
+| 20 | WF_PROCESSNAME | VARCHAR2 | N | 50 |  | Tên hệ thống workflow của instance đang đứng, đã lọc tài khoản test — cột thô, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WF_PROCESSNAME (thay cho WORKSTEP_FLAG đã tính sẵn) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 24, cùng bảng) | — |
+| 21 | WF_ACTIVITYNAME | VARCHAR2 | N | 200 |  | Bước hiện tại của instance workflow, đã lọc tài khoản test — cột thô, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WF_ACTIVITYNAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 24, cùng bảng) | — |
+| 22 | WF_CREATEDBY | VARCHAR2 | N | 50 |  | Mã người/hệ thống tạo bản ghi workflow — cột thô, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WF_CREATEDBY.: SRS áp dụng điều kiện lọc `CREATEDBY NOT IN (5 tài khoản hệ thống/test)` đồng nhất cho CẢ CLOS VÀ RLOS ngay tại điều kiện JOIN WFINSTRUMENTTABLE — trước đây điều kiện này lọc sẵn trong JOIN tại SB_DWH, nay bê nguyên giá trị thô để áp điều kiện lọc ngay trong WORKSTEP_FLAG (cột 24) tại chính PDTD_DTM, đồng bộ đúng cơ chế đã áp dụng cho nhánh RLOS (mục 16) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (điều kiện lọc, cột 24, cùng bảng) | — |
+| 23 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, tạm thời chỉ CLOS — xem ghi chú kiến trúc tại mục 8.1): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này), ngược lại 'From Second Approval'. Input EXITDATE/WI_NAME lấy từ chính bảng này (đã bê 1:1 từ SB_DWH, cột 8/11). Dùng cho BC5.APPROVAL_FLAG — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc chỉ tính sự kiện 'First Approval' khi tính TAT_APPLICATION_HOUR | APPROVAL_FLAG (Phê duyệt lần đầu/từ lần thứ 2) |
+| 24 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4) — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH — xem ghi chú kiến trúc tại mục 8.1): 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE (tra qua WORKSTEP_DECISION_SK → DIM_CLOS_WORKSTEP_DECISION, cột 4) của TOÀN BỘ lịch sử WI_NAME (EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này) kết hợp WF_PROCESSNAME='CLOS'/WF_ACTIVITYNAME (cột 20-21, đã bê 1:1 từ SB_DWH)| Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
+
 
 ## 9. FCT_CLOS_LOAN_DISBURSEMENT
 
@@ -502,6 +523,8 @@ flowchart LR
   DAILY`, không có bảng vật lý) — `LOAN` = hợp đồng vay, `MD` = hợp đồng
   bảo lãnh. Vùng chìa `STG_FCT_LOAN` chỉ giữ dữ liệu của đúng ngày hiện
   tại nên ETL phải chạy đúng ngày, không đọc bù được nếu trễ.
+- **Khóa nghiệp vụ (BK):** `CONTRACT` (cột đơn, không cần hash — bảng
+  hoàn toàn mới ở PDTD_DTM, không bê 1:1 từ SB_DWH)
 - **Khóa chính của bảng (PK):** DAYID, CONTRACT.
 - **Độ chi tiết (grain):** 1 dòng = 1 HỢP ĐỒNG khoản vay T24 x 1 ngày dữ
   liệu (ảnh chụp theo DAYID, không phải SCD2) — khác hẳn grain hồ sơ của
@@ -528,7 +551,7 @@ flowchart LR
     end
     SA -->|1:1 SEAB_LOS_ID, LIMIT_REF + PHÁI SINH DISBURSEMENT_AMT/CUR_BALANCE + self-join PD_CONTRACT sinh NO_DAYS_OVERDUE/CUR_BUCKET| E
     CUST -.->|CUSTOMER_SK, tra theo CUSTOMER_SK có sẵn trên STG_FCT_LOAN| E
-    COMP -.->|COMPANY_SK, tra theo CO_CODE| E
+    COMP -.->|T24_COMPANY_SK, tra theo CO_CODE| E
     LOAN -.->|CONTRACT_SK, tra theo CONTRACT_SK có sẵn trên STG_FCT_LOAN| E
     PROD -.->|SEAB_PRODUCTS_DE_SK, tra theo SEAB_PRODUCTS_DE_SK có sẵn trên STG_FCT_LOAN — SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả| E
     CAPP -.->|APPLICATION_SK theo SEAB_LOS_ID — PHÁI SINH CUST_GROUP/LOANCASEID/APPROVAL_WINAME_LOS/APPROVAL_DATE cho BC11| E
@@ -538,196 +561,220 @@ flowchart LR
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — nguồn STG_FCT_LOAN.DAYID, TRUNC về 00:00:00. Là ngày ảnh chụp số liệu, KHÔNG phải ngày nghiệp vụ | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — một phần khóa chính | — |
-| 2 | CONTRACT | VARCHAR2 | Y | 100 | PK | Mã hợp đồng khoản vay — nguồn STG_FCT_LOAN.CONTRACT (1:1 từ SB_DWH.FCT_LOAN.CONTRACT) | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp, khóa chính | CONTRACT (Mã hợp đồng) |
-| 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'T24' — bảng nguồn T24 core banking (STG_FCT_LOAN), không thuộc STG_LOS | Thiết kế dư thừa | — |
-| 4 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER — nguồn STG_FCT_LOAN.CUSTOMER_SK (surrogate có sẵn, tra thẳng DIM_T24_CUSTOMER.DIMENSION_KEY, không tự lookup qua LEGAL_ID). Mặc định -1 nếu không khớp | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_T24_CUSTOMER để lấy CUSTOMER_ID/SHORT_NAME | — |
-| 5 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_COMPANY — PHÁI SINH: lookup theo STG_FCT_LOAN.CO_CODE = DIM_T24_COMPANY.COMPANY_CODE (chỉ bản ghi hiện hành, COMPANY_EXP_DATE IS NULL phía nguồn T24). Mặc định -1 | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_T24_COMPANY để lấy BRANCH_NAME/COMPANY_NAME | — |
-| 6 | CONTRACT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_LOAN — nguồn STG_FCT_LOAN.CONTRACT_SK (surrogate có sẵn, tra thẳng DIM_T24_LOAN.DIMENSION_KEY). Mặc định -1 | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_T24_LOAN để lấy VALUE_DATE/MATURITY_DATE/REC_STATUS/CONTRACT_REF/REF_VALUE_DATE | — |
-| 7 | SEAB_PRODUCTS_DE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_PRODUCTS_DE — nguồn STG_FCT_LOAN.SEAB_PRODUCTS_DE_SK (surrogate có sẵn, tra thẳng DIMENSION_KEY; SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả). Mặc định -1 | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_T24_SEAB_PRODUCTS_DE để lấy PRODUCT_T24 | — |
-| 8 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION, tra theo SEAB_LOS_ID. KHÔNG để NULL — không tra được thì gán -1 (Unknown), tránh phép JOIN của OAS rớt dòng | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_CLOS_APPLICATION, nguồn cho CUST_GROUP/LOANCASEID/APPROVAL_WINAME_LOS/APPROVAL_DATE (cột 16-19, cùng bảng) | — |
-| 9 | SEAB_LOS_ID | VARCHAR2 | N | 100 |  | Mã hồ sơ LOS do T24 lưu, gắn với hợp đồng — nguồn STG_FCT_LOAN.SEAB_LOS_ID | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | SEAB_LOS_ID (Mã hồ sơ) |
-| 10 | ZONE | VARCHAR2 | N | 50 |  | Tên vùng của đơn vị kinh doanh — PHÁI SINH: LEFT JOIN TMP_REF_COMPANY_REGION_KHDN theo STG_FCT_LOAN.CO_CODE = COMPANY_CODE. Lưu trực tiếp trên fact (không tách FK riêng) vì nguồn là bảng REF_ tĩnh, không phải DIM SCD2 | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | ZONE (Khu vực) |
-| 11 | DISBURSEMENT_AMT | NUMBER | N | 20,2 |  | Số tiền giải ngân — PHÁI SINH: ABS(STG_FCT_LOAN.FIRST_DISBURSEMENT_AMT) | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | DISBURSEMENT_AMT_T24 (Số tiền giải ngân) |
-| 12 | CUR_BALANCE | NUMBER | N | 20,2 |  | Dư nợ hiện tại — PHÁI SINH: (ABS(NVL(BALANCE,0)) + ABS(NVL(PD_BALANCE,0))) * REVAL_RATE trên STG_FCT_LOAN | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | CUR_BALANCE (Dư nợ hiện tại) |
-| 13 | NO_DAYS_OVERDUE | NUMBER | N | 6 |  | Số ngày quá hạn — PHÁI SINH: self-join STG_FCT_LOAN (b) ON a.PD_CONTRACT = b.CONTRACT, lấy b.NO_DAYS_OVERDUE | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | NO_DAYS_OVERDUE (Số ngày quá hạn) |
-| 14 | CUR_BUCKET | NUMBER | N | 2 |  | Nhóm nợ — PHÁI SINH: CASE WHEN NO_DAYS_OVERDUE > 360 THEN 5 WHEN > 180 THEN 4 WHEN > 90 THEN 3 WHEN >= 10 THEN 2 ELSE 1 END, cùng self-join PD_CONTRACT như NO_DAYS_OVERDUE | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | CUR_BUCKET (Nhóm nợ) |
-| 15 | LIMIT_REFERENCE | VARCHAR2 | N | 100 |  | Mã hạn mức — nguồn STG_FCT_LOAN.LIMIT_REF. Giữ trên fact (không chuyển DIM_T24_LOAN) vì nguồn là chính STG_FCT_LOAN, không phải STG_DIM_LOAN | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | LIMIT_REFERENCE (Mã Limit) |
-| 16 | CUST_GROUP | VARCHAR2 | N | 100 |  | Nhóm khách hàng — PHÁI SINH: JOIN APPLICATION_SK sang DIM_CLOS_APPLICATION.CUST_GROUP | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | CUST_GROUP (Nhóm khách hàng) |
-| 17 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ cha — PHÁI SINH: JOIN APPLICATION_SK sang DIM_CLOS_APPLICATION.LOANCASEID, CHỈ giữ giá trị khi hồ sơ có CHANGE_REQUEST='New' (đúng công thức SRS BC11), còn lại gán NULL dù DIM có giá trị | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | LOANCASEID (Mã LOANCASEID) |
-| 18 | APPROVAL_WINAME_LOS | VARCHAR2 | N | 100 |  | Mã hồ sơ cha đã được phê duyệt — PHÁI SINH: JOIN APPLICATION_SK sang DIM_CLOS_APPLICATION.FIRST_APPROVED_WI_NAME (= MIN(WI_NAME) group theo LOANCASEID) | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | APPROVAL_WINAME_LOS (Mã hồ sơ phê duyệt) |
-| 19 | APPROVAL_DATE | DATE | N |  |  | Ngày phê duyệt — PHÁI SINH: JOIN APPLICATION_SK sang DIM_CLOS_APPLICATION.FIRST_APPROVED_DATE (= MAX(EXITDATE) với điều kiện USERNAME IS NOT NULL AND WORKSTEP IN ('CreditApproval','CreditCommittee') AND DECISION IN ('Submit','Send To HOSupport','Send To PostSanction')) | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | APPROVAL_DATE (Ngày phê duyệt) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — nguồn STG_DTM.STG_FCT_LOAN.DAYID, TRUNC về 00:00:00. Là ngày ảnh chụp số liệu, KHÔNG phải ngày nghiệp vụ. BẢNG HOÀN TOÀN MỚI TẠI PDTD_DTM, không có ở SB_DWH (nguồn STG_DTM/DIM_T24_*, không phải SB_DWH) | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — một phần khóa chính | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'T24' — bảng nguồn T24 core banking (STG_DTM.STG_FCT_LOAN), không thuộc STG_LOS — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Thiết kế dư thừa | — |
+| 3 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER — nguồn STG_DTM.STG_FCT_LOAN.CUSTOMER_SK (surrogate có sẵn, tra thẳng DIM_T24_CUSTOMER.DIMENSION_KEY, không tự lookup qua LEGAL_ID). Mặc định -1 nếu không khớp — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_T24_CUSTOMER để lấy CUSTOMER_ID/SHORT_NAME | — |
+| 4 | T24_COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_COMPANY — PHÁI SINH TẠI PDTD_DTM: lookup theo STG_DTM.STG_FCT_LOAN.CO_CODE = DIM_T24_COMPANY.COMPANY_CODE (chỉ bản ghi hiện hành, COMPANY_EXP_DATE IS NULL phía nguồn T24). Mặc định -1 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_T24_COMPANY để lấy BRANCH_NAME/COMPANY_NAME | — |
+| 5 | CONTRACT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_LOAN — nguồn STG_DTM.STG_FCT_LOAN.CONTRACT_SK (surrogate có sẵn, tra thẳng DIM_T24_LOAN.DIMENSION_KEY). Mặc định -1 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_T24_LOAN để lấy VALUE_DATE/MATURITY_DATE/REC_STATUS/CONTRACT_REF/REF_VALUE_DATE | — |
+| 6 | SEAB_PRODUCTS_DE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_PRODUCTS_DE — nguồn STG_DTM.STG_FCT_LOAN.SEAB_PRODUCTS_DE_SK (surrogate có sẵn, tra thẳng DIMENSION_KEY; SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả). Mặc định -1 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_T24_SEAB_PRODUCTS_DE để lấy PRODUCT_T24 | — |
+| 7 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION, tra theo SEAB_LOS_ID (qua STG_DTM.STG_FCT_LOAN.SEAB_LOS_ID). KHÔNG để NULL — không tra được thì gán -1 (Unknown), tránh phép JOIN của OAS rớt dòng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — khóa JOIN sang DIM_CLOS_APPLICATION, nguồn cho CUST_GROUP/LOANCASEID/APPROVAL_WINAME_LOS/APPROVAL_DATE (cột 16-19, cùng bảng) | — |
+| 8 | CONTRACT | VARCHAR2 | Y | 100 | PK | Mã hợp đồng khoản vay — nguồn STG_DTM.STG_FCT_LOAN.CONTRACT (nguồn gốc xa: SB_DWH.FCT_LOAN.CONTRACT, 1:1). BẢNG HOÀN TOÀN MỚI TẠI PDTD_DTM — không có SB_DWH.FCT_CLOS_LOAN_DISBURSEMENT tương ứng, chỉ nguồn gốc xa của riêng cột CONTRACT đi qua SB_DWH.FCT_LOAN (bảng T24 chung, không tách CLOS/RLOS) | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp, khóa chính | CONTRACT (Mã hợp đồng) |
+| 9 | SEAB_LOS_ID | VARCHAR2 | N | 100 |  | Mã hồ sơ LOS do T24 lưu, gắn với hợp đồng — nguồn STG_DTM.STG_FCT_LOAN.SEAB_LOS_ID — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | SEAB_LOS_ID (Mã hồ sơ) |
+| 10 | ZONE | VARCHAR2 | N | 50 |  | Tên vùng của đơn vị kinh doanh — PHÁI SINH TẠI PDTD_DTM: LEFT JOIN TMP_REF_COMPANY_REGION_KHDN theo STG_DTM.STG_FCT_LOAN.CO_CODE = COMPANY_CODE. Lưu trực tiếp trên fact (không tách FK riêng) vì nguồn là bảng REF_ tĩnh, không phải DIM SCD2 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | ZONE (Khu vực) |
+| 11 | DISBURSEMENT_AMT | NUMBER | N | 20,2 |  | Số tiền giải ngân — PHÁI SINH TẠI PDTD_DTM: ABS(STG_DTM.STG_FCT_LOAN.FIRST_DISBURSEMENT_AMT) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | DISBURSEMENT_AMT_T24 (Số tiền giải ngân) |
+| 12 | CUR_BALANCE | NUMBER | N | 20,2 |  | Dư nợ hiện tại — PHÁI SINH TẠI PDTD_DTM: (ABS(NVL(BALANCE,0)) + ABS(NVL(PD_BALANCE,0))) * REVAL_RATE trên STG_DTM.STG_FCT_LOAN — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | CUR_BALANCE (Dư nợ hiện tại) |
+| 13 | NO_DAYS_OVERDUE | NUMBER | N | 6 |  | Số ngày quá hạn — PHÁI SINH TẠI PDTD_DTM: self-join STG_DTM.STG_FCT_LOAN (b) ON a.PD_CONTRACT = b.CONTRACT, lấy b.NO_DAYS_OVERDUE — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | NO_DAYS_OVERDUE (Số ngày quá hạn) |
+| 14 | CUR_BUCKET | NUMBER | N | 2 |  | Nhóm nợ — PHÁI SINH TẠI PDTD_DTM: CASE WHEN NO_DAYS_OVERDUE (cột 13, cùng bảng) > 360 THEN 5 WHEN > 180 THEN 4 WHEN > 90 THEN 3 WHEN >= 10 THEN 2 ELSE 1 END, cùng self-join PD_CONTRACT như NO_DAYS_OVERDUE — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | CUR_BUCKET (Nhóm nợ) |
+| 15 | LIMIT_REFERENCE | VARCHAR2 | N | 100 |  | Mã hạn mức — nguồn STG_DTM.STG_FCT_LOAN.LIMIT_REF. Giữ trên fact (không chuyển DIM_T24_LOAN) vì nguồn là chính STG_FCT_LOAN, không phải STG_DIM_LOAN — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | LIMIT_REFERENCE (Mã Limit) |
+| 16 | CUST_GROUP | VARCHAR2 | N | 100 |  | Nhóm khách hàng — PHÁI SINH TẠI PDTD_DTM: JOIN APPLICATION_SK (cột 7, cùng bảng) sang DIM_CLOS_APPLICATION.CUST_GROUP (PDTD_DTM).| Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | CUST_GROUP (Nhóm khách hàng) |
+| 17 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ cha — PHÁI SINH TẠI PDTD_DTM: JOIN APPLICATION_SK (cột 7) sang DIM_CLOS_APPLICATION.LOANCASEID (PDTD_DTM), CHỈ giữ giá trị khi hồ sơ có CHANGE_REQUEST='New' (đúng công thức SRS BC11), còn lại gán NULL dù DIM có giá trị — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | LOANCASEID (Mã LOANCASEID) |
+| 18 | APPROVAL_WINAME_LOS | VARCHAR2 | N | 100 |  | Mã hồ sơ cha đã được phê duyệt — PHÁI SINH TẠI PDTD_DTM: JOIN APPLICATION_SK (cột 7) sang DIM_CLOS_APPLICATION.FIRST_APPROVED_WI_NAME (PDTD_DTM, = MIN(WI_NAME) group theo LOANCASEID) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | APPROVAL_WINAME_LOS (Mã hồ sơ phê duyệt) |
+| 19 | APPROVAL_DATE | DATE | N |  |  | Ngày phê duyệt — PHÁI SINH TẠI PDTD_DTM: JOIN APPLICATION_SK (cột 7) sang DIM_CLOS_APPLICATION.FIRST_APPROVED_DATE (PDTD_DTM, = MAX(EXITDATE) với điều kiện USERNAME IS NOT NULL AND WORKSTEP IN ('CreditApproval','CreditCommittee') AND DECISION IN ('Submit','Send To HOSupport','Send To PostSanction')) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — hiển thị trực tiếp | APPROVAL_DATE (Ngày phê duyệt) |
 
-## 10. FCT_RLOS_APPLICATION_DAILY
+## 10. FCT_CLOS_LEGAL_PARTY
 
 ### 10.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** bảng FACT xương sống của hồ sơ tín dụng RLOS (bán
-  lẻ/cá nhân) tại PDTD_DTM — bê nguyên 1:1 cấu trúc từ SB_DWH (ảnh trạng
-  thái cuối ngày, chỉ tiêu lũy kế, mốc thời gian xử lý, thông tin phê
-  duyệt, nguồn thu nhập...), bổ sung các khóa kỹ thuật để báo cáo join
-  sang các chiều T24 và tên bước chuẩn hóa dùng chung 2 hệ CLOS/RLOS.
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME.
-- **Độ chi tiết (grain):** 1 dòng = 1 hồ sơ x 1 ngày dữ liệu.
+- **Ý nghĩa bảng:** bảng FACT lưu người/đối tượng liên quan vai trò pháp
+  lý của hồ sơ CLOS (bao gồm cả giấy tờ định danh) — bê nguyên 1:1 từ
+  `FCT_CLOS_LEGAL_PARTY`, bổ sung
+  `LEGAL_TYPE` (LEFT JOIN `REF_CLOS_LEGAL` theo `OBJ_TYPE`, chuẩn hóa vai
+  trò pháp lý tiếng Việt sang mã tiếng Anh). Không SCD2 (nguồn không có
+  CDC key ổn định, xem SB_DWH mục 6).
+  — không cần bảng trung gian riêng vì `CUSTOMER_SK`/`APPLICATION_SK` đã
+  có sẵn ngay trên bảng này.
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_NUMBER` — hash vào
+  cột `LEGAL_PARTY_BK`, bê 1:1 từ SB_DWH
+- **Khóa chính của bảng (PK):** DAYID, LEGAL_PARTY_BK — bê 1:1 từ SB_DWH.
+- **Độ chi tiết (grain):** 1 dòng = 1 người × 1 vai trò × 1 hồ sơ × 1
+  ngày dữ liệu (N dòng/hồ sơ/ngày không giới hạn — 1 người có thể giữ
+  nhiều vai trò cùng lúc), bê 1:1 theo cùng DAYID từ SB_DWH.
 - **Phục vụ báo cáo:**
-  - Báo cáo RLOS APPLICATION (BC1)
-  - Báo cáo Thông tin phê duyệt (BC3) — qua FCT_RLOS_WORKSTEP_EVENT (CREDIT_LIMIT/CURRENCY dư thừa có chủ đích trên DIM_RLOS_APPLICATION)
-  - Báo cáo Tuần Chuyên viên Thẩm định (BC4)
-  - Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT qua PRODUCT_SK
-  - Báo cáo NGOẠI LỆ (BC6)
-  - Báo cáo RETURN (BC8) — RETURN_CNT_DATAENTRY/UNDERWRITING/APPROVAL
-  - Báo cáo KPI (BC9) — AGG_LOS_KPI_APPLICATION.INCOM_3/BUSINESS_INCOM
-  - Báo cáo Giải ngân _ Quá hạn KHCN (BC10)
+  - Báo cáo CLOS APPLICATION (BC2) — trực tiếp (`LEGAL_TYPE` lọc
+    `CUSTOMER`, report-time tra `ID_NUMBER` khi cần đối chiếu). KHÔNG
+    còn là nguồn ETL cho `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE`
+    trên `FCT_CLOS_APPLICATION` (mục 4) — 2 cột đó ETL từ bản
+    **SB_DWH** của bảng này, không phải bản PDTD_DTM này.
 
 ### 10.2 Sơ đồ lineage
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        C["FCT_RLOS_APPLICATION_DAILY"]
-    end
-    subgraph REF_DTM["Bảng REF tại PDTD_DTM"]
-        R{{"RLOS_REF_SLA_TDKHCN"}}
-        S{{"REF_SLA_NLTT"}}
+        C["FCT_CLOS_LEGAL_PARTY"]
     end
     subgraph PDTD_DTM
-        D["FCT_RLOS_APPLICATION_DAILY"]
+        R{{"REF_CLOS_LEGAL"}}
+        D["FCT_CLOS_LEGAL_PARTY"]
     end
-    C -->|bê 1:1, thêm khóa T24_CUSTOMER_SK| D
-    R -->|LEFT JOIN SLA cam kết theo APPROVAL_GROUP/PRODUCT — tính sẵn tại DIM_RLOS_APPLICATION| D
-    S -.->|"LEFT JOIN SLA Nhập liệu tập trung, phục vụ BC9 — report-time qua PRODUCT_SK trên chính bảng này, KHÔNG denormalize (review 2026-09-21)"| D
-    D -.->|"T24_CARD_SK/T24_SEAB_MAIN_CARD_SK (review 2026-09-21, đóng gap BC1.K_TYPE/HOME_ADDRESS) — lookup theo RESULT_MAIN_CARD_ID có sẵn trên DIM_RLOS_APPLICATION (2.3.1.1) sang STG_DTM.STG_DIM_CARD/STG_DIM_SEAB_MAIN_CARD, xem ghi chú chi tiết bên dưới"| D
+    C -->|"bê 1:1 (DAYID+LEGAL_PARTY_BK+CUSTOMER_SK+APPLICATION_SK+...)"| D
+    R -->|LEFT JOIN theo OBJ_TYPE — sinh LEGAL_TYPE| D
 ```
 
 ### 10.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | — (cột kỹ thuật) | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS | Báo cáo RLOS APPLICATION (BC1) — khóa chính<br>Báo cáo KPI (BC9) — khóa nối AGG_LOS_KPI_APPLICATION | WINAME (Mã hồ sơ) |
-| 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS | Báo cáo KPI (BC9) — hiển thị trực tiếp | SYSTEMNAME (Hệ thống CLOS/RLOS) |
-| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION. Mặc định -1 nếu không khớp | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
-| 5 | CURRENT_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP, bước hồ sơ đang đứng tại ngày DAYID. Mặc định -1 | Thiết kế dư thừa | — |
-| 6 | LAST_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP của sự kiện hoàn tất gần nhất. Mặc định -1 | Báo cáo RLOS APPLICATION (BC1) — nguồn cho LAST_WORKSTEP (LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS ở PDTD_DTM) | Nguồn cho chỉ tiêu/trường LAST_WORKSTEP (BC1) |
-| 7 | LAST_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_DECISION của sự kiện hoàn tất gần nhất. Mặc định -1 | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_DECISION | LAST_DECISION (Quyết định tại bước cuối) |
-| 8 | LAST_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER của người xử lý sự kiện hoàn tất gần nhất. Mặc định -1 | Thiết kế dư thừa | — |
-| 9 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_PRODUCT — lookup theo PRODUCT_LINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_PRODUCT<br>Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT theo PRODUCT_LINE_NAME<br>Báo cáo KPI (BC9) — khóa report-time tra REF_SLA_NLTT phục vụ POINT | PRODUCT_LINE (Dòng sản phẩm); nguồn cho chỉ tiêu/trường SLA_DE (Cam kết SLA Chuyên viên nhập liệu, BC5) |
-| 10 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_ORG_UNIT — lookup theo COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_LOS_ORG_UNIT lấy BRANCH_CODE, và tiếp LEFT JOIN TMP_REF_COMPANY_REGION_KHCN lấy ZONE tại tầng truy vấn báo cáo | BRANCH_CODE (Mã Chi nhánh) |
-| 11 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CHANGE_TYPE. Chỉ có giá trị với hồ sơ thay đổi điều kiện phê duyệt, còn lại Unknown -1. Nguồn: NG_SB_RLOS_EXTTABLE.CHANGE_TYPE | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_CHANGE_TYPE | CHANGE_TYPE_DETAIL (Chi tiết loại thay đổi điều kiện) |
-| 12 | CARD_PROMOTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CARD_PROMOTION. Lookup NG_SB_RLOS_CBS.PROMOTION_ID; hồ sơ không phải thẻ dùng -1 | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_CARD_PROMOTION | PROMOTION_ID (Ưu đãi phí) |
-| 13 | RI_USER | VARCHAR2 | N | 100 |  | User khởi tạo hồ sơ (bước RequestInitiate) | Thiết kế dư thừa | — |
-| 14 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | BRANCH_USER (User Chi nhánh) |
-| 15 | DDE_USER | VARCHAR2 | N | 100 |  | User xử lý bước DetailDataEntry, HOÀN TẤT gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | DDE_USER (User Chuyên viên nhập liệu) |
-| 16 | QC_USER | VARCHAR2 | N | 100 |  | User xử lý bước DataInputerChecker, HOÀN TẤT gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | QUALITY_CHECKER (User Kiểm soát nhập liệu) |
-| 17 | UND_MAKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterMaker, HOÀN TẤT gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | UND_MAKER (User Chuyên viên thẩm định) |
-| 18 | UND_CHECKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterChecker, HOÀN TẤT gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | UND_CHECKER (User Kiểm soát thẩm định) |
-| 19 | PHV_USER | VARCHAR2 | N | 100 |  | User xử lý bước PhoneVerification, HOÀN TẤT gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | PHV_USER (User Chuyên viên Thẩm định điện thoại) |
-| 20 | FA_USER | VARCHAR2 | N | 100 |  | User Chuyên viên Thực địa | Thiết kế dư thừa | — |
-| 21 | APPROVER_USER | VARCHAR2 | N | 100 |  | User xử lý bước CreditApproval, HOÀN TẤT gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | BI_APPROVER (User Chuyên gia phê duyệt) |
-| 22 | COMMITTEE_USER | VARCHAR2 | N | 100 |  | User Hội đồng tín dụng | Thiết kế dư thừa | — |
-| 23 | HOS_USER | VARCHAR2 | N | 100 |  | User Hỗ trợ phê duyệt | Thiết kế dư thừa | — |
-| 24 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — dùng xếp hồ sơ vào đúng DAYID khi tổng hợp AGG_LOS_KPI_YTD_DAILY | PROCESSED_DATE (Ngày dữ liệu báo cáo) |
-| 25 | LAST_UWM_ENTRYDATE | TIMESTAMP | N |  |  | MAX(ENTRYDATE) tại UnderwriterMaker <= DAYID — mốc mở chu kỳ thẩm định hiện hành | Nguồn cho chỉ tiêu/trường PROCESSED_DATE_UWM (cột 26, cùng bảng) | — |
-| 26 | PROCESSED_DATE_UWM | DATE | N |  |  | Ngày chốt chu kỳ thẩm định hiện hành, tính tương đối theo LAST_UWM_ENTRYDATE | Thiết kế dư thừa | — |
-| 27 | CREATION_DATE | DATE | N |  |  | TRUNC(MIN(ENTRYDATE)) theo WI_NAME | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | CREATION_DATE (Ngày khởi tạo hồ sơ) |
-| 28 | FIRST_APPROVAL_DATE | DATE | N |  |  | MIN(EXITDATE) tại bước phê duyệt hợp lệ | Thiết kế dư thừa | — |
-| 29 | LAST_APPROVAL_DATE | DATE | N |  |  | MAX(EXITDATE) tại bước phê duyệt (nhóm quyết định đã định nghĩa) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_APPROVAL_DATE (Thời gian phê duyệt cuối cùng) |
-| 30 | MIN_UWM | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại UnderwriterMaker | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | MIN_UWM (Thời gian hồ sơ lên CV thẩm định) |
-| 31 | MIN_APP | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại CreditApproval/CreditCommittee | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | MIN_APP (Thời gian hồ sơ lên CG phê duyệt) |
-| 32 | AUTO_CANCEL_DATE | DATE | N |  |  | Ngày hồ sơ bị hệ thống tự hủy | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | AUTO_CAN_DATE (Thời gian cancel tự động) |
-| 33 | CANCEL_USER_DATE | DATE | N |  |  | EXITDATE tại bản ghi DECISION='Cancel' và USERNAME khác NULL | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | CAN_USER_DATE (Thời gian cancel do NSD) |
-| 34 | BI_CAN_DATE | DATE | N |  |  | ENTRYDATE tại bước CancelRevoke | Thiết kế dư thừa | — |
-| 35 | LAST_ENTRYDATE | TIMESTAMP | N |  |  | ENTRYDATE của sự kiện hoàn tất gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_ENTRYDATE (Thời gian vào bước cuối) |
-| 36 | LAST_EXITDATE | TIMESTAMP | N |  |  | EXITDATE của cùng sự kiện hoàn tất gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_EXITDATE (Thời gian kết thúc bước cuối) |
-| 37 | BI_APPSTATUS | VARCHAR2 | N | 50 |  | Trạng thái hồ sơ chuẩn hóa (Approved/Rejected/Cancelled/Processing) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — hiển thị trực tiếp | BI_APPSTATUS (Trạng thái hồ sơ) |
-| 38 | HAS_ACTION_IN_DAY | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có phát sinh xử lý trong ngày DAYID | Thiết kế dư thừa | — |
-| 39 | LAST_ACTION_DATE | DATE | Y |  |  | Ngày business action gần nhất tính đến cuối DAYID | Thiết kế dư thừa | — |
-| 40 | INACTIVE_DAY_CNT | NUMBER | Y | 5 |  | TRUNC(DAYID) - TRUNC(LAST_ACTION_DATE) | Thiết kế dư thừa | — |
-| 41 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước (LAG theo ENTRYDATE) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | PRE_WORKSTEP (Bước hồ sơ trước đó) |
-| 42 | FLAG_AUTO_CANCEL | VARCHAR2 | N | 10 |  | 'YES' nếu AUTO_CANCEL_DATE khác NULL | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | FLAG_AUTO_CAN (Hồ sơ cancel tự động — YES/NO) |
-| 43 | LAST_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của sự kiện hoàn tất gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_REMARKS (Ghi chú ý kiến bước cuối) |
-| 44 | LAST_REMARK_DDE | VARCHAR2 | N | 4000 |  | Ghi chú tại bước DetailDataEntry | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_REMARK_DDE (Ghi chú tại bước nhập liệu DDE) |
-| 45 | LAST_CAN_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại lần hủy hồ sơ | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_CAN_REMARKS (Ghi chú tại bước Cancel) |
-| 46 | HAS_REACHED_DDE | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước DetailDataEntry hay chưa | Thiết kế dư thừa | — |
-| 47 | HAS_REACHED_QC | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước DataInputerChecker hay chưa | Thiết kế dư thừa | — |
-| 48 | HAS_REACHED_UWM | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước UnderwriterMaker hay chưa | Thiết kế dư thừa | — |
-| 49 | HAS_REACHED_UWC | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước UnderwriterChecker hay chưa | Thiết kế dư thừa | — |
-| 50 | HAS_REACHED_APPROVAL | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước CreditApproval/CreditCommittee hay chưa | Thiết kế dư thừa | — |
-| 51 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LOAN_AMOUNT (Số tiền phê duyệt) |
-| 52 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_TERM | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LOAN_TERM (Thời hạn phê duyệt, tháng) |
-| 53 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%) — ép kiểu từ NG_SB_RLOS_CREDIT_PROPOSAL.CURRENT_RATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | INTEREST_RATE (Lãi suất phê duyệt, %/năm) |
-| 54 | LOAN_TO_VALUE | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị TSBĐ — nguồn NG_SB_RLOS_CREDIT_PROPOSAL(_APP).LOAN_TO_VALUE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LOAN_TO_VALUE (Tỷ lệ LTV, %) |
-| 55 | LOAN_OBJECTIVE | VARCHAR2 | N | 200 |  | Mục đích vay — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_OBJECTIVE (hồ sơ thẻ tín dụng: mang nghĩa loại thẻ) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | Loan Objective (Mục đích cho vay) |
-| 56 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_CURRENCY | Thiết kế dư thừa | — |
-| 57 | TOTAL_INCOME | NUMBER | N | 20,2 |  | Tổng thu nhập khách hàng — nguồn NG_SB_RLOS_REPAY_CALC.TOT_INC_CALC | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | TOTAL_INCOME (Tổng thu nhập phê duyệt) |
-| 58 | RETURN_CNT_DATAENTRY | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu nhập liệu | Báo cáo RETURN (BC8) — hiển thị trực tiếp | SL_RETURN_NHAPLIEU (Số lần return tại Nhập liệu) |
-| 59 | RETURN_CNT_UNDERWRITING | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu thẩm định | Báo cáo RETURN (BC8) — hiển thị trực tiếp | SL_RETURN_THAMDINH (Số lần return tại Thẩm định) |
-| 60 | RETURN_CNT_APPROVAL | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu phê duyệt | Báo cáo RETURN (BC8) — hiển thị trực tiếp | SL_RETURN_PHEDUYET (Số lần return tại Cấp Phê duyệt) |
-| 61 | SALARYFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lương hay không — nguồn NG_SB_RLOS_REPAYFLAGS.SALARYFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72) và INCOM_3 (BC9, điều kiện đếm nguồn thu) | — |
-| 62 | CARFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê phương tiện hay không — NG_SB_RLOS_REPAYFLAGS.CARFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72) và INCOM_3 (BC9) | — |
-| 63 | HOUSEFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê nhà hay không — NG_SB_RLOS_REPAYFLAGS.HOUSEFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72) và INCOM_3 (BC9) | — |
-| 64 | ENTERPRISSEFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lợi nhuận doanh nghiệp hay không — NG_SB_RLOS_REPAYFLAGS.ENTERPRISSEFLAG (giữ nguyên tên sai chính tả nguồn) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72), INCOM_3 và BUSINESS_INCOM (BC9) | — |
-| 65 | DIVINGFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cổ tức hay không — NG_SB_RLOS_REPAYFLAGS.DIVINGFLAG (giữ nguyên tên sai chính tả nguồn) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72) và INCOM_3 (BC9) | — |
-| 66 | FAIMILYFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ kinh doanh hộ gia đình hay không — NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG (giữ nguyên tên sai chính tả nguồn) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72), INCOM_3 và BUSINESS_INCOM (BC9) | — |
-| 67 | NONLICFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ kinh doanh không đăng ký hay không — NG_SB_RLOS_REPAYFLAGS.NONLICFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72), INCOM_3 và BUSINESS_INCOM (BC9) | — |
-| 68 | WAGESFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ tiền công hay không — NG_SB_RLOS_REPAYFLAGS.WAGESFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72) và INCOM_3 (BC9) | — |
-| 69 | PENSIONFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lương hưu/phụ cấp hay không — NG_SB_RLOS_REPAYFLAGS.PENSIONFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72) và INCOM_3 (BC9) | — |
-| 70 | OTHERFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu khác hay không — NG_SB_RLOS_REPAYFLAGS.OTHERFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 72) và INCOM_3 (BC9) | — |
-| 71 | INCOME_SOURCE_CNT | NUMBER | N | 5 |  | Số nguồn thu nhập của hồ sơ — đếm số cờ 'Yes' trong 10 cột trên | Nguồn cho chỉ tiêu/trường INCOM_3 (BC9, điều kiện >=3 nguồn thu) | — |
-| 72 | REPAYMENT_SOURCE | VARCHAR2 | N | 500 |  | Danh sách nguồn trả nợ, nối tên tiếng Việt các nguồn thu đang bật | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | REPAYMENT_SOURCE (Loại nguồn thu) |
-| 73 | FLAG_BUSINESS_INCOME | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh hay không (không áp dụng SeAPro/SeALand) — PHÁI SINH đúng nguyên văn SRS BC9 | Báo cáo KPI (BC9) — nguồn cho BUSINESS_INCOM (AGG_LOS_KPI_APPLICATION) | Nguồn cho chỉ tiêu/trường BUSINESS_INCOM (BC9) |
-| 74 | KPI_VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH theo DECISION/WORKSTEP xa nhất đã đạt, cùng công thức đã chốt ở AGG_LOS_KPI_APPLICATION.VOLUME (2.1.9) | Thiết kế dư thừa | — |
-| 75 | UNDERWRITERMAKER_TAKERESPON | VARCHAR2 | N | 100 |  | CV Thẩm định chịu trách nhiệm — COALESCE(CASE WHEN ak.WORK_STEP='UnderwriterMaker' THEN ak.USER_MAKE END, g.UWMAKERUSER) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | UNDERWRITERMAKER_TAKERESPON (CV Thẩm định chịu trách nhiệm) |
-| 76 | UNDERWRITERCHECKER_TAKERESPON | VARCHAR2 | N | 100 |  | Kiểm soát thẩm định chịu trách nhiệm — COALESCE(CASE WHEN ak.WORK_STEP='UnderwriterChecker' THEN ak.USER_MAKE END, g.UWCHKRUSER) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | UNDERWRITERCHECKER_TAKERESPON (Kiểm soát thẩm định chịu trách nhiệm) |
-| 77 | APPROVAL_TAKERESPON | VARCHAR2 | N | 100 |  | Chuyên gia phê duyệt chịu trách nhiệm — COALESCE(CASE WHEN ak.WORK_STEP IN ('CreditCommittee','CreditApproval') THEN ak.USER_MAKE END, g.CREDAPPRUSER, g.CCOMMITUSER) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | APPROVAL_TAKERESPON (Chuyên gia phê duyệt chịu trách nhiệm) |
-| 78 | APPLICANT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICANT — quan hệ 1:1 với hồ sơ qua WI_NAME, join theo điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL). Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS/applicant — khác T24_CUSTOMER_SK (chân T24) | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICANT (CUSTOMER_NAME, ZONE...) | — |
-| 80 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), tra qua ADD_ID/ADD_ID_OTHER trên DIM_RLOS_APPLICANT. Mặc định -1 (review 2026-09-17: đổi tên từ CUSTOMER_SK để phân biệt rõ với khách hàng LOS/applicant — link qua FCT theo đúng nguyên tắc không link DIM sang DIM. ADD_ID là chuỗi đã nối nhiều giấy tờ bằng ";" nên KHÔNG thể so khớp trực tiếp với LEGAL_ID đơn của T24 — ETL phải tách chuỗi ADD_ID thành từng giá trị ID_NUMBER riêng lẻ theo đúng thứ tự đã nối khi dựng ADD_ID (ưu tiên TCC trước, CC sau), thử so khớp LEGAL_ID lần lượt theo thứ tự đó, lấy giá trị đầu tiên khớp được; nếu không khớp giá trị nào trong ADD_ID thì tiếp tục thử tương tự với ADD_ID_OTHER) | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_CUSTOMER lấy CUSTOMER_ID | Nguồn cho chỉ tiêu/trường CUSTOMER_ID (BC1) |
-| 81 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước hoàn tất gần nhất, chuẩn hóa dùng chung 2 hệ — LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS theo bước/quyết định của sự kiện hoàn tất gần nhất | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_WORKSTEP (Bước hồ sơ cuối cùng) |
-| 82 | T24_CARD_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CARD (T24, cấu trúc cột chi tiết cần bổ sung — bảng đã xác nhận tồn tại thật) — đóng gap BC1.K_TYPE (review 2026-09-21). Lookup theo RESULT_MAIN_CARD_ID (có sẵn trên DIM_RLOS_APPLICATION, qua APPLICATION_SK) = STG_DTM.STG_DIM_CARD.MAIN_ID — đúng nguyên văn nested table SRS BC1 (BR 1.2: "STG_DTM.STG_DIM_CARD (ad) — LEFT JOIN điều kiện n.RESULT_SEAB_MAIN_CARD_ID = ad.MAIN_ID"). Mặc định -1. Báo cáo khai thác K_TYPE qua FK này, không denormalize trực tiếp lên FCT | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_CARD lấy K_TYPE (⚠️ PENDING — DIM_T24_CARD chưa thiết kế chi tiết, cần DBA/DEV cung cấp cấu trúc bảng đầy đủ trước khi sinh LLD) | K_TYPE (Loại thẻ tín dụng) |
-| 83 | T24_SEAB_MAIN_CARD_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_MAIN_CARD (T24, cấu trúc cột chi tiết cần bổ sung — bảng đã xác nhận tồn tại thật) — đóng gap BC1.HOME_ADDRESS (review 2026-09-21). Lookup theo RESULT_MAIN_CARD_ID = STG_DTM.STG_DIM_SEAB_MAIN_CARD.RECID — đúng nguyên văn nested table SRS BC1 (BR 1.2: "STG_DTM.STG_DIM_SEAB_MAIN_CARD (ae) — LEFT JOIN điều kiện n.RESULT_SEAB_MAIN_CARD_ID = ae.RECID"). Mặc định -1. Báo cáo khai thác HOME_ADDRESS qua FK này, không denormalize trực tiếp lên FCT | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_SEAB_MAIN_CARD lấy HOME_ADDRESS (⚠️ PENDING — DIM_T24_SEAB_MAIN_CARD chưa thiết kế chi tiết, cần DBA/DEV cung cấp cấu trúc bảng đầy đủ trước khi sinh LLD) | HOME_ADDRESS (Địa chỉ nhận Pin/Thẻ) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.DAYID | — (cột kỹ thuật, một phần khóa chính) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | LEGAL_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng vai trò pháp lý — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.LEGAL_PARTY_BK: STANDARD_HASH(WI_NAME \|\| '~' \|\| ID_NUMBER \|\| '~' \|\| DATASOURCE, 'SHA256') — gộp 2 cột PK tự nhiên cũ (WI_NAME, ID_NUMBER) thành 1 khóa đơn | — (cột kỹ thuật, một phần khóa chính) | — |
+| 4 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — khách hàng CHÍNH của hồ sơ (MỌI dòng đều có). Bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.CUSTOMER_SK. Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ — cũng là 1 trong 3 khóa mà FCT_CLOS_APPLICATION_PARTY cũ từng cung cấp, trước khi xóa hẳn khỏi thiết kế) | — |
+| 5 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION — join theo WI_NAME. Bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.APPLICATION_SK. Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ — cũng là 1 trong 3 khóa mà FCT_CLOS_APPLICATION_PARTY cũ từng cung cấp, trước khi xóa hẳn khỏi thiết kế) | — |
+| 6 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ CLOS — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.WI_NAME (nguồn gốc xa: NG_SB_CLOS_CUST_INFO_LEGAL.WI_NAME). Quan hệ 1:N với hồ sơ, N không giới hạn | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN report-time để tra ID_NUMBER (LEGAL_TYPE='CUSTOMER') khi cần đối chiếu; nguồn ETL cho FCT_CLOS_APPLICATION.LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE thực chất đi qua bản SB_DWH của bảng này, không phải qua bản PDTD_DTM này | — |
+| 7 | ID_NUMBER | VARCHAR2 | Y | 100 |  | Số giấy tờ định danh — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.ID_NUMBER (nguồn gốc xa: NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER) | Báo cáo CLOS APPLICATION (BC2) — report-time, lọc LEGAL_TYPE='CUSTOMER' để tra ID_NUMBER khi cần | — |
+| 8 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên/tên đối tượng — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.FULL_NAME (nguồn gốc xa: NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE) | Báo cáo CLOS APPLICATION (BC2) — nguồn gián tiếp qua LEGAL_REPRESENTATIVE (LEGAL_TYPE='LEGAL_REPRESENTATIVE', nối chuỗi ';' nếu nhiều đại diện) | LEGAL_REPRESENTATIVE (Người đại diện pháp luật) |
+| 9 | OBJ_TYPE | VARCHAR2 | N | 100 |  | Loại đối tượng của giấy tờ pháp lý — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.OBJ_TYPE (nguồn gốc xa: NG_SB_CLOS_CUST_INFO_LEGAL.OBJ_TYPE) | — (chuẩn hóa thành LEGAL_TYPE ở PDTD_DTM, dùng làm điều kiện lọc) | — |
+| 10 | LEGAL_DOC | VARCHAR2 | N | 100 |  | Tên loại giấy tờ pháp lý — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.LEGAL_DOC (nguồn gốc xa: NG_SB_CLOS_CUST_INFO_LEGAL.LEGAL_DOC) | — (chưa có báo cáo nào tiêu thụ trực tiếp) | — |
+| 11 | LEGAL_TYPE | VARCHAR2 | N | 50 |  | PHÁI SINH TẠI PDTD_DTM: LEFT JOIN REF_CLOS_LEGAL (bảng REF_, chỉ tồn tại ở PDTD_DTM) theo OBJ_TYPE (cột 9, cùng bảng, đã bê 1:1 từ SB_DWH) — chuẩn hóa vai trò pháp lý sang mã tiếng Anh (LEGAL_REPRESENTATIVE, CUSTOMER, COLLATERAL_OWNER, MAIN_CONTRIBUTING_MEMBERS, OTHER) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo CLOS APPLICATION (BC2) — report-time, khóa lọc LEGAL_TYPE='CUSTOMER' khi cần tra ID_NUMBER | — |
 
-**⚠️ PENDING:** `DIM_T24_CARD`/`DIM_T24_SEAB_MAIN_CARD` — đã xác định
-chắc chắn khóa join (`RESULT_MAIN_CARD_ID` = `MAIN_ID`/`RECID`) và 2
-trường nghiệp vụ SRS cần (`K_TYPE`, `HOME_ADDRESS`), nhưng chưa có tài
-liệu nào trong repo mô tả đầy đủ cấu trúc cột/PK thật/cơ chế SCD2 của 2
-bảng T24 này — cần DBA/DEV cung cấp trước khi sinh LLD.
 
-## 11. FCT_RLOS_APPLICATION_PARTY
+## 11. FCT_RLOS_APPLICATION
 
 ### 11.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** bảng FACT quan hệ (factless-fact liên kết) — bê
-  nguyên 1:1 cấu trúc từ SB_DWH, thể hiện quan hệ 1 hồ sơ x 1 applicant x
-  N corepayer của hồ sơ RLOS. Toàn bộ thuộc tính mô tả con người (họ tên,
-  giới tính, địa chỉ, giấy tờ...) nằm ở DIM_RLOS_APPLICANT/
-  DIM_RLOS_COREPAYER — bảng này chỉ giữ khóa liên kết.
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, COREPAYER_SK.
-- **Độ chi tiết (grain):** 1 dòng = 1 hồ sơ x 1 corepayer. Hồ sơ không có
-  corepayer nào vẫn có đúng 1 dòng, với COREPAYER_SK = -1 (Unknown).
+- **Ý nghĩa bảng:** bảng FACT hồ sơ tín dụng RLOS (bán
+  lẻ/cá nhân) tại PDTD_DTM — bê nguyên 1:1 cấu trúc từ SB_DWH (ảnh trạng
+  thái cuối ngày, chỉ tiêu lũy kế, mốc thời gian xử lý, thông tin phê
+  duyệt, nguồn thu nhập...), bổ sung các khóa kỹ thuật để báo cáo join
+  sang các chiều T24 và tên bước chuẩn hóa dùng chung 2 hệ CLOS/RLOS.
+  
+- **Khóa nghiệp vụ (BK):** `WI_NAME`
+- **Khóa chính của bảng (PK):** DAYID, WI_NAME.
+- **Độ chi tiết (grain):** 1 dòng = 1 hồ sơ x 1 ngày dữ liệu.
 - **Phục vụ báo cáo:**
-  - Báo cáo RLOS APPLICATION (BC1) — khóa JOIN lấy tên người đồng trả nợ từ DIM_RLOS_COREPAYER
+  - Báo cáo RLOS APPLICATION (BC1) — `BUSINESS_FLOW` (Phân khúc hồ sơ) nay đọc từ đây thay vì qua `DIM_RLOS_APPLICATION`
+  - Báo cáo Thông tin phê duyệt (BC3) — qua FCT_RLOS_WORKSTEP_EVENT (CREDIT_LIMIT/CURRENCY dư thừa có chủ đích trên DIM_RLOS_APPLICATION)
+  - Báo cáo Tuần Chuyên viên Thẩm định (BC4)
+  - Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT qua PRODUCT_SK; nay đọc `REF_PRODUCT`/`SLA_*` từ đây thay vì qua `DIM_RLOS_APPLICATION`
+  - Báo cáo NGOẠI LỆ (BC6)
+  - Báo cáo RETURN (BC8) — `RETURN_CNT_*` không còn ETL sẵn trên bảng
+    này, báo cáo tự SUM/COUNT report-time từ `FCT_RLOS_WORKSTEP_EVENT`
+    JOIN `DIM_RLOS_WORKSTEP_DECISION` (đồng bộ theo pattern đã áp dụng
+    cho `FCT_CLOS_APPLICATION`, mục 4)
+  - Báo cáo KPI (BC9) — AGG_LOS_KPI_APPLICATION.INCOM_3/BUSINESS_INCOM; `DEVIATION_G3` nay đọc từ đây thay vì qua `DIM_RLOS_APPLICATION`
+  - Báo cáo Giải ngân _ Quá hạn KHCN (BC10)
 
 ### 11.2 Sơ đồ lineage
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        C["FCT_RLOS_APPLICATION_PARTY"]
+        C["FCT_RLOS_APPLICATION"]
+        DV["FCT_RLOS_DEVIATION"]
+        WE["FCT_RLOS_WORKSTEP_EVENT"]
+    end
+    subgraph REF_DTM["Bảng REF tại PDTD_DTM"]
+        REF(["REF_RLOS_FLOW / RLOS_REF_SLA_TDKHCN / REF_SLA_NLTT"])
+    end
+    subgraph STG_DTM["Vùng chìa STG_DTM"]
+        STG(["STG_DIM_CARD / STG_DIM_SEAB_MAIN_CARD"])
     end
     subgraph PDTD_DTM
-        D["FCT_RLOS_APPLICATION_PARTY"]
+        D["FCT_RLOS_APPLICATION"]
     end
     C -->|bê 1:1| D
+    DV -.->|"report-time: DAYID=MAX(DAYID)/WI_NAME, COUNT(*) >=3 → 'YES' — sinh DEVIATION_G3"| D
+    REF -->|"LEFT JOIN theo STREAM (BUSINESS_FLOW); PRODUCT_LINE/CHANGE_TYPE/DEVIATION_G3/APP_GRP (REF_PRODUCT, SLA_*); PRODUCT_SK report-time (SLA Nhập liệu tập trung, BC9)"| D
+    WE -.->|"WORKSTEP_DECISION_SK → WORKSTEP_CODE/DECISION_CODE — sinh APPLICATION_STATUS/FLAG_AUTO_CANCEL, AUTO_CANCEL_DATE "| D
+    STG -.->|"MAIN_ID/RECID = RESULT_MAIN_CARD_ID (qua DIM_RLOS_APPLICATION) — sinh T24_CARD_SK/T24_SEAB_MAIN_CARD_SK"| D
 ```
+
 
 ### 11.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | — (cột kỹ thuật) | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS | Báo cáo RLOS APPLICATION (BC1) — khóa chính, khóa nối sang DIM_RLOS_COREPAYER | — |
-| 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS | — (cột kỹ thuật) | — |
-| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION. Mặc định -1 | Thiết kế dư thừa | — |
-| 5 | APPLICANT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICANT. Mặc định -1 | Thiết kế dư thừa | — |
-| 6 | COREPAYER_SK | NUMBER | Y | 18 | PK | Khóa tới DIM_RLOS_COREPAYER. Mặc định -1 (Unknown) nếu hồ sơ không có corepayer nào | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_COREPAYER lấy tên người đồng trả nợ | CO_REPAYER (Tên người đồng trả nợ) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.DAYID | — (cột kỹ thuật) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.DATASOURCE | Báo cáo KPI (BC9) — hiển thị trực tiếp | SYSTEMNAME (Hệ thống CLOS/RLOS) |
+| 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPLICATION_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
+| 4 | CURRENT_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP_DECISION. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CURRENT_WORKSTEP_SK | Thiết kế dư thừa | — |
+| 5 | LAST_WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP_DECISION. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LAST_WORKSTEP_DECISION_SK | Báo cáo RLOS APPLICATION (BC1) — nguồn cho LAST_WORKSTEP (LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS ở PDTD_DTM) và khóa JOIN cho LAST_DECISION | LAST_DECISION (Quyết định tại bước cuối) |
+| 6 | LAST_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER của người xử lý sự kiện hoàn tất gần nhất. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LAST_USER_SK | Thiết kế dư thừa | — |
+| 7 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_PRODUCT — lookup theo PRODUCT_LINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.PRODUCT_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_PRODUCT<br>Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT theo PRODUCT_LINE_NAME<br>Báo cáo KPI (BC9) — khóa report-time tra REF_SLA_NLTT phục vụ POINT | PRODUCT_LINE (Dòng sản phẩm); nguồn cho chỉ tiêu/trường SLA_DE (Cam kết SLA Chuyên viên nhập liệu, BC5) |
+| 8 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY — lookup theo COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.COMPANY_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_LOS_COMPANY lấy BRANCH_CODE, và tiếp LEFT JOIN TMP_REF_COMPANY_REGION_KHCN lấy ZONE tại tầng truy vấn báo cáo | BRANCH_CODE (Mã Chi nhánh) |
+| 9 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CHANGE_TYPE. Chỉ có giá trị với hồ sơ thay đổi điều kiện phê duyệt, còn lại Unknown -1. Nguồn: NG_SB_RLOS_EXTTABLE.CHANGE_TYPE — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CHANGE_TYPE_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_CHANGE_TYPE | CHANGE_TYPE_DETAIL (Chi tiết loại thay đổi điều kiện) |
+| 10 | CARD_PROMOTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CARD_PROMOTION. Lookup NG_SB_RLOS_CBS.PROMOTION_ID; hồ sơ không phải thẻ dùng -1 — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CARD_PROMOTION_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_CARD_PROMOTION | PROMOTION_ID (Ưu đãi phí) |
+| 11 | T24_CARD_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CARD. Mặc định -1. Báo cáo khai thác K_TYPE qua FK này, không denormalize trực tiếp lên FCT — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_CARD lấy K_TYPE| K_TYPE (Loại thẻ tín dụng) |
+| 12 | T24_SEAB_MAIN_CARD_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_MAIN_CARD. Mặc định -1. Báo cáo khai thác HOME_ADDRESS qua FK này, không denormalize trực tiếp lên FCT — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_SEAB_MAIN_CARD lấy HOME_ADDRESS| HOME_ADDRESS (Địa chỉ nhận Pin/Thẻ) |
+| 13 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.WI_NAME (nguồn gốc xa: NG_SB_RLOS_ENTRY_EXIT.WINAME, direct, driving table) | Báo cáo RLOS APPLICATION (BC1) — khóa chính<br>Báo cáo KPI (BC9) — khóa nối AGG_LOS_KPI_APPLICATION | WINAME (Mã hồ sơ) |
+| 14 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.BRANCH_USER (nguồn gốc xa: NG_SB_RLOS_ENTRY_EXIT.USERNAME tại WORKSTEP='BranchSupport', bản ghi EXITDATE lớn nhất <=DAYID) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | BRANCH_USER (User Chi nhánh) |
+| 15 | DDE_USER | VARCHAR2 | N | 100 |  | User xử lý bước DetailDataEntry, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.DDE_USER | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | DDE_USER (User Chuyên viên nhập liệu) |
+| 16 | QC_USER | VARCHAR2 | N | 100 |  | User xử lý bước DataInputerChecker, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.QC_USER| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | QUALITY_CHECKER (User Kiểm soát nhập liệu) |
+| 17 | UND_MAKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterMaker, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.UND_MAKER_USER| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | UND_MAKER (User Chuyên viên thẩm định) |
+| 18 | UND_CHECKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterChecker, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.UND_CHECKER_USER| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | UND_CHECKER (User Kiểm soát thẩm định) |
+| 19 | PHV_USER | VARCHAR2 | N | 100 |  | User xử lý bước PhoneVerification, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.PHV_USER| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | PHV_USER (User Chuyên viên Thẩm định điện thoại) |
+| 20 | APPROVER_USER | VARCHAR2 | N | 100 |  | User xử lý bước CreditApproval, HOÀN TẤT gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVER_USER| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | BI_APPROVER (User Chuyên gia phê duyệt) |
+| 21 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.PROCESSED_DATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — dùng xếp hồ sơ vào đúng DAYID khi tổng hợp AGG_LOS_KPI_YTD_DAILY | PROCESSED_DATE (Ngày dữ liệu báo cáo) |
+| 22 | CREATION_DATE | DATE | N |  |  | TRUNC(MIN(ENTRYDATE)) theo WI_NAME — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CREATION_DATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | CREATION_DATE (Ngày khởi tạo hồ sơ) |
+| 23 | LAST_APPROVAL_DATE | DATE | N |  |  | MAX(EXITDATE) tại bước phê duyệt (nhóm quyết định đã định nghĩa) — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LAST_APPROVAL_DATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_APPROVAL_DATE (Thời gian phê duyệt cuối cùng) |
+| 24 | MIN_UWM | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại UnderwriterMaker — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.MIN_UWM | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | MIN_UWM (Thời gian hồ sơ lên CV thẩm định) |
+| 25 | MIN_APP | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại CreditApproval/CreditCommittee — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.MIN_APP | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | MIN_APP (Thời gian hồ sơ lên CG phê duyệt) |
+| 26 | CANCEL_USER_DATE | DATE | N |  |  | EXITDATE tại bản ghi DECISION='Cancel' và USERNAME khác NULL — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CANCEL_USER_DATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | CAN_USER_DATE (Thời gian cancel do NSD) |
+| 27 | CANCEL_DATE | DATE | N |  |  | ENTRYDATE tại bước CancelRevoke. Input thô giữ nguyên ở SB_DWH — `AUTO_CANCEL_DATE`/`FLAG_AUTO_CANCEL` (business rule dựa trên lịch sử FCT_RLOS_WORKSTEP_EVENT) nay tính tại chính bảng này (xem cột 74-75) thay vì đọc sẵn từ SB_DWH — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CANCEL_DATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | CANCEL_DATE (Thời gian hồ sơ vào vùng CancelRevoke) |
+| 28 | LAST_ENTRYDATE | TIMESTAMP | N |  |  | ENTRYDATE của sự kiện hoàn tất gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LAST_ENTRYDATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_ENTRYDATE (Thời gian vào bước cuối) |
+| 29 | LAST_EXITDATE | TIMESTAMP | N |  |  | EXITDATE của cùng sự kiện hoàn tất gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LAST_EXITDATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_EXITDATE (Thời gian kết thúc bước cuối) |
+| 30 | HAS_ACTION_IN_DAY | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có phát sinh xử lý trong ngày DAYID — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.HAS_ACTION_IN_DAY | Thiết kế dư thừa | — |
+| 31 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước (LAG theo ENTRYDATE) — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.PRE_WORKSTEP_CODE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | PRE_WORKSTEP (Bước hồ sơ trước đó) |
+| 32 | LAST_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của sự kiện hoàn tất gần nhất — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LAST_REMARKS | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_REMARKS (Ghi chú ý kiến bước cuối) |
+| 33 | LAST_REMARK_DDE | VARCHAR2 | N | 4000 |  | Ghi chú tại bước DetailDataEntry — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LAST_REMARK_DDE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_REMARK_DDE (Ghi chú tại bước nhập liệu DDE) |
+| 34 | LAST_CAN_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại lần hủy hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LAST_CAN_REMARKS | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_CAN_REMARKS (Ghi chú tại bước Cancel) |
+| 35 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVED_AMT_FINAL (nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LOAN_AMOUNT (Số tiền phê duyệt) |
+| 36 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVED_TERM | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LOAN_TERM (Thời hạn phê duyệt, tháng) |
+| 37 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%) — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.INTEREST_RATE_PCT| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | INTEREST_RATE (Lãi suất phê duyệt, %/năm) |
+| 38 | LOAN_TO_VALUE | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị TSBĐ — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LOAN_TO_VALUE| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LOAN_TO_VALUE (Tỷ lệ LTV, %) |
+| 39 | LOAN_OBJECTIVE | VARCHAR2 | N | 200 |  | Mục đích vay — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.LOAN_OBJECTIVE| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | Loan Objective (Mục đích cho vay) |
+| 40 | TOTAL_INCOME | NUMBER | N | 20,2 |  | Tổng thu nhập khách hàng — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.TOTAL_INCOME| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | TOTAL_INCOME (Tổng thu nhập phê duyệt) |
+| 41 | SALARYFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lương hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.SALARYFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.SALARYFLAG) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53) và INCOM_3 (BC9, điều kiện đếm nguồn thu) | — |
+| 42 | CARFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê phương tiện hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CARFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.CARFLAG) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53) và INCOM_3 (BC9) | — |
+| 43 | HOUSEFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê nhà hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.HOUSEFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.HOUSEFLAG) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53) và INCOM_3 (BC9) | — |
+| 44 | ENTERPRISSEFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lợi nhuận doanh nghiệp hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.ENTERPRISSEFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.ENTERPRISSEFLAG, giữ nguyên tên sai chính tả nguồn) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53), INCOM_3 và BUSINESS_INCOM (BC9) | — |
+| 45 | DIVINGFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cổ tức hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.DIVINGFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.DIVINGFLAG, giữ nguyên tên sai chính tả nguồn) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53) và INCOM_3 (BC9) | — |
+| 46 | FAIMILYFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ kinh doanh hộ gia đình hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.FAIMILYFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG, giữ nguyên tên sai chính tả nguồn) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53), INCOM_3 và BUSINESS_INCOM (BC9) | — |
+| 47 | NONLICFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ kinh doanh không đăng ký hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.NONLICFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.NONLICFLAG) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53), INCOM_3 và BUSINESS_INCOM (BC9) | — |
+| 48 | WAGESFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ tiền công hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.WAGESFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.WAGESFLAG) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53) và INCOM_3 (BC9) | — |
+| 49 | PENSIONFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lương hưu/phụ cấp hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.PENSIONFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.PENSIONFLAG) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53) và INCOM_3 (BC9) | — |
+| 50 | OTHERFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu khác hay không — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.OTHERFLAG (nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.OTHERFLAG) | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE (cột 53) và INCOM_3 (BC9) | — |
+| 51 | PRODUCT_NAME | VARCHAR2 | N | 200 |  | Tên sản phẩm vay — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.PRODUCT_NAME| Nguồn cho chỉ tiêu/trường FLAG_BUSINESS_INCOME (cột 54, cùng bảng) | — |
+| 52 | INCOME_SOURCE_CNT | NUMBER | N | 5 |  | Số nguồn thu nhập của hồ sơ| Nguồn cho chỉ tiêu/trường INCOM_3 (BC9, điều kiện >=3 nguồn thu) | — |
+| 53 | REPAYMENT_SOURCE | VARCHAR2 | N | 500 |  | Danh sách nguồn trả nợ, nối tên tiếng Việt các nguồn thu đang bật| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | REPAYMENT_SOURCE (Loại nguồn thu) |
+| 54 | FLAG_BUSINESS_INCOME | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh hay không (không áp dụng SeAPro/SeALand) | Báo cáo KPI (BC9) — nguồn cho BUSINESS_INCOM (AGG_LOS_KPI_APPLICATION) | Nguồn cho chỉ tiêu/trường BUSINESS_INCOM (BC9) |
+| 55 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.UNDERWRITERMAKER_USERMAKE: COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterMaker' THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.UWMAKERUSER) | Báo cáo RLOS APPLICATION (BC1) — BC1 map thẳng vào cột này.| — |
+| 56 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.UNDERWRITERCHECKER_USERMAKE: COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterChecker' THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.UWCHKRUSER) | Báo cáo RLOS APPLICATION (BC1) — BC1 map thẳng vào cột này.| — |
+| 57 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVAL_USERMAKE: COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP IN ('CreditCommittee','CreditApproval') THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.CREDAPPRUSER, NG_SB_RLOS_EXTTABLE.CCOMMITUSER) | Báo cáo RLOS APPLICATION (BC1) — BC1 map thẳng vào cột này. | — |
+| 58 | CHANGE_REQUEST | VARCHAR2 | N | 200 |  | Yêu cầu điều chỉnh hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CHANGE_REQUEST| Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | CHANGE_REQUEST (Thay đổi điều kiện — New/Change) |
+| 59 | CHANGE_TYPE | VARCHAR2 | N | 500 |  | Loại thay đổi điều kiện phê duyệt — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CHANGE_TYPE | Báo cáo RLOS APPLICATION (BC1) hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) khóa tra REF_PRODUCT/SLA_* | CHANGE_TYPE (Loại thay đổi điều kiện) |
+| 60 | C_PHONE_CREATE_FLAG | VARCHAR2 | N | 20 |  | Cờ đánh dấu hồ sơ có phát sinh nhánh phụ Xác minh điện thoại — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.C_PHONE_CREATE_FLAG| — | Thiết kế dư thừa |
+| 61 | C_PHONE_DELETE_FLAG | VARCHAR2 | N | 10 |  | Cờ đánh dấu nhánh phụ Xác minh điện thoại đã được xóa/hủy — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.C_PHONE_DELETE_FLAG, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 62 | C_FI_CREATE_FLAG | VARCHAR2 | N | 20 |  | Cờ đánh dấu hồ sơ có phát sinh nhánh phụ Thẩm định thực địa — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.C_FI_CREATE_FLAG, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 63 | C_FI_DELETE_FLAG | VARCHAR2 | N | 10 |  | Cờ đánh dấu nhánh phụ Thẩm định thực địa đã được xóa/hủy — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.C_FI_DELETE_FLAG, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 64 | C_LEGAL_CREATE_FLAG | VARCHAR2 | N | 20 |  | Cờ đánh dấu hồ sơ có phát sinh nhánh phụ Thẩm định pháp chế — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.C_LEGAL_CREATE_FLAG, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 65 | C_LEGAL_DELETE_FLAG | VARCHAR2 | N | 10 |  | Cờ đánh dấu nhánh phụ Thẩm định pháp chế đã được xóa/hủy — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.C_LEGAL_DELETE_FLAG, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 66 | REINITIATE | VARCHAR2 | N | 5 |  | Cờ đánh dấu hồ sơ đang ở luồng khởi tạo lại (ReInitiate) sau khi bị từ chối — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.REINITIATE, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 67 | NORMALBRHOLD | VARCHAR2 | N | 10 |  | Cờ tạm giữ (hold) hồ sơ tại bước ký hợp đồng, hồ sơ không công chứng — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.NORMALBRHOLD, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 68 | REGBRHOLD | VARCHAR2 | N | 10 |  | Cờ tạm giữ (hold) hồ sơ tại bước ký hợp đồng, hồ sơ có công chứng — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.REGBRHOLD, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 69 | STP_FLAG | VARCHAR2 | N | 50 |  | Cờ xử lý tự động (Straight-Through Processing) — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.STP_FLAG, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 70 | ELIGIBLE | VARCHAR2 | N | 100 |  | Cờ đủ điều kiện — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.ELIGIBLE, cùng lý do cột 60 | — | Thiết kế dư thừa |
+| 71 | TOTALNONELIGIBLE | VARCHAR2 | N | 5 |  | Số lượng điều kiện không đủ tiêu chuẩn ghi nhận trên hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.TOTALNONELIGIBLE| — | Thiết kế dư thừa |
+| 72 | CANCEL_REASON | VARCHAR2 | N | 500 |  | Lý do hủy hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CANCEL_REASON| — | Thiết kế dư thừa |
+| 73 | APPLICATION_STATUS | VARCHAR2 | N | 50 |  | Trạng thái hồ sơ chuẩn hóa (BC1) — PHÁI SINH TẠI PDTD_DTM, CHUYỂN TỪ SB_DWH, business rule (đồng bộ theo pattern CLOS mục 4): tra WORKSTEP_CODE/DECISION_CODE qua LAST_WORKSTEP_DECISION_SK (cột 5, cùng bảng, đã bê 1:1 từ SB_DWH) → SB_DWH.DIM_RLOS_WORKSTEP_DECISION, áp CASE WHEN DECISION_CODE IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport') THEN 'Approved' WHEN DECISION_CODE='Reject' THEN 'Rejected' WHEN WORKSTEP_CODE IN ('CancelRevoke','CancelPermanent') THEN 'Cancelled' ELSE 'Processing' END — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — hiển thị trực tiếp | APPLICATION_STATUS (Trạng thái hồ sơ) |
+| 74 | AUTO_CANCEL_DATE | DATE | N |  |  | Ngày hồ sơ bị hệ thống tự động chuyển sang CancelRevoke (BC1.AUTO_CAN_DATE) — PHÁI SINH TẠI PDTD_DTM| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | AUTO_CAN_DATE (Thời gian cancel tự động) |
+| 75 | FLAG_AUTO_CANCEL | VARCHAR2 | N | 10 |  | 'YES'/'NO' theo nguyên văn SRS BC1 field FLAG_AUTO_CAN (BC1) — PHÁI SINH TẠI PDTD_DTM| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | FLAG_AUTO_CAN (Hồ sơ cancel tự động — YES/NO) |
+| 76 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước hoàn tất gần nhất, chuẩn hóa dùng chung 2 hệ| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_WORKSTEP (Bước hồ sơ cuối cùng) |
+| 77 | BUSINESS_FLOW | VARCHAR2 | N | 50 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo| Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | BUSINESS_FLOW (Phân khúc hồ sơ) |
+| 78 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ chính sách trở lên hay không (YES/NO) — CHUYỂN TỪ `DIM_RLOS_APPLICATION`.| Báo cáo KPI (BC9) — AGG_LOS_KPI_APPLICATION.DEVIATION_G3 | DEVIATION_G3 (Hồ sơ có từ 3 ngoại lệ trở lên) |
+| 79 | REF_PRODUCT | NVARCHAR2 | N | 200 |  | Nhóm sản phẩm dùng để tra cam kết SLA (BC5) — CHUYỂN TỪ `DIM_RLOS_APPLICATION`. PHÁI SINH TẠI PDTD_DTM: LEFT JOIN RLOS_REF_SLA_TDKHCN (bảng REF_, chỉ tồn tại ở PDTD_DTM) theo PRODUCT_LINE_NAME (lấy qua PRODUCT_SK cột 7, cùng bảng, đã bê 1:1 từ SB_DWH → SB_DWH.DIM_RLOS_PRODUCT) hoặc CHANGE_TYPE (either/or — chỉ so khớp CHANGE_TYPE khi dòng REF_ có PRODUCT_LINE='Trường Change Request'; CHANGE_TYPE đã có sẵn trên chính bảng này, cột 59, đã bê 1:1 từ SB_DWH)+DEVIATION_G3 (cột 78, cùng bảng, bỏ qua nếu REF_ để trống)+SECONDARY_PRODUCTLINE (qua APPLICATION_SK cột 3 → SB_DWH.DIM_RLOS_APPLICATION, bỏ qua nếu REF_ để trống)+APP_GRP (qua APPLICATION_SK cột 3 → SB_DWH.DIM_RLOS_APPLICATION) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — khóa tra cam kết SLA | — |
+| 80 | SLA_CREDIT_OFFICER | NUMBER | N | 10,2 |  | Cam kết giờ cho chuyên viên tín dụng — CHUYỂN TỪ `DIM_RLOS_APPLICATION`. PHÁI SINH TẠI PDTD_DTM, cùng LEFT JOIN REF_ trên (cột 79) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_CREDIT_OFFICER (Cam kết SLA chuyên viên tín dụng) |
+| 81 | SLA_MARKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước lập hồ sơ thẩm định — CHUYỂN TỪ `DIM_RLOS_APPLICATION`. PHÁI SINH TẠI PDTD_DTM, cùng LEFT JOIN REF_ trên (cột 79) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_MARKER (Cam kết SLA lập hồ sơ thẩm định) |
+| 82 | SLA_CHECKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát thẩm định — CHUYỂN TỪ `DIM_RLOS_APPLICATION`. PHÁI SINH TẠI PDTD_DTM, cùng LEFT JOIN REF_ trên (cột 79) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_CHECKER (Cam kết SLA kiểm soát thẩm định) |
+| 83 | SLA_CREDIT_APPROVER | NUMBER | N | 10,2 |  | Cam kết giờ cho cấp phê duyệt — CHUYỂN TỪ `DIM_RLOS_APPLICATION`. PHÁI SINH TẠI PDTD_DTM, cùng LEFT JOIN REF_ trên (cột 79) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_CREDIT_APPROVER (Cam kết SLA cấp phê duyệt) |
 
 ## 12. FCT_RLOS_COLLATERAL
 
@@ -736,13 +783,17 @@ flowchart LR
   trúc từ SB_DWH, lưu ảnh số liệu thay đổi theo ngày của từng tài sản bảo
   đảm thuộc hồ sơ RLOS. Không có chiều tài sản riêng — toàn bộ thuộc
   tính lưu thẳng trên fact vì 4 bảng nguồn không khai khóa CDC.
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, COLLATERAL_BK.
+- **Khóa nghiệp vụ (BK):** composite toàn bộ cột không phải CLOB của
+  bảng grid tài sản nguồn (`COL_REALESTATE`/`COL_TRANSPORT`/
+  `COL_VALPAPER`/`COL_OTHER`) + `DATASOURCE` + tên bảng nguồn — hash vào
+  cột `COLLATERAL_BK`, bê 1:1 từ SB_DWH
+- **Khóa chính của bảng (PK):** DAYID, COLLATERAL_BK.
 - **Độ chi tiết (grain):** 1 dòng = 1 tài sản bảo đảm của 1 hồ sơ x 1
   ngày dữ liệu.
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
   - Báo cáo Thông tin phê duyệt (BC3)
-  - Báo cáo KPI (BC9) — nguồn cho AGG_LOS_KPI_APPLICATION.TSBD_G2 (UNION toàn bộ dòng của hồ sơ tại ảnh chụp gần nhất, đếm số tài sản >=2)
+  - Báo cáo KPI (BC9) — nguồn cho AGG_LOS_KPI_APPLICATION.TSBD_G2
 
 ### 12.2 Sơ đồ lineage
 
@@ -761,27 +812,27 @@ flowchart LR
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | — (cột kỹ thuật) | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS | Báo cáo RLOS APPLICATION (BC1) — khóa chính<br>Báo cáo KPI (BC9) — khóa nối AGG_LOS_KPI_APPLICATION.TSBD_G2 | — |
-| 3 | COLLATERAL_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng tài sản — PHÁI SINH: STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB của đúng bảng grid tài sản (COL_REALESTATE/COL_TRANSPORT/COL_VALPAPER/COL_OTHER) sinh ra dòng đó, cộng DATASOURCE và tên bảng nguồn. Chuẩn hóa trước khi hash: TRIM chuỗi, NULL quy về '<NULL>', DATE/NUMBER dùng format cố định không phụ thuộc NLS | — (cột kỹ thuật, khóa chính) | — |
-| 4 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS | — (cột kỹ thuật) | — |
-| 5 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
-| 6 | COLLATERAL_TYPE_CODE | VARCHAR2 | N | 100 |  | Nhãn phân loại nguồn của tài sản bảo đảm — gán cố định theo bảng grid mà bản ghi đến từ đó (REALESTATE/TRANSPORT/VALPAPER/OTHER). Dùng để CASE chọn đúng cột chi tiết khi dựng TYPES_OF_COLLATERALS (cột 21) — không phải dữ liệu mô tả tài sản | Báo cáo RLOS APPLICATION (BC1) — điều kiện lọc tách GCN_REAL_ESTATE/GCN_OTHER, TSBD_BDS/TSBD_PTVT<br>Báo cáo Thông tin phê duyệt (BC3) — điều kiện lọc dựng TYPES_OF_COLLATERALS | Nguồn cho chỉ tiêu/trường TYPES_OF_COLLATERALS (BC3); điều kiện lọc GCN_REAL_ESTATE/GCN_OTHER/TSBD_BDS/TSBD_PTVT (BC1) |
-| 7 | CERTIFICATE_NO | VARCHAR2 | N | 500 |  | Số giấy chứng nhận tài sản — BĐS lấy NG_SB_RLOS_COL_REALESTATE.NO_CERTI; các tài sản khác lấy NG_SB_RLOS_COLL_CERTIGRD.CERTIFICATENO (nối theo tài sản, không phải theo hồ sơ) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp (tách GCN_REAL_ESTATE/GCN_OTHER theo COLLATERAL_TYPE_CODE)<br>Báo cáo Thông tin phê duyệt (BC3) — nguồn cho TYPES_OF_COLLATERALS khi COLLATERAL_TYPE_CODE=REALESTATE | GCN_REAL_ESTATE (Số GCN TSBĐ là BĐS); GCN_OTHER (Số GCN TSBĐ là PTVT/Khác) |
-| 8 | DESCRIPTION | VARCHAR2 | N | 4000 |  | Mô tả tài sản bảo đảm — PHÁI SINH đúng nguyên văn SRS BC3: UNION theo loại tài sản — BĐS: NO_CERTI \|\| ', ' \|\| USING_PURPOSE; PTVT: BRAND \|\| ', ' \|\| CONTROL_POSTER; GTCG: NUMBERSIGN; Khác: DESCRIBE. Không dùng REMARKS (không có trong SRS) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | DESCRIPTION (Mô tả TSBĐ) |
-| 9 | OWNER_NAME | VARCHAR2 | N | 200 |  | Chủ sở hữu tài sản — nguồn OWNER của 4 bảng grid tài sản RLOS | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | OWNERSHIP (Sở hữu nhà ở, BC1); OWNER (Chủ TSBĐ, BC3) |
-| 10 | REL_TO_CUSTOMER | VARCHAR2 | N | 200 |  | Quan hệ giữa chủ tài sản và khách hàng — UNION REL_CUSTOMER/RELATION_CUSTOMER của 4 bảng grid tài sản | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | TSBD_RELATIONSHIP (Mối quan hệ chủ tài sản và KH) |
-| 11 | USING_PURPOSE | VARCHAR2 | N | 255 |  | Mục đích sử dụng của bất động sản — nguồn NG_SB_RLOS_COL_REALESTATE.USING_PURPOSE | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho DESCRIPTION khi COLLATERAL_TYPE_CODE=REALESTATE | Nguồn cho chỉ tiêu/trường DESCRIPTION (BC3, nhánh BĐS) |
-| 12 | VEHICLE_TYPE | VARCHAR2 | N | 100 |  | Loại phương tiện vận tải — nguồn NG_SB_RLOS_COL_TRANSPORT.TYPE_VEHICLE | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho TYPES_OF_COLLATERALS khi COLLATERAL_TYPE_CODE=TRANSPORT | Nguồn cho chỉ tiêu/trường TYPES_OF_COLLATERALS (BC3, nhánh phương tiện) |
-| 13 | BRAND | VARCHAR2 | N | 200 |  | Hãng của phương tiện vận tải — nguồn NG_SB_RLOS_COL_TRANSPORT.BRAND | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho DESCRIPTION khi COLLATERAL_TYPE_CODE=TRANSPORT | Nguồn cho chỉ tiêu/trường DESCRIPTION (BC3, nhánh phương tiện) |
-| 14 | CONTROL_POSTER | VARCHAR2 | N | 100 |  | Biển số kiểm soát của phương tiện — nguồn NG_SB_RLOS_COL_TRANSPORT.CONTROL_POSTER | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho DESCRIPTION khi COLLATERAL_TYPE_CODE=TRANSPORT | Nguồn cho chỉ tiêu/trường DESCRIPTION (BC3, nhánh phương tiện) |
-| 15 | VALPAPER_TYPE | VARCHAR2 | N | 100 |  | Loại giấy tờ có giá — nguồn NG_SB_RLOS_COL_VALPAPER.TYPE1 | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho TYPES_OF_COLLATERALS khi COLLATERAL_TYPE_CODE=VALPAPER | Nguồn cho chỉ tiêu/trường TYPES_OF_COLLATERALS (BC3, nhánh giấy tờ có giá) |
-| 16 | NUMBERSIGN | VARCHAR2 | N | 200 |  | Số hiệu giấy tờ có giá — nguồn NG_SB_RLOS_COL_VALPAPER.NUMBERSIGN | Báo cáo RLOS APPLICATION (BC1) — điều kiện lọc IS NOT NULL cho cờ TSBD_GTCG<br>Báo cáo Thông tin phê duyệt (BC3) — nguồn cho DESCRIPTION khi COLLATERAL_TYPE_CODE=VALPAPER | TSBD_GTCG (Hồ sơ có TSBĐ là GTCG — YES/NO, BC1); nguồn cho chỉ tiêu/trường DESCRIPTION (BC3, nhánh GTCG) |
-| 17 | IS_ASSET_FORMED | VARCHAR2 | N | 10 |  | Tài sản đã hình thành hay chưa — nguồn PROPERTY của COL_REALESTATE/COL_TRANSPORT | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp, lọc theo COLLATERAL_TYPE_CODE | TSBD_BDS (Hồ sơ có TSBĐ là BĐS — YES/NO); TSBD_PTVT (Hồ sơ có TSBĐ là PTVT — YES/NO) |
-| 18 | IS_FORMED_FROM_LOAN | VARCHAR2 | N | 100 |  | Loại tài sản hình thành từ vốn vay — PHÁI SINH đúng nguyên văn SRS BC1.PROPERTY_FORMED: giá trị trả về là NG_SB_RLOS_DISB_COL_GRID.COL_TYPE của dòng nối theo tài sản tương ứng có điều kiện lọc PROPERTY_FORMED='YES' (cột filter, không phải giá trị trả về); NULL nếu không có dòng nào thỏa điều kiện | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | PROPERTY_FORMED (Tài sản hình thành từ vốn vay không? — YES/NO) |
-| 19 | APPRAISED_VALUE | NUMBER | N | 20,2 |  | Giá trị định giá của tài sản — PRICING_VALUE (COL_REALESTATE) hoặc PRICINGVALUE (3 bảng còn lại). Ép kiểu số từ text định dạng Việt Nam, DEFAULT NULL ON CONVERSION ERROR | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | APPRAISED_VALUE (Giá trị định giá) |
-| 20 | LOAN_RATE_LTV | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị tài sản — LOANRATE của 4 bảng grid tài sản. Cùng quy tắc ép kiểu, đơn vị phần trăm | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | LTV (Tỷ lệ cho vay của TSBĐ) |
-| 21 | TYPES_OF_COLLATERALS | VARCHAR2 | N | 500 |  | PHÁI SINH — phục vụ trực tiếp BC3.TYPES_OF_COLLATERALS: CASE theo COLLATERAL_TYPE_CODE chọn đúng 1 cột chi tiết tương ứng — REALESTATE→CERTIFICATE_NO, TRANSPORT→VEHICLE_TYPE, VALPAPER→VALPAPER_TYPE, OTHER→DESCRIPTION | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | TYPES_OF_COLLATERALS (Loại TSBĐ) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.DAYID | — (cột kỹ thuật) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | COLLATERAL_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.COLLATERAL_BK: PHÁI SINH STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB của đúng bảng grid tài sản (COL_REALESTATE/COL_TRANSPORT/COL_VALPAPER/COL_OTHER) sinh ra dòng đó, cộng DATASOURCE và tên bảng nguồn. Chuẩn hóa trước khi hash: TRIM chuỗi, NULL quy về '<NULL>', DATE/NUMBER dùng format cố định không phụ thuộc NLS | — (cột kỹ thuật, khóa chính) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.APPLICATION_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
+| 5 | WI_NAME | VARCHAR2 | Y | 100 | | Mã hồ sơ tín dụng RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.WI_NAME | Báo cáo RLOS APPLICATION (BC1) — khóa chính<br>Báo cáo KPI (BC9) — khóa nối AGG_LOS_KPI_APPLICATION.TSBD_G2 | — |
+| 6 | COLLATERAL_TYPE_CODE | VARCHAR2 | N | 100 |  | Nhãn phân loại nguồn của tài sản bảo đảm — gán cố định theo bảng grid mà bản ghi đến từ đó (REALESTATE/TRANSPORT/VALPAPER/OTHER). Dùng để CASE chọn đúng cột chi tiết khi dựng TYPES_OF_COLLATERALS (cột 21) — không phải dữ liệu mô tả tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.COLLATERAL_TYPE_CODE | Báo cáo RLOS APPLICATION (BC1) — điều kiện lọc tách GCN_REAL_ESTATE/GCN_OTHER, TSBD_BDS/TSBD_PTVT<br>Báo cáo Thông tin phê duyệt (BC3) — điều kiện lọc dựng TYPES_OF_COLLATERALS | Nguồn cho chỉ tiêu/trường TYPES_OF_COLLATERALS (BC3); điều kiện lọc GCN_REAL_ESTATE/GCN_OTHER/TSBD_BDS/TSBD_PTVT (BC1) |
+| 7 | CERTIFICATE_NO | VARCHAR2 | N | 500 |  | Số giấy chứng nhận tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.CERTIFICATE_NO (nguồn gốc xa: BĐS lấy NG_SB_RLOS_COL_REALESTATE.NO_CERTI; các tài sản khác lấy NG_SB_RLOS_COLL_CERTIGRD.CERTIFICATENO) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp (tách GCN_REAL_ESTATE/GCN_OTHER theo COLLATERAL_TYPE_CODE)<br>Báo cáo Thông tin phê duyệt (BC3) — nguồn cho TYPES_OF_COLLATERALS khi COLLATERAL_TYPE_CODE=REALESTATE | GCN_REAL_ESTATE (Số GCN TSBĐ là BĐS); GCN_OTHER (Số GCN TSBĐ là PTVT/Khác) |
+| 8 | DESCRIPTION | VARCHAR2 | N | 4000 |  | Mô tả tài sản bảo đảm — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.DESCRIPTION, đúng nguyên văn SRS BC3: UNION theo loại tài sản — BĐS: NO_CERTI \|\| ', ' \|\| USING_PURPOSE; PTVT: BRAND \|\| ', ' \|\| CONTROL_POSTER; GTCG: NUMBERSIGN; Khác: DESCRIBE. Không dùng REMARKS (không có trong SRS) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | DESCRIPTION (Mô tả TSBĐ) |
+| 9 | OWNER_NAME | VARCHAR2 | N | 200 |  | Chủ sở hữu tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.OWNER_NAME (nguồn gốc xa: OWNER của 4 bảng grid tài sản RLOS) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | OWNERSHIP (Sở hữu nhà ở, BC1); OWNER (Chủ TSBĐ, BC3) |
+| 10 | REL_TO_CUSTOMER | VARCHAR2 | N | 200 |  | Quan hệ giữa chủ tài sản và khách hàng — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.REL_TO_CUSTOMER (nguồn gốc xa: UNION REL_CUSTOMER/RELATION_CUSTOMER của 4 bảng grid tài sản) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | TSBD_RELATIONSHIP (Mối quan hệ chủ tài sản và KH) |
+| 11 | USING_PURPOSE | VARCHAR2 | N | 255 |  | Mục đích sử dụng của bất động sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.USING_PURPOSE (nguồn gốc xa: NG_SB_RLOS_COL_REALESTATE.USING_PURPOSE) | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho DESCRIPTION khi COLLATERAL_TYPE_CODE=REALESTATE | Nguồn cho chỉ tiêu/trường DESCRIPTION (BC3, nhánh BĐS) |
+| 12 | VEHICLE_TYPE | VARCHAR2 | N | 100 |  | Loại phương tiện vận tải — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.VEHICLE_TYPE (nguồn gốc xa: NG_SB_RLOS_COL_TRANSPORT.TYPE_VEHICLE) | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho TYPES_OF_COLLATERALS khi COLLATERAL_TYPE_CODE=TRANSPORT | Nguồn cho chỉ tiêu/trường TYPES_OF_COLLATERALS (BC3, nhánh phương tiện) |
+| 13 | BRAND | VARCHAR2 | N | 200 |  | Hãng của phương tiện vận tải — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.BRAND (nguồn gốc xa: NG_SB_RLOS_COL_TRANSPORT.BRAND) | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho DESCRIPTION khi COLLATERAL_TYPE_CODE=TRANSPORT | Nguồn cho chỉ tiêu/trường DESCRIPTION (BC3, nhánh phương tiện) |
+| 14 | CONTROL_POSTER | VARCHAR2 | N | 100 |  | Biển số kiểm soát của phương tiện — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.CONTROL_POSTER (nguồn gốc xa: NG_SB_RLOS_COL_TRANSPORT.CONTROL_POSTER) | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho DESCRIPTION khi COLLATERAL_TYPE_CODE=TRANSPORT | Nguồn cho chỉ tiêu/trường DESCRIPTION (BC3, nhánh phương tiện) |
+| 15 | VALPAPER_TYPE | VARCHAR2 | N | 100 |  | Loại giấy tờ có giá — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.VALPAPER_TYPE (nguồn gốc xa: NG_SB_RLOS_COL_VALPAPER.TYPE1) | Báo cáo Thông tin phê duyệt (BC3) — nguồn cho TYPES_OF_COLLATERALS khi COLLATERAL_TYPE_CODE=VALPAPER | Nguồn cho chỉ tiêu/trường TYPES_OF_COLLATERALS (BC3, nhánh giấy tờ có giá) |
+| 16 | NUMBERSIGN | VARCHAR2 | N | 200 |  | Số hiệu giấy tờ có giá — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.NUMBERSIGN (nguồn gốc xa: NG_SB_RLOS_COL_VALPAPER.NUMBERSIGN) | Báo cáo RLOS APPLICATION (BC1) — điều kiện lọc IS NOT NULL cho cờ TSBD_GTCG<br>Báo cáo Thông tin phê duyệt (BC3) — nguồn cho DESCRIPTION khi COLLATERAL_TYPE_CODE=VALPAPER | TSBD_GTCG (Hồ sơ có TSBĐ là GTCG — YES/NO, BC1); nguồn cho chỉ tiêu/trường DESCRIPTION (BC3, nhánh GTCG) |
+| 17 | IS_ASSET_FORMED | VARCHAR2 | N | 10 |  | Tài sản đã hình thành hay chưa — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.IS_ASSET_FORMED (nguồn gốc xa: PROPERTY của COL_REALESTATE/COL_TRANSPORT) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp, lọc theo COLLATERAL_TYPE_CODE | TSBD_BDS (Hồ sơ có TSBĐ là BĐS — YES/NO); TSBD_PTVT (Hồ sơ có TSBĐ là PTVT — YES/NO) |
+| 18 | IS_FORMED_FROM_LOAN | VARCHAR2 | N | 100 |  | Loại tài sản hình thành từ vốn vay — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.IS_FORMED_FROM_LOAN, đúng nguyên văn SRS BC1.PROPERTY_FORMED: giá trị trả về là NG_SB_RLOS_DISB_COL_GRID.COL_TYPE của dòng nối theo tài sản tương ứng có điều kiện lọc PROPERTY_FORMED='YES'; NULL nếu không có dòng nào thỏa điều kiện | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | PROPERTY_FORMED (Tài sản hình thành từ vốn vay không? — YES/NO) |
+| 19 | APPRAISED_VALUE | NUMBER | N | 20,2 |  | Giá trị định giá của tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.APPRAISED_VALUE (nguồn gốc xa: PRICING_VALUE/PRICINGVALUE của 4 bảng grid, ép kiểu số) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | APPRAISED_VALUE (Giá trị định giá) |
+| 20 | LOAN_RATE_LTV | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.LOAN_RATE_LTV (nguồn gốc xa: LOANRATE của 4 bảng grid tài sản, cùng quy tắc ép kiểu, đơn vị phần trăm) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | LTV (Tỷ lệ cho vay của TSBĐ) |
+| 21 | TYPES_OF_COLLATERALS | VARCHAR2 | N | 500 |  | PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.TYPES_OF_COLLATERALS — phục vụ trực tiếp BC3.TYPES_OF_COLLATERALS: CASE theo COLLATERAL_TYPE_CODE chọn đúng 1 cột chi tiết tương ứng — REALESTATE→CERTIFICATE_NO, TRANSPORT→VEHICLE_TYPE, VALPAPER→VALPAPER_TYPE, OTHER→DESCRIPTION | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | TYPES_OF_COLLATERALS (Loại TSBĐ) |
 
 ## 13. FCT_RLOS_SUB_PRODUCT
 
@@ -790,12 +841,15 @@ flowchart LR
   lần đăng ký sản phẩm phụ đi kèm hồ sơ tín dụng RLOS (SeABuy, SeACivil,
   SeATeacher, SeAWoman, thẻ tín dụng phụ) — hạn mức, thời hạn, thuộc tính
   thẻ phụ nếu có.
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, SUB_PRODUCT_TYPE_CODE,
-  SUB_PRODUCT_BK.
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`SUB_PRODUCT_LINE`+
+  `SPP_AMOUNT`+`SPP_TERM` — hash vào cột `SUB_PRODUCT_BK`, bê 1:1 từ
+  SB_DWH
+- **Khóa chính của bảng (PK):** DAYID, SUB_PRODUCT_BK
 - **Độ chi tiết (grain):** 1 dòng = 1 lần đăng ký sản phẩm phụ trong ảnh
-  chụp của ngày DAYID. Bốn nhóm SeABuy/Civil/Teacher/Woman tối đa 1
+  chụp của ngày DAYID. Bốn nhóm SeABuy/Civil/Teacher/Woman thường 1
   dòng/loại/hồ sơ; thẻ tín dụng phụ có thể nhiều dòng/hồ sơ (1 hồ sơ có
-  thể mở nhiều thẻ phụ).
+  thể mở nhiều thẻ phụ, do LEFT JOIN tự nhân dòng — xem cơ chế nạp đầy
+  đủ tại SB_DWH mục 11).
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
 
@@ -816,32 +870,48 @@ flowchart LR
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | — (cột kỹ thuật) | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS — nguồn NG_SB_RLOS_SUB_PRODUCT.WI_NAME và WI_NAME của 5 bảng sản phẩm phụ | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang hồ sơ, không hiển thị trực tiếp ở trường này | — |
-| 3 | SUB_PRODUCT_TYPE_CODE | VARCHAR2 | Y | 30 | PK | Mã LOẠI sản phẩm phụ do DWH chuẩn hóa — PHÁI SINH: gán theo bảng nguồn mà dòng đến từ đó, đúng điều kiện lọc SRS BC1 (BR 1.2): NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE = 'SeACivil'→CIVIL, 'SeATeacher'→TEACHER, 'SeAWoman'→WOMAN, 'SeABuy'→SEABUY, 'Thẻ tín dụng'→CREDIT_CARD. Đổi tên từ SUB_PRODUCT_CODE gốc để tránh trùng nghĩa với DIM_RLOS_PRODUCT.SUB_PRODUCT_CODE (sản phẩm nhánh của sản phẩm chính) | — (cột kỹ thuật, một phần PK) | — |
-| 4 | SUB_PRODUCT_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của 1 lần đăng ký sản phẩm phụ — PHÁI SINH: với NG_SB_RLOS_SEABUY_APP/TEACHER_APP/WOMAN_APP (khai khóa CDC=WI_NAME) dùng thẳng khóa nguồn; với NG_SB_RLOS_SUB_PRODUCT/CREDIT_CARD_APP/CIVIL_APP/SENT_CBS_LOG (không khai khóa CDC) dùng STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB (loại trừ COMMENT_CO, REQUEST), cộng DATASOURCE và tên bảng nguồn | — (cột kỹ thuật, một phần PK) | — |
-| 5 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS | — (cột kỹ thuật) | — |
-| 6 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp | — (cột kỹ thuật, khóa JOIN nội bộ) | — |
-| 7 | SUB_PRODUCT_LINE | VARCHAR2 | N | 200 |  | Dòng của sản phẩm phụ — nguồn NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE. Trường SAN_PHAM_PHU của BC1 | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | SAN_PHAM_PHU (Sản phẩm phụ chi tiết) |
-| 8 | SPP_AMOUNT | NUMBER | N | 20,2 |  | Hạn mức của sản phẩm phụ — UNION LIMIT_NO của 5 bảng (CREDIT_CARD_APP/SEABUY_APP/CIVIL_APP/TEACHER_APP/WOMAN_APP). Ép kiểu số từ text định dạng Việt Nam, DEFAULT NULL ON CONVERSION ERROR. Trường SPP_Amount của BC1 | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | SPP_Amount (Giá trị của sản phẩm phụ) |
-| 9 | SPP_TERM | NUMBER | N | 5 |  | Thời hạn của sản phẩm phụ, đơn vị tháng — CREDIT_CARD_APP.TERM; SEABUY_APP/CIVIL_APP/TEACHER_APP/WOMAN_APP.TIME_VALID. Trường SPP_Term của BC1 | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | SPP_Term (Thời hạn của sản phẩm phụ) |
-| 10 | CARD_TYPE_CODE | VARCHAR2 | N | 100 |  | Loại thẻ đăng ký lúc đề xuất sản phẩm phụ là thẻ tín dụng — nguồn NG_SB_RLOS_CREDIT_CARD_APP.CARD_TYPE. Chỉ có ở dòng SUB_PRODUCT_TYPE_CODE='CREDIT_CARD'. Là khái niệm khác BC1.K_TYPE (loại thẻ thật sau giải ngân, nguồn STG_DIM_CARD.K_TYPE, join qua NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID = STG_DIM_CARD.MAIN_ID, không đi qua bảng này) — không dùng để tra BC1.K_TYPE | Thiết kế dư thừa | — |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_RLOS_SUB_PRODUCT.DAYID | — (cột kỹ thuật) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_SUB_PRODUCT.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | SUB_PRODUCT_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của 1 lần đăng ký sản phẩm phụ — bê 1:1 từ SB_DWH.FCT_RLOS_SUB_PRODUCT.SUB_PRODUCT_BK: STANDARD_HASH(WI_NAME \|\| '~' \|\| SUB_PRODUCT_LINE \|\| '~' \|\| NVL(TO_CHAR(SPP_AMOUNT),'<NULL>') \|\| '~' \|\| NVL(TO_CHAR(SPP_TERM),'<NULL>') \|\| '~' \|\| DATASOURCE, 'SHA256') — tính tại SB_DWH, xem chi tiết lý do tại SB_DWH mục 11. Tự thân đủ đảm bảo duy nhất — PK chỉ cần DAYID + SUB_PRODUCT_BK | — (cột kỹ thuật, một phần PK) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_SUB_PRODUCT.APPLICATION_SK | — (cột kỹ thuật, khóa JOIN nội bộ) | — |
+| 5 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_SUB_PRODUCT.WI_NAME (nguồn gốc xa: NG_SB_RLOS_SUB_PRODUCT.WI_NAME, driving table) | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang hồ sơ, không hiển thị trực tiếp ở trường này | — |
+| 6 | SUB_PRODUCT_LINE | VARCHAR2 | N | 200 |  | Dòng của sản phẩm phụ — bê 1:1 từ SB_DWH.FCT_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE (nguồn gốc xa: NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE, driving table). Trường SAN_PHAM_PHU của BC1 — 5 giá trị khả dĩ tự phân biệt loại sản phẩm phụ, không cần cột chuẩn hóa riêng (`SUB_PRODUCT_TYPE_CODE` đã xóa hẳn khỏi thiết kế — chỉ là ánh xạ 1-1 dư thừa của cột này) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | SAN_PHAM_PHU (Sản phẩm phụ chi tiết) |
+| 7 | SPP_AMOUNT | NUMBER | N | 20,2 |  | Hạn mức của sản phẩm phụ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_SUB_PRODUCT.SPP_AMOUNT theo SRS BC1 BR 1.2: LEFT JOIN đúng 1 trong 5 bảng grid theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='<giá trị tương ứng>' (không phải UNION 5 nguồn độc lập), lấy LIMIT_NO. Ép kiểu số từ text định dạng Việt Nam, DEFAULT NULL ON CONVERSION ERROR. Trường SPP_Amount của BC1 | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | SPP_Amount (Giá trị của sản phẩm phụ) |
+| 8 | SPP_TERM | NUMBER | N | 5 |  | Thời hạn của sản phẩm phụ, đơn vị tháng — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_SUB_PRODUCT.SPP_TERM (cùng cơ chế JOIN cột 7): CREDIT_CARD_APP.TERM hoặc SEABUY_APP/CIVIL_APP/TEACHER_APP/WOMAN_APP.TIME_VALID của đúng bảng đã khớp điều kiện JOIN. Trường SPP_Term của BC1 | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | SPP_Term (Thời hạn của sản phẩm phụ) |
+| 9 | CARD_TYPE_CODE | VARCHAR2 | N | 100 |  | Loại thẻ đăng ký lúc đề xuất sản phẩm phụ là thẻ tín dụng — bê 1:1 từ SB_DWH.FCT_RLOS_SUB_PRODUCT.CARD_TYPE_CODE (nguồn gốc xa: NG_SB_RLOS_CREDIT_CARD_APP.CARD_TYPE, LEFT JOIN theo cơ chế cột 7). Chỉ có ở dòng SUB_PRODUCT_LINE='Thẻ tín dụng'. Là khái niệm khác BC1.K_TYPE (loại thẻ thật sau giải ngân, nguồn STG_DIM_CARD.K_TYPE, join qua NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID = STG_DIM_CARD.MAIN_ID — thuộc FCT_RLOS_APPLICATION, không đi qua bảng này) — không dùng để tra BC1.K_TYPE | Thiết kế dư thừa | — |
+
+**Cơ chế nạp:** xem giải thích đầy đủ tại
+`hld/hld_review/HLD_FCT_SB_DWH_review.md` mục 11 — driving table đúng là
+`NG_SB_RLOS_SUB_PRODUCT`, 5 bảng grid chỉ LEFT JOIN bổ sung chi tiết theo
+`WI_NAME + SUB_PRODUCT_LINE`, không tự sinh dòng độc lập;
+`NG_SB_RLOS_SENT_CBS_LOG` không liên quan tới bảng này (thuộc
+`FCT_RLOS_APPLICATION`). `SUB_PRODUCT_TYPE_CODE` đã xóa hẳn khỏi
+thiết kế (chỉ là ánh xạ 1-1 dư thừa của `SUB_PRODUCT_LINE`) — PK rút gọn
+còn `DAYID + SUB_PRODUCT_BK`. Bảng có **9 cột**.
 
 ## 14. FCT_RLOS_EXCEPTION
 
 ### 14.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** ghi nhận từng lần một lý do (ngoại lệ/nội dung cần làm
-  rõ) được nêu ra trên hồ sơ tín dụng RLOS trong quá trình xử lý, kèm người
-  nêu, thời điểm, và các chỉ tiêu đánh giá chất lượng nhập liệu lần đầu
-  (First Time Right).
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, EXCEPTION_CATEGORY,
-  RAISED_BY, RAISED_DATE_TIME.
+- **Ý nghĩa bảng:** bảng FACT chi tiết tại PDTD_DTM — bê nguyên 1:1 từ
+  `FCT_RLOS_EXCEPTION` (SB_DWH, 13 cột nghiệp vụ, gồm cả `SUB_PRODUCT`),
+  ghi nhận từng lần một lý do (ngoại lệ/nội dung cần làm rõ) được nêu ra
+  trên hồ sơ tín dụng RLOS trong quá trình xử lý, kèm người nêu, thời
+  điểm, và các chỉ tiêu đánh giá chất lượng nhập liệu lần đầu (First Time
+  Right). Bổ sung tại tầng này 3 cột phái sinh: `CHECK_FTR`/
+  `FIRST_WORKSTEP_RETURN` và `PHAN_LOAI_DDE` (LEFT JOIN `REF_PHAN_LOAI_DDE`
+  theo EXCEPTION_CATEGORY + SYSTEMNAME='RLOS').
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`EXCEPTION_CATEGORY`+
+  `RAISED_BY`+`RAISED_DATE_TIME` — hash vào cột `EXCEPTION_BK`, bê 1:1
+  từ SB_DWH (xem `HLD_FCT_SB_DWH_review.md` mục 10)
+- **Khóa chính của bảng (PK):** DAYID, EXCEPTION_BK — bê 1:1 từ SB_DWH
+  (xem `HLD_FCT_SB_DWH_review.md` mục 10): `EXCEPTION_BK` gộp 4 cột PK
+  tự nhiên cũ (WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME)
+  thành 1 khóa hash duy nhất.
 - **Độ chi tiết (grain):** 1 dòng = 1 lần ghi nhận lý do của 1 hồ sơ, trong
   ảnh chụp của ngày DAYID.
 - **Phục vụ báo cáo:**
   - Báo cáo EXCEPTION - FTR (BC7)
   - Báo cáo RETURN (BC8)
-  - Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua LOANCASEID
 
 ### 14.2 Sơ đồ lineage
 
@@ -849,6 +919,7 @@ flowchart LR
 flowchart LR
     subgraph SB_DWH
         C["FCT_RLOS_EXCEPTION"]
+        WE["FCT_RLOS_WORKSTEP_EVENT"]
     end
     subgraph REF_DTM["Bảng REF tại PDTD_DTM"]
         REF(["REF_PHAN_LOAI_DDE"])
@@ -857,29 +928,33 @@ flowchart LR
         D["FCT_RLOS_EXCEPTION"]
     end
     C -->|bê 1:1| D
-    REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='RLOS' — sinh PHAN_LOAI_DDE (review 2026-09-22, chuyển từ SB_DWH)"| D
+    REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='RLOS' — sinh PHAN_LOAI_DDE"| D
+    WE -.->|"JOIN theo WI_NAME (không phải STG_LOS) — sinh FIRST_WORKSTEP_RETURN: WORKSTEP_CODE tại MIN(EXITDATE) thỏa 3 nhánh WORKSTEP/DECISION_CODE"| D
+    C -.->|"EXCEPTION_CATEGORY/EXCEPTION_NAME (có sẵn) + SUB_PRODUCT (cột thô mới) — sinh CHECK_FTR: whitelist miễn trừ phân nhóm theo BI_SUB_PRODUCT"| D
 ```
 
 ### 14.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | — (cột kỹ thuật) | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, cũng là khóa JOIN | WI_NAME (Mã hồ sơ) |
-| 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_RLOS_APPLICATION để lấy LOANCASEID (dù BC7 ưu tiên dùng LOANCASEID có sẵn trực tiếp trên bảng này) | — |
-| 4 | EXCEPTION_REASON_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_EXCEPTION_REASON — PHÁI SINH 2 bước đúng SRS BC7: (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_RLOS_ENTRY_EXIT khớp WORKSTEP/DECISION. Mặc định -1 nếu không còn dòng nào khớp | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_RLOS_EXCEPTION_REASON để lấy ACTIVITYNAME, EXCEPTION_CODE | — |
-| 5 | RAISED_BY_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng | — (cột kỹ thuật, khóa JOIN nội bộ — BC7 dùng cột RAISED_BY gốc để hiển thị) | — |
-| 6 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 | PK | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_CATEGORY | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, cũng là khóa JOIN sang DIM_RLOS_EXCEPTION_REASON và REF_PHAN_LOAI_DDE (tính PHAN_LOAI_DDE) | EXCEPTION_CATEGORY (Nhóm lý do quyết định) |
-| 7 | EXCEPTION_NAME | VARCHAR2 | N | 500 |  | Tên nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_NAME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, cũng là điều kiện lọc/khóa JOIN cho CHECK_FTR và DIM_RLOS_EXCEPTION_REASON | EXCEPTION_NAME (Tên lý do) |
-| 8 | EXCEPTION_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_REMARKS | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_REMARKS (Ý kiến) |
-| 9 | RAISED_BY | VARCHAR2 | N | 100 | PK | Người nêu nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.RAISED_BY | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RAISED_BY (User tạo lý do) |
-| 10 | RAISED_DATE_TIME | TIMESTAMP | N |  | PK | Thời điểm nêu nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.RAISED_DATE_TIME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — dùng làm PROCESSED_DATE (giữ nguyên giá trị timestamp) | RAISED_DATE_TIME (Thời gian tạo lý do); PROCESSED_DATE (Ngày dữ liệu, BC8) |
-| 11 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' | — (cột kỹ thuật) | — |
-| 12 | RCTYPE | VARCHAR2 | N | 20 |  | Loại ghi nhận, Raise hay Clear — nguồn NG_SB_RLOS_EXCEPTION.RCTYPE. Không còn dùng làm điều kiện lọc CHECK_FTR (SRS BC7 cập nhật 2026-09-18) nhưng BC7 vẫn hiển thị trực tiếp | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | CHECK_FTR (thành phần Raise/Clear của trường "Hồ sơ đạt FTR hay không đạt FTR") |
-| 13 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH (review 2026-09-18): công thức riêng của RLOS, mặc định 'Not First Time Right', là 'First Time Right' chỉ khi mọi dòng EXCEPTION_CATEGORY LIKE '%BR%' đều khớp 1 trong 5 điều kiện miễn trừ | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | CHECK_FTR (Hồ sơ đạt FTR hay không đạt FTR) |
-| 14 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH (review 2026-09-18): WORKSTEP tại MIN(EXITDATE) theo WI_NAME trên NG_SB_RLOS_ENTRY_EXIT, khớp 1 trong 3 điều kiện WORKSTEP/DECISION | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | FIRST_WORKSTEP_RETURN (Bước trả về lần đầu) |
-| 15 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (review 2026-09-22, chuyển từ SB_DWH — cùng lý do đã áp dụng cho FCT_CLOS_EXCEPTION): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY + SYSTEMNAME='RLOS', lấy PHAN_LOAI_DDE | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | PHAN_LOAI_DDE (Lỗi Nhập liệu/Thiếu Checklist) |
-| 16 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ — PHÁI SINH: JOIN sang DIM_RLOS_APPLICATION theo APPLICATION_SK, lấy LOANCASEID (cùng cách FCT_CLOS_EXCEPTION đã làm) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp (ưu tiên dùng cột này thay vì join qua APPLICATION_SK) | LOANCASEID (Mã LOANCASEID) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.DAYID | — (cột kỹ thuật) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | EXCEPTION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng ngoại lệ — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.EXCEPTION_BK: STANDARD_HASH(WI_NAME \|\| '~' \|\| EXCEPTION_CATEGORY \|\| '~' \|\| RAISED_BY \|\| '~' \|\| TO_CHAR(RAISED_DATE_TIME,'YYYY-MM-DD HH24:MI:SS.FF6') \|\| '~' \|\| DATASOURCE, 'SHA256') — gộp 4 cột PK tự nhiên cũ thành 1 khóa đơn | — (cột kỹ thuật, một phần khóa chính) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.APPLICATION_SK | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_RLOS_APPLICATION, report-time tự tra LOANCASEID khi cần (không còn ETL sẵn trên bảng này) | — |
+| 5 | EXCEPTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_EXCEPTION — PHÁI SINH 2 bước đúng SRS BC7, ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.EXCEPTION_SK: (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_RLOS_ENTRY_EXIT khớp WORKSTEP/DECISION. Mặc định -1 nếu không còn dòng nào khớp | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_RLOS_EXCEPTION để lấy ACTIVITYNAME, EXCEPTION_CODE | — |
+| 6 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.USER_SK | — (cột kỹ thuật, khóa JOIN nội bộ — BC7 dùng cột RAISED_BY gốc để hiển thị) | — |
+| 7 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.WI_NAME (nguồn gốc xa: NG_SB_RLOS_EXCEPTION.WI_NAME, direct, driving table) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, cũng là khóa JOIN | WI_NAME (Mã hồ sơ) |
+| 8 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 |  | Phân nhóm nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.EXCEPTION_CATEGORY (nguồn gốc xa: NG_SB_RLOS_EXCEPTION.EXCEPTION_CATEGORY) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, cũng là khóa JOIN sang DIM_RLOS_EXCEPTION và REF_PHAN_LOAI_DDE (tính PHAN_LOAI_DDE) | EXCEPTION_CATEGORY (Nhóm lý do quyết định) |
+| 9 | RAISED_BY | VARCHAR2 | N | 100 |  | Người nêu nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.RAISED_BY (nguồn gốc xa: NG_SB_RLOS_EXCEPTION.RAISED_BY) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RAISED_BY (User tạo lý do) |
+| 10 | RAISED_DATE_TIME | TIMESTAMP | N |  |  | Thời điểm nêu nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.RAISED_DATE_TIME (nguồn gốc xa: NG_SB_RLOS_EXCEPTION.RAISED_DATE_TIME) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — dùng làm PROCESSED_DATE (giữ nguyên giá trị timestamp) | RAISED_DATE_TIME (Thời gian tạo lý do); PROCESSED_DATE (Ngày dữ liệu, BC8) |
+| 11 | EXCEPTION_NAME | VARCHAR2 | N | 500 |  | Tên nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.EXCEPTION_NAME (nguồn gốc xa: NG_SB_RLOS_EXCEPTION.EXCEPTION_NAME) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, cũng là điều kiện lọc/khóa JOIN cho CHECK_FTR và DIM_RLOS_EXCEPTION | EXCEPTION_NAME (Tên lý do) |
+| 12 | EXCEPTION_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của nội dung cần làm rõ — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.EXCEPTION_REMARKS (nguồn gốc xa: NG_SB_RLOS_EXCEPTION.EXCEPTION_REMARKS) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_REMARKS (Ý kiến) |
+| 13 | RCTYPE | VARCHAR2 | N | 20 |  | Loại ghi nhận, Raise hay Clear — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.RCTYPE (nguồn gốc xa: NG_SB_RLOS_EXCEPTION.RCTYPE). Không còn dùng làm điều kiện lọc CHECK_FTR nhưng BC7 vẫn hiển thị trực tiếp | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | CHECK_FTR (thành phần Raise/Clear của trường "Hồ sơ đạt FTR hay không đạt FTR") |
+| 14 | SUB_PRODUCT | VARCHAR2 | N | 255 |  | Sản phẩm vay chi tiết tự khai theo hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_EXCEPTION.SUB_PRODUCT (nguồn gốc xa: LEFT JOIN NG_SB_RLOS_APPLICANT_GENERAL theo WI_NAME, cột thô, bổ sung để tính CHECK_FTR tại đây) | Nguồn cho chỉ tiêu/trường CHECK_FTR (cột 15, cùng bảng) | — |
+| 15 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH — xem ghi chú kiến trúc tại mục 14.1): công thức riêng của RLOS, mặc định 'Not First Time Right'; là 'First Time Right' CHỈ KHI mọi dòng cùng WI_NAME có EXCEPTION_CATEGORY LIKE '%BR%' (tra trên chính bảng này) đều khớp 1 trong 5 điều kiện miễn trừ theo EXCEPTION_NAME, một số điều kiện phụ theo BI_SUB_PRODUCT — PHÁI SINH TẠI ĐÂY: CASE WHEN SUB_PRODUCT (cột 14) LIKE '%Phát hành%' OR LIKE '%TTD%' THEN 'Credit Card' ELSE SUB_PRODUCT END | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | CHECK_FTR (Hồ sơ đạt FTR hay không đạt FTR) |
+| 16 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH — xem ghi chú kiến trúc tại mục 14.1): WORKSTEP_CODE của dòng SB_DWH.FCT_RLOS_WORKSTEP_EVENT tại MIN(EXITDATE) theo WI_NAME, với điều kiện EXITDATE IS NOT NULL AND ((WORKSTEP_CODE='DetailDataEntry' AND DECISION_CODE='Send_Back') OR (WORKSTEP_CODE IN ('DataInputerChecker','UnderwriterMaker','CreditApproval') AND DECISION_CODE='Additional_Doc_Required') OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send_Back to BranchSupport')) — DECISION_CODE tra qua WORKSTEP_DECISION_SK → DIM_RLOS_WORKSTEP_DECISION | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | FIRST_WORKSTEP_RETURN (Bước trả về đầu tiên) |
+| 17 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (cùng lý do đã áp dụng cho FCT_CLOS_EXCEPTION): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY + SYSTEMNAME='RLOS', lấy PHAN_LOAI_DDE | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | PHAN_LOAI_DDE (Lỗi Nhập liệu/Thiếu Checklist) |
+
 
 ## 15. FCT_RLOS_DEVIATION
 
@@ -887,7 +962,11 @@ flowchart LR
 - **Ý nghĩa bảng:** lưu ảnh số liệu thay đổi theo ngày của từng ngoại lệ
   chính sách (deviation) thuộc hồ sơ tín dụng RLOS. Không có chiều riêng —
   toàn bộ thuộc tính lưu thẳng trên fact vì nguồn không khai khóa CDC.
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, DEVIATION_BK.
+- **Khóa nghiệp vụ (BK):** composite toàn bộ cột không phải CLOB của
+  `NG_SB_RLOS_MANUAL_DEVIATION` (loại trừ `REASON`) + `DATASOURCE` + tên
+  bảng nguồn — hash vào cột `DEVIATION_BK`, bê 1:1 từ SB_DWH (xem
+  `HLD_FCT_SB_DWH_review.md` mục 11)
+- **Khóa chính của bảng (PK):** DAYID, DEVIATION_BK.
 - **Độ chi tiết (grain):** 1 dòng = 1 ngoại lệ chính sách trong ảnh chụp
   của ngày DAYID.
 - **Phục vụ báo cáo:**
@@ -912,15 +991,15 @@ flowchart LR
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD | — (cột kỹ thuật) | — |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp, cũng là khóa PK | WI_NAME (Mã hồ sơ) |
-| 3 | DEVIATION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng ngoại lệ — PHÁI SINH: STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB của NG_SB_RLOS_MANUAL_DEVIATION (loại trừ REASON), cộng DATASOURCE và tên bảng nguồn | Báo cáo KPI (BC9) — nguồn cho chỉ tiêu/trường DEVIATION_G2/DEVIATION_G3 (COUNT(*) số dòng theo WI_NAME trên AGG_LOS_KPI_APPLICATION, lọc DAYID mới nhất) | — |
-| 4 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' | — (cột kỹ thuật) | — |
-| 5 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp | — (cột kỹ thuật, khóa JOIN nội bộ) | — |
-| 6 | CHECKING_CONDITION | VARCHAR2 | N | 500 |  | Điều kiện kiểm tra chính sách — nguồn NG_SB_RLOS_MANUAL_DEVIATION.CHECKING_CONDITION | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | CHECKING_CONDITION (Tiêu chí ngoại lệ) |
-| 7 | CHECKING_RESULT | VARCHAR2 | N | 200 |  | Kết quả kiểm tra chính sách — nguồn NG_SB_RLOS_MANUAL_DEVIATION.CHECKING_RESULT | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | CHECKING_RESULT (Loại ngoại lệ) |
-| 8 | DEVIATION_REASON | VARCHAR2 | N | 4000 |  | Lý do lệch chính sách — nguồn NG_SB_RLOS_MANUAL_DEVIATION.REASON (đổi tên cho rõ nghĩa) | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | REASON (Nội dung ngoại lệ) |
-| 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — PHÁI SINH: tính độc lập từ NG_SB_RLOS_ENTRY_EXIT theo cùng công thức 3 mức ưu tiên đã dùng cho FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE — không JOIN sang FCT_RLOS_APPLICATION_DAILY | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | PROCESSED_DATE (Ngày dữ liệu báo cáo) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_RLOS_DEVIATION.DAYID | — (cột kỹ thuật) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' — bê 1:1 từ SB_DWH.FCT_RLOS_DEVIATION.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | DEVIATION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng ngoại lệ — bê 1:1 từ SB_DWH.FCT_RLOS_DEVIATION.DEVIATION_BK: PHÁI SINH STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB của NG_SB_RLOS_MANUAL_DEVIATION (loại trừ REASON), cộng DATASOURCE và tên bảng nguồn | Báo cáo KPI (BC9) — nguồn cho chỉ tiêu/trường DEVIATION_G2/DEVIATION_G3 (COUNT(*) số dòng theo WI_NAME trên AGG_LOS_KPI_APPLICATION, lọc DAYID mới nhất) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_DEVIATION.APPLICATION_SK | — (cột kỹ thuật, khóa JOIN nội bộ) | — |
+| 5 | WI_NAME | VARCHAR2 | Y | 100 | | Mã hồ sơ tín dụng RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_DEVIATION.WI_NAME (nguồn gốc xa: NG_SB_RLOS_MANUAL_DEVIATION.WI_NAME, direct, driving table) | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp, cũng là khóa PK | WI_NAME (Mã hồ sơ) |
+| 6 | CHECKING_CONDITION | VARCHAR2 | N | 500 |  | Điều kiện kiểm tra chính sách — bê 1:1 từ SB_DWH.FCT_RLOS_DEVIATION.CHECKING_CONDITION (nguồn gốc xa: NG_SB_RLOS_MANUAL_DEVIATION.CHECKING_CONDITION) | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | CHECKING_CONDITION (Tiêu chí ngoại lệ) |
+| 7 | CHECKING_RESULT | VARCHAR2 | N | 200 |  | Kết quả kiểm tra chính sách — bê 1:1 từ SB_DWH.FCT_RLOS_DEVIATION.CHECKING_RESULT (nguồn gốc xa: NG_SB_RLOS_MANUAL_DEVIATION.CHECKING_RESULT) | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | CHECKING_RESULT (Loại ngoại lệ) |
+| 8 | DEVIATION_REASON | VARCHAR2 | N | 4000 |  | Lý do lệch chính sách — bê 1:1 từ SB_DWH.FCT_RLOS_DEVIATION.DEVIATION_REASON (nguồn gốc xa: NG_SB_RLOS_MANUAL_DEVIATION.REASON, đổi tên cho rõ nghĩa) | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | REASON (Nội dung ngoại lệ) |
+| 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_DEVIATION.PROCESSED_DATE (PHÁI SINH TẠI SB_DWH: tính độc lập từ NG_SB_RLOS_ENTRY_EXIT theo cùng công thức 3 mức ưu tiên đã dùng cho FCT_RLOS_APPLICATION.PROCESSED_DATE — không JOIN sang FCT_RLOS_APPLICATION) | Báo cáo NGOẠI LỆ (BC6) — hiển thị trực tiếp | PROCESSED_DATE (Ngày dữ liệu báo cáo) |
 
 ## 16. FCT_RLOS_WORKSTEP_EVENT
 
@@ -928,19 +1007,25 @@ flowchart LR
 - **Ý nghĩa bảng:** nhật ký workflow mức nguyên tử của hệ RLOS (bán lẻ/cá
   nhân) — mỗi dòng là 1 lần hồ sơ đi qua 1 bước xử lý (workstep) trên
   workflow, ghi lại đầy đủ thời gian vào/ra, người xử lý, quyết định và
-  các chỉ số TAT tính sẵn. Giữ HẾT MỌI SỰ KIỆN, không bao giờ xóa.
-- **Khóa chính của bảng (PK):** DAYID, WI_NAME, WORKSTEP_CODE, ENTRYDATE.
+  các chỉ số TAT tính sẵn. Giữ HẾT MỌI SỰ KIỆN.
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`WORKSTEP_CODE`+
+  `ENTRYDATE` — hash vào cột `WORKSTEP_EVENT_BK`, bê 1:1 từ SB_DWH (xem
+  `HLD_FCT_SB_DWH_review.md` mục 12)
+- **Khóa chính của bảng (PK):** DAYID, WORKSTEP_EVENT_BK — bê 1:1 từ
+  SB_DWH (xem `HLD_FCT_SB_DWH_review.md` mục 12): `WORKSTEP_EVENT_BK`
+  gộp 3 cột PK tự nhiên cũ (WI_NAME, WORKSTEP_CODE, ENTRYDATE) thành 1
+  khóa hash duy nhất.
 - **Độ chi tiết (grain):** 1 dòng = 1 phiên bản của 1 logical event (hồ
   sơ × workstep × lần vào bước).
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
   - Báo cáo CLOS APPLICATION (BC2)
   - Báo cáo Thông tin phê duyệt (BC3)
-  - Báo cáo Tuần Chuyên viên Thẩm định (BC4)
-  - Báo cáo SLA - TAT (BC5)
+  - Báo cáo Tuần Chuyên viên Thẩm định (BC4) — `WORKSTEP_FLAG` (BC4.FLAG)
+  - Báo cáo SLA - TAT (BC5) — `APPROVAL_FLAG`
   - Báo cáo EXCEPTION - FTR (BC7)
   - Báo cáo RETURN (BC8)
-  - Báo cáo KPI (BC9)
+  - Báo cáo KPI (BC9) — `APPROVAL_FLAG='First Approval'` điều kiện lọc TAT_APPLICATION_HOUR
   - Báo cáo Giải ngân _ Quá hạn KHCN (BC10)
   - Báo cáo Giải ngân _ Quá hạn KHDN (BC11)
 
@@ -954,38 +1039,41 @@ flowchart LR
     subgraph PDTD_DTM
         D["FCT_RLOS_WORKSTEP_EVENT"]
     end
-    C -->|bê 1:1, cùng grain/PK| D
+    C -->|"bê 1:1, cùng grain/PK — tự EXISTS-check qua các dòng cùng WI_NAME để sinh APPROVAL_FLAG + WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY đã bê 1:1 để sinh WORKSTEP_FLAG "| D
 ```
 
 ### 16.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — nguồn NG_SB_RLOS_ENTRY_EXIT, TRUNC về 00:00:00. Là ngày phiên bản được ghi nhận, KHÔNG phải ảnh chụp lại toàn bộ nhật ký mỗi ngày | — | Nguồn cho chỉ tiêu/trường APPLICATION_SK, APPLICANT_SK (mốc thời gian xác định phiên bản SCD2 hiệu lực khi lookup DIM) |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS — nguồn ENTRY_EXIT.WINAME (đổi tên WINAME→WI_NAME) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo Thông tin phê duyệt (BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4)<br>Báo cáo SLA - TAT (BC5)<br>Báo cáo RETURN (BC8) | WINAME (Mã hồ sơ) |
-| 3 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | PK | Mã bước xử lý trên workflow — nguồn ENTRY_EXIT.WORKSTEP (thêm hậu tố CODE), đã cắt tiền tố hệ nguồn nếu có | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp, đồng thời là điều kiện lọc bước CreditApprovalReview/CreditApproval/CreditCommittee<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — điều kiện lọc bước UnderwriterMaker/UnderwriterChecker<br>Báo cáo SLA - TAT (BC5) — điều kiện lọc để SUM từng cột TAT theo từng bước<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp | WORKSTEP (Bước hồ sơ) |
-| 4 | ENTRYDATE | TIMESTAMP | Y |  | PK | Thời điểm hồ sơ vào bước xử lý — nguồn ENTRY_EXIT.ENTRYDATE. Bắt buộc nằm trong khóa vì 1 hồ sơ có thể quay lại cùng 1 bước nhiều lần | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) — dùng tính ENTRYDATE_DDE (MIN theo bước DetailDataEntry) | ENTRYDATE (Thời gian lên bước) |
-| 5 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | SYSTEMNAME (Hệ thống — CLOS/RLOS) |
-| 6 | WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP, lookup bằng WORKSTEP_CODE theo điều kiện thời gian (EFF_DATE/EXP_DATE). Mặc định -1 nếu không khớp | — | Thiết kế dư thừa |
-| 7 | DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_DECISION, lookup bằng DECISION_CODE theo điều kiện thời gian. KHÔNG nằm trong PK | — | Thiết kế dư thừa |
-| 8 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người xử lý của chính sự kiện này. ĐÚNG GRAIN của bảng. Mặc định -1. KHÔNG nằm trong PK | — | Thiết kế dư thừa |
-| 9 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 | Báo cáo Thông tin phê duyệt (BC3) — khóa JOIN sang DIM_RLOS_APPLICATION.STREAM/APPROVED_AMT_FINAL/CURRENCY_CODE/APPROVED_TERM<br>Báo cáo KPI (BC9) — khóa tra BI_FLOW (điều kiện lọc SLHS_RLOS/SLGN_RLOS), khóa tra FIRST_ELIGIBLE_TS trên REF_LOS_KPI_USER_YEAR (NHAN_SU) | Nguồn cho chỉ tiêu/trường STREAM, CREDIT_LIMIT, CURRENCY, CREDIT_TERM (BC3); SLHS_RLOS, SLGN_RLOS, NHAN_SU (BC9) |
-| 10 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý — nguồn ENTRY_EXIT.EXITDATE. NULL nghĩa là hồ sơ đang nằm tại bước này | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) — dùng tính EXITDATE_DDE (MAX theo bước DetailDataEntry) | EXITDATE (Thời gian kết thúc bước) |
-| 11 | DECISION_CODE | VARCHAR2 | N | 200 |  | Mã quyết định tại bước xử lý — nguồn ENTRY_EXIT.DECISION (thêm hậu tố CODE) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp | DECISION (Quyết định) |
-| 12 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản người xử lý hồ sơ — nguồn ENTRY_EXIT.USERNAME. Giữ nguyên giá trị gốc, không join qua DIM_LOS_USER | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp (BI_APPROVER/BI_COMMITTEE, lọc theo WORKSTEP_CODE)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp (UND_MAKER)<br>Báo cáo KPI (BC9) — điều kiện lọc IS_TEST_ACCOUNT, nguồn cho FIRST_ELIGIBLE_TS/NHAN_SU trên REF_LOS_KPI_USER_YEAR | BI_APPROVER, BI_COMMITTEE (BC3); UND_MAKER (BC4); nguồn cho chỉ tiêu/trường IS_TEST_ACCOUNT, NHAN_SU (BC9) |
-| 13 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — nguồn ENTRY_EXIT.REMARKS | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REMARKS (Ghi chú) |
-| 14 | REASON_CODE | VARCHAR2 | N | 50 |  | Mã lý do hủy hồ sơ — nguồn NG_SB_RLOS_ENTRY_EXIT.REASON_CODE (chỉ RLOS có cột này) | — | Thiết kế dư thừa |
-| 15 | REASON_DESC | VARCHAR2 | N | 500 |  | Diễn giải lý do hủy hồ sơ — nguồn NG_SB_RLOS_ENTRY_EXIT.REASON_DESC (chỉ RLOS có cột này) | — | Thiết kế dư thừa |
-| 16 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — nguồn ENTRY_EXIT.TAT. Giữ lại để đối soát với 3 cột TAT tính lại bên dưới | — | Nguồn cho chỉ tiêu/trường TAT_CALENDAR_HOUR (input tính toán, dùng khi EXITDATE-ENTRYDATE không đủ dữ liệu) |
-| 17 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước xử lý (BranchSupport, DetailDataEntry, DataInputerChecker, UnderwriterMaker, UnderwriterChecker, CreditApproval, CreditCommittee...) | STEP01_BRANCH_CL_TAT, STEP02_DDE_CL_TAT, STEP03_QUALITY_CHECKER_CL_TAT, STEP04_UNDMAKER_CL_TAT, STEP04_UNDCHECKER_CL_TAT, STEP07_APPROVER_CL_TAT, STEP07_COMMITTEE_CL_TAT, TAT_PHONG_CL_TAT, TAT_KHOI_PDTD_CL_TAT |
-| 18 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước xử lý, cùng nhóm cột với TAT_CALENDAR_HOUR | STEP01_BRANCH_WK_TAT, STEP02_DDE_WK_TAT, STEP03_QUALITY_CHECKER_WK_TAT, STEP04_UNDMAKER_WK_TAT, STEP04_UNDCHECKER_WK_TAT, STEP07_APPROVER_WK_TAT, STEP07_COMMITTEE_WK_TAT, TAT_PHONG_WK_TAT, TAT_KHOI_PDTD_WK_TAT |
-| 19 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30 | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước để so sánh với các mốc SLA đã cam kết (SLA_DE, SLA_QC, SLA_MARKER, SLA_CHECKER, SLA_CREDIT_OFFICER, SLA_CREDIT_APPROVER) | STEP01_BRANCH_TAT_CPC, STEP02_DDE_TAT_CPC, STEP03_QUALITY_CHECKER_TAT_CPC, STEP04_UNDMAKER_TAT_CPC, STEP04_UNDCHECKER_TAT_CPC, STEP04_UND_TAT_CPC, STEP07_APPROVER_TAT_CPC |
-| 20 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN) | — | Thiết kế dư thừa |
-| 21 | BI_FLAG_APPROVAL | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH: 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ), ngược lại 'From Second Approval' | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc khi tính TAT_APPLICATION_HOUR (chỉ lấy sự kiện phê duyệt lần đầu) | BI_FLAG_APPROVAL (Phê duyệt lần đầu/từ lần thứ 2, BC5); nguồn cho chỉ tiêu/trường TAT_APPLICATION_HOUR (điều kiện lọc, BC9) |
-| 22 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước — PHÁI SINH: LAG(WORKSTEP_CODE) OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo CLOS APPLICATION (BC2) | PRE_WORKSTEP (Bước xử lý liền trước) |
-| 23 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21), không copy/JOIN từ FCT_RLOS_APPLICATION_DAILY | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8)<br>Báo cáo KPI (BC9) — mốc xếp hồ sơ vào đúng DAYID khi SUM/COUNT SLHS_RLOS/SLGN_RLOS/TAT_RLOS lên grain ngày (qua AGG_LOS_KPI_APPLICATION) | REPORT_DATE (Ngày báo cáo, BC4); PROCESSED_DATE (Ngày dữ liệu, BC8) |
-| 24 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4, nhánh RLOS) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21), LEFT JOIN WFINSTRUMENTTABLE loại tài khoản hệ thống/test, 5 nhánh CASE-WHEN | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
-| 25 | APPLICANT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICANT — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21), join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID, quan hệ 1:1 với hồ sơ. Mặc định -1 nếu không khớp | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICANT.FULL_NAME<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — khóa JOIN sang DIM_RLOS_APPLICANT.FULL_NAME | Nguồn cho chỉ tiêu/trường CUSTOMER_NAME (BC1, BC4) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — nguồn NG_SB_RLOS_ENTRY_EXIT, TRUNC về 00:00:00. Là ngày phiên bản được ghi nhận, KHÔNG phải ảnh chụp lại toàn bộ nhật ký mỗi ngày — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.DAYID | — | Nguồn cho chỉ tiêu/trường APPLICATION_SK (mốc thời gian xác định phiên bản SCD2 hiệu lực khi lookup DIM) |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.DATASOURCE | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | SYSTEMNAME (Hệ thống — CLOS/RLOS) |
+| 3 | WORKSTEP_EVENT_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng sự kiện — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WORKSTEP_EVENT_BK: STANDARD_HASH(WI_NAME \|\| '~' \|\| WORKSTEP_CODE \|\| '~' \|\| TO_CHAR(ENTRYDATE,'YYYY-MM-DD HH24:MI:SS.FF6') \|\| '~' \|\| DATASOURCE, 'SHA256') — gộp 3 cột PK tự nhiên cũ thành 1 khóa đơn | — (cột kỹ thuật, một phần khóa chính) | — |
+| 4 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP_DECISION (gộp từ WORKSTEP_SK+DECISION_SK), lookup theo cặp WORKSTEP_CODE (cột 9, chính dòng event) + DECISION_CODE điều kiện thời gian (EFF_DATE/EXP_DATE). Mặc định -1 nếu không khớp. KHÔNG nằm trong PK — chỉ để tra cứu thêm thuộc tính (kể cả DECISION_CODE, đã xóa denormalize khỏi fact) — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WORKSTEP_DECISION_SK | Báo cáo Thông tin phê duyệt (BC3) — khóa JOIN thay cho cột DECISION_CODE denormalize đã xóa<br>Báo cáo RETURN (BC8) — khóa JOIN thay cho cột DECISION_CODE denormalize đã xóa | DECISION (Quyết định) |
+| 5 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người xử lý của chính sự kiện này. ĐÚNG GRAIN của bảng. Mặc định -1. KHÔNG nằm trong PK — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.USER_SK | — | Thiết kế dư thừa |
+| 6 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.APPLICATION_SK | Báo cáo Thông tin phê duyệt (BC3) — khóa JOIN sang DIM_RLOS_APPLICATION.STREAM/APPROVED_AMT_FINAL/CURRENCY_CODE/APPROVED_TERM<br>Báo cáo KPI (BC9) — khóa tra BUSINESS_FLOW (điều kiện lọc SLHS_RLOS/SLGN_RLOS), khóa tra FIRST_ELIGIBLE_TS trên AGG_LOS_KPI_USER_YEAR (NHAN_SU) | Nguồn cho chỉ tiêu/trường STREAM, CREDIT_LIMIT, CURRENCY, CREDIT_TERM (BC3); SLHS_RLOS, SLGN_RLOS, NHAN_SU (BC9) |
+| 7 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WI_NAME (nguồn gốc xa: ENTRY_EXIT.WINAME, đổi tên WINAME→WI_NAME) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo Thông tin phê duyệt (BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4)<br>Báo cáo SLA - TAT (BC5)<br>Báo cáo RETURN (BC8) | WINAME (Mã hồ sơ) |
+| 8 | WORKSTEP_CODE | VARCHAR2 | Y | 200 |  | Mã bước xử lý trên workflow — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WORKSTEP_CODE (nguồn gốc xa: ENTRY_EXIT.WORKSTEP, thêm hậu tố CODE, đã cắt tiền tố hệ nguồn nếu có) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp, đồng thời là điều kiện lọc bước CreditApprovalReview/CreditApproval/CreditCommittee<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — điều kiện lọc bước UnderwriterMaker/UnderwriterChecker<br>Báo cáo SLA - TAT (BC5) — điều kiện lọc để SUM từng cột TAT theo từng bước<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp | WORKSTEP (Bước hồ sơ) |
+| 9 | ENTRYDATE | TIMESTAMP | Y |  |  | Thời điểm hồ sơ vào bước xử lý — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.ENTRYDATE (nguồn gốc xa: ENTRY_EXIT.ENTRYDATE). Bắt buộc nằm trong khóa nghiệp vụ vì 1 hồ sơ có thể quay lại cùng 1 bước nhiều lần | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) — dùng tính ENTRYDATE_DDE (MIN theo bước DetailDataEntry) | ENTRYDATE (Thời gian lên bước) |
+| 10 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.EXITDATE (nguồn gốc xa: ENTRY_EXIT.EXITDATE). NULL nghĩa là hồ sơ đang nằm tại bước này | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) — dùng tính EXITDATE_DDE (MAX theo bước DetailDataEntry) | EXITDATE (Thời gian kết thúc bước) |
+| 11 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản người xử lý hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.USERNAME (nguồn gốc xa: ENTRY_EXIT.USERNAME). Giữ nguyên giá trị gốc, không join qua DIM_LOS_USER | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp (BI_APPROVER/BI_COMMITTEE, lọc theo WORKSTEP_CODE)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp (UND_MAKER)<br>Báo cáo KPI (BC9) — điều kiện lọc IS_TEST_ACCOUNT, nguồn cho FIRST_ELIGIBLE_TS/NHAN_SU trên AGG_LOS_KPI_USER_YEAR | BI_APPROVER, BI_COMMITTEE (BC3); UND_MAKER (BC4); nguồn cho chỉ tiêu/trường IS_TEST_ACCOUNT, NHAN_SU (BC9) |
+| 12 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.REMARKS (nguồn gốc xa: ENTRY_EXIT.REMARKS) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REMARKS (Ghi chú) |
+| 13 | REASON_CODE | VARCHAR2 | N | 50 |  | Mã lý do hủy hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.REASON_CODE (nguồn gốc xa: NG_SB_RLOS_ENTRY_EXIT.REASON_CODE, chỉ RLOS có cột này) | — | Thiết kế dư thừa |
+| 14 | REASON_DESC | VARCHAR2 | N | 500 |  | Diễn giải lý do hủy hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.REASON_DESC (nguồn gốc xa: NG_SB_RLOS_ENTRY_EXIT.REASON_DESC, chỉ RLOS có cột này) | — | Thiết kế dư thừa |
+| 15 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.TAT_SOURCE_SEC (nguồn gốc xa: ENTRY_EXIT.TAT). Giữ lại để đối soát với 3 cột TAT tính lại bên dưới | — | Nguồn cho chỉ tiêu/trường TAT_CALENDAR_HOUR (input tính toán, dùng khi EXITDATE-ENTRYDATE không đủ dữ liệu) |
+| 16 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.TAT_CALENDAR_HOUR: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước xử lý (BranchSupport, DetailDataEntry, DataInputerChecker, UnderwriterMaker, UnderwriterChecker, CreditApproval, CreditCommittee...) | STEP01_BRANCH_CL_TAT, STEP02_DDE_CL_TAT, STEP03_QUALITY_CHECKER_CL_TAT, STEP04_UNDMAKER_CL_TAT, STEP04_UNDCHECKER_CL_TAT, STEP07_APPROVER_CL_TAT, STEP07_COMMITTEE_CL_TAT, TAT_PHONG_CL_TAT, TAT_KHOI_PDTD_CL_TAT |
+| 17 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.TAT_WORKING_HOUR: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước xử lý, cùng nhóm cột với TAT_CALENDAR_HOUR | STEP01_BRANCH_WK_TAT, STEP02_DDE_WK_TAT, STEP03_QUALITY_CHECKER_WK_TAT, STEP04_UNDMAKER_WK_TAT, STEP04_UNDCHECKER_WK_TAT, STEP07_APPROVER_WK_TAT, STEP07_COMMITTEE_WK_TAT, TAT_PHONG_WK_TAT, TAT_KHOI_PDTD_WK_TAT |
+| 18 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.TAT_CPC_HOUR: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30 | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước để so sánh với các mốc SLA đã cam kết (SLA_DE, SLA_QC, SLA_MARKER, SLA_CHECKER, SLA_CREDIT_OFFICER, SLA_CREDIT_APPROVER) | STEP01_BRANCH_TAT_CPC, STEP02_DDE_TAT_CPC, STEP03_QUALITY_CHECKER_TAT_CPC, STEP04_UNDMAKER_TAT_CPC, STEP04_UNDCHECKER_TAT_CPC, STEP04_UND_TAT_CPC, STEP07_APPROVER_TAT_CPC |
+| 19 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.EVENT_SEQ_ASC: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN) | — | Thiết kế dư thừa |
+| 20 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH (không copy/JOIN từ FCT_RLOS_APPLICATION), bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.PROCESSED_DATE | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8)<br>Báo cáo KPI (BC9) — mốc xếp hồ sơ vào đúng DAYID khi SUM/COUNT SLHS_RLOS/SLGN_RLOS/TAT_RLOS lên grain ngày (qua AGG_LOS_KPI_APPLICATION) | REPORT_DATE (Ngày báo cáo, BC4); PROCESSED_DATE (Ngày dữ liệu, BC8) |
+| 21 | WF_PROCESSNAME | VARCHAR2 | N | 50 |  | Tên hệ thống workflow của instance đang đứng — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_PROCESSNAME (thay cho WORKSTEP_FLAG đã tính sẵn, cùng cơ chế đã áp dụng cho CLOS) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 28, cùng bảng) | — |
+| 22 | WF_ACTIVITYNAME | VARCHAR2 | N | 200 |  | Bước hiện tại của instance workflow — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_ACTIVITYNAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 28, cùng bảng) | — |
+| 23 | WF_CREATEDBY | VARCHAR2 | N | 50 |  | Mã người/hệ thống tạo bản ghi workflow — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_CREATEDBY.| Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (điều kiện lọc, cột 28, cùng bảng) | — |
+| 24 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng (BC3.CREDIT_LIMIT) — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.APPROVED_AMT_FINAL (nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT, cùng công thức/kết quả với FCT_RLOS_APPLICATION.APPROVED_AMT_FINAL cho cùng WI_NAME, không copy/JOIN từ đó) — phục vụ BC3 lookup thẳng qua APPLICATION_SK, không cần JOIN fan-out sang FCT_RLOS_APPLICATION | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | CREDIT_LIMIT (Số tiền phê duyệt) |
+| 25 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền (BC3.CURRENCY) — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.CURRENCY_CODE (nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_CURRENCY) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | CURRENCY (Đơn vị tiền tệ) |
+| 26 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt (BC3.CREDIT_TERM) — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.APPROVED_TERM (nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_TERM) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | CREDIT_TERM (Thời hạn phê duyệt) |
+| 27 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, cùng cơ chế đã áp dụng cho CLOS): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này), ngược lại 'From Second Approval' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc khi tính TAT_APPLICATION_HOUR (chỉ lấy sự kiện phê duyệt lần đầu) | APPROVAL_FLAG (Phê duyệt lần đầu/từ lần thứ 2, BC5); nguồn cho chỉ tiêu/trường TAT_APPLICATION_HOUR (điều kiện lọc, BC9) |
+| 28 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4, nhánh RLOS) — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH): 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE (tra qua WORKSTEP_DECISION_SK → DIM_RLOS_WORKSTEP_DECISION, cột 4) của CHÍNH DÒNG SỰ KIỆN đang xét, kết hợp WF_PROCESSNAME='RLOS'/WF_ACTIVITYNAME (cột 21-22, đã bê 1:1 từ SB_DWH) — nhánh 2/4/5 khác CLOS (nhánh 4 có thêm OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send to UWChecker')).| Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
 
 ## 17. FCT_RLOS_LOAN_DISBURSEMENT
 
@@ -998,6 +1086,8 @@ flowchart LR
   nhau). Bảng RLOS này không có 3 cột `CUST_GROUP`/`LOANCASEID`/
   `APPROVAL_WINAME_LOS` (RLOS không có khái niệm hồ sơ cha/nhóm khách
   hàng doanh nghiệp).
+- **Khóa nghiệp vụ (BK):** `CONTRACT` (cột đơn, không cần hash — bảng
+  hoàn toàn mới ở PDTD_DTM, không bê 1:1 từ SB_DWH)
 - **Khóa chính của bảng (PK):** DAYID, CONTRACT.
 - **Độ chi tiết (grain):** 1 dòng = 1 HỢP ĐỒNG khoản vay trên T24, trong
   ảnh chụp của ngày DAYID — khác hẳn grain hồ sơ của mọi bảng LOS khác
@@ -1024,7 +1114,7 @@ flowchart LR
     end
     SA -->|1:1 SEAB_LOS_ID, LIMIT_REF + PHÁI SINH DISBURSEMENT_AMT/CUR_BALANCE + self-join PD_CONTRACT sinh NO_DAYS_OVERDUE/CUR_BUCKET| E
     CUST -.->|CUSTOMER_SK, tra theo CUSTOMER_SK có sẵn trên STG_FCT_LOAN| E
-    COMP -.->|COMPANY_SK, tra theo CO_CODE| E
+    COMP -.->|T24_COMPANY_SK, tra theo CO_CODE| E
     LOAN -.->|CONTRACT_SK, tra theo CONTRACT_SK có sẵn trên STG_FCT_LOAN| E
     PROD -.->|SEAB_PRODUCTS_DE_SK, tra theo SEAB_PRODUCTS_DE_SK có sẵn trên STG_FCT_LOAN — SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả| E
     RAPP -.->|APPLICATION_SK theo SEAB_LOS_ID — PHÁI SINH APPROVAL_DATE qua LAST_APPROVAL_DATE cho BC10| E
@@ -1034,19 +1124,160 @@ flowchart LR
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — nguồn STG_FCT_LOAN.DAYID, TRUNC về 00:00:00. Là ngày ảnh chụp số liệu, KHÔNG phải ngày nghiệp vụ | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp (DAYID)<br>Báo cáo KPI (BC9) — nguồn cho chỉ tiêu/trường SLGN_RLOS_DAY (điều kiện lọc EXISTS hợp đồng theo SEAB_LOS_ID) | DAYID (Ngày dữ liệu, BC10) |
-| 2 | CONTRACT | VARCHAR2 | Y | 100 | PK | Mã hợp đồng khoản vay — nguồn STG_FCT_LOAN.CONTRACT (1:1 từ SB_DWH.FCT_LOAN.CONTRACT) | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp, cũng là khóa PK | CONTRACT (Mã hợp đồng) |
-| 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'T24' — bảng nguồn T24 core banking (STG_FCT_LOAN), không thuộc STG_LOS | — (cột kỹ thuật) | — |
-| 4 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER — nguồn STG_FCT_LOAN.CUSTOMER_SK (surrogate có sẵn, tra thẳng DIM_T24_CUSTOMER.DIMENSION_KEY). Mặc định -1 nếu không khớp | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — khóa JOIN sang DIM_T24_CUSTOMER để lấy CUSTOMER_ID/SHORT_NAME | Nguồn cho chỉ tiêu/trường CUSTOMER_ID, SHORT_NAME (BC10) |
-| 5 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_COMPANY — PHÁI SINH: lookup theo STG_FCT_LOAN.CO_CODE = DIM_T24_COMPANY.COMPANY_CODE (COMPANY_EXP_DATE IS NULL phía nguồn T24). Mặc định -1 | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — khóa JOIN sang DIM_T24_COMPANY để lấy BRANCH_NAME/COMPANY_NAME | Nguồn cho chỉ tiêu/trường BRANCH_NAME, COMPANY_NAME (BC10) |
-| 6 | CONTRACT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_LOAN — nguồn STG_FCT_LOAN.CONTRACT_SK (surrogate có sẵn, tra thẳng DIMENSION_KEY). Mặc định -1 | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — khóa JOIN sang DIM_T24_LOAN để lấy VALUE_DATE/MATURITY_DATE/REC_STATUS/CONTRACT_REF/REF_VALUE_DATE | Nguồn cho chỉ tiêu/trường VALUE_DATE, MATURITY_DATE, STATUS, CONTRACT_REF, REF_VALUE_DATE (BC10) |
-| 7 | SEAB_PRODUCTS_DE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_PRODUCTS_DE — nguồn STG_FCT_LOAN.SEAB_PRODUCTS_DE_SK (surrogate có sẵn; SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả). Mặc định -1 | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — khóa JOIN sang DIM_T24_SEAB_PRODUCTS_DE để lấy PRODUCT_T24 | Nguồn cho chỉ tiêu/trường PRODUCT_T24 (BC10) |
-| 8 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION, tra theo SEAB_LOS_ID. KHÔNG để NULL — không tra được thì gán -1 (Unknown), tránh phép JOIN của OAS rớt dòng | — (cột kỹ thuật, khóa JOIN nội bộ để sinh APPROVAL_DATE) | Nguồn cho chỉ tiêu/trường APPROVAL_DATE (BC10) |
-| 9 | SEAB_LOS_ID | VARCHAR2 | N | 100 |  | Mã hồ sơ LOS do T24 lưu, gắn với hợp đồng — nguồn STG_FCT_LOAN.SEAB_LOS_ID | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — nguồn cho chỉ tiêu/trường SLGN_RLOS_DAY (điều kiện lọc EXISTS hợp đồng STG_FCT_LOAN theo SEAB_LOS_ID) | SEAB_LOS_ID (Mã hồ sơ, BC10); nguồn cho chỉ tiêu/trường SLGN_RLOS_DAY (điều kiện lọc, BC9) |
-| 10 | ZONE | VARCHAR2 | N | 50 |  | Tên vùng của đơn vị kinh doanh — PHÁI SINH: LEFT JOIN TMP_REF_COMPANY_REGION_KHCN theo STG_FCT_LOAN.CO_CODE = COMPANY_CODE. Lưu trực tiếp trên fact (không tách FK riêng) vì nguồn là bảng REF_ tĩnh, không phải DIM SCD2 | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | ZONE (Khu vực) |
-| 11 | DISBURSEMENT_AMT | NUMBER | N | 20,2 |  | Số tiền giải ngân — PHÁI SINH: ABS(STG_FCT_LOAN.FIRST_DISBURSEMENT_AMT) | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | DISBURSEMENT_AMT_T24 (Số tiền giải ngân) |
-| 12 | CUR_BALANCE | NUMBER | N | 20,2 |  | Dư nợ hiện tại — PHÁI SINH: (ABS(NVL(BALANCE,0)) + ABS(NVL(PD_BALANCE,0))) * REVAL_RATE trên STG_FCT_LOAN | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | CUR_BALANCE (Dư nợ hiện tại) |
-| 13 | NO_DAYS_OVERDUE | NUMBER | N | 6 |  | Số ngày quá hạn — PHÁI SINH: self-join STG_FCT_LOAN (b) ON a.PD_CONTRACT = b.CONTRACT, lấy b.NO_DAYS_OVERDUE | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp, cũng là nguồn tính CUR_BUCKET | NO_DAYS_OVERDUE (Số ngày quá hạn) |
-| 14 | CUR_BUCKET | NUMBER | N | 2 |  | Nhóm nợ — PHÁI SINH: CASE WHEN NO_DAYS_OVERDUE > 360 THEN 5 WHEN > 180 THEN 4 WHEN > 90 THEN 3 WHEN >= 10 THEN 2 ELSE 1 END, cùng self-join PD_CONTRACT như NO_DAYS_OVERDUE | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | CUR_BUCKET (Nhóm nợ) |
-| 15 | APPROVAL_DATE | DATE | N |  |  | Ngày phê duyệt — PHÁI SINH: JOIN APPLICATION_SK sang DIM_RLOS_APPLICATION.LAST_APPROVAL_DATE — giữ nguyên tắc "DTM chỉ đọc DWH", không đọc thẳng NG_SB_RLOS_ENTRY_EXIT tại đây, không JOIN fact-to-fact sang FCT_RLOS_APPLICATION_DAILY | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | APPROVAL_DATE (Ngày phê duyệt) |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — nguồn STG_DTM.STG_FCT_LOAN.DAYID, TRUNC về 00:00:00. Là ngày ảnh chụp số liệu, KHÔNG phải ngày nghiệp vụ. BẢNG HOÀN TOÀN MỚI TẠI PDTD_DTM, không có ở SB_DWH (nguồn STG_DTM/DIM_T24_*, không phải SB_DWH) | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp (DAYID)<br>Báo cáo KPI (BC9) — nguồn cho chỉ tiêu/trường SLGN_RLOS_DAY (điều kiện lọc EXISTS hợp đồng theo SEAB_LOS_ID) | DAYID (Ngày dữ liệu, BC10) |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'T24' — bảng nguồn T24 core banking (STG_DTM.STG_FCT_LOAN), không thuộc STG_LOS — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | — (cột kỹ thuật) | — |
+| 3 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER — nguồn STG_DTM.STG_FCT_LOAN.CUSTOMER_SK (surrogate có sẵn, tra thẳng DIM_T24_CUSTOMER.DIMENSION_KEY). Mặc định -1 nếu không khớp — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — khóa JOIN sang DIM_T24_CUSTOMER để lấy CUSTOMER_ID/SHORT_NAME | Nguồn cho chỉ tiêu/trường CUSTOMER_ID, SHORT_NAME (BC10) |
+| 4 | T24_COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_COMPANY — PHÁI SINH TẠI PDTD_DTM: lookup theo STG_DTM.STG_FCT_LOAN.CO_CODE = DIM_T24_COMPANY.COMPANY_CODE (COMPANY_EXP_DATE IS NULL phía nguồn T24). Mặc định -1 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — khóa JOIN sang DIM_T24_COMPANY để lấy BRANCH_NAME/COMPANY_NAME | Nguồn cho chỉ tiêu/trường BRANCH_NAME, COMPANY_NAME (BC10) |
+| 5 | CONTRACT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_LOAN — nguồn STG_DTM.STG_FCT_LOAN.CONTRACT_SK (surrogate có sẵn, tra thẳng DIMENSION_KEY). Mặc định -1 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — khóa JOIN sang DIM_T24_LOAN để lấy VALUE_DATE/MATURITY_DATE/REC_STATUS/CONTRACT_REF/REF_VALUE_DATE | Nguồn cho chỉ tiêu/trường VALUE_DATE, MATURITY_DATE, STATUS, CONTRACT_REF, REF_VALUE_DATE (BC10) |
+| 6 | SEAB_PRODUCTS_DE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_PRODUCTS_DE — nguồn STG_DTM.STG_FCT_LOAN.SEAB_PRODUCTS_DE_SK (surrogate có sẵn; SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả). Mặc định -1 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — khóa JOIN sang DIM_T24_SEAB_PRODUCTS_DE để lấy PRODUCT_T24 | Nguồn cho chỉ tiêu/trường PRODUCT_T24 (BC10) |
+| 7 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION, tra theo SEAB_LOS_ID (qua STG_DTM.STG_FCT_LOAN.SEAB_LOS_ID). KHÔNG để NULL — không tra được thì gán -1 (Unknown), tránh phép JOIN của OAS rớt dòng — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | — (cột kỹ thuật, khóa JOIN nội bộ để sinh APPROVAL_DATE) | Nguồn cho chỉ tiêu/trường APPROVAL_DATE (BC10) |
+| 8 | CONTRACT | VARCHAR2 | Y | 100 | PK | Mã hợp đồng khoản vay — nguồn STG_DTM.STG_FCT_LOAN.CONTRACT (nguồn gốc xa: SB_DWH.FCT_LOAN.CONTRACT, 1:1). BẢNG HOÀN TOÀN MỚI TẠI PDTD_DTM — không có SB_DWH.FCT_RLOS_LOAN_DISBURSEMENT tương ứng, chỉ nguồn gốc xa của riêng cột CONTRACT đi qua SB_DWH.FCT_LOAN (bảng T24 chung, không tách CLOS/RLOS) | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp, cũng là khóa PK | CONTRACT (Mã hợp đồng) |
+| 9 | SEAB_LOS_ID | VARCHAR2 | N | 100 |  | Mã hồ sơ LOS do T24 lưu, gắn với hợp đồng — nguồn STG_DTM.STG_FCT_LOAN.SEAB_LOS_ID — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — nguồn cho chỉ tiêu/trường SLGN_RLOS_DAY (điều kiện lọc EXISTS hợp đồng STG_FCT_LOAN theo SEAB_LOS_ID) | SEAB_LOS_ID (Mã hồ sơ, BC10); nguồn cho chỉ tiêu/trường SLGN_RLOS_DAY (điều kiện lọc, BC9) |
+| 10 | ZONE | VARCHAR2 | N | 50 |  | Tên vùng của đơn vị kinh doanh — PHÁI SINH TẠI PDTD_DTM: LEFT JOIN TMP_REF_COMPANY_REGION_KHCN theo STG_DTM.STG_FCT_LOAN.CO_CODE = COMPANY_CODE. Lưu trực tiếp trên fact (không tách FK riêng) vì nguồn là bảng REF_ tĩnh, không phải DIM SCD2 — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | ZONE (Khu vực) |
+| 11 | DISBURSEMENT_AMT | NUMBER | N | 20,2 |  | Số tiền giải ngân — PHÁI SINH TẠI PDTD_DTM: ABS(STG_DTM.STG_FCT_LOAN.FIRST_DISBURSEMENT_AMT) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | DISBURSEMENT_AMT_T24 (Số tiền giải ngân) |
+| 12 | CUR_BALANCE | NUMBER | N | 20,2 |  | Dư nợ hiện tại — PHÁI SINH TẠI PDTD_DTM: (ABS(NVL(BALANCE,0)) + ABS(NVL(PD_BALANCE,0))) * REVAL_RATE trên STG_DTM.STG_FCT_LOAN — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | CUR_BALANCE (Dư nợ hiện tại) |
+| 13 | NO_DAYS_OVERDUE | NUMBER | N | 6 |  | Số ngày quá hạn — PHÁI SINH TẠI PDTD_DTM: self-join STG_DTM.STG_FCT_LOAN (b) ON a.PD_CONTRACT = b.CONTRACT, lấy b.NO_DAYS_OVERDUE — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp, cũng là nguồn tính CUR_BUCKET | NO_DAYS_OVERDUE (Số ngày quá hạn) |
+| 14 | CUR_BUCKET | NUMBER | N | 2 |  | Nhóm nợ — PHÁI SINH TẠI PDTD_DTM: CASE WHEN NO_DAYS_OVERDUE (cột 13, cùng bảng) > 360 THEN 5 WHEN > 180 THEN 4 WHEN > 90 THEN 3 WHEN >= 10 THEN 2 ELSE 1 END, cùng self-join PD_CONTRACT như NO_DAYS_OVERDUE — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | CUR_BUCKET (Nhóm nợ) |
+| 15 | APPROVAL_DATE | DATE | N |  |  | Ngày phê duyệt — PHÁI SINH TẠI PDTD_DTM: JOIN APPLICATION_SK (cột 7, cùng bảng) sang DIM_RLOS_APPLICATION.LAST_APPROVAL_DATE (PDTD_DTM) — giữ nguyên tắc "DTM chỉ đọc DWH", không đọc thẳng NG_SB_RLOS_ENTRY_EXIT tại đây, không JOIN fact-to-fact sang FCT_RLOS_APPLICATION — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — hiển thị trực tiếp | APPROVAL_DATE (Ngày phê duyệt) |
+
+## 18. FCT_RLOS_CUSTOMER
+
+### 18.1 Mục đích thiết kế
+- **Ý nghĩa bảng:** thông tin người vay chính (applicant) của hồ sơ RLOS
+  tại PDTD_DTM, chi tiết tới TỪNG GIẤY TỜ ĐỊNH DANH.
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_TYPE`+`ID_NUMBER` —
+  hash vào cột `CUSTOMER_BK`, bê 1:1 từ SB_DWH
+- **Khóa chính của bảng (PK):** `DAYID`, `CUSTOMER_BK` (giữ nguyên như SB_DWH).
+- **Độ chi tiết (grain):** 1 dòng = 1 ngày × 1 giấy tờ định danh của
+  người vay chính trên 1 hồ sơ, snapshot hàng ngày — không SCD2 (giữ
+  nguyên như SB_DWH).
+- **Phục vụ báo cáo:**
+  - Báo cáo RLOS APPLICATION (BC1)
+  - Báo cáo CLOS APPLICATION (BC2)
+  - Báo cáo Thông tin phê duyệt (BC3) — hiển thị tên khách hàng
+  - Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị tên khách hàng
+
+### 18.2 Sơ đồ lineage
+
+```mermaid
+flowchart LR
+    subgraph SB_DWH
+        C["FCT_RLOS_CUSTOMER"]
+    end
+    subgraph PDTD_DTM
+        D["FCT_RLOS_CUSTOMER"]
+    end
+    C -.->|"bê 1:1, PHÁI SINH thêm CUSTOMER_SEGMENT từ CUS_SEGMENT"| D
+```
+
+
+### 18.3 Cấu trúc bảng
+
+Cấu trúc cột kế thừa toàn bộ 37 cột từ SB_DWH (bê 1:1 — xem nguồn/công
+thức đầy đủ tại `HLD_FCT_SB_DWH_review.md` mục 15, không lặp lại ở đây),
+cộng thêm 1 cột phái sinh mới (`CUSTOMER_SEGMENT`, cột 38):
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.DAYID | — (cột kỹ thuật) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | CUSTOMER_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ hash của tổ hợp (hồ sơ, loại giấy tờ, số giấy tờ) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CUSTOMER_BK: PHÁI SINH STANDARD_HASH(WI_NAME \|\| '~' \|\| ID_TYPE \|\| '~' \|\| ID_NUMBER, 'SHA256') | — (cột kỹ thuật, khóa chính) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.APPLICATION_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
+| 5 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.T24_CUSTOMER_SK — join theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME (đúng nguyên văn SRS BC1 BR 1.2). Mặc định -1 nếu không khớp. Chân khách hàng T24 — khác chân khách hàng LOS/applicant thể hiện bằng chính WI_NAME/ID_TYPE/ID_NUMBER | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_CUSTOMER lấy CUSTOMER_ID | Nguồn cho chỉ tiêu/trường CUSTOMER_ID (BC1) |
+| 6 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.WI_NAME (nguồn gốc xa: NG_SB_RLOS_APPLICANT_IDGRID.WI_NAME, driving table tại SB_DWH). Quan hệ 1:N với giấy tờ (1 hồ sơ có thể có nhiều giấy tờ) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | WINAME (Mã hồ sơ) |
+| 7 | ID_TYPE | VARCHAR2 | N | 50 |  | Loại giấy tờ định danh — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ID_TYPE (nguồn gốc xa: NG_SB_RLOS_APPLICANT_IDGRID.ID_TYPE) | — | Thiết kế dư thừa (đầu vào cho pivot ADD_ID/ADD_ID_OTHER nếu cần tại tầng report) |
+| 8 | ID_NUMBER | VARCHAR2 | N | 100 |  | Số giấy tờ định danh — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ID_NUMBER (nguồn gốc xa: NG_SB_RLOS_APPLICANT_IDGRID.ID_NUMBER) | — | Thiết kế dư thừa (đầu vào cho pivot ADD_ID/ADD_ID_OTHER nếu cần tại tầng report) |
+| 9 | ISSUE_DATE | DATE | N |  |  | Ngày cấp giấy tờ — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ISSUE_DATE | — | Thiết kế dư thừa |
+| 10 | EXPIRY_DATE | DATE | N |  |  | Ngày hết hạn giấy tờ — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.EXPIRY_DATE | — | Thiết kế dư thừa |
+| 11 | ISSUE_PLACE | VARCHAR2 | N | 200 |  | Nơi cấp giấy tờ — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ISSUE_PLACE | — | Thiết kế dư thừa |
+| 12 | ISSUE_DATE_VISA | DATE | N |  |  | Ngày cấp visa (khách hàng nước ngoài) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ISSUE_DATE_VISA | — | Thiết kế dư thừa |
+| 13 | EXPIRY_DATE_VISA | DATE | N |  |  | Ngày hết hạn visa (khách hàng nước ngoài) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.EXPIRY_DATE_VISA | — | Thiết kế dư thừa |
+| 14 | CUST_CLASS | VARCHAR2 | N | 200 |  | Phân loại khách hàng theo giấy tờ (CLASS.IND.UNDEFINED/CLASS.MASS/CLASS.SB.STAFF/CLASS.VIPS) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CUST_CLASS | — | Thiết kế dư thừa |
+| 15 | IS_FETCH | VARCHAR2 | N | 200 |  | Cờ giấy tờ có được tự động lấy từ hệ định danh hay không — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.IS_FETCH | — | Thiết kế dư thừa |
+| 16 | CIF | VARCHAR2 | N | 50 |  | Mã CIF khách hàng, nếu đã định danh — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CIF. Khác APPLICANT_CIF trên DIM_RLOS_APPLICATION (gắn theo hồ sơ) | — | Thiết kế dư thừa |
+| 17 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên đầy đủ — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.FULL_NAME (nguồn gốc xa: NG_SB_RLOS_APPLICANT_GENERAL.FULL_NAME) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo Thông tin phê duyệt (BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) | CUSTOMER_NAME (Tên khách hàng) |
+| 18 | DATE_OF_BIRTH | DATE | N |  |  | Ngày sinh — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.DATE_OF_BIRTH | Báo cáo RLOS APPLICATION (BC1) | DATE_OF_BIRTH (Ngày sinh) |
+| 19 | GENDER | VARCHAR2 | N | 20 |  | Giới tính — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.GENDER | Báo cáo RLOS APPLICATION (BC1) | GENDER (Giới tính) |
+| 20 | NATIONALITY | VARCHAR2 | N | 100 |  | Quốc tịch (mã) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.NATIONALITY | — | Thiết kế dư thừa |
+| 21 | TITLE | VARCHAR2 | N | 50 |  | Danh xưng — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.TITLE | — | Thiết kế dư thừa |
+| 22 | HOME_PHONE | VARCHAR2 | N | 50 |  | Số điện thoại nhà riêng — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.HOME_PHONE | — | Thiết kế dư thừa |
+| 23 | PHONE_1 | VARCHAR2 | N | 50 |  | Số điện thoại di động chính — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.PHONE_1 | — | Thiết kế dư thừa |
+| 24 | PHONE_2 | VARCHAR2 | N | 50 |  | Số điện thoại phụ — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.PHONE_2 | — | Thiết kế dư thừa |
+| 25 | MARRIAGE_STATUS | VARCHAR2 | N | 100 |  | Tình trạng hôn nhân — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.MARRIAGE_STATUS (nguồn gốc xa: NG_SB_RLOS_APPLICANT_DETAIL.MARR_STATUS) | Báo cáo RLOS APPLICATION (BC1) | MARRIAGE_STATUS (Tình trạng hôn nhân) |
+| 26 | EDUCATION_LEVEL | VARCHAR2 | N | 100 |  | Trình độ học vấn — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.EDUCATION_LEVEL | Báo cáo RLOS APPLICATION (BC1) | EDUCATION_LEVEL (Trình độ học vấn) |
+| 27 | VEHICLE | VARCHAR2 | N | 100 |  | Phương tiện đi lại — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.VEHICLE | Báo cáo RLOS APPLICATION (BC1) | VEHICLES (Phương tiện đi lại) |
+| 28 | PERM_ADDRESS | VARCHAR2 | N | 500 |  | Địa chỉ thường trú — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.PERM_ADDRESS | Báo cáo RLOS APPLICATION (BC1) | PERMANENT_RESIDENCE_ADDRESS (Địa chỉ thường trú) |
+| 29 | CURR_HOUSE_NO | VARCHAR2 | N | 200 |  | Số nhà thuộc địa chỉ hiện tại — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CURR_HOUSE_NO | Báo cáo RLOS APPLICATION (BC1) | Nguồn cho chỉ tiêu/trường CURRENT_RESIDENTIAL_ADDRESS (thành phần số nhà) |
+| 30 | CURR_WARD | VARCHAR2 | N | 100 |  | Phường xã thuộc địa chỉ hiện tại — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CURR_WARD | Báo cáo RLOS APPLICATION (BC1) | CURRENT_RESIDENTIAL_WARD (Địa chỉ hiện tại — Phường/Xã) |
+| 31 | CITY_CODE | VARCHAR2 | N | 50 |  | Mã tỉnh/thành phố thuộc địa chỉ hiện tại — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CITY_CODE | — | — |
+| 32 | CITY_NAME | VARCHAR2 | N | 200 |  | Tên tỉnh/thành phố — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CITY_NAME | Báo cáo RLOS APPLICATION (BC1) | CURRENT_RESIDENTIAL_CITY (Địa chỉ hiện tại — Tỉnh/TP) |
+| 33 | CITY_NAME_VN | VARCHAR2 | N | 200 |  | Tên tỉnh/thành phố tiếng Việt có dấu (dùng ghép địa chỉ chi tiết) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CITY_NAME_VN | Báo cáo RLOS APPLICATION (BC1) | Nguồn cho chỉ tiêu/trường CURRENT_RESIDENTIAL_ADDRESS (thành phần tỉnh/thành) |
+| 34 | DISTRICT_CODE | VARCHAR2 | N | 50 |  | Mã quận/huyện thuộc địa chỉ hiện tại — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.DISTRICT_CODE | — | — |
+| 35 | DISTRICT_NAME | VARCHAR2 | N | 200 |  | Tên quận/huyện — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.DISTRICT_NAME | Báo cáo RLOS APPLICATION (BC1) | CURRENT_RESIDENTIAL_DISTRICT (Địa chỉ hiện tại — Quận/Huyện) |
+| 36 | DISTRICT_NAME_VN | VARCHAR2 | N | 200 |  | Tên quận/huyện tiếng Việt có dấu (dùng ghép địa chỉ chi tiết) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.DISTRICT_NAME_VN (đã xử lý NULL cho giá trị lỗi '#NA'/'#REF!' ngay tại SB_DWH) | Báo cáo RLOS APPLICATION (BC1) | Nguồn cho chỉ tiêu/trường CURRENT_RESIDENTIAL_ADDRESS (thành phần quận/huyện) |
+| 37 | CUS_SEGMENT | VARCHAR2 | N | 100 |  | Phân khúc khách hàng theo LOS (giá trị gốc, chưa chuẩn hóa) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CUS_SEGMENT (nguồn gốc xa: NG_SB_RLOS_APPLICANT_DETAIL.CUS_SEGMENT) | — | Thiết kế dư thừa (nguồn duy nhất của CUSTOMER_SEGMENT, cột 38 cùng bảng) |
+| 38 | CUSTOMER_SEGMENT | VARCHAR2 | N | 50 |  | Phân khúc khách hàng chuẩn hóa để hiển thị trên báo cáo | Báo cáo RLOS APPLICATION (BC1) | CUSTOMER_SEGMENT |
+
+
+## 19. FCT_RLOS_COREPAYER
+
+### 19.1 Mục đích thiết kế
+- **Ý nghĩa bảng:** thông tin người đồng trả nợ (corepayer) của hồ sơ
+  RLOS tại PDTD_DTM, chi tiết tới TỪNG GIẤY TỜ ĐỊNH DANH — bê nguyên 1:1
+  cấu trúc từ SB_DWH, không có cột phái sinh riêng ở tầng này. Bảng này
+  trước đây là `DIM_RLOS_COREPAYER` (SCD2, grain 1 dòng/1 corepayer) —
+  xem lý do đầy đủ tại `HLD_FCT_SB_DWH_review.md` mục 14 (Section SB_DWH,
+  cùng thay đổi).
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`REL_TO_APPLICANT`+
+  `ID_NO_CO`+`ID_TYPE`+`ID_NUMBER` — hash vào cột `COREPAYER_BK`, bê 1:1
+  từ SB_DWH (xem `HLD_FCT_SB_DWH_review.md` mục 14)
+- **Khóa chính của bảng (PK):** `DAYID`, `COREPAYER_BK` (giữ nguyên như SB_DWH).
+- **Độ chi tiết (grain):** 1 dòng = 1 ngày × 1 giấy tờ định danh của 1
+  corepayer trên 1 hồ sơ, snapshot hàng ngày — không SCD2 (giữ nguyên như
+  SB_DWH).
+- **Phục vụ báo cáo:**
+  - Báo cáo RLOS APPLICATION (BC1)
+
+### 19.2 Sơ đồ lineage
+
+```mermaid
+flowchart LR
+    subgraph SB_DWH
+        C["FCT_RLOS_COREPAYER"]
+    end
+    subgraph PDTD_DTM
+        D["FCT_RLOS_COREPAYER"]
+    end
+    C -->|bê 1:1, 17 cột, không có cột phái sinh riêng| D
+```
+
+### 19.3 Cấu trúc bảng
+
+Cấu trúc cột **kế thừa toàn bộ** từ SB_DWH (bê 1:1, xem
+`HLD_FCT_SB_DWH_review.md` mục 14 — 17 cột, đã gồm
+`DATASOURCE`/`COREPAYER_BK`), **không bổ sung cột nào ở PDTD_DTM**.
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.DAYID | — (cột kỹ thuật) | — |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.DATASOURCE | — (cột kỹ thuật) | — |
+| 3 | COREPAYER_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ hash của tổ hợp (hồ sơ, quan hệ với người vay chính, nhãn thứ tự corepayer, loại giấy tờ, số giấy tờ) — bê nguyên 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.COREPAYER_BK | — (cột kỹ thuật, khóa chính) | — |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.APPLICATION_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
+| 5 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.WI_NAME. Quan hệ 1:N với giấy tờ (1 corepayer có thể có nhiều giấy tờ, 1 hồ sơ có thể có 0..4 corepayer) | Báo cáo RLOS APPLICATION (BC1) | WINAME (Mã hồ sơ) |
+| 6 | REL_TO_APPLICANT | VARCHAR2 | N | 200 |  | Quan hệ với người đề nghị vay chính — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.REL_TO_APPLICANT | Báo cáo RLOS APPLICATION (BC1) | CO_REPAYER/ADD_ID_COREPAYER (thành phần vai trò trong tên hiển thị) |
+| 7 | ID_NO_CO | VARCHAR2 | N | 100 |  | Nhãn thứ tự người đồng trả nợ (PIN: Corep1-4) — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.ID_NO_CO | — | Thiết kế dư thừa |
+| 8 | ID_TYPE | VARCHAR2 | N | 50 |  | Loại giấy tờ định danh — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.ID_TYPE | — | Thiết kế dư thừa (đầu vào LISTAGG ADD_ID_COREPAYER/ADD_ID_OTHER_COREPAYER, chưa xử lý trong lượt này) |
+| 9 | ID_NUMBER | VARCHAR2 | N | 100 |  | Số giấy tờ định danh — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.ID_NUMBER | Báo cáo RLOS APPLICATION (BC1) | Thiết kế dư thừa (đầu vào LISTAGG ADD_ID_COREPAYER/ADD_ID_OTHER_COREPAYER — BC1 cần dạng chuỗi nối nhiều giấy tờ theo nhóm ID_TYPE, chưa xử lý trong lượt này) |
+| 10 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên đầy đủ — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.FULL_NAME | Báo cáo RLOS APPLICATION (BC1) | CO_REPAYER (Tên người đồng trả nợ) |
+| 11 | DATE_OF_BIRTH | DATE | N |  |  | Ngày sinh — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.DATE_OF_BIRTH | — | Thiết kế dư thừa |
+| 12 | NATIONALITY | VARCHAR2 | N | 100 |  | Quốc tịch — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.NATIONALITY | — | Thiết kế dư thừa |
+| 13 | TITLE | VARCHAR2 | N | 30 |  | Danh xưng — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.TITLE | — | Thiết kế dư thừa |
+| 14 | HOUSEHOLD | VARCHAR2 | N | 100 |  | Số sổ hộ khẩu — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.HOUSEHOLD | — | Thiết kế dư thừa |
+| 15 | PHONE_1 | VARCHAR2 | N | 50 |  | Số điện thoại di động chính — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.PHONE_1 | — | Thiết kế dư thừa |
+| 16 | PHONE_2 | VARCHAR2 | N | 50 |  | Số điện thoại phụ — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.PHONE_2 | — | Thiết kế dư thừa |
+| 17 | HOME_PHONE | VARCHAR2 | N | 50 |  | Số điện thoại cố định — bê 1:1 từ SB_DWH.FCT_RLOS_COREPAYER.HOME_PHONE | — | Thiết kế dư thừa |
+
+**Kiến trúc:** bảng FACT snapshot hàng ngày, bê nguyên 1:1 từ SB_DWH,
+không có cột phái sinh nào ở tầng này. 17 cột (giống hệt SB_DWH). Phục
+vụ BC1.
 

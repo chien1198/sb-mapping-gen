@@ -18,7 +18,7 @@ nguồn → hợp nhất theo đối tượng phát sinh giao dịch/thời gian
 
 #### 1.1 Bộ bảng CHUNG
 
-##### 1.1.1 DIM_LOS_ORG_UNIT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_COMPANY/MAS_BRANCH/MAS_REGION, review 2026-09-18)
+##### 1.1.1 DIM_LOS_COMPANY — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_COMPANY/MAS_BRANCH/MAS_REGION, review 2026-09-18)
 
 ```mermaid
 flowchart LR
@@ -28,7 +28,7 @@ flowchart LR
         R(["NG_SB_RLOS_MAS_REGION"])
     end
     subgraph SB_DWH
-        C["DIM_LOS_ORG_UNIT"]
+        C["DIM_LOS_COMPANY"]
     end
     A -->|"grain — 1 dòng/COMPANY_CODE (PGD/CN nhỏ nhất)"| C
     B -->|"LEFT JOIN theo BRANCH_ID — bổ sung tên/địa bàn Chi nhánh"| C
@@ -56,7 +56,7 @@ mức chi tiết nhất (grain = PGD/`COMPANY_CODE`), giữ nguyên kiến trúc
 `MAS_COMPANY`/`MAS_BRANCH`/`MAS_REGION` là bảng danh mục ở STG_LOS,
 **không có cột EFF_DATE** do BA khai báo tay (khác `MAP_LOS_USER`/
 `MAP_CLOS_PRODUCT`...). Theo quyết định người dùng, `EFF_DATE` của
-`DIM_LOS_ORG_UNIT` được ETL tính bằng **CDC** (so sánh bản ghi cũ/mới của 3
+`DIM_LOS_COMPANY` được ETL tính bằng **CDC** (so sánh bản ghi cũ/mới của 3
 bảng nguồn tại mỗi lần chạy) chứ không đọc thẳng từ cột khai báo tay —
 khác cơ chế của các DIM ở mục 1.1.2/1.2.1.2-4/1.3.1.2-4 bên dưới (những
 DIM đó dùng EFF_DATE do BA/DevOps nhập tay trên chính bảng MAP_).
@@ -95,14 +95,14 @@ Section 2.
 
 **SCD2 đổi cách xác định EFF_DATE:** `MAS_USER` không có cột EFF_DATE khai
 báo tay như `MAP_LOS_USER` — `EFF_DATE` nay do ETL tính qua **CDC**, cùng
-cơ chế đã áp dụng cho `DIM_LOS_ORG_UNIT` (1.1.1). Xem Section 3.
+cơ chế đã áp dụng cho `DIM_LOS_COMPANY` (1.1.1). Xem Section 3.
 
 
 ### 1.2 Bộ bảng CLOS
 
 ##### 1.2.1 DIM
 
-###### 1.2.1.1 DIM_CLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (xem DQ-11; đã bổ sung CHANGE_TYPE, không tách DIM_CLOS_CHANGE_TYPE; đã bổ sung APP_GRP, HAVE_ANY_DEVIATION — thay thế DIM_CLOS_APPROVAL_GROUP đã loại bỏ)
+###### 1.2.1.1 DIM_CLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (xem DQ-11; APP_GRP, HAVE_ANY_DEVIATION — thay thế DIM_CLOS_APPROVAL_GROUP đã loại bỏ). ⚠️ review 2026-09-25 (lượt 3): xóa INDUSTRY_LVL1/2/3_CODE (trùng DIM_CLOS_CUSTOMER), đổi nguồn EMPLOYEE_CODE/NAME sang EXTTABLE
 
 ```mermaid
 flowchart LR
@@ -110,21 +110,138 @@ flowchart LR
         A(["NG_SB_CLOS_CUST_INFO"])
         B(["NG_SB_CLOS_APPROVAL"])
         C(["NG_SB_CLOS_EXTTABLE"])
-        D(["NG_SB_CLOS_CHANGEREQ"])
         E(["NG_SB_CLOS_ENTRY_EXIT"])
         G(["NG_SB_CLOS_CREDITINFO_COMM"])
+        L(["NG_SB_CLOS_CUST_INFO_LEGAL"])
     end
     subgraph SB_DWH
         F["DIM_CLOS_APPLICATION"]
     end
-    A -->|1:1 WI_NAME, CUST_GROUP, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME| F
-    B -->|1:1 STREAM, APPROVAL_TYPE, APP_GRP| F
-    C -->|1:1 LOANCASEID, CREDIT_PROFILE| F
+    C -->|"grain hồ sơ — driving table: WI_NAME, LOANCASEID, CREDIT_PROFILE, EMPLOYEE_CODE/NAME, CUSTOMER_NAME + 3 cột dư thừa (PRODUCT_NAME, CHANNEL, CUSTOMER_NAME — review 2026-09-30 lượt 2: xóa DECISION/CURR_WSNAME/PREV_WSNAME, xem 1.2.1.1)"| F
     C -.->|"PHÁI SINH: MIN(WI_NAME) group theo LOANCASEID — sinh FIRST_APPROVED_WI_NAME"| F
-    D -->|1:1 CHANGE_REQUEST, CHANGE_TYPE| F
-    E -.->|"PHÁI SINH: MAX(EXITDATE) theo điều kiện WORKSTEP/DECISION đã phê duyệt — sinh FIRST_APPROVED_DATE; MIN(ENTRYDATE) — sinh CREATION_DATE"| F
+    A -->|"LEFT JOIN theo WI_NAME: ZONEE→ZONE, APP_DATE, LOAN_PURPOSE, EMAIL, DISTANCE_BRANCH_CUSTOMER, PRODUCT_LINE, SUB_PRODUCT (review 2026-09-30 lượt 2: LG_REQ/FI_REQ/PHONE_REQ chuyển sang FCT_CLOS_APPLICATION, xem 1.2.2.1)"| F
+    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER (khách hàng chính đứng tên vay)"| F
+    B -->|"1:1 STREAM, APP_GRP (APPROVAL_TYPE chuyển tính tại FCT_CLOS_APPLICATION tầng PDTD_DTM, review 2026-09-30 lượt 2 — xem 2.2.2.1)"| F
+    E -.->|"PHÁI SINH: MIN(ENTRYDATE) — sinh CREATION_DATE (FIRST_APPROVED_DATE chuyển sang FCT_CLOS_APPLICATION, review 2026-09-30 lượt 2 — xem 1.2.2.1)"| F
     G -->|1:1 HAVE_ANY_DEVIATION| F
 ```
+
+**✅ Đã giải quyết — xóa `INDUSTRY_LVL1/2/3_CODE`, đổi nguồn
+`EMPLOYEE_CODE`/`EMPLOYEE_NAME` (review 2026-09-25, lượt 3, theo yêu cầu
+người dùng):** `INDUSTRY_LVL1/2/3_CODE` là thuộc tính khách hàng (ngành
+nghề kinh doanh cố hữu, không đổi giữa các hồ sơ của cùng khách hàng),
+đã có sẵn ở `DIM_CLOS_CUSTOMER` (1.2.1.6) — xóa khỏi bảng này để không
+trùng lặp, xem chi tiết tại Section 2 (1.2.1.1). `EMPLOYEE_CODE`/
+`EMPLOYEE_NAME` đổi nguồn từ `NG_SB_CLOS_CUST_INFO.EMP_CODE`/`EMP_NAME`
+sang `NG_SB_CLOS_EXTTABLE.EMPLOYEE_CODE`/`EMPLOYEE_NAME` (đã có sẵn 2
+cột cùng tên trên EXTTABLE, xác nhận qua metadata Column Review) — cùng
+driving table với `WI_NAME`/`LOANCASEID`/`CREDIT_PROFILE`, không cần
+LEFT JOIN thêm bảng `NG_SB_CLOS_CUST_INFO` nào cho 2 cột này.
+
+**Đổi driving table sang `NG_SB_CLOS_EXTTABLE` (review 2026-09-25, lượt
+2):** `input/DS_BANG_202608.xlsx` xác nhận cả `NG_SB_CLOS_EXTTABLE` và
+`NG_SB_CLOS_CUST_INFO` đều có `KEY CDC = WI_NAME` (cùng grain hồ sơ) —
+đổi bảng lấy `WI_NAME` (NK) sang `NG_SB_CLOS_EXTTABLE` vì đây là driving
+table gốc đúng nghĩa của hồ sơ CLOS (theo yêu cầu người dùng); `NG_SB_
+CLOS_CUST_INFO` vẫn tiếp tục LEFT JOIN theo `WI_NAME` để lấy các thuộc
+tính của nó, không đổi ý nghĩa dữ liệu, chỉ đổi bảng "cầm trịch" grain.
+
+**Đổi ngược 2 nhóm cột với `DIM_CLOS_CUSTOMER` (review 2026-09-25, sau
+khi đánh giá lại grain của `DIM_CLOS_CUSTOMER`, xem 1.2.1.6):**
+
+- **Xóa `CUST_GROUP`** khỏi bảng này — thuộc tính khách hàng thật (phân
+  khúc doanh nghiệp), không phải hồ sơ, đã chuyển hẳn về `DIM_CLOS_
+  CUSTOMER` (1.2.1.6, cột 6). Mọi công thức từng dùng `CUST_GROUP` local
+  của bảng này (`BUSINESS_FLOW`, chọn bảng SLA `CLOS_REF_SLA_TDKHDNL`/
+  `CLOS_REF_SLA_TDKHDN` cho `REF_PRODUCT`/`SLA_*`, cả hai ở PDTD_DTM —
+  xem 2.2.1.1) nay đổi sang lấy `CUST_GROUP` từ `DIM_CLOS_CUSTOMER` qua
+  `CUSTOMER_SK`. `CHECK_FTR` trên `FCT_CLOS_EXCEPTION` (1.2.2.4) và
+  `CUST_GROUP` denormalize trên `FCT_CLOS_LOAN_DISBURSEMENT` (2.2.2.7)
+  cũng đổi tương tự — xem ghi chú riêng tại mỗi bảng đó.
+- **Nhận lại 8 cột hồ sơ-grain** đã bị loại khỏi `DIM_CLOS_CUSTOMER`
+  (review 2026-09-25, xem 1.2.1.6): `ZONE` (đổi tên từ nguồn `ZONEE`),
+  `APP_DATE`, `LOAN_PURPOSE`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`,
+  `DISTANCE_BRANCH_CUSTOMER` — cùng nguồn `NG_SB_CLOS_CUST_INFO`, quan hệ
+  1:1 với hồ sơ (đúng grain của bảng này). Đây là các cột từng bị đặt sai
+  chỗ ở `DIM_CLOS_CUSTOMER` (review 2026-09-21, dưới tên "làm giàu"),
+  nay xác định lại đúng bản chất là thuộc tính HỒ SƠ (khu vực đơn vị xử
+  lý, mục đích vay của khoản đang xin, cờ yêu cầu phát sinh theo hồ sơ,
+  liên hệ khai theo hồ sơ, khoảng cách tới chi nhánh xử lý cụ thể) — đưa
+  về đúng bảng theo grain, xem Section 3.
+
+**Xóa `CHANGE_REQUEST`/`CHANGE_TYPE` khỏi DIM, chuyển hẳn sang Fact
+(review 2026-09-25, lượt 2):** nguồn `NG_SB_CLOS_CHANGEREQ` mang bản
+chất "thay đổi thường xuyên" theo hồ sơ (không phải thuộc tính ổn định
+kiểu SCD2 chậm thay đổi như các cột khác của DIM này) — theo quyết định
+người dùng, 2 cột này sẽ được thêm vào `FCT_CLOS_APPLICATION`
+(1.2.2.1) ở lượt review riêng của bảng đó, chưa xử lý trong lượt này.
+**⚠️ Tham chiếu treo:** các bảng sau vẫn còn sơ đồ lineage/mô tả tham
+chiếu `CHANGE_REQUEST`/`CHANGE_TYPE` qua `DIM_CLOS_APPLICATION` — sẽ cập
+nhật khi `FCT_CLOS_APPLICATION` được review: `FCT_CLOS_WORKSTEP_
+EVENT` (1.2.2.6), `FCT_CLOS_EXCEPTION` (1.2.2.4), `FCT_CLOS_DEVIATION`,
+`FCT_CLOS_COLLATERAL`, `DIM_CLOS_CHANGE_
+TYPE` note (RLOS-side, không đổi), và công thức `REF_PRODUCT`/`SLA_*` ở
+PDTD_DTM (2.2.1.1) dùng `CHANGE_TYPE` làm khóa either/or. (⚠️ review
+2026-09-26: `FCT_CLOS_APPLICATION_PARTY` (PDTD_DTM, 2.2.2.2) đã bị xóa
+hẳn — loại khỏi danh sách này, không còn tồn tại để cập nhật; bản
+SB_DWH, 1.2.2.2, không có tham chiếu treo này.) Xem Section 3.
+
+**Thêm mới — thông tin hồ sơ từ `NG_SB_CLOS_CUST_INFO` (review 2026-09-25,
+lượt 2, theo yêu cầu người dùng + đối chiếu SRS BC2):** `PRODUCT_LINE`,
+`SUB_PRODUCT` — text tự khai theo hồ sơ (mã dòng sản phẩm dạng PRO01-06 +
+tên sản phẩm chi tiết), BC2 dùng hiển thị trực tiếp (STT27/28). Giữ
+nguyên dạng text, KHÔNG join `DIM_CLOS_PRODUCT` — giá trị của `CUST_INFO.
+PRODUCT_LINE`/`SUB_PRODUCT` là tự khai theo hồ sơ, chưa xác nhận khớp
+1:1 với mã chuẩn hóa `PRODUCT_LINE_CODE`/`SUB_PRODUCT_CODE` của `DIM_
+CLOS_PRODUCT` (nguồn `NG_SB_CLOS_MAS_PRO_LINE`/`MAS_SUB_PROD`, xem
+1.2.1.2) — quan hệ hồ sơ↔sản phẩm chuẩn hóa vẫn tiếp tục đi qua `FCT_
+CLOS_APPLICATION_DAILY.PRODUCT_SK` như thiết kế cũ (xem 2.2.1.1 Section
+1, "Lưu ý về PRODUCT_LINE/SUB_PRODUCT dùng làm khóa tra"), không đổi.
+
+**Thêm mới — khách hàng chính (review 2026-09-25, lượt 2):** `ID_NUMBER`
+— số ĐKKD/CMND của khách hàng đứng tên vay chính, lấy qua `NG_SB_CLOS_
+CUST_INFO_LEGAL` lọc `UPPER(OBJ_TYPE)='KHÁCH HÀNG'` theo `WI_NAME` (mỗi
+hồ sơ chỉ có đúng 1 dòng OBJ_TYPE='Khách hàng', đã xác nhận — xem
+`FCT_CLOS_LEGAL_PARTY`, 1.2.2.7). Mục đích: thể hiện tường minh quan hệ
+hồ sơ↔khách hàng ngay trên DIM này (yêu cầu người dùng khi `DIM_CLOS_
+CUSTOMER` đổi NK, không còn `WI_NAME`). `CUSTOMER_NAME` KHÔNG cần lấy
+riêng qua LEGAL — `NG_SB_CLOS_EXTTABLE` (driving table) đã có sẵn cột
+này, xem nhóm 18 cột dư thừa dưới đây.
+
+**Thêm mới — 18 cột dư thừa lưu vết nguồn `NG_SB_CLOS_EXTTABLE` (review
+2026-09-25, lượt 2, theo yêu cầu người dùng):** đối chiếu `input/CLOS -
+Metadata.xlsx` (sheet "3. Column Review", 28 cột đã review của
+`EXTTABLE`) với SRS (BC2/BC3/BC5/BC9) không phát hiện report nào dùng
+trực tiếp 18 cột này — thêm vào DIM để không bỏ sót thuộc tính gốc của
+driving table mới, đánh dấu "Thiết kế dư thừa" (cùng cách đã làm với
+`CHANNEL` trên `DIM_CLOS_WORKSTEP_DECISION`, 1.2.1.3): `CUSTOMER_NAME`,
+`DECISION`, `CURR_WSNAME`, `PREV_WSNAME`, `PRODUCT_NAME`, `DATACHKUSER`,
+`UWMAKERUSER`, `UWCHKRUSER`, `CREDAPPRUSER`, `CCOMMITUSER`,
+`HOSUPPORTUSER`, `POSTSANCUSER`, `PREDISBMAKUSER`, `PREDISBCHKUSER`,
+`DISBCHKUSER`, `DISBMAKUSER`, `CHECKER3_TARGET`, `CHANNEL` (⚠️ review
+2026-09-30, theo yêu cầu người dùng: 12 cột `DATACHKUSER`…`CHECKER3_TARGET`
+đã xóa lại khỏi DIM — xem giải trình đầu mục 1.2.1.1, chỉ còn `DECISION`/
+`CURR_WSNAME`/`PREV_WSNAME`/`PRODUCT_NAME`/`CHANNEL` trong nhóm này).
+Loại trừ cột
+`RN` (100% rỗng trên metadata, không có ý nghĩa nghiệp vụ). Lưu ý:
+`EXTTABLE` và `CUST_INFO` có 6 cột trùng tên (`COMPANY_CODE/NAME`,
+`BRANCH_CODE/NAME`, `CUSTOMER_NAME`, `CUST_GROUP`) — theo quyết định
+người dùng, `COMPANY_CODE/NAME`/`BRANCH_CODE/NAME` KHÔNG đưa vào DIM này
+(quan hệ hồ sơ↔đơn vị kinh doanh đã có sẵn qua `COMPANY_SK` → `DIM_LOS_
+COMPANY`); `CUSTOMER_NAME` lấy từ `EXTTABLE` (driving table); `CUST_
+GROUP` không lấy ở cả 2 nguồn (đã chuyển hẳn về `DIM_CLOS_CUSTOMER`).
+
+**Join `CUST_GROUP` mới qua `CUSTOMER_SK` (áp dụng cho mọi công thức
+từng đọc `CUST_GROUP` local, review 2026-09-25):** vì `DIM_CLOS_
+APPLICATION` không có chiều ngày (không phải SCD2-theo-DAYID như FCT),
+không thể tra `DIM_CLOS_CUSTOMER` theo điều kiện "hiệu lực tại DAYID"
+như trên `FCT_CLOS_APPLICATION`. Thay vào đó, dùng đúng logic đã
+dùng để dựng chính `DIM_CLOS_CUSTOMER`: `WI_NAME` (của dòng đang ETL) →
+`NG_SB_CLOS_CUST_INFO_LEGAL` lọc `UPPER(OBJ_TYPE)='KHÁCH HÀNG'` → lấy
+`ID_NUMBER` → LEFT JOIN `DIM_CLOS_CUSTOMER` theo `ID_NUMBER` (NK) lấy
+bản ghi hiện hành (`EXP_DATE IS NULL`) tại thời điểm ETL — ra
+`CUSTOMER_SK`/`CUST_GROUP`. Xem cột `CUSTOMER_SK` (mới, cột 27) tại
+Section 2.
 
 **Đính chính công thức `FIRST_APPROVED_WI_NAME`/`FIRST_APPROVED_DATE`
 (review 2026-09-15) — khớp lại đúng SRS BC11:** thiết kế trước đây (kế
@@ -142,6 +259,30 @@ nhận. `FCT_CLOS_LOAN_DISBURSEMENT` (2.2.2.7) denormalize trực tiếp 2 cột
 này qua `APPLICATION_SK` — nay khớp tuyệt đối BC11, không còn ghi chú
 "chấp nhận lệch" như trước.
 
+**⚠️ Review 2026-09-30 (lượt 2, theo yêu cầu người dùng): chuyển
+`FIRST_APPROVED_DATE`/`LG_REQ`/`FI_REQ`/`PHONE_REQ` sang `FCT_CLOS_
+APPLICATION`, xóa `APPROVAL_TYPE`/`DECISION`/`CURR_WSNAME`/
+`PREV_WSNAME`:** rà soát cùng pattern đã áp dụng cho `DIM_RLOS_
+APPLICATION` (đợt review trước đó). `FIRST_APPROVED_DATE` chỉ có giá trị
+từ khi hồ sơ tới bước phê duyệt (không phải thuộc tính hồ sơ ổn định),
+chuyển sang đặt cạnh `LAST_APPROVAL_DATE` trên `FCT_CLOS_APPLICATION`
+(1.2.2.1) — 2 cột độc lập (khác điều kiện lọc DECISION), không trùng
+lặp dù cùng công thức MAX(EXITDATE). `LG_REQ`/`FI_REQ`/`PHONE_REQ` là cờ
+yêu cầu gắn với nguồn `NG_SB_CLOS_CUST_INFO` (bảng tự phát sinh dòng mới
+khi hồ sơ bàn giao nhân viên khác xử lý) — chuyển sang `FCT_CLOS_
+APPLICATION`, cùng lý do 11 cờ tương ứng đã chuyển bên `DIM_RLOS_
+APPLICATION`. `APPROVAL_TYPE` xóa khỏi DIM — không phải cột trùng lặp
+với `STREAM` (cùng nguồn nhưng khác điều kiện lọc `STREAM IN ('Phê duyệt
+tín dụng','Sent To Disbursement Request')`), nhưng điều kiện lọc là
+business rule nên chuyển tính tại `FCT_CLOS_APPLICATION` tầng PDTD_DTM
+(2.2.2.1), không đặt ở SB_DWH; `STREAM` (giá trị gốc) vẫn giữ nguyên
+trên DIM này. `DECISION`/`CURR_WSNAME`/`PREV_WSNAME` xóa hẳn — trùng bản
+chất với `LAST_WORKSTEP_DECISION_SK`/`PRE_WORKSTEP_CODE` đã có report
+dùng qua BC2 trên `FCT_CLOS_APPLICATION`, cùng `FCT_CLOS_WORKSTEP_EVENT`
+— đúng tiền lệ đã xóa 3 cột cùng tên trên `DIM_RLOS_APPLICATION`. Xem
+bảng cột chi tiết và giải trình đầy đủ tại Section 2 → 1.2.1.1 (mục lục
+riêng ở đây chỉ giữ sơ đồ lineage tổng quan).
+
 **Ghi chú lineage — loại bỏ `DIM_CLOS_APPROVAL_GROUP`, bổ sung `APP_GRP` +
 `HAVE_ANY_DEVIATION` thẳng lên đây:** kiểm tra lại nguồn `NG_SB_CLOS_APPROVAL`
 (RLOS Metadata/CLOS Metadata gốc, sheet Table Review) xác nhận **grain thật
@@ -149,15 +290,15 @@ là 1 dòng = 1 hồ sơ** — không phải bảng ghi nhận nhiều lần ph�
 thời gian như giả định ban đầu khi tạo `DIM_CLOS_APPROVAL_GROUP` (Section 3
 dòng #9, nay đã cập nhật). Vì vậy `APP_GRP` (cấp thẩm quyền phê duyệt) là
 thuộc tính ổn định của hồ sơ, đọc thẳng từ `NG_SB_CLOS_APPROVAL` — cùng
-bảng, cùng cách với `STREAM`/`APPROVAL_TYPE` đã có sẵn ở đây — không cần
+bảng, cùng cách với `STREAM` đã có sẵn ở đây — không cần
 một DIM danh mục riêng nữa. `DIM_CLOS_APPROVAL_GROUP` và
 `MAP_CLOS_APPROVAL_GROUP` (seed table đi kèm) đã bị loại bỏ hoàn toàn; cột
-`APPROVAL_GROUP_SK` cũng bị loại khỏi `FCT_CLOS_APPLICATION_DAILY` (báo
+`APPROVAL_GROUP_SK` cũng bị loại khỏi `FCT_CLOS_APPLICATION` (báo
 cáo lấy `APP_GRP` bằng JOIN `APPLICATION_SK` sang đây).
 
 `HAVE_ANY_DEVIATION` là cột có sẵn trên `NG_SB_CLOS_CREDITINFO_COMM` (cùng
 bảng nguồn đã dùng cho `CREDIT_LIMIT_COMMITTEE` trên
-`FCT_CLOS_APPLICATION_DAILY` — bảng ghi tại bước Hội đồng tín dụng, mỗi hồ
+`FCT_CLOS_APPLICATION` — bảng ghi tại bước Hội đồng tín dụng, mỗi hồ
 sơ 1 dòng, sửa thì ghi đè chứ không sinh dòng mới). Đây là thuộc tính gắn
 với hồ sơ (dù chỉ có giá trị từ khi hồ sơ tới bước Hội đồng tín dụng, NULL
 ở các phiên bản trước đó — cùng kiểu "thuộc tính đến muộn" như
@@ -171,16 +312,18 @@ PDTD_DTM (REF_ chỉ tồn tại ở đó), xem 2.2.1.1 (Section 1 → PDTD_DTM)
 chỉ giữ 2 cột thô này, chưa tính `REF_PRODUCT`/`SLA_*` ở layer này — đã xác
 nhận với người dùng, xem Section 3 dòng #13.
 
-**Ghi chú lineage — không tách `DIM_CLOS_CHANGE_TYPE`:** đối chiếu SRS BC2
-("Báo cáo CLOS APPLICATION") xác nhận `CHANGE_TYPE` lấy thẳng từ
-`NG_SB_CLOS_CHANGEREQ.CHANGE_TYPE`, không qua bảng danh mục nào — khác hẳn
-RLOS có `SB_RLOS_MAS_CHANGE_TYPE` là danh mục gốc thật. Metadata CLOS xác
-nhận cột này là chuỗi tự do đa giá trị (nhiều loại hạn mức nối bằng `~`,
-ví dụ `Hạn mức Chiết khấu~Hạn mức bảo lãnh~`), đã là tên sẵn chứ không phải
-mã cần tra tên — không có `DETAIL_CHANGE_TYPE` nào cho CLOS trong SRS. Vì
-vậy `CHANGE_TYPE` được giữ làm cột text trực tiếp trên `DIM_CLOS_APPLICATION`
-(cùng nguồn `NG_SB_CLOS_CHANGEREQ` với `CHANGE_REQUEST`), không tách thành
-DIM riêng — xem Section 3 dòng liên quan.
+**Ghi chú lineage — không tách `DIM_CLOS_CHANGE_TYPE` (giữ nguyên phân
+tích, chỉ đổi nơi lưu trữ):** đối chiếu SRS BC2 ("Báo cáo CLOS
+APPLICATION") xác nhận `CHANGE_TYPE` lấy thẳng từ `NG_SB_CLOS_
+CHANGEREQ.CHANGE_TYPE`, không qua bảng danh mục nào — khác hẳn RLOS có
+`SB_RLOS_MAS_CHANGE_TYPE` là danh mục gốc thật. Metadata CLOS xác nhận
+cột này là chuỗi tự do đa giá trị (nhiều loại hạn mức nối bằng `~`, ví
+dụ `Hạn mức Chiết khấu~Hạn mức bảo lãnh~`), đã là tên sẵn chứ không phải
+mã cần tra tên — không có `DETAIL_CHANGE_TYPE` nào cho CLOS trong SRS,
+nên vẫn không tách thành DIM riêng. **⚠️ review 2026-09-25 (lượt 2):**
+`CHANGE_TYPE`/`CHANGE_REQUEST` không còn là cột trên `DIM_CLOS_
+APPLICATION` — đã xóa (xem ghi chú ở trên), chuyển hẳn sang `FCT_CLOS_
+APPLICATION_DAILY` khi review bảng đó. Xem Section 3 dòng liên quan.
 
 ###### 1.2.1.2 DIM_CLOS_PRODUCT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_PRO_LINE/MAS_SUB_PROD, review 2026-09-18)
 
@@ -210,9 +353,9 @@ nữa (vẫn tiếp tục phục vụ các bảng khác như `DIM_CLOS_APPLICATI
 **SCD2 đổi cách xác định EFF_DATE:** `MAS_PRO_LINE`/`MAS_SUB_PROD` không
 có cột EFF_DATE khai báo tay như `MAP_CLOS_PRODUCT` trước đây — `EFF_DATE`
 nay do ETL tính qua **CDC** (so sánh bản ghi cũ/mới), cùng cơ chế đã áp
-dụng cho `DIM_LOS_ORG_UNIT` (1.1.1). Xem Section 3.
+dụng cho `DIM_LOS_COMPANY` (1.1.1). Xem Section 3.
 
-###### 1.2.1.3 DIM_CLOS_WORKSTEP — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_DECISION, review 2026-09-18)
+###### 1.2.1.3 DIM_CLOS_WORKSTEP_DECISION — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_DECISION, review 2026-09-24, gộp từ DIM_CLOS_WORKSTEP + DIM_CLOS_DECISION)
 
 ```mermaid
 flowchart LR
@@ -220,68 +363,71 @@ flowchart LR
         A(["NG_SB_CLOS_MAS_DECISION"])
     end
     subgraph SB_DWH
-        C["DIM_CLOS_WORKSTEP"]
+        C["DIM_CLOS_WORKSTEP_DECISION"]
     end
-    A -->|"DISTINCT QUEUE_NAME — CDC xác định thay đổi"| C
+    A -->|"1:1 QUEUE_NAME + DECISION — CDC xác định thay đổi, mỗi cặp (WORKSTEP_CODE, DECISION_CODE) là 1 dòng duy nhất trên nguồn"| C
 ```
 
-**Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #2):**
-nguồn trước đây suy từ `NG_SB_CLOS_ENTRY_EXIT` (bảng lịch sử xử lý, không
-phải danh mục bước BPM gốc) rồi tạm thay bằng bảng khai báo thủ công
-`MAP_CLOS_WORKSTEP`; nay BA LOS xác nhận (16/09) bảng danh mục thật
-`NG_SB_CLOS_MAS_DECISION` — bảng này gộp chung WORKSTEP (`QUEUE_NAME`) và
-DECISION (`DECISION`) dạng quan hệ N-N, không có danh mục WORKSTEP độc lập
-riêng. Theo quyết định người dùng: **giữ tách 2 DIM** (`DIM_CLOS_WORKSTEP`/
-`DIM_CLOS_DECISION`) như thiết kế hiện tại, mỗi DIM suy ra danh mục riêng
-bằng `DISTINCT` trên cột tương ứng của cùng bảng nguồn — không gộp thành 1
-DIM composite theo đúng cấu trúc N-N của bảng nguồn. `NG_SB_CLOS_ENTRY_EXIT`
-không còn là nguồn của DIM này nữa (vẫn tiếp tục phục vụ các FCT khác như
-`FCT_CLOS_APPLICATION_DAILY`).
+**Gộp 2 DIM thành 1 (review 2026-09-24):** trước đây tách riêng
+`DIM_CLOS_WORKSTEP` (DISTINCT QUEUE_NAME) và `DIM_CLOS_DECISION`
+(DISTINCT DECISION) từ cùng bảng nguồn `NG_SB_CLOS_MAS_DECISION`, theo
+quyết định cũ (review 2026-09-18) "giữ tách 2 DIM... không gộp thành 1
+DIM composite theo đúng cấu trúc N-N của bảng nguồn". Xác nhận lại
+(review 2026-09-24, theo quyết định người dùng): `NG_SB_CLOS_MAS_DECISION`
+đúng là 1 WORKSTEP có thể xuất hiện ở nhiều dòng với DECISION khác nhau
+(N:N ở mức từng cột), NHƯNG **mỗi cặp (QUEUE_NAME, DECISION) là duy nhất
+trên bảng nguồn** — grain thật của bảng nguồn là "1 dòng = 1 cặp
+(WORKSTEP, DECISION) hợp lệ", không phải 2 danh mục độc lập tự do kết
+hợp. Tách thành 2 DIM riêng làm mất thông tin cặp nào thực sự hợp lệ.
+Đã gộp lại thành 1 DIM composite `DIM_CLOS_WORKSTEP_DECISION`, giữ đúng
+grain của bảng nguồn — không còn suy ra danh mục bằng DISTINCT riêng lẻ
+từng cột.
 
-**SCD2 đổi cách xác định EFF_DATE:** cùng cơ chế CDC như 1.2.1.2 (không còn
-EFF_DATE khai báo tay của `MAP_CLOS_WORKSTEP`). Xem Section 3.
+⚠️ **Giả định cần BA xác nhận lại trước khi sinh LLD:** file
+`input/DS Bảng danh mục.xlsx` (sheet `NG_SB_CLOS_MAS_DECISION`) chỉ xác
+nhận bảng nguồn tồn tại thật với 3 cột (`QUEUE_NAME`, `DECISION`,
+`CHANNEL`) — không có dữ liệu mẫu để tự kiểm chứng độc lập việc mỗi cặp
+(QUEUE_NAME, DECISION) là duy nhất. Grain trên dựa theo xác nhận nghiệp
+vụ của người dùng, chưa có bằng chứng dữ liệu mẫu trong repo.
+
+**`DIM_CLOS_WORKSTEP_DECISION` (SB_DWH):**
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_WORKSTEP_DECISION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
+| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
+| 3 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_WORKSTEP_DECISION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
+| 4 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | NK | Mã bước xử lý trên workflow CLOS — nguồn NG_SB_CLOS_MAS_DECISION.QUEUE_NAME. Cùng với DECISION_CODE tạo thành khóa nghiệp vụ composite của bảng |
+| 5 | DECISION_CODE | VARCHAR2 | Y | 200 | NK | Mã quyết định phát sinh tại bước xử lý trên — nguồn NG_SB_CLOS_MAS_DECISION.DECISION. UNIQUE (WORKSTEP_CODE, DECISION_CODE, EFF_DATE) |
+| 6 | CHANNEL | VARCHAR2 | N | 200 |  | Kênh áp dụng của cặp (bước xử lý, quyết định) — nguồn NG_SB_CLOS_MAS_DECISION.CHANNEL. Giữ có chủ đích để bảo toàn dữ liệu nguồn (review 2026-09-24, theo yêu cầu người dùng) — hiện chưa có báo cáo nào tiêu thụ, tương tự trường hợp FCT_CLOS_DEVIATION.AS_REGULAR |
+| 7 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION |
+| 8 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
+
+- Bảng DIM lưu danh mục cặp (bước xử lý, quyết định) hợp lệ trong quy trình BPM của hồ sơ tín dụng CLOS, 1 dòng = 1 cặp (WORKSTEP_CODE, DECISION_CODE) hợp lệ.
+- Khóa chính của bảng (PK): **DIMENSION_KEY**.
+
+**Bổ sung cột `CHANNEL` (review 2026-09-24, theo yêu cầu người dùng):**
+bảng nguồn `NG_SB_CLOS_MAS_DECISION` có 3 cột (`QUEUE_NAME`, `DECISION`,
+`CHANNEL` — xác nhận qua `input/DS Bảng danh mục.xlsx`), trước đây DIM
+chỉ nạp 2 cột đầu. Bổ sung `CHANNEL` để không bỏ sót thuộc tính gốc
+của bảng nguồn — giữ có chủ đích dù chưa có báo cáo nào tiêu thụ trực
+tiếp (thiết kế dư thừa cho thông tin nguồn, giống `AS_REGULAR` trên
+`FCT_CLOS_DEVIATION`, xem Section 2 → 2.2.2.7 dòng ghi chú "Sửa lỗi
+copy-paste hàng loạt").
+
+**Đối chiếu SRS (BC1, BC2, BC3, BC4, BC5, BC7, BC8, BC9):** BC3, BC4, BC8
+dùng `WORKSTEP`/`DECISION` cho mục đích hiển thị/lọc — nay đọc qua JOIN
+`WORKSTEP_DECISION_SK` sang `DIM_CLOS_WORKSTEP_DECISION` thay vì cột
+denormalize trên `FCT_CLOS_WORKSTEP_EVENT` (xem 1.2.2.6, cột đã xóa).
+BC1/BC2/BC5/BC7/BC9 dùng cùng cách. Không phát hiện lệch tài liệu nào về
+công thức cột.
 
 `WFINSTRUMENTTABLE` vẫn không thuộc phạm vi bảng này — bảng đó chỉ dùng ở
 tầng FCT để đối chiếu bước hồ sơ đang đứng hiện tại (`ACTIVITYNAME`) khi
-tính cột phái sinh `WORKSTEP_FLAG` (trước đây gọi tắt là "BC4.FLAG") trên
-`FCT_*_APPLICATION_DAILY`. **✅ Đã giải quyết (PENDING #6):**
-`WFINSTRUMENTTABLE.PROCESSNAME`/`ACTIVITYNAME` đã được nạp trực tiếp vào
-`FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (1.2.2.1/
-1.3.2.1) để tính `WORKSTEP_FLAG` theo đúng 5 nhánh CASE-WHEN của SRS BC4
-— không liên quan tới `DIM_CLOS_WORKSTEP`. **Cập nhật (review
-2026-09-21):** nay `WFINSTRUMENTTABLE` cũng LEFT JOIN thêm vào
-`FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT` (1.2.2.6/1.3.2.7) để
-tính `WORKSTEP_FLAG` độc lập trực tiếp trên bảng event (phục vụ BC4
-không cần JOIN fan-out sang `APPLICATION_DAILY` nữa) — cùng công thức,
-2 nơi tính độc lập, không phải join chuỗi.
+tính cột phái sinh `WORKSTEP_FLAG` trên `FCT_*_APPLICATION_DAILY`/
+`FCT_*_WORKSTEP_EVENT` — không liên quan tới `DIM_CLOS_WORKSTEP_DECISION`.
 
-###### 1.2.1.4 DIM_CLOS_DECISION — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_DECISION, review 2026-09-18)
-
-```mermaid
-flowchart LR
-    subgraph STG_LOS
-        A(["NG_SB_CLOS_MAS_DECISION"])
-    end
-    subgraph SB_DWH
-        C["DIM_CLOS_DECISION"]
-    end
-    A -->|"DISTINCT DECISION — CDC xác định thay đổi"| C
-```
-
-**Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #2):**
-nguồn trước đây suy từ `NG_SB_CLOS_ENTRY_EXIT` (bảng lịch sử xử lý, không
-phải danh mục quyết định BPM gốc) rồi tạm thay bằng bảng khai báo thủ công
-`MAP_CLOS_DECISION`; nay BA LOS xác nhận (16/09) cùng bảng danh mục thật
-`NG_SB_CLOS_MAS_DECISION` đã dùng cho `DIM_CLOS_WORKSTEP` (1.2.1.3) — lấy
-`DISTINCT DECISION` từ cùng bảng (xem 1.2.1.3 về lý do giữ tách 2 DIM thay
-vì gộp theo đúng quan hệ N-N của bảng nguồn). `NG_SB_CLOS_ENTRY_EXIT` không
-còn là nguồn của DIM này nữa (vẫn tiếp tục phục vụ các FCT khác như
-`FCT_CLOS_APPLICATION_DAILY`).
-
-**SCD2 đổi cách xác định EFF_DATE:** cùng cơ chế CDC như 1.2.1.3 (không còn
-EFF_DATE khai báo tay của `MAP_CLOS_DECISION`). Xem Section 3.
-
-###### 1.2.1.5 DIM_CLOS_EXCEPTION_REASON
+###### 1.2.1.5 DIM_CLOS_EXCEPTION
 
 ```mermaid
 flowchart LR
@@ -289,7 +435,7 @@ flowchart LR
         A(["NG_SB_CLOS_MAS_EXCEPTION"])
     end
     subgraph SB_DWH
-        C["DIM_CLOS_EXCEPTION_REASON"]
+        C["DIM_CLOS_EXCEPTION"]
     end
     A -->|1:1 ACTIVITYNAME, DECISION_CODE, EXCEPTION_CATEGORY, EXCEPTION_NAME| C
 ```
@@ -303,148 +449,120 @@ sơ như `NG_SB_CLOS_ENTRY_EXIT`/`NG_SB_CLOS_APPROVAL`. Do đó **không rơi
 vào pattern "application-scoped source"** — giữ nguyên nguồn trực tiếp từ
 `NG_SB_CLOS_MAS_EXCEPTION`, không cần bảng `MAP_` seed.
 
-###### 1.2.1.6 DIM_CLOS_COLLATERAL_TYPE
-
-```mermaid
-flowchart LR
-    subgraph STG_LOS
-        A(["NG_SB_CLOS_COLL_CD"])
-    end
-    subgraph SB_DWH
-        C["DIM_CLOS_COLLATERAL_TYPE"]
-    end
-    A -->|1:1 COLLTYPE| C
-```
-
-**Ghi chú lineage:** `NG_SB_CLOS_COLL_CD` là bảng danh mục 11 loại TSBĐ
-đặc thù doanh nghiệp (`COLLTYPE`), không phải bảng grain-theo-hồ-sơ hay
-event log — cùng bản chất danh mục cấu hình gốc như
-`NG_SB_CLOS_MAS_EXCEPTION` (1.2.1.6), nên **không rơi vào pattern
-"application-scoped source"**. Giữ nguyên nguồn trực tiếp, không cần bảng
-`MAP_` seed.
-
-###### 1.2.1.7 DIM_CLOS_CUSTOMER — THAY ĐỔI KIẾN TRÚC (tách khỏi FCT_LOS_APPLICATION_PARTY, không còn là FCT)
+###### 1.2.1.6 DIM_CLOS_CUSTOMER — ĐỔI GRAIN (review 2026-09-25, "1 dòng/hồ sơ" → "1 dòng/khách hàng")
 
 ```mermaid
 flowchart LR
     subgraph STG_LOS
         A(["NG_SB_CLOS_CUST_INFO"])
+        L(["NG_SB_CLOS_CUST_INFO_LEGAL"])
     end
     subgraph SB_DWH
         E["DIM_CLOS_CUSTOMER"]
     end
-    A -->|1:1 CUSTOMER_NAME → FULL_NAME| E
-    A -.->|"1:1 làm giàu (review 2026-09-21, theo yêu cầu người dùng): ZONEE→ZONE, APP_DATE, LOAN_PURPOSE, CUST_CATEGORY, PRECUSTGROUP, LG_REQ, FI_REQ, PHONE_REQ, EMAIL, DISTANCE_BRANCH_CUSTOMER"| E
+    A -->|1:1 CUSTOMER_NAME → FULL_NAME, CUST_GROUP, CUST_CATEGORY, PRECUSTGROUP, INDUSTRY_CODE_LEVEL_1/2/3| E
+    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER làm NK; ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME)=1 khi 1 khách hàng có nhiều hồ sơ"| E
 ```
 
-**Ghi chú lineage — đánh giá lại kiến trúc:** `NG_SB_CLOS_CUST_INFO` có
-khóa nghiệp vụ thật là `WI_NAME` (khóa kỹ thuật `WI_NAME + EMP_CODE` chỉ
-là hiện tượng bàn giao nhân viên xử lý, các báo cáo hạ nguồn luôn lấy dòng
-mới nhất theo `WI_NAME` = 1 dòng/hồ sơ, theo CLOS Metadata Table Review) —
-đây là quan hệ **1:1 với hồ sơ**, cùng bản chất với `DIM_RLOS_APPLICANT`
-(1.3.1.9), khác hẳn `NG_SB_CLOS_CUST_INFO_LEGAL` (1:N thực sự, xem
-`DIM_CLOS_LEGAL_PARTY`, 1.2.1.8). Vì vậy tách thành **DIM** (không phải
-FCT như thiết kế ban đầu) — sửa lại đánh giá trước đó (từng cho rằng toàn
-bộ `FCT_LOS_APPLICATION_PARTY` là quan hệ 1:N không thể tách DIM, nhưng đó
-chỉ đúng với phần `CUST_INFO_LEGAL`, không đúng với phần `CUST_INFO`).
+**Ghi chú lineage — đổi khóa nghiệp vụ (review 2026-09-25, theo yêu cầu
+người dùng):** thiết kế trước đây (xem lịch sử ngay dưới) dùng `WI_NAME`
+làm NK — nghĩa là grain thật là "1 dòng/hồ sơ", không phải "1 dòng/khách
+hàng". Một khách hàng nộp nhiều hồ sơ (nhiều `WI_NAME`) sẽ tạo nhiều dòng
+trùng lặp cho cùng 1 khách hàng — sai bản chất DIM khách hàng. NK mới là
+**`ID_NUMBER`** (số ĐKKD/CMND của khách hàng, định danh pháp lý ổn định,
+không đổi giữa các hồ sơ khác nhau) — lấy bằng `NG_SB_CLOS_CUST_INFO` LEFT
+JOIN `NG_SB_CLOS_CUST_INFO_LEGAL` theo `WI_NAME` + `UPPER(OBJ_TYPE)='KHÁCH
+HÀNG'` (mỗi hồ sơ chỉ có đúng 1 dòng `OBJ_TYPE='Khách hàng'` — đã xác nhận
+trước đây, xem `FCT_CLOS_LEGAL_PARTY`, 1.2.1.7). `WI_NAME` **không còn là
+cột lưu trữ trên bảng này** — chỉ là điều kiện join lúc ETL, không đại
+diện cho grain nữa.
 
-Áp dụng **column-optimization rule**: bỏ `DATASOURCE`, `PARTY_TYPE`,
-`PARTY_ROLE_CODE` (luôn cố định 'ORG_CUSTOMER', không còn giá trị phân
-biệt vì bảng chỉ chứa khách hàng chính), `GEO_SK` (không cần cho tổ chức),
-`ORG_LEGAL_ID`/`OBJ_TYPE` (thuộc về `DIM_CLOS_LEGAL_PARTY`, xem 1.2.1.8,
-dù có lưu dư thừa `ORG_LEGAL_ID` ở PDTD_DTM — xem Section 2 → 2.2.1.7), 6
-cột chỉ có nguồn RLOS theo column-optimization rule.
+**Dedupe khi 1 `ID_NUMBER` xuất hiện ở nhiều `WI_NAME`:** dữ liệu thuộc
+tính giống nhau giữa các hồ sơ của cùng khách hàng trên thực tế (xác nhận
+người dùng) — chỉ cần lấy 1 dòng đại diện bằng `ROW_NUMBER() OVER
+(PARTITION BY ID_NUMBER ORDER BY WI_NAME) = 1`, không cần logic "mới
+nhất" phức tạp.
 
-**Làm giàu thêm 10 cột (review 2026-09-21, theo yêu cầu người dùng):**
-`NG_SB_CLOS_CUST_INFO` là quan hệ 1:1/hồ sơ (đã xác nhận ở trên) — mọi cột
-mô tả còn lại (không phải khóa join/FK) đưa thẳng lên đây an toàn, không
-phá vỡ grain. Bao gồm `ZONE` (đổi tên từ nguồn `ZONEE`, đóng gap BC1/BC2
-— xem ghi chú riêng bên dưới), `APP_DATE`, `LOAN_PURPOSE`,
-`CUST_CATEGORY`, `PRECUSTGROUP`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`,
-`EMAIL`, `DISTANCE_BRANCH_CUSTOMER`. Không đưa `PRODUCT_LINE`/
-`SUB_PRODUCT`/`EMP_CODE`/`EMP_NAME`/`COMPANY_CODE`/`COMPANY_NAME`/
-`BRANCH_CODE`/`BRANCH_NAME` (đã có ở `DIM_CLOS_PRODUCT`/`DIM_CLOS_
-APPLICATION`/`DIM_LOS_ORG_UNIT` — tránh trùng lặp 2 nguồn cho cùng 1 sự
-thật).
+**Lịch sử kiến trúc trước 2026-09-25 (để tham khảo):** bảng này vốn tách
+từ `FCT_LOS_APPLICATION_PARTY` (áp dụng column-optimization rule: bỏ
+`DATASOURCE`, `PARTY_TYPE`, `PARTY_ROLE_CODE`, `GEO_SK`, `ORG_LEGAL_ID`/
+`OBJ_TYPE`, 6 cột chỉ có nguồn RLOS), sau đó làm giàu thêm 10 cột mô tả
+hồ sơ (review 2026-09-21: `ZONE`, `APP_DATE`, `LOAN_PURPOSE`,
+`CUST_CATEGORY`, `PRECUSTGROUP`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`,
+`DISTANCE_BRANCH_CUSTOMER`), dựa trên lập luận "quan hệ 1:1 với hồ sơ nên
+đưa mọi cột mô tả lên an toàn". Lập luận đó đúng về mặt kỹ thuật join
+nhưng sai về NGỮ NGHĨA GRAIN — nhiều cột trong số 10 cột làm giàu đó thực
+chất là thuộc tính HỒ SƠ (đơn vị xử lý, mục đích vay của khoản đang xin,
+cờ yêu cầu phát sinh theo hồ sơ...), không phải thuộc tính KHÁCH HÀNG —
+xem đánh giá lại chi tiết ngay dưới.
 
-**Đóng PENDING BC1.ZONE/BC2.ZONE bằng cột `ZONE` mới (review 2026-09-21):**
-tách biệt rõ 2 khái niệm từng bị nhập nhằng — `DIM_LOS_ORG_UNIT.ZONE` (mã
-nội bộ chuẩn hóa từ `MAS_COMPANY.ZONE`, thuộc tính của ĐƠN VỊ KINH DOANH)
-khác với `ZONEE` tự khai trên hồ sơ (thuộc tính của HỒ SƠ/KHÁCH HÀNG tại
-thời điểm nhập liệu). Theo quyết định người dùng: BC1/BC2.ZONE đọc từ
-cột `ZONE` mới này (qua `CUSTOMER_SK`), không còn liên quan
-`DIM_LOS_ORG_UNIT` — `BRANCH_CODE`/`BRANCH_NAME`/`COMPANY_CODE`/
-`COMPANY_NAME` của BC1/BC2 vẫn giữ nguyên qua `ORG_UNIT_SK` như cũ, chỉ
-riêng cột ZONE đổi nguồn. Quyết định loại bỏ `ZONEE`/`ZONE` khỏi
-`DIM_LOS_ORG_UNIT` (review 2026-09-18, do BI xác nhận không tương ứng
-`DIM_COMPANY`/T24) vẫn đúng cho vai trò KHÓA JOIN đơn vị kinh doanh —
-không mâu thuẫn với việc giữ giá trị này làm thuộc tính hiển thị gắn với
-hồ sơ/khách hàng.
+**Rà soát lại toàn bộ 20 cột + 3 cột gap SRS của `NG_SB_CLOS_CUST_INFO`
+theo đúng ngữ nghĩa KHÁCH HÀNG vs HỒ SƠ (review 2026-09-25):**
 
-###### 1.2.1.8 DIM_CLOS_LEGAL_PARTY — THAY ĐỔI KIẾN TRÚC (gộp FCT_LOS_APPLICATION_PARTY phần vai trò pháp lý + FCT_LOS_PARTY_DOCUMENT, không còn là FCT)
+- **Giữ/thêm — thuộc tính KHÁCH HÀNG thật (ổn định qua các hồ sơ khác
+  nhau của cùng 1 khách hàng):** `CUSTOMER_NAME`→`FULL_NAME`,
+  `CUST_GROUP` (chuyển từ `DIM_CLOS_APPLICATION`, xem ghi chú TODO dưới),
+  `CUST_CATEGORY`, `PRECUSTGROUP`, và 3 cột mới `INDUSTRY_CODE_LEVEL_1/
+  2/3` (gap SRS, xem ghi chú riêng dưới).
+- **Loại bỏ — thực chất là thuộc tính HỒ SƠ, không phải khách hàng
+  (review 2026-09-25, đảo ngược quyết định "làm giàu" 2026-09-21):**
+  `APP_DATE` (ngày tạo hồ sơ — gắn với hồ sơ, không gắn với khách hàng),
+  `ZONE`/`ZONEE` (khu vực đơn vị XỬ LÝ hồ sơ — cùng bản chất
+  `COMPANY_CODE`/`BRANCH_CODE`, không phải thuộc tính khách hàng dù trước
+  đây lưu ở đây), `LOAN_PURPOSE` (mục đích vay của khoản đang xin trong
+  hồ sơ này, không phải đặc tính cố định của khách hàng), `LG_REQ`/
+  `FI_REQ`/`PHONE_REQ` (cờ yêu cầu phát sinh theo từng hồ sơ),
+  `EMAIL` (liên hệ khai theo hồ sơ, không đảm bảo cố định theo khách
+  hàng), `DISTANCE_BRANCH_CUSTOMER` (khoảng cách tới chi nhánh xử lý CỤ
+  THỂ của hồ sơ này, phụ thuộc hồ sơ chứ không phải hằng số của khách
+  hàng). **8 cột này hiện "mồ côi"** — xóa khỏi bảng này trong lượt review
+  này, đích đến (đưa về `DIM_CLOS_APPLICATION` hay bỏ hẳn) do người dùng
+  quyết định ở lượt review riêng cho `DIM_CLOS_APPLICATION`, xem Section 3.
+- **Xóa vì trùng lặp với NK mới:** `ORG_LEGAL_ID` (trước đây ở PDTD_DTM,
+  2.2.1.6 — LEFT JOIN `FCT_CLOS_LEGAL_PARTY` theo `WI_NAME`+`LEGAL_TYPE=
+  'CUSTOMER'` lấy `ID_NUMBER` của khách hàng chính) nay **trùng lặp hoàn
+  toàn** với NK `ID_NUMBER` của chính bảng này — xóa cột, báo cáo tra
+  trực tiếp NK của dòng.
 
-```mermaid
-flowchart LR
-    subgraph STG_LOS
-        A(["NG_SB_CLOS_CUST_INFO_LEGAL"])
-    end
-    subgraph SB_DWH
-        E["DIM_CLOS_LEGAL_PARTY"]
-    end
-    A -->|1:1 NAMEE, ID_NUMBER, OBJ_TYPE, LEGAL_DOC| E
-```
+**Bổ sung `CUST_GROUP` (review 2026-09-25) — ⚠️ TODO còn trùng lặp tạm
+thời ở `DIM_CLOS_APPLICATION`:** `CUST_GROUP` (phân khúc KH: SME/MSME/
+USME/STR/JSC/SOC/BANK/FDI/NBFI) là thuộc tính khách hàng thật, không phải
+hồ sơ — theo quyết định người dùng, thêm vào đây (nguồn
+`NG_SB_CLOS_CUST_INFO.CUST_GROUP`, cùng dòng dùng để lấy `ID_NUMBER`).
+Cột này **hiện vẫn còn tồn tại trùng lặp tại `DIM_CLOS_APPLICATION`**
+(1.2.1.1/2.2.1.1, dùng làm input tính `BUSINESS_FLOW`/chọn bảng SLA) — người
+dùng sẽ đánh giá xóa ở đó khi làm lại `DIM_CLOS_APPLICATION` ở lượt review
+riêng, CHƯA xử lý trong lượt này. Xem Section 3.
 
-**Ghi chú lineage — đánh giá lại kiến trúc, giải thích chi tiết phân biệt
-với `DIM_RLOS_COREPAYER`:** `NG_SB_CLOS_CUST_INFO_LEGAL` là quan hệ **1
-hồ sơ : N người liên quan** thực sự (CLOS Metadata Table Review xác nhận
-trực tiếp: "1 hồ sơ có nhiều dòng cho cùng 1 WI_NAME", và **"1 người có
-thể giữ nhiều vai trò (OBJ_TYPE) khác nhau trong cùng 1 hồ sơ"** — xác
-nhận BA). Khác hẳn `APP_GRP`/`HAVE_ANY_DEVIATION` (thuộc tính 1 hồ sơ = 1
-giá trị, đã đưa lên `DIM_CLOS_APPLICATION`): **không thể đưa dữ liệu người
-liên quan lên DIM_APPLICATION/FCT_APPLICATION_DAILY** vì sẽ làm mất dữ
-liệu của những người liên quan khác (nhiều dòng không thể nén vào 1 dòng
-mà không đổi grain của `FCT_APPLICATION_DAILY`).
+**Bổ sung 3 cột `INDUSTRY_LVL1/2/3_CODE` (review 2026-09-25 — gap SRS vs
+metadata, cùng pattern DQ-11 đã ghi ở Section 3 #2):** metadata
+`CLOS - Metadata.xlsx` (sheet "3. Column Review", 20 cột đã review của
+`NG_SB_CLOS_CUST_INFO`) KHÔNG liệt kê 3 cột này. Đối chiếu trực tiếp SRS
+gốc `BC2_PDTD_DTM_SRS_v1.0.docx` (table 8, rows 9-11) xác nhận rõ:
+`INDUSTRY_GROUP`←`NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_1`,
+`INDUSTRY_CLASS`←`.INDUSTRY_CODE_LEVEL_2`, `INDUSTRY`←
+`.INDUSTRY_CODE_LEVEL_3`. Đây là ngành nghề kinh doanh — đặc tính cố hữu
+của khách hàng doanh nghiệp, đúng grain CUSTOMER. Đặt tên cột đích
+`INDUSTRY_LVL1_CODE`/`INDUSTRY_LVL2_CODE`/`INDUSTRY_LVL3_CODE` (mượn
+naming convention đã dùng ở `DIM_LOS_APPLICATION`/`DIM_PDTD_APPLICATION`
+— bảng RLOS khác domain, chỉ mượn tên cột). ⚠️ PENDING — cần xác nhận
+trực tiếp trên database (giống DQ-11): metadata chưa liệt kê không có
+nghĩa là cột không tồn tại (có thể do review sót), nhưng chưa có xác nhận
+DB thực tế cho riêng 3 cột này. Xem Section 3.
 
-**Vì sao KHÔNG áp dụng pattern pivot-thành-cột-cố-định như
-`DIM_RLOS_COREPAYER`:** RLOS corepayer có đúng **1 vai trò duy nhất**
-(corepayer), số lượng người có **giới hạn cứng đã xác nhận** (0-4, theo
-nhãn PIN Corep1-4) — nên tách được thành 1 DIM riêng theo đúng 1 vai trò
-với N nhỏ, biết trước. CLOS có **5 vai trò khả dĩ** (`CUSTOMER`,
-`LEGAL_REPRESENTATIVE`, `COLLATERAL_OWNER`, `MAIN_CONTRIBUTING_MEMBERS`,
-`OTHER`), nhưng khác RLOS ở 2 điểm mấu chốt: (1) **không có giới hạn cứng
-đã biết** cho số người ở mỗi vai trò (số người đại diện/chủ sở hữu
-TSBĐ/thành viên góp vốn phụ thuộc hoàn toàn cấu trúc sở hữu thực tế của
-từng doanh nghiệp, không có trần cố định như "tối đa 4"); (2) **các vai
-trò không loại trừ lẫn nhau** — 1 người có thể đồng thời là người đại
-diện pháp luật VÀ thành viên góp vốn chính trên cùng 1 hồ sơ (2 dòng cho
-cùng 1 người), trong khi RLOS 1 người chỉ có thể là applicant HOẶC
-corepayer, không bao giờ cả hai. Vì N không giới hạn/không biết trước và
-vai trò không loại trừ nhau, **không đủ điều kiện pivot thành cột cố định**
-— phải giữ dạng bảng danh sách (grain nhân dòng).
+###### 1.2.1.7 DIM_CLOS_LEGAL_PARTY — xem `FCT_CLOS_LEGAL_PARTY` (1.2.2.7)
 
-**Tuy nhiên vẫn phân loại là DIM (không phải FCT):** dù grain là 1:N,
-bản chất dữ liệu vẫn là thông tin MÔ TẢ (không đo lường) — nhất quán với
-cách `DIM_RLOS_COREPAYER` (cũng 1:N) được phân loại là DIM thay vì FCT.
-Điểm khác biệt DIM_CLOS_LEGAL_PARTY và DIM_RLOS_COREPAYER chỉ nằm ở CÁCH
-BIỂU DIỄN N (bảng danh sách vs pivot cột), không nằm ở việc có phải DIM
-hay không.
-
-**Gộp `FCT_LOS_PARTY_DOCUMENT` vào thẳng bảng này** (bỏ hẳn bảng document
-riêng) — nguồn giấy tờ pháp lý CLOS chỉ có đúng 1 bảng gốc
-(`NG_SB_CLOS_CUST_INFO_LEGAL`) với đúng 1 cặp `LEGAL_DOC`/`ID_NUMBER` trên
-mỗi dòng, không có rủi ro "nhiều giấy tờ/nhóm" như RLOS IDGRID (14 loại
-giấy tờ, có thể nhiều dòng/nhóm TCC-CC) — gộp trực tiếp an toàn, không mất
-dữ liệu (đã xác nhận với người dùng).
-
-Bỏ `DATASOURCE`, `PARTY_TYPE`, `PARTY_ROLE_CODE` (thay bằng `OBJ_TYPE`
-gốc + `LEGAL_TYPE` chuẩn hóa ở PDTD_DTM, xem Section 2 → 2.2.1.8),
-`APPLICATION_SK`, `GEO_SK` (không cần vì không phải khách hàng chính).
+**Đổi phân loại DIM → FACT (review 2026-09-25, theo quyết định người
+dùng):** bảng này đã đổi tên thành `FCT_CLOS_LEGAL_PARTY` và chuyển sang
+nhóm FCT — xem 1.2.2.7 (Section 1) / 1.2.2.7 (Section 2) để tránh trùng
+lặp nội dung. Giữ lại số hiệu `1.2.1.7` như một mục rỗng trỏ chuyển tiếp,
+không xóa số để không làm lệch số các bảng DIM khác trong nhóm CLOS.
 
 ##### 1.2.2 FCT
 
-###### 1.2.2.1 FCT_CLOS_APPLICATION_DAILY
+###### 1.2.2.1 FCT_CLOS_APPLICATION
 
-**Lineage đầy đủ (bao gồm cả nguồn của `DIM_CLOS_CUSTOMER`, 1.2.1.7 —
+**Lineage đầy đủ (bao gồm cả nguồn của `DIM_CLOS_CUSTOMER`, 1.2.1.6 —
 xem `hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của DIM này):**
 
 ```mermaid
@@ -458,60 +576,130 @@ flowchart LR
         G(["NG_SB_CLOS_APPROVAL"])
         H(["NG_SB_CLOS_USER_MAKE_WORK_STEP"])
         M(["NG_SB_CLOS_CUST_INFO"])
+        ML(["NG_SB_CLOS_CUST_INFO_LEGAL"])
+        MW(["NG_SB_CLOS_MAS_DECISION"])
     end
     subgraph SB_DWH
         K["DIM_CLOS_CUSTOMER"]
-        WS["DIM_CLOS_WORKSTEP"]
-        DC["DIM_CLOS_DECISION"]
-        US["DIM_LOS_USER"]
+        WD["DIM_CLOS_WORKSTEP_DECISION"]
         PR["DIM_CLOS_PRODUCT"]
-        OU["DIM_LOS_ORG_UNIT"]
-        E["FCT_CLOS_APPLICATION_DAILY"]
+        OU["DIM_LOS_COMPANY"]
+        AP["DIM_CLOS_APPLICATION"]
+        E["FCT_CLOS_APPLICATION"]
     end
     A -->|1:1 + PHÁI SINH: ngày/mốc/trạng thái/đếm trả về| E
     B -->|1:1 CREDIT_LIMIT → CREDIT_LIMIT_APPROVAL| E
     C -->|1:1 PRECREDITLIMIT/CREDIT_LIMIT/CREDIT_TERM/CURRENCY/INTEREST_RATE| E
     D -->|"LEFT JOIN WI_NAME=PROCESSINSTANCEID, loại 5 CREATEDBY hệ thống/test — sinh WORKSTEP_FLAG"| E
-    F -.->|"UWMAKERUSER/UWCHKRUSER — fallback của TAKERESPON khi không khớp bước tại NG_SB_CLOS_USER_MAKE_WORK_STEP"| E
-    G -.->|"APP_GRP — hardcode hằng số fallback của APPROVAL_TAKERESPON"| E
-    H -.->|"LEFT JOIN WI_NAME+WORK_STEP=WORKSTEP — sinh UNDERWRITERMAKER/CHECKER/APPROVAL_TAKERESPON (đã xác nhận tồn tại thật, Section 3 #20)"| E
-    K -.->|"CUSTOMER_SK, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID (quan hệ 1:1)"| E
-    M -->|1:1 CUSTOMER_NAME → FULL_NAME| K
-    WS -.->|"CURRENT_WORKSTEP_SK/LAST_WORKSTEP_SK, lookup WORKSTEP_CODE theo thời gian (review 2026-09-21, bổ sung vào lineage — 2 FK đã có sẵn trên cột nhưng thiếu vẽ)"| E
-    DC -.->|"LAST_DECISION_SK, lookup DECISION_CODE theo thời gian (review 2026-09-21, bổ sung vào lineage)"| E
-    US -.->|"LAST_USER_SK, lookup theo USERNAME (review 2026-09-21, bổ sung vào lineage)"| E
+    F -->|"driving table (review 2026-09-26, đổi từ ENTRY_EXIT) — base set WI_NAME đầy đủ mọi hồ sơ còn hiệu lực, full snapshot mọi DAYID; đồng thời UWMAKERUSER/UWCHKRUSER — input thô *_USERMAKE"| E
+    G -.->|"APP_GRP — input thô cho *_USERMAKE, business rule CASE WHEN chuyển sang PDTD_DTM (review 2026-09-26)"| E
+    H -.->|"LEFT JOIN WI_NAME+WORK_STEP=WORKSTEP — sinh input thô UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE (review 2026-09-26, đổi tên từ *_TAKERESPON — công thức COALESCE/CASE chuyển sang PDTD_DTM, xem 2.2.2.1); bảng nguồn đã xác nhận tồn tại thật, Section 3 #20"| E
+    K -.->|"CUSTOMER_SK (review 2026-09-25: đổi cách join do DIM_CLOS_CUSTOMER đổi grain sang 1 dòng/khách hàng) — tra ID_NUMBER qua WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, rồi lookup DIM_CLOS_CUSTOMER theo ID_NUMBER (NK) + điều kiện SCD2 hiệu lực tại DAYID"| E
+    M --> K
+    ML -.-> K
+    MW --> WD
+    WD -.->|"LAST_WORKSTEP_DECISION_SK (review 2026-09-24, gộp từ LAST_WORKSTEP_SK+LAST_DECISION_SK), lookup theo cặp WORKSTEP_CODE+DECISION_CODE của sự kiện hoàn tất gần nhất theo thời gian; CURRENT_WORKSTEP_SK đã xóa khỏi bảng, không báo cáo nào tiêu thụ"| E
     PR -.->|"PRODUCT_SK, lookup PRODUCT_LINE_CODE=NG_SB_CLOS_CUST_INFO.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT, SCD2 hiệu lực tại DAYID (review 2026-09-21, bổ sung vào lineage — công thức đã có ở Section 2 → 1.2.2.1 cột 9, chỉ thiếu vẽ)"| E
-    OU -.->|"ORG_UNIT_SK, lookup COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, SCD2 hiệu lực tại DAYID (review 2026-09-21, bổ sung vào lineage — công thức đã có ở Section 2 → 1.2.2.1 cột 10, chỉ thiếu vẽ)"| E
-    M -->|"PRODUCT_LINE/SUB_PRODUCT — input của PRODUCT_SK ở trên"| PR
-    M -->|"COMPANY_CODE — input của ORG_UNIT_SK ở trên"| OU
+    OU -.->|"COMPANY_SK, lookup COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, SCD2 hiệu lực tại DAYID (review 2026-09-21, bổ sung vào lineage — công thức đã có ở Section 2 → 1.2.2.1 cột 10, chỉ thiếu vẽ)"| E
+    F --> AP
+    M --> AP
+    ML -.-> AP
+    G --> AP
+    A -.-> AP
+    C --> AP
+    AP -.->|"APPLICATION_SK, join theo WI_NAME (review 2026-09-26, bổ sung vào lineage — chiều bị thiếu; xem 1.2.1.1 để biết chi tiết cách dựng DIM_CLOS_APPLICATION)"| E
+    A -.->|"PHÁI SINH: MAX(EXITDATE) lọc DECISION đã phê duyệt — sinh FIRST_APPROVED_DATE (chuyển từ DIM_CLOS_APPLICATION, review 2026-09-30 lượt 2 — đặt cạnh LAST_APPROVAL_DATE)"| E
+    M -->|"LEFT JOIN theo WI_NAME: LG_REQ, FI_REQ, PHONE_REQ (chuyển từ DIM_CLOS_APPLICATION, review 2026-09-30 lượt 2)"| E
+    M --> PR
+    M --> OU
 ```
 
-**Ghi chú lineage:** giữ nguyên grain `1 dòng = 1 hồ sơ x 1 ngày dữ liệu`,
-PK = `DAYID + WI_NAME`, và toàn bộ quy tắc load T-1 (sinh dòng khi có action
-hoặc còn trong chu kỳ thẩm định chưa chốt) như tài liệu gốc — bảng gốc
-`FCT_LOS_APPLICATION_DAILY` chỉ tách vật lý theo hệ, không đổi grain/PK/quy
-tắc load. **✅ Đã giải quyết (PENDING #6):** `WFINSTRUMENTTABLE` nay đã
-nạp vào bảng này để tính cột phái sinh `WORKSTEP_FLAG` (trạng thái bước
-hiện tại, 5 nhánh CASE-WHEN theo SRS BC4) — xem chi tiết công thức tại
-Section 2 → 1.2.2.1. **✅ Đã giải quyết (review 2026-09-21, Section 3
-dòng #20):** 3 cột `*_TAKERESPON` cần nguồn `NG_SB_CLOS_USER_MAKE_
-WORK_STEP` — không có trong `DS_BANG_202608.xlsx` nhưng đã xác nhận
-tồn tại thật qua `input/CLOS - Metadata.xlsx` (trạng thái "Đã xác
-nhận" cho cả bảng và toàn bộ cột).
+**⚠️ Cập nhật join `CUSTOMER_SK` sau khi `DIM_CLOS_CUSTOMER` đổi grain
+(review 2026-09-25):** trước đây join thẳng `WI_NAME + SCD2 tại DAYID`
+(quan hệ 1:1 hồ sơ↔DIM). Nay `DIM_CLOS_CUSTOMER` có NK=`ID_NUMBER`
+(grain 1 dòng/khách hàng, xem 1.2.1.6) — ETL phải qua 1 bước tra cứu
+trung gian: `WI_NAME` (của dòng `FCT_CLOS_APPLICATION` đang nạp) →
+`NG_SB_CLOS_CUST_INFO_LEGAL` lọc `UPPER(OBJ_TYPE)='KHÁCH HÀNG'` → lấy
+`ID_NUMBER` → lookup `DIM_CLOS_CUSTOMER.DIMENSION_KEY` theo `ID_NUMBER` +
+điều kiện SCD2 hiệu lực tại `DAYID`. Quan hệ vẫn N:1 (nhiều hồ sơ/DAYID
+của cùng khách hàng có thể trỏ cùng 1 `CUSTOMER_SK`), không phải 1:1 như
+trước — đây là hệ quả tất yếu của việc grain khách hàng độc lập với hồ sơ.
+Mặc định -1 nếu không khớp.
 
-**Bổ sung 5 node DIM còn thiếu trong lineage (review 2026-09-21):**
-rà soát toàn bộ FK của bảng này phát hiện `CURRENT_WORKSTEP_SK`,
-`LAST_WORKSTEP_SK`, `LAST_DECISION_SK`, `LAST_USER_SK`, `PRODUCT_SK`,
-`ORG_UNIT_SK` đều đã tồn tại thật trong danh sách cột (Section 2 →
-1.2.2.1) và có DIM đích tồn tại thật (`DIM_CLOS_WORKSTEP`, `DIM_CLOS_
-DECISION`, `DIM_LOS_USER`, `DIM_CLOS_PRODUCT`, `DIM_LOS_ORG_UNIT`) —
-nhưng sơ đồ lineage trước đây chỉ vẽ `DIM_CLOS_CUSTOMER`, bỏ sót 5 DIM
-còn lại. Đây là thiếu sót thuần vẽ sơ đồ, không phải gap thiết kế mới —
-công thức JOIN của `PRODUCT_SK`/`ORG_UNIT_SK` đã có sẵn nguyên văn ở
-Section 2 (cột 9-10, review 2026-09-21 trước đó); `WORKSTEP_SK`/
-`DECISION_SK`/`USER_SK` theo đúng pattern lookup-theo-thời-gian đã dùng
-nhất quán ở mọi bảng khác trong tài liệu (ví dụ `FCT_CLOS_WORKSTEP_
-EVENT`, 1.2.2.6). Đã bổ sung đủ 5 node + 5 cạnh JOIN vào mermaid trên.
+**Ghi chú lineage:** giữ nguyên grain `1 dòng = 1 hồ sơ x 1 ngày dữ liệu`,
+PK = `DAYID + WI_NAME`. **✅ Đã giải quyết (PENDING #6):** `WFINSTRUMENTTABLE`
+nay đã nạp vào bảng này để tính cột phái sinh `WORKSTEP_FLAG` (trạng thái
+bước hiện tại, 5 nhánh CASE-WHEN theo SRS BC4) — xem chi tiết công thức tại
+Section 2 → 1.2.2.1. **✅ Đã giải quyết (review 2026-09-21, Section 3
+dòng #20):** input thô `UNDERWRITERMAKER_USERMAKE`/`UNDERWRITERCHECKER_
+USERMAKE`/`APPROVAL_USERMAKE` (review 2026-09-26, đổi tên từ `*_TAKERESPON`
+— xem "Đổi driving table + chuyển business rule sang PDTD_DTM" bên dưới)
+cần nguồn `NG_SB_CLOS_USER_MAKE_WORK_STEP` — không có trong
+`DS_BANG_202608.xlsx` nhưng đã xác nhận tồn tại thật qua `input/CLOS -
+Metadata.xlsx` (trạng thái "Đã xác nhận" cho cả bảng và toàn bộ cột).
+
+**⚠️ Đổi driving table + chuyển business rule sang PDTD_DTM (review
+2026-09-26, theo yêu cầu người dùng):** đánh giá lại yêu cầu "tại mỗi
+DAYID phải view được hết trạng thái mới nhất của toàn bộ tập hồ sơ" —
+driving table trước đây (`NG_SB_CLOS_ENTRY_EXIT`, nhật ký sự kiện) không
+đảm bảo phủ đủ hồ sơ đang "đứng yên" (không action trong ngày nhưng vẫn
+còn trong chu kỳ thẩm định), vì bản thân bảng sự kiện chỉ sinh dòng khi có
+action mới. Đổi driving table sang `NG_SB_CLOS_EXTTABLE` (KEY CDC=`WI_NAME`,
+xem [[feedback_clos_exttable_master_driving]]) — full snapshot: mọi
+`WI_NAME` còn hiệu lực trên `EXTTABLE` sinh dòng ở MỌI `DAYID`, thay cho
+quy tắc T-1 có điều kiện (HAS_ACTION_IN_DAY hoặc còn trong chu kỳ thẩm
+định tra trên `FCT_CLOS_WORKSTEP_EVENT`) của tài liệu gốc
+`FCT_LOS_APPLICATION_DAILY` — đây là thay đổi có ý nghĩa nghiệp vụ (khối
+lượng dữ liệu tăng, hồ sơ đã chốt Approved/Rejected/Cancelled vẫn tiếp tục
+sinh dòng mỗi ngày thay vì dừng lại), đã xác nhận với người dùng.
+
+Đồng thời chuyển 2 cột business rule (CASE WHEN dựa trên "sự kiện hoàn tất
+gần nhất", tái tạo được từ input đã có sẵn trên chính bảng này) sang tính
+tại PDTD_DTM, ưu tiên dữ liệu bám sát nguồn: `APPLICATION_STATUS`,
+`FLAG_AUTO_CANCEL` — xem Section 2 → 2.2.2.1 (PDTD_DTM) để biết công
+thức đầy đủ viết lại theo nguồn SB_DWH. (Trước đây có thêm
+`UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/
+`APPROVAL_TAKERESPON` trong danh sách này — đã xóa khỏi thiết kế review
+2026-10-01, xem Section 2 → 2.2.2.1.)
+**Không có `AUTO_CANCEL_DATE`** (rà soát lại review 2026-09-26, cùng
+ngày, sau khi đối chiếu SRS BC1 gốc do người dùng cung cấp) — field
+`AUTO_CAN_DATE` chỉ tồn tại trong SRS BC1 (RLOS, công thức hoàn toàn
+khác — MIN(ENTRYDATE) + điều kiện NULL 3 cột + treo BranchSupport
+≥2400 phút làm việc + không có DECISION='Cancel' trước đó); SRS BC2
+(CLOS) không định nghĩa field này, chỉ định nghĩa trực tiếp
+`FLAG_AUTO_CAN`; không báo cáo nào trong BC1-BC11 tiêu thụ
+`AUTO_CANCEL_DATE` cho nhánh CLOS — cột dư thừa, không đưa vào bất kỳ
+tầng nào.
+Bảng này (SB_DWH) nay chỉ còn giữ 3 cột input thô tương ứng
+`UNDERWRITERMAKER_USERMAKE`/`UNDERWRITERCHECKER_USERMAKE`/
+`APPROVAL_USERMAKE` (nguyên giá trị `USER_MAKE`/fallback, KHÔNG áp
+COALESCE/CASE WHEN business rule — business rule dời hẳn sang PDTD_DTM).
+Các cột aggregate quét toàn bộ lịch sử sự kiện (`RETURN_CNT_DATAENTRY`/
+`UNDERWRITING`/`APPROVAL`, `PROCESSED_DATE`) — đã đánh giá và xác nhận
+GIỮ NGUYÊN ở SB_DWH, không chuyển, vì không thể tái tạo chỉ từ 1-2 mốc
+"sự kiện gần nhất" hiện có trên bảng, phải quét nhiều dòng nguồn.
+
+**Bổ sung node DIM còn thiếu trong lineage (review 2026-09-21):**
+rà soát toàn bộ FK của bảng này phát hiện `LAST_WORKSTEP_SK`,
+`LAST_DECISION_SK`, `PRODUCT_SK`, `COMPANY_SK` đều đã tồn tại thật trong
+danh sách cột (Section 2 → 1.2.2.1) và có DIM đích tồn tại thật
+(`DIM_CLOS_WORKSTEP`, `DIM_CLOS_DECISION`, `DIM_CLOS_PRODUCT`,
+`DIM_LOS_COMPANY`) — nhưng sơ đồ lineage trước đây chỉ vẽ `DIM_CLOS_
+CUSTOMER`, bỏ sót các DIM còn lại. Đây là thiếu sót thuần vẽ sơ đồ,
+không phải gap thiết kế mới — công thức JOIN của `PRODUCT_SK`/
+`COMPANY_SK` đã có sẵn nguyên văn ở Section 2 (cột 7-8); `WORKSTEP_SK`/
+`DECISION_SK` theo đúng pattern lookup-theo-thời-gian đã dùng nhất quán
+ở mọi bảng khác trong tài liệu (ví dụ `FCT_CLOS_WORKSTEP_EVENT`, 1.2.2.6).
+Đã bổ sung đủ node + cạnh JOIN vào mermaid trên. **Cắt gọn (review
+2026-09-24):** `CURRENT_WORKSTEP_SK` và `LAST_USER_SK` — dù có FK/DIM
+đích tồn tại thật (`DIM_CLOS_WORKSTEP`, `DIM_LOS_USER`) — đã bị XÓA khỏi
+bảng vì rà soát toàn bộ báo cáo (BC1-BC11) xác nhận không báo cáo nào
+JOIN qua 2 khóa này; các báo cáo chỉ đọc `LAST_WORKSTEP_SK`/
+`LAST_DECISION_SK` hoặc các cột USERNAME text (`RI_USER`, `BRANCH_USER`...)
+có sẵn trực tiếp trên bảng. **Gộp thêm (review 2026-09-24, tiếp theo):**
+`LAST_WORKSTEP_SK`+`LAST_DECISION_SK` gộp thành 1 `LAST_WORKSTEP_
+DECISION_SK` duy nhất, theo quyết định gộp `DIM_CLOS_WORKSTEP`+
+`DIM_CLOS_DECISION` (xem 1.2.1.3).
 
 Áp dụng **column-optimization rule**: loại khỏi bản CLOS mọi cột chỉ có
 nguồn RLOS (`SALARYFLAG`...`OTHERFLAG`, `INCOME_SOURCE_CNT`,
@@ -521,7 +709,7 @@ cũng loại khỏi bản CLOS — theo quyết định đã chốt ở `DIM_CLO
 (mục 1.2.1.1), CLOS không tách `DIM_CLOS_CHANGE_TYPE`, cột `CHANGE_TYPE` nằm
 thẳng trên `DIM_CLOS_APPLICATION`; giữ `CHANGE_TYPE_SK` trỏ sang
 `DIM_RLOS_CHANGE_TYPE` sẽ phá vỡ ranh giới tách CLOS/RLOS, nên bỏ hẳn khóa
-này khỏi `FCT_CLOS_APPLICATION_DAILY` (đã xác nhận với người dùng).
+này khỏi `FCT_CLOS_APPLICATION` (đã xác nhận với người dùng).
 
 **Đánh giá kiến trúc — không tham chiếu ETL sang `FCT_CLOS_COLLATERAL`/
 `FCT_CLOS_DEVIATION`:** thiết kế gốc có `DEVIATION_CNT`/`COLLATERAL_CNT`
@@ -529,7 +717,7 @@ này khỏi `FCT_CLOS_APPLICATION_DAILY` (đã xác nhận với người dùng)
 — đây là cột kỹ thuật trung gian, không báo cáo nào (BC1-BC11) dùng trực
 tiếp tên cột, chỉ để tính ra các cờ YES/NO cuối cùng (`TSDB_NHOM_0`,
 `TSBD_BDS`...). Việc pre-aggregate ở ETL bắt `FCT_CLOS_COLLATERAL`/
-`FCT_CLOS_DEVIATION` phải chạy xong trước `FCT_CLOS_APPLICATION_DAILY` —
+`FCT_CLOS_DEVIATION` phải chạy xong trước `FCT_CLOS_APPLICATION` —
 một phụ thuộc thứ tự ETL giữa các fact có thể tránh hoàn toàn, vì báo cáo
 dùng OAS (Oracle Analytics Server): model `FCT_CLOS_COLLATERAL`/
 `FCT_CLOS_DEVIATION` như logical fact riêng trong RPD, dùng chung
@@ -537,95 +725,48 @@ dùng OAS (Oracle Analytics Server): model `FCT_CLOS_COLLATERAL`/
 (lọc `COLLATERAL_TYPE_CODE` khi cần) đặt làm logical measure — BI Server tự sinh
 SQL multi-pass đúng chuẩn, không cần cột đếm vật lý trên datamart. Đã bỏ
 hẳn 11 cột này khỏi thiết kế (xem 1.2.2.5 và Section 2 → 1.2.2.1) — 3
-luồng ETL (`FCT_CLOS_APPLICATION_DAILY`, `FCT_CLOS_COLLATERAL`,
+luồng ETL (`FCT_CLOS_APPLICATION`, `FCT_CLOS_COLLATERAL`,
 `FCT_CLOS_DEVIATION`) hoàn toàn độc lập.
 
-###### 1.2.2.2 FCT_CLOS_APPLICATION_PARTY — MỚI (factless-fact liên kết, tương tự FCT_RLOS_APPLICATION_PARTY)
+**⚠️ Nhận thêm 4 cột từ `DIM_CLOS_APPLICATION` (review 2026-09-30, lượt
+2, theo yêu cầu người dùng):** `FIRST_APPROVED_DATE` (đặt cạnh
+`LAST_APPROVAL_DATE` — cùng bản chất grain-theo-sự-kiện, chỉ có giá trị
+từ khi hồ sơ tới bước phê duyệt, không phải thuộc tính hồ sơ ổn định phù
+hợp DIM; 2 cột độc lập không trùng lặp dù cùng công thức MAX(EXITDATE),
+khác điều kiện lọc DECISION) và `LG_REQ`/`FI_REQ`/`PHONE_REQ` (cùng lý
+do 11 cờ tương ứng đã chuyển bên `DIM_RLOS_APPLICATION`/`FCT_RLOS_
+APPLICATION`: nguồn `NG_SB_CLOS_CUST_INFO` tự phát sinh dòng mới khi
+bàn giao nhân viên khác xử lý). Không đổi công thức/nguồn — chỉ đổi
+bảng chứa. Xem bảng cột chi tiết tại Section 2 → 1.2.2.1.
 
-**Lineage đầy đủ (bao gồm cả nguồn của `DIM_CLOS_APPLICATION` 1.2.1.1,
-`DIM_CLOS_CUSTOMER` 1.2.1.7, và `DIM_CLOS_LEGAL_PARTY` 1.2.1.8 — xem
-`hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của 3 DIM này; bản thân
-`FCT_CLOS_APPLICATION_PARTY` không đọc STG_LOS, xem ghi chú "Không có
-subgraph STG_LOS" bên dưới — mọi node STG_LOS ở đây chỉ phục vụ lineage
-của 3 DIM nó nối tới):**
+###### 1.2.2.2 FCT_CLOS_APPLICATION_PARTY — ĐÃ XÓA (review 2026-09-26, theo yêu cầu người dùng)
 
-```mermaid
-flowchart LR
-    subgraph STG_LOS
-        H(["NG_SB_CLOS_CUST_INFO"])
-        I(["NG_SB_CLOS_APPROVAL"])
-        J(["NG_SB_CLOS_EXTTABLE"])
-        K1(["NG_SB_CLOS_CHANGEREQ"])
-        L(["NG_SB_CLOS_ENTRY_EXIT"])
-        N(["NG_SB_CLOS_CREDITINFO_COMM"])
-        M(["NG_SB_CLOS_CUST_INFO_LEGAL"])
-    end
-    subgraph SB_DWH
-        A["DIM_CLOS_APPLICATION"]
-        B["DIM_CLOS_CUSTOMER"]
-        C["DIM_CLOS_LEGAL_PARTY"]
-        E["FCT_CLOS_APPLICATION_PARTY"]
-    end
-    A -->|1:1 APPLICATION_SK| E
-    B -->|1:1 CUSTOMER_SK| E
-    C -->|1:N LEGAL_PARTY_SK, mặc định -1 nếu hồ sơ không có người liên quan nào| E
-    H -->|1:1 WI_NAME, CUST_GROUP, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME| A
-    I -->|1:1 STREAM, APPROVAL_TYPE, APP_GRP| A
-    J -->|1:1 LOANCASEID, CREDIT_PROFILE| A
-    J -.->|"PHÁI SINH: MIN(WI_NAME) group theo LOANCASEID — sinh FIRST_APPROVED_WI_NAME"| A
-    K1 -->|1:1 CHANGE_REQUEST, CHANGE_TYPE| A
-    L -.->|"PHÁI SINH: MAX(EXITDATE) theo điều kiện WORKSTEP/DECISION đã phê duyệt — sinh FIRST_APPROVED_DATE; MIN(ENTRYDATE) — sinh CREATION_DATE"| A
-    N -->|1:1 HAVE_ANY_DEVIATION| A
-    H -->|1:1 CUSTOMER_NAME → FULL_NAME| B
-    M -->|1:1 NAMEE, ID_NUMBER, OBJ_TYPE, LEGAL_DOC| C
-```
+**Đã xóa hẳn bảng này:** cùng lý do đã áp dụng cho `FCT_RLOS_APPLICATION_
+PARTY` (1.3.2.2, đã xóa) — bảng liên kết factless này chỉ mang 3 khóa
+(`APPLICATION_SK`/`CUSTOMER_SK`/`LEGAL_PARTY_SK`) để bắc cầu
+`DIM_CLOS_CUSTOMER` sang `FCT_CLOS_LEGAL_PARTY`. Nhưng `FCT_CLOS_LEGAL_
+PARTY` (1.2.2.7) tự nó đã mang sẵn `WI_NAME` (và cả `CUSTOMER_SK`/
+`APPLICATION_SK` từ review 2026-09-25) để join trực tiếp sang
+`DIM_CLOS_APPLICATION`/`DIM_CLOS_CUSTOMER` theo đúng `WI_NAME`+
+`LEGAL_TYPE`, không cần đi qua bảng cầu nối trung gian này nữa — khác
+biệt duy nhất so với bên RLOS là nhánh CLOS chưa từng mất surrogate key
+ổn định, nhưng bảng cầu nối vẫn dư thừa vì đích đến (`FCT_CLOS_LEGAL_
+PARTY`) đã tự đủ khóa join trực tiếp. Đã xóa hoàn toàn khỏi thiết kế.
+`DIM_CLOS_CUSTOMER` (PDTD_DTM) lookup `ID_NUMBER`/`LEGAL_REPRESENTATIVE`/
+`ADD_ID_REPRESENTATIVE` bằng cách JOIN thẳng `FCT_CLOS_LEGAL_PARTY` theo
+`WI_NAME`+`LEGAL_TYPE`, không qua bảng này nữa. Giữ lại số hiệu `1.2.2.2`
+như một mục rỗng trỏ chuyển tiếp, không xóa số để không làm lệch số các
+bảng FCT khác trong nhóm CLOS.
 
-**Ghi chú lineage — bảng còn thiếu, bổ sung để khớp pattern đã áp dụng cho
-RLOS:** sau khi tách `DIM_CLOS_CUSTOMER` (1.2.1.7) và `DIM_CLOS_LEGAL_PARTY`
-(1.2.1.8) ra khỏi FCT, cần 1 bảng **factless-fact liên kết** để thể hiện lại
-quan hệ `1 hồ sơ × 1 khách hàng chính × N người liên quan pháp lý` — đúng
-cùng vai trò với `FCT_RLOS_APPLICATION_PARTY` (1.3.2.2) bên RLOS, chỉ khác
-ở phía "N": RLOS là `DIM_RLOS_APPLICANT` (1:1) × `DIM_RLOS_COREPAYER` (1:N,
-giới hạn cứng 0-4), còn CLOS là `DIM_CLOS_CUSTOMER` (1:1) ×
-`DIM_CLOS_LEGAL_PARTY` (1:N, không giới hạn).
-
-**Grain:** 1 dòng = 1 hồ sơ × 1 người liên quan pháp lý (dòng trên
-`DIM_CLOS_LEGAL_PARTY`). Hồ sơ không có người liên quan nào khác ngoài
-chính khách hàng vẫn có ít nhất 1 dòng ứng với dòng `LEGAL_TYPE='CUSTOMER'`
-trên `DIM_CLOS_LEGAL_PARTY` (không dùng sentinel -1 trong trường hợp thông
-thường — khác RLOS, vì CLOS luôn có tối thiểu 1 dòng LEGAL_PARTY cho chính
-khách hàng); `LEGAL_PARTY_SK = -1` chỉ dùng cho trường hợp dữ liệu thiếu/
-không khớp được (Unknown), không phải quy ước "hồ sơ không có corepayer"
-như bên RLOS.
-
-Không gộp thuộc tính mô tả nào vào bảng này (toàn bộ đã nằm trên
-`DIM_CLOS_CUSTOMER`/`DIM_CLOS_LEGAL_PARTY`) — bảng chỉ giữ 3 khóa liên kết,
-cùng nguyên tắc "factless fact" đã áp dụng cho RLOS.
-
-**Không có subgraph STG_LOS (review 2026-09-17):** cùng lý do với
-`FCT_RLOS_APPLICATION_PARTY` (1.3.2.2) — bảng không đọc lại STG_LOS, được
-build hoàn toàn bằng cách join lại `DIM_CLOS_APPLICATION` ×
-`DIM_CLOS_CUSTOMER` × `DIM_CLOS_LEGAL_PARTY` đã có sẵn tại SB_DWH (mỗi
-dòng `DIM_CLOS_LEGAL_PARTY` hiện hành của 1 hồ sơ sinh ra đúng 1 dòng
-FCT). Hệ quả tất yếu của kiến trúc factless-fact liên kết DIM×DIM×DIM,
-không phải thiếu sót lineage.
-
-**Rà soát tính cần thiết (review 2026-09-17):** đã rà soát toàn bộ
-BC1-BC11, xác nhận hiện chỉ 2/5 vai trò (`CUSTOMER`,
-`LEGAL_REPRESENTATIVE`) thực sự được BC2 dùng, và đã giải quyết trực
-tiếp bằng cách nối chuỗi trên `DIM_CLOS_CUSTOMER` (2.2.1.7, không qua
-bảng này) — 3 vai trò còn lại (`COLLATERAL_OWNER`,
-`MAIN_CONTRIBUTING_MEMBERS`, `OTHER`) chưa có báo cáo nào cần. Theo
-quyết định người dùng: **vẫn giữ bảng đúng grain N=5 vai trò đầy đủ**
-(không cắt bớt theo column-optimization rule) để mô hình đúng quan hệ
-N:N thật giữa hồ sơ và người liên quan pháp lý, đảm bảo toàn vẹn thông
-tin — không phải thiếu sót, là lựa chọn có chủ đích.
+**Phạm vi:** xóa ở CẢ 2 tầng — SB_DWH (mục này) và PDTD_DTM (2.2.2.2,
+đã xóa từ trước). Xem thêm `hld/hld_review/HLD_FCT_SB_DWH_review.md`
+mục 2 (đã áp dụng cùng thay đổi này) và Section 3 dòng #37/#85 (lịch sử
+quyết định trước đó, đã bổ sung ghi chú xóa hẳn).
 
 ###### 1.2.2.3 FCT_CLOS_COLLATERAL
 
-**Lineage đầy đủ (bao gồm cả nguồn của `DIM_CLOS_COLLATERAL_TYPE`,
-1.2.1.6, và `DIM_CLOS_APPLICATION`, 1.2.1.1 — xem `hld/HLD_DIM_SB_DWH.md`
-để đối chiếu lineage gốc của 2 DIM này):**
+**Lineage đầy đủ (bao gồm cả nguồn của `DIM_CLOS_APPLICATION`, 1.2.1.1 —
+xem `hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của DIM này):**
 
 ```mermaid
 flowchart LR
@@ -639,15 +780,12 @@ flowchart LR
         N(["NG_SB_CLOS_CREDITINFO_COMM"])
     end
     subgraph SB_DWH
-        B["DIM_CLOS_COLLATERAL_TYPE"]
         D["DIM_CLOS_APPLICATION"]
         C["FCT_CLOS_COLLATERAL"]
     end
-    A -->|1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột| C
-    B -.->|COLLATERAL_TYPE_SK, lookup theo COLLATERAL_TYPE_CODE| C
+    A -->|"1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột; COLLTYPE denormalize trực tiếp (bỏ DIM_CLOS_COLLATERAL_TYPE, review 2026-09-30 — SRS chỉ khai thác COLLTYPE gốc, không cần bảng danh mục riêng)"| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
-    A -->|1:1 COLLTYPE| B
-    H -->|1:1 WI_NAME, CUST_GROUP, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME| D
+    H -->|"1:1 WI_NAME, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME, ZONEE→ZONE, APP_DATE, LOAN_PURPOSE, LG_REQ, FI_REQ, PHONE_REQ, EMAIL, DISTANCE_BRANCH_CUSTOMER"| D
     I -->|1:1 STREAM, APPROVAL_TYPE, APP_GRP| D
     J -->|1:1 LOANCASEID, CREDIT_PROFILE| D
     J -.->|"PHÁI SINH: MIN(WI_NAME) group theo LOANCASEID — sinh FIRST_APPROVED_WI_NAME"| D
@@ -663,11 +801,22 @@ vẫn phải là hash toàn bộ cột (trừ `COLL_MGMT_APP`/`DESCRIPTION` vì 
 cộng `DATASOURCE` + tên bảng nguồn để tránh đụng khóa giữa các nguồn (dù
 CLOS chỉ có đúng 1 bảng nguồn, vẫn giữ quy tắc hash chung để nhất quán với
 RLOS — xem 1.3.2.3). Ảnh chụp đầy đủ theo ngày dựng theo quy trình A2, PK =
-`DAYID + WI_NAME + COLLATERAL_BK`. Ngoài `COLLATERAL_TYPE_SK`, bảng còn có
-khóa `APPLICATION_SK` nối về `DIM_CLOS_APPLICATION` (không phải khóa tra
-danh mục ổn định như `COLLATERAL_TYPE_SK`, mà là khóa liên kết hồ sơ theo
-đúng phiên bản DIM hiệu lực tại `DAYID`) — WI_NAME cũng được giữ trực tiếp
-trên fact để tiện truy vấn không cần join qua DIM.
+`DAYID + WI_NAME + COLLATERAL_BK`. Bảng còn có khóa `APPLICATION_SK` nối
+về `DIM_CLOS_APPLICATION` (khóa liên kết hồ sơ theo đúng phiên bản DIM
+hiệu lực tại `DAYID`) — WI_NAME cũng được giữ trực tiếp trên fact để tiện
+truy vấn không cần join qua DIM.
+
+**Bỏ hẳn `DIM_CLOS_COLLATERAL_TYPE` (review 2026-09-30, theo yêu cầu
+người dùng):** rà soát lại xác nhận SRS (BC1, BC2, BC3, BC9) chỉ khai thác
+trực tiếp giá trị text `NG_SB_CLOS_COLL_CD.COLLTYPE` (tiếng Việt không
+dấu) — không có báo cáo nào cần một bảng danh mục loại tài sản riêng với
+`DIMENSION_KEY`/SCD2. Xóa hẳn `DIM_CLOS_COLLATERAL_TYPE` (trước đây
+1.2.1.6) khỏi thiết kế — đảo ngược quyết định đổi nguồn sang
+`NG_SB_RLOS_MAS_COLL_CODE` (review 2026-09-26) lẫn quyết định tách DIM
+ban đầu. `COLLTYPE` nay denormalize trực tiếp trên `FCT_CLOS_COLLATERAL`
+(cột `COLLATERAL_TYPE_CODE`, xem Section 2) — đúng tiền lệ đã áp dụng cho
+`FCT_RLOS_COLLATERAL` khi xóa `DIM_RLOS_COLLATERAL_TYPE` (review
+2026-09-22, xem 1.3.2.3).
 
 Áp dụng **column-optimization rule**: loại khỏi bản CLOS mọi cột chỉ có
 nguồn RLOS (`REL_TO_CUSTOMER`, `USING_PURPOSE`, `VEHICLE_TYPE`, `BRAND`,
@@ -708,11 +857,12 @@ kết luận áp dụng cho `FCT_RLOS_COLLATERAL` (1.3.2.3) — RLOS cũng dùng
 `STANDARD_HASH` trên 4 bảng grid tài sản, cùng lý do hệ nguồn không khai
 khóa CDC.
 
-###### 1.2.2.4 FCT_CLOS_EXCEPTION — review 2026-09-18 (SRS BC7 cập nhật: CHECK_FTR/PHAN_LOAI_DDE đổi công thức)
+###### 1.2.2.4 FCT_CLOS_EXCEPTION — review 2026-09-18 (SRS BC7 cập nhật: CHECK_FTR/PHAN_LOAI_DDE đổi công thức). ⚠️ review 2026-09-26: CHECK_FTR/FIRST_WORKSTEP_RETURN chuyển hẳn sang tính tại PDTD_DTM (xem 5.2.2.4 hoặc HLD_FCT_PDTD_DTM_review.md mục 6); bảng này (SB_DWH) chỉ còn giữ CUSTOMER_SK làm cột thô phục vụ tra CUST_GROUP ở PDTD_DTM
 
-**Lineage đầy đủ (bao gồm cả nguồn của `DIM_CLOS_EXCEPTION_REASON`,
-1.2.1.5, `DIM_CLOS_APPLICATION`, 1.2.1.1, và `DIM_LOS_USER`, 1.1.2 — xem
-`hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của 3 DIM này):**
+**Lineage đầy đủ (bao gồm cả nguồn của `DIM_CLOS_EXCEPTION`,
+1.2.1.5, `DIM_CLOS_APPLICATION`, 1.2.1.1, `DIM_CLOS_CUSTOMER`, 1.2.1.6,
+và `DIM_LOS_USER`, 1.1.2 — xem `hld/HLD_DIM_SB_DWH.md` để đối chiếu
+lineage gốc của các DIM này):**
 
 ```mermaid
 flowchart LR
@@ -721,6 +871,7 @@ flowchart LR
         E(["NG_SB_CLOS_ENTRY_EXIT"])
         R(["NG_SB_CLOS_MAS_EXCEPTION"])
         H(["NG_SB_CLOS_CUST_INFO"])
+        L(["NG_SB_CLOS_CUST_INFO_LEGAL"])
         I(["NG_SB_CLOS_APPROVAL"])
         J(["NG_SB_CLOS_EXTTABLE"])
         K1(["NG_SB_CLOS_CHANGEREQ"])
@@ -728,25 +879,27 @@ flowchart LR
         U(["NG_SB_RLOS_MAS_USER"])
     end
     subgraph SB_DWH
-        B["DIM_CLOS_EXCEPTION_REASON"]
+        B["DIM_CLOS_EXCEPTION"]
         D["DIM_CLOS_APPLICATION"]
+        KC["DIM_CLOS_CUSTOMER"]
         F["DIM_LOS_USER"]
         C["FCT_CLOS_EXCEPTION"]
     end
     A -->|1:1, khóa CDC khai đủ, không hash| C
-    B -.->|EXCEPTION_REASON_SK, LEFT JOIN EXCEPTION_CATEGORY+EXCEPTION_NAME rồi EXISTS-filter qua E| C
+    B -.->|EXCEPTION_SK, LEFT JOIN EXCEPTION_CATEGORY+EXCEPTION_NAME rồi EXISTS-filter qua E| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
-    F -.->|RAISED_BY_USER_SK, lookup theo RAISED_BY| C
-    E -.->|"PHÁI SINH CHECK_FTR (whitelist theo CUST_GROUP)/FIRST_WORKSTEP_RETURN + EXISTS-filter ACTIVITYNAME/DECISION cho EXCEPTION_REASON_SK (review 2026-09-18)"| C
-    H -.->|"CUST_GROUP — điều kiện chọn nhóm whitelist CHECK_FTR (review 2026-09-18)"| C
+    F -.->|USER_SK, lookup theo RAISED_BY| C
+    KC -.->|"CUSTOMER_SK (review 2026-09-26, bổ sung vật lý — trước là lookup tạm để tính CHECK_FTR, nay CHECK_FTR/FIRST_WORKSTEP_RETURN đã chuyển hẳn sang PDTD_DTM, xem 2.2.2.4): tra ID_NUMBER qua WI_NAME + NG_SB_CLOS_CUST_INFO_LEGAL"| C
     R -->|1:1 ACTIVITYNAME, DECISION_CODE, EXCEPTION_CATEGORY, EXCEPTION_NAME| B
-    H -->|1:1 WI_NAME, CUST_GROUP, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME| D
+    H -->|1:1 WI_NAME, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME, ZONEE→ZONE, APP_DATE, LOAN_PURPOSE, LG_REQ, FI_REQ, PHONE_REQ, EMAIL, DISTANCE_BRANCH_CUSTOMER| D
     I -->|1:1 STREAM, APPROVAL_TYPE, APP_GRP| D
     J -->|1:1 LOANCASEID, CREDIT_PROFILE| D
     J -.->|"PHÁI SINH: MIN(WI_NAME) group theo LOANCASEID — sinh FIRST_APPROVED_WI_NAME"| D
     K1 -->|1:1 CHANGE_REQUEST, CHANGE_TYPE| D
     E -.->|"PHÁI SINH: MAX(EXITDATE) theo điều kiện WORKSTEP/DECISION đã phê duyệt — sinh FIRST_APPROVED_DATE; MIN(ENTRYDATE) — sinh CREATION_DATE"| D
     N -->|1:1 HAVE_ANY_DEVIATION| D
+    H -->|1:1 CUSTOMER_NAME → FULL_NAME, CUST_GROUP| KC
+    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER làm NK"| KC
     U -->|"grain 1 dòng/LOGIN_ID, CDC xác định thay đổi (review 2026-09-18)"| F
 ```
 
@@ -761,14 +914,14 @@ bước nhận Clear khi đã làm rõ/bổ sung và đẩy lại). Ảnh chụp
 ngày dựng theo quy trình A2, PK = `DAYID + WI_NAME + EXCEPTION_CATEGORY +
 RAISED_BY + RAISED_DATE_TIME`.
 
-**`EXCEPTION_REASON_SK` — lookup 2 bước theo đúng SRS BC7 (không phải
-lookup 1 cột đơn giản):** `DIM_CLOS_EXCEPTION_REASON` (1.2.1.5) khai Natural
+**`EXCEPTION_SK` — lookup 2 bước theo đúng SRS BC7 (không phải
+lookup 1 cột đơn giản):** `DIM_CLOS_EXCEPTION` (1.2.1.5) khai Natural
 Key đủ 4 cột (`ACTIVITYNAME + DECISION_CODE + EXCEPTION_CATEGORY +
 EXCEPTION_NAME`) vì BA xác nhận 1 tổ hợp bước+quyết định có thể cho phép
 nhiều loại ngoại lệ khác nhau — nhưng nguồn của FCT (`NG_SB_CLOS_EXCEPTION`)
 không có cột `ACTIVITYNAME`/`DECISION` để join thẳng đủ 4 cột. SRS BC7
 (field `ACTIVITYNAME`, nguyên văn Business Rules) giải quyết bằng 2 bước:
-1. `LEFT JOIN DIM_CLOS_EXCEPTION_REASON (d)` theo
+1. `LEFT JOIN DIM_CLOS_EXCEPTION (d)` theo
    `a.EXCEPTION_CATEGORY = d.EXCEPTION_CATEGORY AND a.EXCEPTION_NAME =
    d.EXCEPTION_NAME` — có thể khớp nhiều dòng `d` (nhiều tổ hợp
    `ACTIVITYNAME`/`DECISION_CODE` khác nhau cùng category+name).
@@ -794,10 +947,10 @@ lại đây là lỗi soạn thảo lặp lại (không phải cố ý đổi sa
 chéo 2 hệ), giữ nguyên kết luận dùng `NG_SB_CLOS_ENTRY_EXIT` cho nhánh
 CLOS.
 
-**Đánh giá kiến trúc — vì sao không gộp vào `FCT_CLOS_APPLICATION_DAILY`
+**Đánh giá kiến trúc — vì sao không gộp vào `FCT_CLOS_APPLICATION`
 (1.2.2.1):** đã cân nhắc và xác nhận giữ `FCT_CLOS_EXCEPTION` là bảng
-riêng, không gộp thành cột trên `FCT_CLOS_APPLICATION_DAILY`, vì hai bảng
-khác nhau về grain: `FCT_CLOS_APPLICATION_DAILY` là 1 dòng/hồ sơ/ngày,
+riêng, không gộp thành cột trên `FCT_CLOS_APPLICATION`, vì hai bảng
+khác nhau về grain: `FCT_CLOS_APPLICATION` là 1 dòng/hồ sơ/ngày,
 còn đây là 1 dòng/**lần nêu lý do**/hồ sơ/ngày — 1 hồ sơ có thể phát sinh
 nhiều lần nêu lý do (nhiều loại, nhiều người, nhiều thời điểm, qua các
 vòng Raise/Clear). BC7 tự mô tả là báo cáo liệt kê chi tiết từng lý do
@@ -805,34 +958,56 @@ vòng Raise/Clear). BC7 tự mô tả là báo cáo liệt kê chi tiết từng
 không phải rollup — gộp vào grain 1 dòng/hồ sơ/ngày sẽ mất chi tiết (chỉ
 giữ được lần gần nhất) hoặc phải pivot số cột không giới hạn N, không khả
 thi. Cùng lý do khác grain đã áp dụng cho `FCT_CLOS_COLLATERAL` (xem
-1.2.2.3, không gộp vào `FCT_CLOS_APPLICATION_DAILY`) — giữ nguyên bảng
+1.2.2.3, không gộp vào `FCT_CLOS_APPLICATION`) — giữ nguyên bảng
 riêng là lựa chọn phù hợp, không phải ETL dư thừa. Số đếm tổng hợp cho
 báo cáo (nếu cần) tính trực tiếp ở tầng report/OAS từ bảng chi tiết, không
-cần cột đếm trung gian trên `FCT_CLOS_APPLICATION_DAILY` (xem đánh giá
+cần cột đếm trung gian trên `FCT_CLOS_APPLICATION` (xem đánh giá
 kiến trúc tại 1.2.2.1).
 
-**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` (và ban
-đầu cả `PHAN_LOAI_DDE`) chuyển từ `FCT_CLOS_APPLICATION_DAILY` sang đây:**
-thiết kế gốc đặt 3 cột này (tên gốc `FLAG_FTR`, `FIRST_WORKSTEP_RETURN`,
-`PHAN_LOAI_DDE`) trên `FCT_LOS_APPLICATION_DAILY` — nhưng chính "Trường
-đích trên báo cáo" của tài liệu gốc ghi rõ cả 3 chỉ phục vụ `BC7`
-(`BC7.CHECK_FTR`, `BC7.FIRST_WORKSTEP_RETURN`, `BC7.PHAN_LOAI_DDE`); rà
-soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào khác dùng tới. Vì
-BC7 đúng grain của `FCT_CLOS_EXCEPTION` (1 dòng/lần nêu lý do), không phải
-grain hồ sơ/ngày của `FCT_CLOS_APPLICATION_DAILY`, nên `CHECK_FTR`/
-`FIRST_WORKSTEP_RETURN` chuyển hẳn sang tính trực tiếp tại đây, đọc thêm
-`NG_SB_CLOS_ENTRY_EXIT` (không qua JOIN ngược `FCT_CLOS_APPLICATION_DAILY`)
-— tính ngay ở tầng SB_DWH, giữ đúng nguyên tắc "DTM chỉ đọc DWH" cho tầng
-PDTD_DTM (xem 2.2.2.4). `FCT_CLOS_APPLICATION_DAILY`/
-`FCT_RLOS_APPLICATION_DAILY` (1.2.2.1/1.3.2.1) đã bỏ cả 3 cột gốc này.
-`PHAN_LOAI_DDE` riêng KHÔNG tính tại SB_DWH — xem "Đánh giá kiến trúc —
-`PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" ngay dưới đây (review
-2026-09-22): bảng danh mục `REF_PHAN_LOAI_DDE` nó lookup vào chỉ tồn tại
-vật lý ở tầng PDTD_DTM, nên công thức JOIN cũng phải đặt ở đó.
+**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
+`PHAN_LOAI_DDE` đều chuyển hẳn sang tính tại PDTD_DTM (cập nhật review
+2026-09-26 — 2 cột đầu từng đặt tại SB_DWH, xem lịch sử quyết định bên
+dưới):** thiết kế gốc đặt 3 cột này (tên gốc `FLAG_FTR`,
+`FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE`) trên `FCT_LOS_APPLICATION_DAILY`
+— nhưng chính "Trường đích trên báo cáo" của tài liệu gốc ghi rõ cả 3 chỉ
+phục vụ `BC7` (`BC7.CHECK_FTR`, `BC7.FIRST_WORKSTEP_RETURN`,
+`BC7.PHAN_LOAI_DDE`); rà soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo
+nào khác dùng tới. Vì BC7 đúng grain của `FCT_CLOS_EXCEPTION` (1 dòng/lần
+nêu lý do), không phải grain hồ sơ/ngày của `FCT_CLOS_APPLICATION`,
+cả 3 cột đã bỏ hẳn khỏi `FCT_CLOS_APPLICATION`/
+`FCT_RLOS_APPLICATION` (1.2.2.1/1.3.2.1) từ trước.
+
+**Lịch sử quyết định — `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` (review
+2026-09-18 → 2026-09-26):** ban đầu (review 2026-09-18) 2 cột này chuyển
+sang tính trực tiếp tại SB_DWH (đọc thêm `NG_SB_CLOS_ENTRY_EXIT`), với lý
+do "giữ đúng nguyên tắc DTM chỉ đọc DWH cho tầng PDTD_DTM". Rà soát lại
+(review 2026-09-26, theo yêu cầu người dùng) xác nhận lý do đó KHÔNG đủ —
+cả 2 công thức đều là CASE WHEN/whitelist theo business rule SRS BC7
+(danh sách miễn trừ/điều kiện WORKSTEP-DECISION do BA định nghĩa, có thể
+đổi theo SRS), không phải giá trị gốc STG_LOS hay phép JOIN+lọc thuần
+túy — đặt tại SB_DWH vi phạm nguyên tắc "SB_DWH ảnh chụp sạch nguồn,
+PDTD_DTM chuẩn hóa/tính business rule". Đã chuyển hẳn công thức sang
+PDTD_DTM (xem `hld/hld_review/HLD_FCT_PDTD_DTM_review.md` mục 6): SB_DWH
+KHÔNG cần thêm cột thô mới nào ngoài `CUSTOMER_SK` (bổ sung cùng đợt, để
+PDTD_DTM tra `CUST_GROUP`) — vì lịch sử `WORKSTEP_CODE`/`EXITDATE`/
+`DECISION_CODE` theo `WI_NAME` mà cả 2 công thức cần đã có sẵn, đầy đủ
+trên `SB_DWH.FCT_CLOS_WORKSTEP_EVENT` (1.2.2.6); PDTD_DTM JOIN sang bảng
+SB_DWH này (không phải STG_LOS) để tự tính lại, đúng nguyên tắc "JOIN
+dựng cột ETL luôn xuất phát từ SB_DWH, PDTD_DTM không đọc thẳng STG_LOS".
+`PHAN_LOAI_DDE` đã chuyển PDTD_DTM từ trước (review 2026-09-22) vì lý do
+khác — bảng danh mục `REF_PHAN_LOAI_DDE` nó lookup vào chỉ tồn tại vật lý
+ở tầng PDTD_DTM, xem "Đánh giá kiến trúc — `PHAN_LOAI_DDE` chuyển hẳn
+sang PDTD_DTM" ngay dưới đây.
 
 **Review 2026-09-18 — SRS BC7 cập nhật đổi hẳn công thức `CHECK_FTR` và
 `PHAN_LOAI_DDE` (không còn khớp bản SRS trước, `FIRST_WORKSTEP_RETURN`
-chỉ bổ sung thêm điều kiện lọc):**
+chỉ bổ sung thêm điều kiện lọc):** ⚠️ định nghĩa nghiệp vụ dưới đây vẫn
+đúng, nhưng nơi HIỆN THỰC HÓA công thức đã chuyển hẳn sang PDTD_DTM
+(review 2026-09-26) — bảng nguồn `h`/`e` bên dưới (`NG_SB_CLOS_
+ENTRY_EXIT`) tại PDTD_DTM đọc qua `SB_DWH.FCT_CLOS_WORKSTEP_EVENT`, không
+JOIN thẳng STG_LOS. Xem cơ chế chuyển tại đánh giá kiến trúc phía trên và
+công thức JOIN cụ thể tại `hld/hld_review/HLD_FCT_PDTD_DTM_review.md`
+mục 6.
 
 - **`CHECK_FTR` — đảo ngược bản chất phép tính, không còn là công thức
   đơn giản trên `ENTRY_EXIT`:** SRS mới định nghĩa theo **whitelist miễn
@@ -922,8 +1097,8 @@ flowchart LR
     end
     A -->|1:1 + PHÁI SINH DEVIATION_BK bằng hash toàn bộ cột| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
-    E -.->|PHÁI SINH PROCESSED_DATE, cùng công thức FCT_CLOS_APPLICATION_DAILY| C
-    H -->|1:1 WI_NAME, CUST_GROUP, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME| D
+    E -.->|PHÁI SINH PROCESSED_DATE, cùng công thức FCT_CLOS_APPLICATION| C
+    H -->|"1:1 WI_NAME, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME, ZONEE→ZONE, APP_DATE, LOAN_PURPOSE, LG_REQ, FI_REQ, PHONE_REQ, EMAIL, DISTANCE_BRANCH_CUSTOMER"| D
     I -->|1:1 STREAM, APPROVAL_TYPE, APP_GRP| D
     J -->|1:1 LOANCASEID, CREDIT_PROFILE| D
     J -.->|"PHÁI SINH: MIN(WI_NAME) group theo LOANCASEID — sinh FIRST_APPROVED_WI_NAME"| D
@@ -951,15 +1126,15 @@ nội dung thuộc tính, SCD2/DIM không khả thi. Giữ dạng FCT ảnh ch�
 bộ theo ngày.
 
 **Đánh giá kiến trúc — vì sao `PROCESSED_DATE` tính trực tiếp tại đây
-thay vì JOIN `FCT_CLOS_APPLICATION_DAILY`:** để `FCT_CLOS_DEVIATION` và
-`FCT_CLOS_APPLICATION_DAILY` là 2 luồng ETL hoàn toàn độc lập, không phụ
+thay vì JOIN `FCT_CLOS_APPLICATION`:** để `FCT_CLOS_DEVIATION` và
+`FCT_CLOS_APPLICATION` là 2 luồng ETL hoàn toàn độc lập, không phụ
 thuộc thứ tự chạy trước/sau lẫn nhau (đã rà soát toàn bộ tham chiếu chéo
-giữa 2 bảng này khi thiết kế `FCT_CLOS_APPLICATION_DAILY`, xem đánh giá
+giữa 2 bảng này khi thiết kế `FCT_CLOS_APPLICATION`, xem đánh giá
 kiến trúc tại 1.2.2.1 — `DEVIATION_CNT` cũng đã bỏ khỏi
-`FCT_CLOS_APPLICATION_DAILY`), `PROCESSED_DATE` tính độc lập ngay tại
+`FCT_CLOS_APPLICATION`), `PROCESSED_DATE` tính độc lập ngay tại
 đây, đọc thẳng `NG_SB_CLOS_ENTRY_EXIT` — cùng công thức 3 mức ưu tiên
 (ngày phê duyệt cuối/ngày hủy/ngày thoát bước gần nhất) đã dùng cho
-`FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE` (1.2.2.1), không JOIN bảng
+`FCT_CLOS_APPLICATION.PROCESSED_DATE` (1.2.2.1), không JOIN bảng
 nào khác. PDTD_DTM của bảng này chỉ còn bê 1:1 (xem 2.2.2.5).
 
 **Lưu ý đối chiếu SRS BC6:** bảng join tổng quan (BR 1.2, nested table)
@@ -971,10 +1146,9 @@ field-list chi tiết (BR 1.3) ghi đúng `PROCESSED_DATE` nhánh CLOS nguồn t
 
 ###### 1.2.2.6 FCT_CLOS_WORKSTEP_EVENT — TÁCH TỪ FCT_LOS_WORKSTEP_EVENT (đánh giá lại 2026-09-14, xem lý do tách bên dưới)
 
-**Lineage đầy đủ (bao gồm cả nguồn của `DIM_CLOS_WORKSTEP` 1.2.1.3,
-`DIM_CLOS_DECISION` 1.2.1.4, `DIM_LOS_USER` 1.1.2, và `DIM_CLOS_APPLICATION`
-1.2.1.1 — xem `hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của 4 DIM
-này):**
+**Lineage đầy đủ (bao gồm cả nguồn của `DIM_CLOS_WORKSTEP_DECISION`
+1.2.1.3, `DIM_LOS_USER` 1.1.2, và `DIM_CLOS_APPLICATION` 1.2.1.1 — xem
+`hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của 3 DIM này):**
 
 ```mermaid
 flowchart LR
@@ -990,23 +1164,20 @@ flowchart LR
         WF(["WFINSTRUMENTTABLE"])
     end
     subgraph SB_DWH
-        WS["DIM_CLOS_WORKSTEP"]
-        DC["DIM_CLOS_DECISION"]
+        WD["DIM_CLOS_WORKSTEP_DECISION"]
         US["DIM_LOS_USER"]
         AP["DIM_CLOS_APPLICATION"]
         KC["DIM_CLOS_CUSTOMER"]
         E["FCT_CLOS_WORKSTEP_EVENT"]
     end
     A -->|1:1 + PHÁI SINH, khóa CDC khai đủ, không hash| E
-    WS -.->|WORKSTEP_SK, lookup WORKSTEP_CODE theo thời gian| E
-    DC -.->|DECISION_SK, lookup DECISION_CODE theo thời gian| E
+    WD -.->|"WORKSTEP_DECISION_SK (review 2026-09-24, gộp từ WORKSTEP_SK+DECISION_SK), lookup theo cặp WORKSTEP_CODE+DECISION_CODE theo thời gian — khóa JOIN chính thức duy nhất để lấy DECISION_CODE (đã xóa khỏi fact, không denormalize)"| E
     US -.->|USER_SK, lookup theo USERNAME, USERNAME có thể rỗng khi bước chưa EXIT — vẫn map -1 bình thường| E
     AP -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| E
-    KC -.->|"CUSTOMER_SK (review 2026-09-21, bổ sung), join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID (quan hệ 1:1) — cùng điều kiện đã dùng trên FCT_CLOS_APPLICATION_DAILY.CUSTOMER_SK, 2.2.2.1"| E
-    MW -->|"DISTINCT QUEUE_NAME, CDC xác định thay đổi (review 2026-09-18)"| WS
-    MW -->|"DISTINCT DECISION, CDC xác định thay đổi (review 2026-09-18)"| DC
+    KC -.->|"CUSTOMER_SK (review 2026-09-21, bổ sung), join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID (quan hệ 1:1) — cùng điều kiện đã dùng trên FCT_CLOS_APPLICATION.CUSTOMER_SK, 2.2.2.1"| E
+    MW -->|"1:1 QUEUE_NAME+DECISION, CDC xác định thay đổi (review 2026-09-24, gộp từ 2 lần DISTINCT riêng lẻ)"| WD
     U -->|"grain 1 dòng/LOGIN_ID, CDC xác định thay đổi (review 2026-09-18)"| US
-    H -->|1:1 WI_NAME, CUST_GROUP, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME| AP
+    H -->|"1:1 WI_NAME, INDUSTRY_LVL1/2/3_CODE, EMPLOYEE_CODE/NAME, ZONEE→ZONE, APP_DATE, LOAN_PURPOSE, LG_REQ, FI_REQ, PHONE_REQ, EMAIL, DISTANCE_BRANCH_CUSTOMER"| AP
     I -->|1:1 STREAM, APPROVAL_TYPE, APP_GRP| AP
     J -->|1:1 LOANCASEID, CREDIT_PROFILE| AP
     J -.->|"PHÁI SINH: MIN(WI_NAME) group theo LOANCASEID — sinh FIRST_APPROVED_WI_NAME"| AP
@@ -1014,8 +1185,19 @@ flowchart LR
     A -.->|"PHÁI SINH: MAX(EXITDATE) theo điều kiện WORKSTEP/DECISION đã phê duyệt — sinh FIRST_APPROVED_DATE; MIN(ENTRYDATE) — sinh CREATION_DATE"| AP
     N -->|1:1 HAVE_ANY_DEVIATION| AP
     A -.->|"PHÁI SINH (review 2026-09-21, trực tiếp trên E): PROCESSED_DATE 3 mức ưu tiên"| E
-    WF -.->|"LEFT JOIN WI_NAME=PROCESSINSTANCEID, loại 5 CREATEDBY hệ thống/test — PHÁI SINH WORKSTEP_FLAG (review 2026-09-21, trực tiếp trên E)"| E
+    WF -.->|"LEFT JOIN WI_NAME=PROCESSINSTANCEID, loại 5 CREATEDBY hệ thống/test — sinh cột thô WF_PROCESSNAME/WF_ACTIVITYNAME (review 2026-09-26, thay cho WORKSTEP_FLAG đã tính sẵn — công thức CASE WHEN chuyển sang PDTD_DTM)"| E
 ```
+
+**Gộp WORKSTEP_SK+DECISION_SK thành 1 khóa (review 2026-09-24):** sau khi
+gộp `DIM_CLOS_WORKSTEP`+`DIM_CLOS_DECISION` thành `DIM_CLOS_WORKSTEP_
+DECISION` (1.2.1.3), 2 khóa `WORKSTEP_SK`/`DECISION_SK` trên bảng này gộp
+thành 1 `WORKSTEP_DECISION_SK` duy nhất, lookup theo cặp
+(WORKSTEP_CODE, DECISION_CODE) của chính dòng event, điều kiện thời gian
+SCD2. Đồng thời xóa cột `DECISION_CODE` denormalize trên fact — cột này
+không phải PK (khác `WORKSTEP_CODE`, vẫn giữ nguyên vì là 1 phần PK vật
+lý của bảng), nên bắt buộc phải JOIN qua `WORKSTEP_DECISION_SK` để lấy
+giá trị DECISION khi cần. `WORKSTEP_CODE` KHÔNG đổi — vẫn denormalize
+trực tiếp trên fact và nằm trong PK như thiết kế gốc.
 
 **Vì sao tách vật lý CLOS/RLOS (đánh giá lại 2026-09-14, thay thế kết luận
 "giữ CHUNG" trước đó):** lần đánh giá trước kết luận giữ CHUNG vì grain và
@@ -1069,7 +1251,7 @@ hiện lệch tài liệu, không phát sinh PENDING mới.
 
 **Đính chính lld/BC4.csv (review 2026-09-21):** rà soát mapping trước đó
 phát hiện `WINAME`/`WORKSTEP`/`ENTRYDATE`/`EXITDATE`/`UND_MAKER`/`REMARKS`
-của BC4 bị trỏ nhầm sang `FCT_CLOS_APPLICATION_DAILY` (snapshot 1
+của BC4 bị trỏ nhầm sang `FCT_CLOS_APPLICATION` (snapshot 1
 dòng/hồ sơ/ngày) — SAI GRAIN so với ý định thật của báo cáo. Người dùng
 xác nhận: BC4 là báo cáo liệt kê TOÀN BỘ các dòng sự kiện (event-grain,
 nhiều dòng/hồ sơ) của các hồ sơ đã có bước thẩm định, lọc `WHERE
@@ -1085,7 +1267,7 @@ event (NULL khi dòng đang xét là `UnderwriterChecker`, không self-join
 lấy từ dòng UWM khác cùng hồ sơ). Các thuộc tính cấp-hồ-sơ khác của BC4
 (`SYSTEMNAME`=`DATASOURCE`, `CUSTOMER_NAME` qua `DIM_CLOS_CUSTOMER`) đọc
 trực tiếp trên chính bảng này/DIM liên quan, không cần JOIN sang
-`FCT_CLOS_APPLICATION_DAILY` nữa. **Cập nhật tiếp (review 2026-09-21,
+`FCT_CLOS_APPLICATION` nữa. **Cập nhật tiếp (review 2026-09-21,
 theo yêu cầu đồng bộ của người dùng):** `REPORT_DATE`(=`PROCESSED_DATE`)
 và `FLAG`(=`WORKSTEP_FLAG`) — 2 cột duy nhất còn cần JOIN fan-out sang
 `APPLICATION_DAILY` — nay ĐÃ bổ sung làm cột phái sinh MỚI tính độc lập
@@ -1098,35 +1280,136 @@ RLOS áp dụng y hệt trên `FCT_RLOS_WORKSTEP_EVENT` (1.3.2.7, cột 24-26).
 Xem `lld/BC4.csv` các dòng 4/6/7/8/9/11 (CLOS) và 15/17/18/19/20/22
 (RLOS).
 
+###### 1.2.2.7 FCT_CLOS_LEGAL_PARTY — ĐỔI PHÂN LOẠI DIM → FACT (review 2026-09-25, trước đây là DIM_CLOS_LEGAL_PARTY, 1.2.1.7)
 
+```mermaid
+flowchart LR
+    subgraph STG_LOS
+        A(["NG_SB_CLOS_CUST_INFO_LEGAL"])
+    end
+    subgraph SB_DWH
+        K["DIM_CLOS_CUSTOMER"]
+        AP["DIM_CLOS_APPLICATION"]
+        E["FCT_CLOS_LEGAL_PARTY"]
+    end
+    A -->|1:1 NAMEE→FULL_NAME, ID_NUMBER, OBJ_TYPE, LEGAL_DOC| E
+    K -.->|"CUSTOMER_SK — tìm dòng cùng WI_NAME có UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, lấy ID_NUMBER, lookup DIM_CLOS_CUSTOMER theo ID_NUMBER (NK) — mọi dòng đều có, kể cả dòng không phải vai trò Khách hàng"| E
+    AP -.->|"APPLICATION_SK, join theo WI_NAME"| E
+```
+
+**Đổi phân loại DIM → FACT (review 2026-09-25, theo quyết định người
+dùng):** nguồn `NG_SB_CLOS_CUST_INFO_LEGAL` có **KEY CDC RỖNG** trong
+`input/DS_BANG_202608.xlsx` — đã ghi nhận rủi ro này ở Section 3 #36
+(trước đây giải quyết bằng cách GIỮ NGUYÊN kiến trúc DIM, đổi cơ chế SCD2
+sang so khớp "full-row-key" 5 cột). Lần này người dùng quyết định đổi
+hướng khác, đúng theo "Red flag — source table has no CDC key → can't be
+a DIM/SCD2" (`references/design-method.md`): chuyển hẳn thành **FACT** —
+một snapshot trung thực của những gì nguồn thực sự cung cấp (không có
+định danh dòng độc lập với nội dung), thay vì giả vờ có lịch sử SCD2 đáng
+tin cậy. Xem Section 3 — dòng follow-up thay thế quyết định cũ (không xóa
+dòng #36, giữ lịch sử).
+
+**Giữ nguyên toàn bộ thuộc tính của `DIM_CLOS_LEGAL_PARTY` cũ** (`OBJ_TYPE`
+gốc, `FULL_NAME`←`NAMEE`, `LEGAL_DOC`, `ID_NUMBER`, và `LEGAL_TYPE` chuẩn
+hóa qua `REF_CLOS_LEGAL` ở PDTD_DTM, xem Section 2 → 2.2.2.8) — chỉ đổi
+khóa/cơ chế nạp. **Grain: 1 dòng = 1 người/đối tượng liên quan pháp lý của
+1 hồ sơ** (`WI_NAME` + `ID_NUMBER`, theo đúng "Khóa nghiệp vụ" ghi trong
+`CLOS - Metadata.xlsx` sheet "2. Table Review" dòng
+`NG_SB_CLOS_CUST_INFO_LEGAL`) — PK giờ là composite `WI_NAME + ID_NUMBER`,
+không còn `DIMENSION_KEY` sequence.
+
+**Bổ sung 2 chiều FK mới (yêu cầu người dùng, review 2026-09-25):**
+
+1. **Chiều khách hàng chính — `CUSTOMER_SK`:** MỌI dòng (dù vai trò
+   `OBJ_TYPE` là gì — Khách hàng, Người đại diện theo pháp luật, Chủ sở
+   hữu TSBĐ, Thành viên góp vốn chính, Khác) đều có `CUSTOMER_SK` trỏ về
+   khách hàng CHÍNH của hồ sơ đó — không phải chính dòng đang xét (trừ
+   khi dòng đó chính là `OBJ_TYPE='Khách hàng'` thì trùng nhau tự nhiên).
+   Cách lấy: từ `WI_NAME` của dòng đang xét, tìm dòng khác cùng `WI_NAME`
+   có `UPPER(OBJ_TYPE)='KHÁCH HÀNG'` trên chính `NG_SB_CLOS_CUST_INFO_
+   LEGAL`, lấy `ID_NUMBER` của dòng đó, lookup sang `DIM_CLOS_CUSTOMER.
+   DIMENSION_KEY` theo `ID_NUMBER` (NK, xem 1.2.1.6) — tái sử dụng đúng
+   logic đã dùng để dựng `DIM_CLOS_CUSTOMER`, không phát minh lại. Mặc
+   định -1 nếu không khớp.
+2. **Chiều hồ sơ — `APPLICATION_SK`:** join theo `WI_NAME` sang
+   `DIM_CLOS_APPLICATION.DIMENSION_KEY` (1.2.1.1) — quan hệ N:1 (nhiều
+   dòng vai trò pháp lý cùng `WI_NAME` trỏ về đúng 1 hồ sơ). Mặc định -1
+   nếu không khớp.
+
+**Vì sao KHÔNG áp dụng pattern pivot-thành-cột-cố-định (lịch sử — so sánh
+với `DIM_RLOS_COREPAYER` tại thời điểm review này, xem cập nhật ⚠️ dưới
+đây):** RLOS corepayer (tại thời điểm review 2026-09-25) có đúng **1 vai
+trò duy nhất** (corepayer), số lượng người có **giới hạn cứng đã xác
+nhận** (0-4, theo nhãn PIN Corep1-4) — nên tách được thành 1 DIM riêng
+theo đúng 1 vai trò với N nhỏ, biết trước. CLOS có **5 vai trò khả dĩ**
+(`CUSTOMER`, `LEGAL_REPRESENTATIVE`, `COLLATERAL_OWNER`,
+`MAIN_CONTRIBUTING_MEMBERS`, `OTHER`), nhưng khác RLOS ở 2 điểm mấu chốt:
+(1) **không có giới hạn cứng đã biết** cho số người ở mỗi vai trò (số
+người đại diện/chủ sở hữu TSBĐ/thành viên góp vốn phụ thuộc hoàn toàn
+cấu trúc sở hữu thực tế của từng doanh nghiệp, không có trần cố định như
+"tối đa 4"); (2) **các vai trò không loại trừ lẫn nhau** — 1 người có
+thể đồng thời là người đại diện pháp luật VÀ thành viên góp vốn chính
+trên cùng 1 hồ sơ (2 dòng cho cùng 1 người), trong khi RLOS 1 người chỉ
+có thể là applicant HOẶC corepayer, không bao giờ cả hai. Vì N không
+giới hạn/không biết trước và vai trò không loại trừ nhau, **không đủ
+điều kiện pivot thành cột cố định** — phải giữ dạng bảng danh sách (grain
+nhân dòng).
+
+⚠️ **Cập nhật 2026-09-26 — so sánh trên chỉ còn giá trị lịch sử ở vế
+CLOS:** `DIM_RLOS_COREPAYER` đã đổi thành `FCT_RLOS_COREPAYER` (1.3.2.9)
+và bỏ hẳn pivot `ADD_ID_COREPAYER`/`ADD_ID_OTHER_COREPAYER`, đổi grain
+sang 1 dòng/giấy tờ — theo yêu cầu người dùng ("cần chi tiết theo dòng"),
+KHÔNG phải vì corepayer hết đủ điều kiện pivot (giới hạn cứng 0-4 và
+1-vai-trò-duy-nhất vẫn đúng, không đổi). Lập luận "vì sao KHÔNG pivot"
+của `FCT_CLOS_LEGAL_PARTY` (bảng này) vẫn đúng nguyên vẹn — CLOS thật sự
+không đủ điều kiện pivot (N không giới hạn, vai trò không loại trừ nhau)
+— chỉ riêng đối tượng so sánh (`DIM_RLOS_COREPAYER`) không còn tồn tại
+dưới tên/kiến trúc đó nữa.
+
+**Gộp `FCT_LOS_PARTY_DOCUMENT` vào thẳng bảng này** (bỏ hẳn bảng document
+riêng) — nguồn giấy tờ pháp lý CLOS chỉ có đúng 1 bảng gốc
+(`NG_SB_CLOS_CUST_INFO_LEGAL`) với đúng 1 cặp `LEGAL_DOC`/`ID_NUMBER` trên
+mỗi dòng, không có rủi ro "nhiều giấy tờ/nhóm" như RLOS IDGRID (14 loại
+giấy tờ, có thể nhiều dòng/nhóm TCC-CC) — gộp trực tiếp an toàn, không mất
+dữ liệu (đã xác nhận với người dùng).
+
+Bỏ `DATASOURCE`, `PARTY_TYPE`, `PARTY_ROLE_CODE` (thay bằng `OBJ_TYPE`
+gốc + `LEGAL_TYPE` chuẩn hóa ở PDTD_DTM, xem Section 2 → 2.2.2.8),
+`GEO_SK` (không cần vì không phải khách hàng chính).
+
+**Ảnh hưởng lan truyền do đổi tên bảng (review 2026-09-25):** `FCT_CLOS_
+APPLICATION_PARTY` (1.2.2.2) có cột `LEGAL_PARTY_SK` từng trỏ
+`DIM_CLOS_LEGAL_PARTY.DIMENSION_KEY` — nay đổi trỏ sang `FCT_CLOS_
+LEGAL_PARTY` theo đúng PK composite mới (`WI_NAME + ID_NUMBER`), không
+còn `DIMENSION_KEY` để trỏ. Xem 1.2.2.2 cột `LEGAL_PARTY_SK` đã cập nhật
+ghi chú. `DIM_CLOS_CUSTOMER` (1.2.1.6, PDTD_DTM 2.2.1.6) — các cột
+`LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` đổi nguồn từ "LEFT JOIN
+DIM_CLOS_LEGAL_PARTY" thành "LEFT JOIN FCT_CLOS_LEGAL_PARTY" (cùng điều
+kiện join theo WI_NAME+LEGAL_TYPE, chỉ đổi tên bảng nguồn).
 
 #### 1.3 Bộ bảng RLOS
 
 ##### 1.3.1 DIM
 
-###### 1.3.1.1 DIM_RLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (đã bổ sung APP_GRP, DEVIATION_G3, CHANGE_TYPE — thay thế DIM_RLOS_APPROVAL_GROUP đã loại bỏ)
+###### 1.3.1.1 DIM_RLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (đã bổ sung APP_GRP, APPLICATION_DATE; lấy đầy đủ cột dư thừa từ driving table EXTTABLE; DEVIATION_G3 chuyển report-time PDTD_DTM; CHANGE_REQUEST/CHANGE_TYPE/CUS_SEGMENT/APPROVED_AMT_FINAL/CURRENCY_CODE/APPROVED_TERM chuyển đi nơi khác). ⚠️ review 2026-09-30 (3 lượt, theo yêu cầu người dùng): xóa 12 cột "username/routing tại 1 bước" (UWMAKERUSER/UWCHKRUSER/CREDAPPRUSER/CCOMMITUSER/DATACHKUSER/HOSUPPORTUSER/POSTSANCUSER/PREDISBMAKUSER/PREDISBCHKUSER/DISBMAKUSER/DISBCHKUSER/CHECKER3_TARGET), sau đó 10 cột username khác + APPROVAL_REJECT/APPROVAL_FLAG, chuyển 11 cột cờ nhánh phụ sang FCT_RLOS_APPLICATION, rồi xóa tiếp CURR_WSNAME/PREV_WSNAME/DECISION/CHECKER3_CONDITION/DISBURSEMENT_TYPE/DISB_DECSION/MAJOR_DEV/MINOR_DEV/CANCEL_DATE + chuyển TOTALNONELIGIBLE/REASON (→CANCEL_REASON) sang FCT_RLOS_APPLICATION — xem chi tiết đầy đủ tại 1.3.1.1 (Section 1) — nay 39 cột
 
 ```mermaid
 flowchart LR
     subgraph STG_LOS
         A(["NG_SB_RLOS_APPLICANT_GENERAL"])
-        B(["NG_SB_RLOS_APPLICANT_DETAIL"])
         C(["NG_SB_RLOS_APPROVAL"])
         D(["NG_SB_RLOS_EXTTABLE"])
         E(["NG_SB_RLOS_SENT_CBS_LOG"])
         F(["NG_SB_RLOS_ENTRY_EXIT"])
-        H(["NG_SB_RLOS_MANUAL_DEVIATION"])
     end
     subgraph SB_DWH
         G["DIM_RLOS_APPLICATION"]
     end
-    D -->|"1:1 WI_NAME, LOANCASEID, CHANGE_REQUEST(=REQ_TYPE), CHANGE_TYPE — driving table"| G
-    A -->|1:1 POLICY, CAMPAIGN, PROOF_OF_INCOME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG, EMPLOYEE_CODE/NAME| G
-    B -->|1:1 CUS_SEGMENT, BI_CUS_SEGMENT| G
+    D -->|"driving table: WI_NAME, LOANCASEID + 6 cột dư thừa (review 2026-09-30, 3 lượt: xóa 22 cột username/routing/state/deviation/cancel, chuyển 13 cột (11 cờ + TOTALNONELIGIBLE/REASON) sang FCT_RLOS_APPLICATION — xem 1.3.1.1)"| G
+    A -->|1:1 POLICY, CAMPAIGN, PROOF_OF_INCOME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG, EMPLOYEE_CODE/NAME, APPLICATION_DATE| G
     C -->|1:1 STREAM, APP_GRP| G
     E -->|1:1 RESULT_MAIN_CARD_ID| G
     F -.->|PHÁI SINH CREATION_DATE, LAST_APPROVAL_DATE| G
-    H -.->|"PHÁI SINH đếm số dòng theo WI_NAME >=3 — sinh DEVIATION_G3"| G
 ```
 
 **Ghi chú lineage — đổi driving table sang `NG_SB_RLOS_EXTTABLE` (review
@@ -1138,25 +1421,138 @@ bảng đều grain 1:1 hồ sơ theo RLOS Metadata (không phải sửa lỗi g
 cùng cấu trúc theo RLOS Metadata (bảng `NG_SB_RLOS_EXTTABLE`, sheet Table
 Review).
 
-**Ghi chú lineage — loại bỏ `DIM_RLOS_APPROVAL_GROUP`, bổ sung `APP_GRP` +
-`DEVIATION_G3` thẳng lên đây:** RLOS Metadata gốc (sheet Table Review, bảng
+**✅ Đã giải quyết — lấy đầy đủ cột dư thừa của driving table
+`NG_SB_RLOS_EXTTABLE` (review 2026-09-25):** trước đó đổi driving table
+(review 2026-09-22) mới chỉ lấy 4 cột (`WI_NAME`, `LOANCASEID`,
+`CHANGE_REQUEST`, `CHANGE_TYPE`), bỏ sót các cột khác của cùng bảng —
+cùng tình huống đã xử lý ở `DIM_CLOS_APPLICATION` (1.2.1.1). Rà soát lại
+toàn bộ 50 cột của `NG_SB_RLOS_EXTTABLE` (`CLOS - Metadata.xlsx`, sheet
+"3. Column Review" — file này chứa chung metadata cả 2 hệ, gồm cả bảng
+RLOS) đối chiếu SRS BC1 (bảng field-list chính, 87 dòng):
+- **4 cột có report dùng thật** (BC1, dạng `COALESCE` fallback):
+  `UWMAKERUSER` (fallback cho `UNDERWRITERMAKER_USERMAKE`),
+  `UWCHKRUSER` (fallback cho `UNDERWRITERCHECKER_USERMAKE`),
+  `CREDAPPRUSER`, `CCOMMITUSER` (2 fallback tuần tự cho
+  `APPROVAL_USERMAKE`). (Tên đích ban đầu dự kiến `*_TAKERESPON` — đã
+  đổi/xóa theo review 2026-10-01, xem Section 2 → 2.3.2.1.)
+- **49 cột còn lại không có báo cáo nào dùng trực tiếp** — thêm vào theo
+  quyết định người dùng, đánh dấu "Thiết kế dư thừa" để không bỏ sót
+  thuộc tính gốc của driving table (cùng nguyên tắc đã áp dụng ở
+  `DIM_CLOS_APPLICATION`): `CURR_WSNAME`, `PREV_WSNAME`, `DECISION`,
+  `CUSTOMER_NAME`, `PRODUCT_NAME`, `APPROVAL_CONDITION`, `APPROVER_TYPE`,
+  `CHECKER3_CONDITION`, `CHECKER3_TARGET`, `DISBURSEMENT_TYPE`,
+  `DISB_DECSION`, `STP_FLAG`, `ELIGIBLE`, `C_PHONE_CREATE_FLAG`,
+  `C_FI_CREATE_FLAG`, `C_LEGAL_CREATE_FLAG`, `C_PHONE_DELETE_FLAG`,
+  `C_FI_DELETE_FLAG`, `C_LEGAL_DELETE_FLAG`, `REINITIATE`, `RR_USER`,
+  `DATACHKUSER`, `HOSUPPORTUSER`, `POSTSANCUSER`, `PREDISBMAKUSER`,
+  `PREDISBCHKUSER`, `DISBMAKUSER`, `DISBCHKUSER`, `POSTDISBDEUSER`,
+  `NORMBRUSER`, `REGBRUSER`, `NORMSUPPORT_DCSN`, `REGSUPPORT_DCSN`,
+  `NORMALBRHOLD`, `REGBRHOLD`, `BRASUPPORTSENDER`, `DISBURSEUSER`,
+  `DISBCHECKERUSER`, `LASTAPPROVER`, `APP_STATUS`, `APPROVAL_REJECT`,
+  `APPROVAL_FLAG`, `MAJOR_DEV`, `MINOR_DEV`, `TOTALNONELIGIBLE`,
+  `CANCEL_DATE`, `REASON`, `RMEMAILID`, `REMARKS`.
+- **Loại trừ hoàn toàn:** `ITEMINDEX` (khóa vật lý kỹ thuật của bảng
+  nguồn, không mang ý nghĩa nghiệp vụ — cùng lý do đã loại `RN` ở
+  `NG_SB_CLOS_EXTTABLE`); `BRANCH_CODE`/`BRANCH_NAME` (đã có sẵn qua
+  `COMPANY_SK` → `DIM_LOS_COMPANY` trên `FCT_RLOS_APPLICATION`,
+  không cần thêm lại dạng text — cùng lý do đã loại
+  `COMPANY_CODE`/`COMPANY_NAME`/`BRANCH_CODE`/`BRANCH_NAME` ở
+  `DIM_CLOS_APPLICATION`).
+
+`MAJOR_DEV`/`MINOR_DEV` (số lượng sai lệch chính sách mức lớn/nhỏ ghi
+nhận trực tiếp trên `NG_SB_RLOS_EXTTABLE`) đọc **khác nguồn hoàn toàn**
+với `DEVIATION_G3` (đếm từ `NG_SB_RLOS_MANUAL_DEVIATION`, xem ghi chú
+riêng bên dưới) — giữ cả hai, không dùng `MAJOR_DEV`/`MINOR_DEV` để suy ra
+hay thay thế `DEVIATION_G3`, tránh nhầm lẫn 2 khái niệm đếm khác nguồn.
+`DISB_DECSION` giữ nguyên tên gốc dù thiếu chữ so với chính tả đúng
+"DECISION" — lỗi đặt tên từ hệ thống nguồn, đã ghi nhận ở metadata.
+
+**✅ Đã giải quyết — chuyển `CHANGE_REQUEST`/`CHANGE_TYPE` sang
+`FCT_RLOS_APPLICATION` (review 2026-09-25):** cùng lý do đã áp dụng
+cho `DIM_CLOS_APPLICATION` (1.2.1.1) — bản chất "thay đổi thường xuyên"
+theo hồ sơ không phù hợp cột ổn định SCD2 của DIM. Khác với CLOS (chấp
+nhận để tham chiếu treo tạm thời), lần này thêm thẳng luôn vào
+`FCT_RLOS_APPLICATION` (1.3.2.1, đọc trực tiếp
+`NG_SB_RLOS_EXTTABLE.REQ_TYPE`/`CHANGE_TYPE`) — không để trạng thái
+PENDING. Khóa tra SLA (`REF_PRODUCT`/`SLA_*`, PDTD_DTM 2.3.1.1) đổi sang
+lấy `CHANGE_TYPE` qua `APPLICATION_SK` → `FCT_RLOS_APPLICATION`
+thay vì đọc cột local đã xóa trên DIM.
+
+**✅ Đã giải quyết — chuyển `CUS_SEGMENT`/`CUSTOMER_SEGMENT` sang
+`DIM_RLOS_APPLICANT` (review 2026-09-25):** nguồn
+`NG_SB_RLOS_APPLICANT_DETAIL.CUS_SEGMENT` là thuộc tính khách hàng/cá
+nhân applicant, không phải hồ sơ — cùng bản chất tách bạch đã áp dụng
+cho `CUST_GROUP` giữa `DIM_CLOS_APPLICATION`/`DIM_CLOS_CUSTOMER`. Chuyển
+2 cột này sang `DIM_RLOS_APPLICANT` — bảng dự kiến đổi tên
+thành `DIM_RLOS_CUSTOMER` ở một lượt review riêng sau này, chưa thực hiện
+đổi tên trong lượt này. **Cập nhật (review 2026-09-26):** `DIM_RLOS_
+APPLICANT` đã đổi hẳn thành `FCT_RLOS_CUSTOMER` (1.3.2.x, đổi grain
+sang WI_NAME+ID_TYPE+ID_NUMBER, xem ghi chú tại đó) — `CUS_SEGMENT` nay
+nằm trên bảng FCT này; `CUSTOMER_SEGMENT` chuyển tiếp sang PDTD_DTM (không
+còn ở SB_DWH).
+
+**✅ Đã giải quyết — chuyển `APPROVED_AMT_FINAL`/`CURRENCY_CODE`/
+`APPROVED_TERM` sang `FCT_RLOS_WORKSTEP_EVENT` (review 2026-09-25):**
+trước đây 3 cột này đặt trên DIM dạng "dư thừa có chủ đích" (cùng
+nguồn/giá trị với `FCT_RLOS_APPLICATION`) chỉ để
+`FCT_RLOS_WORKSTEP_EVENT` (1.3.2.7) lookup thẳng qua `APPLICATION_SK`
+không cần JOIN fan-out. Theo yêu cầu người dùng: đặt thẳng 3 cột này lên
+chính `FCT_RLOS_WORKSTEP_EVENT` (tính độc lập tại đó, cùng nguồn
+`NG_SB_RLOS_CREDIT_PROPOSAL`, cùng pattern `PROCESSED_DATE`/
+`WORKSTEP_FLAG` đã có — phái sinh trực tiếp trên bảng, lặp lại giống
+nhau trên mọi dòng event của hồ sơ) — không cần đặt bản dư thừa trên DIM
+nữa.
+
+**✅ Đã giải quyết — bổ sung `APPLICATION_DATE` (review 2026-09-25):**
+rà soát toàn bộ ~29 cột của `NG_SB_RLOS_APPLICANT_GENERAL` (cùng bảng
+driving `POLICY`/`CAMPAIGN`/`EMPLOYEE_CODE`...) phát hiện `APPLICATION_
+DATE` ("ngày khởi tạo hồ sơ" khai theo form) là cột hồ sơ-grain duy nhất
+còn thiếu, chưa dùng ở đâu trong tài liệu. Thêm dạng dư thừa riêng, song
+song với `CREATION_DATE` đã có sẵn (cột phái sinh `MIN(ENTRYDATE)` trên
+`NG_SB_RLOS_ENTRY_EXIT`, cùng khái niệm "ngày khởi tạo hồ sơ" nhưng khác
+nguồn — theo yêu cầu người dùng, giữ cả hai vì không chắc chắn 2 giá trị
+luôn khớp nhau). Các cột hồ sơ-grain khác của `NG_SB_RLOS_APPLICANT_
+GENERAL` đã dùng ở nơi khác: `COMPANY_CODE`/`BRACH_CODE`/`BRANCH_NAME`
+(lookup `COMPANY_SK`), `PRODUCT_LINE`/`SUB_PRODUCT` (lookup
+`PRODUCT_SK`), `ZONE`/`NATIONALITY`/`TITLE`/`HOME_PHONE`/`PHONE_1`/
+`PHONE2`/`SALE_TYPE`/`BROKER_*`/`ACC_OFFICER`/`ACCOUNT_OFFICER_NAME`/
+`EXISTING_CUSTOMER`/`APPLICANTCIF`/`BUSINESS_MODEL`/`KYC1` (⚠️ review
+2026-09-26: `ZONE`/`SALE_TYPE`/`BROKER_*`/`ACC_OFFICER`/
+`ACCOUNT_OFFICER_NAME`/`EXISTING_CUSTOMER`/`APPLICANTCIF`/
+`BUSINESS_MODEL`/`KYC1` xác nhận qua dữ liệu thực là thuộc tính HỒ SƠ,
+không phải khách hàng — đã chuyển các cột này VỀ LẠI đây (`DIM_RLOS_
+APPLICATION`), xem cột bổ sung ở bảng cột Section 2. `NATIONALITY`/
+`TITLE`/`HOME_PHONE`/`PHONE_1`/`PHONE_2` vẫn ở `FCT_RLOS_CUSTOMER` —
+đây là thuộc tính con người thật), `LOS_ORA_ROWSCN`/`LOS_TIME_UPDATE_ROWSCN`
+(cột kỹ thuật CDC, không đưa vào).
+
+**Ghi chú lineage — loại bỏ `DIM_RLOS_APPROVAL_GROUP`, bổ sung `APP_GRP`
+thẳng lên đây:** RLOS Metadata gốc (sheet Table Review, bảng
 `NG_SB_RLOS_APPROVAL`) xác nhận trực tiếp **grain = 1 dòng = 1 hồ sơ RLOS**
 — cùng kết luận với CLOS (xem 1.2.1.1). `APP_GRP` là thuộc tính ổn định
 của hồ sơ, đọc thẳng từ `NG_SB_RLOS_APPROVAL` — cùng bảng, cùng cách với
 `STREAM` đã có sẵn ở đây. `DIM_RLOS_APPROVAL_GROUP` và
 `MAP_RLOS_APPROVAL_GROUP` đã bị loại bỏ hoàn toàn; cột `APPROVAL_GROUP_SK`
-cũng bị loại khỏi `FCT_RLOS_APPLICATION_DAILY`.
+cũng bị loại khỏi `FCT_RLOS_APPLICATION`. `APP_GRP` dùng làm khóa
+tra cam kết SLA (`REF_PRODUCT`/`SLA_*`) ở PDTD_DTM (2.3.1.1) cùng
+`SECONDARY_PRODUCTLINE` (=`IS_SEC_PRODUCT`, đã có sẵn), `CHANGE_TYPE`
+(xem bên dưới) và `DEVIATION_G3` (nay tính report-time tại PDTD_DTM,
+không còn đặt trên DIM này — xem ghi chú riêng ở 2.3.1.1).
 
-`DEVIATION_G3` = COUNT(*) theo `WI_NAME` trên `NG_SB_RLOS_MANUAL_DEVIATION`
-(>=3 → 'YES', còn lại → 'NO') — trích nguyên văn SRS BC5/BC9: *"Count số
-dòng (sl) của mỗi WI_NAME trong bảng NG_SB_RLOS_MANUAL_DEVIATION, sl>=3
-tương ứng 'YES', sl<3 tương ứng 'NO'"*. Đây là số đếm lũy kế có thể tăng
-theo thời gian sống hồ sơ, tương tự `APP_GRP` có thể đổi khi định tuyến lại
-— khi giá trị đổi qua ngưỡng 3 (NO↔YES), mở phiên bản DIM mới theo đúng cơ
-chế SCD2 chuẩn, không phải giá trị tĩnh 1 lần. Cả `APP_GRP`, `DEVIATION_G3`
-dùng làm khóa tra cam kết SLA (`REF_PRODUCT`/`SLA_*`) ở PDTD_DTM (2.3.1.1)
-cùng `SECONDARY_PRODUCTLINE` (=`IS_SEC_PRODUCT`, đã có sẵn) và
-`CHANGE_TYPE` (mới bổ sung, xem bên dưới).
+**✅ Đã giải quyết — bỏ `DEVIATION_G3` khỏi DIM, chuyển sang report-time
+PDTD_DTM (review 2026-09-25):** thiết kế trước đây đặt `DEVIATION_G3`
+ngay trên DIM này (SCD2, COUNT(*) theo `WI_NAME` trên
+`NG_SB_RLOS_MANUAL_DEVIATION`, đọc thẳng STG_LOS). Rà soát lại: nguồn này
+đã có sẵn đường đi SB_DWH qua `FCT_RLOS_DEVIATION` (1.3.2.x — cùng bảng
+`NG_SB_RLOS_MANUAL_DEVIATION`, full-snapshot mỗi ngày theo `DAYID +
+WI_NAME + DEVIATION_BK`) — đây cũng chính là nguồn `AGG_LOS_KPI_
+APPLICATION.DEVIATION_G3` (2.1.9, PDTD_DTM, report-time: UNION
+`FCT_RLOS_DEVIATION`, lọc `DAYID=MAX(DAYID)` mỗi `WI_NAME`, `COUNT(*)`,
+>=3→'YES'). Theo yêu cầu người dùng: bỏ hẳn bản SCD2 trên DIM (SB_DWH),
+để khóa tra SLA (`REF_PRODUCT`/`SLA_*`, PDTD_DTM 2.3.1.1) dùng chung
+nguồn/công thức với `AGG_LOS_KPI_APPLICATION` — không cần đọc thẳng
+STG_LOS thêm lần nữa, không tạo 2 luồng tính song song cho cùng 1 khái
+niệm. Xem ghi chú report-time đầy đủ tại 2.3.1.1.
 
 **Bổ sung `CHANGE_TYPE`:** đọc thẳng từ `NG_SB_RLOS_EXTTABLE.CHANGE_TYPE` —
 cùng bảng nguồn đã tin cậy dùng cho `LOANCASEID`/`CHANGE_REQUEST` ở DIM
@@ -1186,18 +1582,20 @@ join qua DIM, không qua FCT khác hệ:** phục vụ
 `DECISION IN ('Submit','Send To HOSupport','Send To PostSanction','Submit
 To DisbursementMaker')` — đúng nguyên văn công thức SRS BC10. Cùng khái
 niệm và cùng công thức với `LAST_APPROVAL_DATE` đã có trên
-`FCT_RLOS_APPLICATION_DAILY` (1.3.2.1) — nhưng **tính độc lập lại tại đây**
+`FCT_RLOS_APPLICATION` (1.3.2.1) — nhưng **tính độc lập lại tại đây**
 (đọc thẳng `NG_SB_RLOS_ENTRY_EXIT`, không JOIN fact-to-fact sang
-`FCT_RLOS_APPLICATION_DAILY`), theo đúng nguyên tắc "mỗi FCT/DIM là 1
+`FCT_RLOS_APPLICATION`), theo đúng nguyên tắc "mỗi FCT/DIM là 1
 luồng ETL độc lập" đã áp dụng xuyên suốt tài liệu này (xem đánh giá kiến
-trúc tại `FCT_CLOS_DEVIATION`, 1.2.2.5). Đây cũng là lựa chọn giữ đối
-xứng kiến trúc với CLOS: `DIM_CLOS_APPLICATION` đã có sẵn
-`FIRST_APPROVED_WI_NAME`/`FIRST_APPROVED_DATE` ngay trên DIM (không phải
-trên FCT) để phục vụ `BC11.APPROVAL_WINAME_LOS`/`APPROVAL_DATE` — RLOS
-không có khái niệm "hồ sơ cha" (không có `LOANCASEID` lặp nhiều `WI_NAME`
-như CLOS, xem cột `LOANCASEID`/`FIRST_APPROVED_WI_NAME` ở
-`DIM_CLOS_APPLICATION`, 1.2.1.1) nên không có `LAST_APPROVAL_WI_NAME`
-tương ứng — chỉ cần đúng 1 cột ngày.
+trúc tại `FCT_CLOS_DEVIATION`, 1.2.2.5). RLOS không có khái niệm "hồ sơ
+cha" (không có `LOANCASEID` lặp nhiều `WI_NAME` như CLOS, xem cột
+`LOANCASEID`/`FIRST_APPROVED_WI_NAME` ở `DIM_CLOS_APPLICATION`, 1.2.1.1)
+nên không có `LAST_APPROVAL_WI_NAME` tương ứng — chỉ cần đúng 1 cột
+ngày. ⚠️ Review 2026-09-30: `FIRST_APPROVED_DATE` phía CLOS đã chuyển
+từ `DIM_CLOS_APPLICATION` sang `FCT_CLOS_APPLICATION` (đặt cạnh
+`LAST_APPROVAL_DATE`, xem 1.2.2.1) — nay cả 2 hệ đều đặt cột phê duyệt
+trên FCT, chỉ khác `FIRST_APPROVED_WI_NAME` (khái niệm "hồ sơ cha")
+vẫn giữ trên `DIM_CLOS_APPLICATION` vì là thuộc tính hồ sơ ổn định
+(không đổi theo sự kiện).
 
 ###### 1.3.1.2 DIM_RLOS_PRODUCT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_PRODUCT_LINE/MAS_SUB_PRODUCT, review 2026-09-18)
 
@@ -1228,7 +1626,7 @@ khác `SUB_PRODUCT`); `MAS_SUB_PRODUCT` có thêm `SCORE_REQUIRED`/
 **SCD2 đổi cách xác định EFF_DATE:** cùng cơ chế CDC như `DIM_CLOS_PRODUCT`
 (1.2.1.2) — 2 bảng nguồn không có EFF_DATE khai báo tay. Xem Section 3.
 
-###### 1.3.1.3 DIM_RLOS_WORKSTEP — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_DECISION, review 2026-09-18)
+###### 1.3.1.3 DIM_RLOS_WORKSTEP_DECISION — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_DECISION, review 2026-09-24, gộp từ DIM_RLOS_WORKSTEP + DIM_RLOS_DECISION)
 
 ```mermaid
 flowchart LR
@@ -1236,58 +1634,38 @@ flowchart LR
         A(["NG_SB_RLOS_MAS_DECISION"])
     end
     subgraph SB_DWH
-        C["DIM_RLOS_WORKSTEP"]
+        C["DIM_RLOS_WORKSTEP_DECISION"]
     end
-    A -->|"DISTINCT QUEUE_NAME — CDC xác định thay đổi"| C
+    A -->|"1:1 QUEUE_NAME + DECISION — CDC xác định thay đổi, mỗi cặp (WORKSTEP_CODE, DECISION_CODE) là 1 dòng duy nhất trên nguồn"| C
 ```
 
-**Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #2):**
-cùng giải pháp với `DIM_CLOS_WORKSTEP` (1.2.1.3) — nguồn trước đây suy từ
-`NG_SB_RLOS_ENTRY_EXIT` rồi tạm thay bằng `MAP_RLOS_WORKSTEP`; nay BA LOS
-xác nhận (16/09) bảng danh mục thật `NG_SB_RLOS_MAS_DECISION` — bảng này
-gộp chung WORKSTEP (`QUEUE_NAME`) và DECISION (`DECISION`) dạng N-N (thêm
-cột `REQ_TYPE`), không có danh mục WORKSTEP độc lập riêng. Theo quyết định
-người dùng: **giữ tách 2 DIM** như `DIM_CLOS_WORKSTEP`/`DIM_CLOS_DECISION`
-(xem 1.2.1.3), suy ra `DISTINCT QUEUE_NAME` từ cùng bảng nguồn.
-`NG_SB_RLOS_ENTRY_EXIT` không còn là nguồn của DIM này nữa (vẫn tiếp tục
-phục vụ các FCT khác).
+**Gộp 2 DIM thành 1 (review 2026-09-24):** cùng lý do và quyết định đã
+áp dụng cho `DIM_CLOS_WORKSTEP_DECISION` (1.2.1.3) — `NG_SB_RLOS_MAS_
+DECISION` (thêm cột `REQ_TYPE`, khác `CHANNEL` của bản CLOS) gộp chung
+WORKSTEP (`QUEUE_NAME`) và DECISION (`DECISION`), 1 WORKSTEP có thể
+xuất hiện ở nhiều dòng với DECISION khác nhau nhưng mỗi cặp (QUEUE_NAME,
+DECISION) là duy nhất trên bảng nguồn. Quyết định cũ (review 2026-09-18)
+"giữ tách 2 DIM" đã thay thế — gộp lại thành `DIM_RLOS_WORKSTEP_DECISION`,
+giữ đúng grain "1 dòng = 1 cặp (WORKSTEP, DECISION) hợp lệ" của bảng
+nguồn. `NG_SB_RLOS_ENTRY_EXIT` không còn là nguồn của DIM này nữa (vẫn
+tiếp tục phục vụ các FCT khác).
+
+⚠️ **Giả định cần BA xác nhận lại trước khi sinh LLD:** cùng lưu ý đã
+ghi ở `DIM_CLOS_WORKSTEP_DECISION` (1.2.1.3) — `input/DS Bảng danh
+mục.xlsx` chỉ xác nhận cấu trúc cột, không có dữ liệu mẫu để tự kiểm
+chứng grain.
 
 `WFINSTRUMENTTABLE` vẫn không thuộc phạm vi bảng này — **✅ đã giải quyết
 (PENDING #6):** `PROCESSNAME`/`ACTIVITYNAME` nay đã nạp trực tiếp vào
-`FCT_RLOS_APPLICATION_DAILY` (1.3.2.1) để tính `WORKSTEP_FLAG`, xem ghi
-chú đầy đủ ở `DIM_CLOS_WORKSTEP` (1.2.1.3). **Cập nhật (review
+`FCT_RLOS_APPLICATION` (1.3.2.1) để tính `WORKSTEP_FLAG`, xem ghi
+chú đầy đủ ở `DIM_CLOS_WORKSTEP_DECISION` (1.2.1.3). **Cập nhật (review
 2026-09-21):** nay cũng LEFT JOIN thêm vào `FCT_RLOS_WORKSTEP_EVENT`
 (1.3.2.7) để tính `WORKSTEP_FLAG` độc lập trực tiếp trên bảng event.
 
 **SCD2 đổi cách xác định EFF_DATE:** cùng cơ chế CDC như 1.2.1.3. Xem
 Section 3.
 
-###### 1.3.1.4 DIM_RLOS_DECISION — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_DECISION, review 2026-09-18)
-
-```mermaid
-flowchart LR
-    subgraph STG_LOS
-        A(["NG_SB_RLOS_MAS_DECISION"])
-    end
-    subgraph SB_DWH
-        C["DIM_RLOS_DECISION"]
-    end
-    A -->|"DISTINCT DECISION — CDC xác định thay đổi"| C
-```
-
-**Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #2):**
-nguồn trước đây suy từ `NG_SB_RLOS_ENTRY_EXIT` (bảng lịch sử xử lý, không
-phải danh mục quyết định BPM gốc) rồi tạm thay bằng `MAP_RLOS_DECISION`;
-nay BA LOS xác nhận (16/09) cùng bảng danh mục thật
-`NG_SB_RLOS_MAS_DECISION` đã dùng cho `DIM_RLOS_WORKSTEP` (1.3.1.3) — lấy
-`DISTINCT DECISION` từ cùng bảng (xem 1.2.1.3 về lý do giữ tách 2 DIM).
-`NG_SB_RLOS_ENTRY_EXIT` không còn là nguồn của DIM này nữa (vẫn tiếp
-tục phục vụ các FCT khác).
-
-**SCD2 đổi cách xác định EFF_DATE:** cùng cơ chế CDC như 1.3.1.3. Xem
-Section 3.
-
-###### 1.3.1.5 DIM_RLOS_EXCEPTION_REASON
+###### 1.3.1.5 DIM_RLOS_EXCEPTION
 
 ```mermaid
 flowchart LR
@@ -1295,12 +1673,12 @@ flowchart LR
         A(["NG_SB_RLOS_MAS_EXCEPTION"])
     end
     subgraph SB_DWH
-        C["DIM_RLOS_EXCEPTION_REASON"]
+        C["DIM_RLOS_EXCEPTION"]
     end
     A -->|1:1 ACTIVITYNAME, DECISION_CODE, EXCEPTION_CATEGORY, EXCEPTION_NAME| C
 ```
 
-**Ghi chú lineage:** cùng bản chất với `DIM_CLOS_EXCEPTION_REASON`
+**Ghi chú lineage:** cùng bản chất với `DIM_CLOS_EXCEPTION`
 (1.2.1.6) — `NG_SB_RLOS_MAS_EXCEPTION` là bảng LOẠI 1 (danh mục cấu hình
 gốc, khóa CDC khai đủ tổ hợp khóa tự nhiên), không phải bảng sự kiện theo
 hồ sơ, nên không rơi vào pattern "application-scoped source". Giữ nguyên
@@ -1329,35 +1707,7 @@ không có báo cáo nào khác (BC2–BC11) dùng bảng này. `DIM_RLOS_CHANGE
 không rơi vào pattern "application-scoped source" — giữ nguyên nguồn trực
 tiếp, không cần bảng `MAP_` seed.
 
-###### 1.3.1.7 DIM_RLOS_GEO
-
-```mermaid
-flowchart LR
-    subgraph STG_LOS
-        A(["H_NG_SB_RLOS_MAS_CITY"])
-        B(["H_NG_SB_RLOS_MAS_DISTRICT"])
-    end
-    subgraph SB_DWH
-        C["DIM_RLOS_GEO"]
-    end
-    A -->|1:1 CITY_CODE, CITY_NAME, CITY_NAME_VN| C
-    B -.->|1:1 DISTRICT_CODE, DISTRICT_NAME — PHÁI SINH DISTRICT_NAME_VN| C
-```
-
-**Ghi chú lineage:** không có bảng tương đương phía CLOS — `DIM_RLOS_GEO`
-không thuộc cặp CLOS/RLOS song song mà là DIM đặc thù riêng của RLOS (xem
-`output/Table_Split_Proposal_CLOS_RLOS.md` mục 3: "không có nguồn CLOS
-tương ứng trong `DS_BANG_202608`"). `H_NG_SB_RLOS_MAS_CITY`/
-`H_NG_SB_RLOS_MAS_DISTRICT` là 2 bảng danh mục địa giới hành chính gốc
-(mang tiền tố `MAS_`), không phải bảng sự kiện theo hồ sơ — không rơi vào
-pattern "application-scoped source", giữ nguyên nguồn trực tiếp. Bảng
-không có cột `DATASOURCE` ngay từ thiết kế gốc (đã là RLOS-only), không
-cần bỏ cột nào khi tách. Tiền tố `H_` đã đối chiếu khớp đúng nguyên văn
-SRS BC1 (cả Business Rules join-table lẫn field-mapping table) — không
-nhầm với tên không tiền tố ghi trong `output/Table_Split_Proposal_CLOS_RLOS.md`
-(tài liệu chỉ quyết định tách bảng, không phải nguồn công thức chi tiết).
-
-###### 1.3.1.8 DIM_RLOS_CARD_PROMOTION
+###### 1.3.1.7 DIM_RLOS_CARD_PROMOTION
 
 ```mermaid
 flowchart LR
@@ -1379,134 +1729,11 @@ gốc thật, không phải bảng sự kiện theo hồ sơ — không rơi và
 tách) chưa từng có cột `DATASOURCE`; **review 2026-09-17:** đã bổ sung
 `DATASOURCE` (cố định 'RLOS') tại Section 2 làm cột kỹ thuật đánh dấu
 nguồn hệ, đồng bộ với mọi DIM/FCT RLOS khác sau khi tách vật lý CLOS/RLOS
-— quyết định có chủ đích, xem chi tiết tại Section 2 → 1.3.1.8.
-
-###### 1.3.1.9 DIM_RLOS_APPLICANT — MỚI (tách từ FCT_LOS_APPLICATION_PARTY)
-
-```mermaid
-flowchart LR
-    subgraph STG_LOS
-        A(["NG_SB_RLOS_APPLICANT_GENERAL"])
-        B(["NG_SB_RLOS_APPLICANT_DETAIL"])
-        C(["NG_SB_RLOS_APPLICANT_IDGRID"])
-    end
-    subgraph SB_DWH
-        E["DIM_RLOS_APPLICANT"]
-    end
-    A -->|1:1 FULL_NAME, GENDER, DOB| E
-    B -->|1:1 MARR_STATUS, EDU_LEVEL, PERM_ADD, CITY/DISTRICT/WARD/HOUSNO_CURR_RES| E
-    C -.->|PHÁI SINH: PIVOT theo ID_TYPE thuộc nhóm TCC/CC vs còn lại, nối chuỗi dấu chấm phẩy nếu nhiều — sinh ADD_ID, ADD_ID_OTHER| E
-    A -.->|"1:1 làm giàu (review 2026-09-21, theo yêu cầu người dùng): ZONE, NATIONALITY, TITLE, HOME_PHONE, PHONE_1, PHONE2, SALE_TYPE, BROKER_TYPE/ID/NAME, ACC_OFFICER, ACCOUNT_OFFICER_NAME, EXISTING_CUSTOMER, APPLICANTCIF, BUSINESS_MODEL, KYC1"| E
-```
-
-**Ghi chú lineage — tách khỏi `FCT_LOS_APPLICATION_PARTY`, không tách theo
-kiểu bảng chi tiết như CLOS:** khác với CLOS (nơi 1 hồ sơ có N người liên
-quan với N vai trò không loại trừ lẫn nhau), RLOS có cấu trúc rõ ràng: **1
-người đề nghị vay chính** (applicant, 1:1 với hồ sơ) và **0..N người đồng
-trả nợ** (corepayer). Vì applicant là quan hệ 1:1 với hồ sơ, tách thành DIM
-riêng (không gộp thẳng vào `DIM_RLOS_APPLICATION`) vì đây là nhóm thuộc
-tính CON NGƯỜI (nhân khẩu học, liên hệ) khác hẳn bản chất thuộc tính HỒ SƠ
-(sản phẩm, quy trình, phê duyệt) đã có trên `DIM_RLOS_APPLICATION`.
-
-**Bổ sung `ADD_ID`/`ADD_ID_OTHER` (pivot từ `FCT_LOS_PARTY_DOCUMENT` cũ):**
-theo SRS BC1 (BR 1.3, trích nguyên văn): *"ADD_ID — NG_SB_RLOS_APPLICANT_
-IDGRID > ID_NUMBER, với điều kiện ID_TYPE in ('TCC','CC')"*, *"ADD_ID_OTHER
-— NG_SB_RLOS_APPLICANT_IDGRID > ID_NUMBER, với điều kiện ID_TYPE not in
-('TCC','CC')"*. Đây là 2 NHÓM LỌC theo `ID_TYPE` (14 loại giấy tờ quan sát
-được trên `NG_SB_RLOS_APPLICANT_IDGRID`), không phải "giấy tờ chính/giấy
-tờ khác" theo nghĩa 1-1 — không có tài liệu nào đảm bảo mỗi nhóm chỉ có
-đúng 1 giấy tờ. Xử lý: nếu 1 nhóm có nhiều dòng, **nối chuỗi `ID_NUMBER`
-bằng dấu ";"** — tránh phải giữ bảng chi tiết giấy tờ riêng
-(`FCT_RLOS_PARTY_DOCUMENT` bị loại bỏ hoàn toàn, xem ghi chú ở
-`FCT_RLOS_APPLICATION_PARTY`, 1.3.2.2).
-
-**Xác nhận thiết kế và thứ tự nối chuỗi (review 2026-09-17):** đây là
-quyết định kiến trúc có chủ đích — grain của DIM này là 1 dòng/1
-applicant, giữ TOÀN BỘ giấy tờ bằng cách nối chuỗi thay vì chọn 1 dòng
-đại diện (không có khái niệm "giấy tờ chính" cần chọn, không phải thiếu
-sót — pattern này đã được người dùng xác nhận là mục tiêu thiết kế,
-tương tự cách `DIM_CLOS_CUSTOMER.LEGAL_REPRESENTATIVE`/
-`ADD_ID_REPRESENTATIVE` nối chuỗi khi nhiều đại diện, xem Section 3 #19).
-Trong `ADD_ID`, thứ tự nối khi nhóm TCC/CC có nhiều giấy tờ: **ưu tiên
-`ID_TYPE='TCC'` trước, `ID_TYPE='CC'` sau**. Thứ tự này là căn cứ để ETL
-tách ngược `ADD_ID` khi cần so khớp từng giá trị riêng lẻ (xem
-`T24_CUSTOMER_SK` tại `FCT_RLOS_APPLICATION_DAILY`, 1.3.2.1/2.3.2.1).
-
-**Làm giàu thêm 15 cột (review 2026-09-21, theo yêu cầu người dùng):**
-`NG_SB_RLOS_APPLICANT_GENERAL` là quan hệ 1:1/hồ sơ (đã xác nhận ở
-trên) — mọi cột mô tả còn lại (không phải khóa join/FK, không phải cột
-kỹ thuật CDC) đưa thẳng lên đây an toàn. Bao gồm `ZONE` (đóng gap
-BC1/BC2 — cùng lý do/quyết định đã áp dụng cho `DIM_CLOS_CUSTOMER.ZONE`,
-xem 1.2.1.7), `NATIONALITY`, `TITLE`, `HOME_PHONE`, `PHONE_1`, `PHONE2`
-(đổi tên `PHONE_2` cho nhất quán), `SALE_TYPE`, `BROKER_TYPE`/
-`BROKER_ID`/`BROKER_NAME`, `ACC_OFFICER`/`ACCOUNT_OFFICER_NAME`,
-`EXISTING_CUSTOMER`, `APPLICANTCIF` (đổi tên `APPLICANT_CIF`),
-`BUSINESS_MODEL`, `KYC1`. Không đưa `FIRST_NAME`/`MIDDLE_NAME`/
-`LAST_NAME` (đã có `FULL_NAME` đủ dùng), `PRODUCT_LINE`/`SUB_PRODUCT`/
-`POLICY`/`CAMPAIGN`/`IS_SEC_PRODUCT`/`EMPLOYEE_CODE`/`EMPLOYEE_NAME`/
-`COLLREQUIRE`/`PROOF_OF_INCOME`/`COMPANY_CODE`/`COMPANY_NAME`/
-`BRACH_CODE`/`BRANCH_NAME` (đã có trên `DIM_RLOS_APPLICATION`/
-`DIM_LOS_ORG_UNIT` — tránh trùng lặp), `LOS_ORA_ROWSCN`/`LOS_TIME_
-UPDATE_ROWSCN` (cột kỹ thuật CDC nội bộ, không phải dữ liệu nghiệp vụ).
-`KYC1` (VARCHAR2, "đơn vị/khối đang xử lý hồ sơ tại thời điểm ghi nhận")
-metadata đang ở trạng thái "Cần chỉnh sửa" (đề xuất đổi tên "Luồng phê
-duyệt"/Approval Flow) — vẫn đưa lên theo ý nghĩa gốc, cần BA xác nhận
-lại tên/ý nghĩa chuẩn trước khi sinh LLD.
-
-###### 1.3.1.10 DIM_RLOS_COREPAYER — MỚI (tách từ FCT_LOS_APPLICATION_PARTY)
-
-```mermaid
-flowchart LR
-    subgraph STG_LOS
-        A(["NG_SB_RLOS_COREPAYER_GENERAL"])
-        B(["NG_SB_RLOS_COREP_IDGRID"])
-    end
-    subgraph SB_DWH
-        E["DIM_RLOS_COREPAYER"]
-    end
-    A -->|1:1 REL_TO_APPLICANT, FULL_NAME, DOB_CO, NATIONALITY_CO| E
-    B -.->|PHÁI SINH: PIVOT theo ID_TYPE thuộc nhóm TCC/CC vs còn lại, nối theo WI_NAME + PIN bằng ID_NO_CO, nối chuỗi dấu chấm phẩy nếu nhiều — sinh ADD_ID_COREPAYER, ADD_ID_OTHER_COREPAYER| E
-    A -.->|"1:1 làm giàu (review 2026-09-21, theo yêu cầu người dùng, đối xứng DIM_RLOS_APPLICANT): TITLE_CO→TITLE, HOUSEHOLD, PHONE1→PHONE_1, PHONE2→PHONE_2, HOMEPHONE→HOME_PHONE"| E
-```
-
-**Ghi chú lineage — grain thực tế khác Table Review metadata (xác nhận
-trực tiếp từ người dùng/BA):** RLOS Metadata (sheet Table Review) ghi grain
-`NG_SB_RLOS_COREPAYER_GENERAL` là "1 dòng = 1 hồ sơ RLOS (thông tin người
-đồng trả nợ, nếu có)" — nhưng người dùng xác nhận trực tiếp: **thực tế 1
-hồ sơ có thể có NHIỀU dòng người đồng trả nợ** (khớp với
-`NG_SB_RLOS_COREP_IDGRID` xác nhận tối đa 4 corepayer/hồ sơ qua nhãn
-`PIN` — Corep1-4). Business key: `WI_NAME + ID_NO_CO` (không match identity
-xuyên hồ sơ — đã xác nhận không cần, xem ghi chú ở `FCT_RLOS_APPLICATION_
-PARTY`).
-
-Rà soát cấu trúc cột `NG_SB_RLOS_COREPAYER_GENERAL` so với
-`NG_SB_RLOS_APPLICANT_GENERAL`/`APPLICANT_DETAIL` (theo RLOS Metadata sheet
-"3. Column Review") xác nhận: **KHÔNG trùng khớp cấu trúc**, nên KHÔNG gộp
-chung thành 1 `DIM_RLOS_PARTY` — corepayer thiếu hẳn nhóm địa chỉ/hôn
-nhân/học vấn (`PERM_ADD`, `CITY/DISTRICT/WARD_CURR_RES`, `MARR_STATUS`,
-`EDU_LEVEL`) mà applicant có, trong khi lại có sẵn nhóm chi tiết giấy tờ
-(`ID_NO_CO` + hộ chiếu/visa) ngay trên bảng nguồn — khác hẳn applicant
-(giấy tờ tách bảng riêng `IDGRID`). Gộp chung sẽ sinh rất nhiều cột luôn
-NULL tùy vai trò — cùng rủi ro "bảng lai nhiều hình dạng" đã tránh với
-`NG_SB_CLOS_CUST_INFO_LEGAL` (xem `DIM_CLOS_APPLICATION`, 1.2.1.1).
-
-**Bổ sung `ADD_ID_COREPAYER`/`ADD_ID_OTHER_COREPAYER` (pivot từ
-`FCT_LOS_PARTY_DOCUMENT` cũ):** cùng công thức nhóm lọc `ID_TYPE` với
-applicant, nguồn `NG_SB_RLOS_COREP_IDGRID`, nối theo `WI_NAME + PIN` (=
-`ID_NO_CO` trên `COREPAYER_GENERAL`, xác nhận trực tiếp từ người dùng —
-Table Review metadata chỉ ghi quan hệ qua `WI_NAME`, không nêu rõ
-`ID_NO_CO = PIN`, nên đây là xác nhận nghiệp vụ bổ sung ngoài tài liệu).
-Theo SRS BC1: *"ADD_ID_COREPAYER — ID_NUMBER/PARTY_ROLE_CODE với điều
-kiện ID_TYPE in ('TCC','CC')"*, *"ADD_ID_OTHER_COREPAYER — ID_NUMBER với
-điều kiện ID_TYPE not in ('TCC','CC')"* — nối chuỗi `ID_NUMBER` bằng ";"
-nếu nhóm có nhiều dòng.
+— quyết định có chủ đích, xem chi tiết tại Section 2 → 1.3.1.7.
 
 ##### 1.3.2 FCT
 
-###### 1.3.2.1 FCT_RLOS_APPLICATION_DAILY
-
-**Lineage đầy đủ (bao gồm cả nguồn của `DIM_RLOS_APPLICANT`, 1.3.1.9 —
-xem `hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của DIM này):**
+###### 1.3.2.1 FCT_RLOS_APPLICATION
 
 ```mermaid
 flowchart LR
@@ -1516,57 +1743,62 @@ flowchart LR
         C(["NG_SB_RLOS_CREDIT_PROPOSAL_APP"])
         F(["NG_SB_RLOS_REPAY_CALC"])
         G(["NG_SB_RLOS_REPAYFLAGS"])
-        H(["WFINSTRUMENTTABLE"])
         I(["NG_SB_RLOS_EXTTABLE"])
         J(["NG_SB_RLOS_USER_MAKE_WORK_STEP"])
         P1(["NG_SB_RLOS_APPLICANT_GENERAL"])
-        P2(["NG_SB_RLOS_APPLICANT_DETAIL"])
-        P3(["NG_SB_RLOS_APPLICANT_IDGRID"])
         P4(["NG_SB_RLOS_CBS"])
     end
     subgraph SB_DWH
-        K["DIM_RLOS_APPLICANT"]
-        WS["DIM_RLOS_WORKSTEP"]
-        DC["DIM_RLOS_DECISION"]
+        WD["DIM_RLOS_WORKSTEP_DECISION"]
         US["DIM_LOS_USER"]
         PR["DIM_RLOS_PRODUCT"]
-        OU["DIM_LOS_ORG_UNIT"]
+        OU["DIM_LOS_COMPANY"]
         CT["DIM_RLOS_CHANGE_TYPE"]
         CP["DIM_RLOS_CARD_PROMOTION"]
-        E["FCT_RLOS_APPLICATION_DAILY"]
+        E["FCT_RLOS_APPLICATION"]
     end
-    A -->|1:1 + PHÁI SINH: ngày/mốc/trạng thái/đếm trả về| E
+    A -->|"1:1 + PHÁI SINH: ngày/mốc/đếm trả về (CANCEL_DATE giữ nguyên ở SB_DWH; APPLICATION_STATUS/FLAG_AUTO_CANCEL/AUTO_CANCEL_DATE chuyển sang PDTD_DTM, review 2026-09-27)"| E
     B -->|1:1 LOAN_AMOUNT/LOAN_TERM/CURRENT_RATE/LOAN_CURRENCY/LOAN_OBJECTIVE| E
     C -->|1:1 LOAN_TO_VALUE| E
     F -->|1:1 TOT_INC_CALC → TOTAL_INCOME| E
     G -->|1:1 10 cột cờ nguồn thu — PHÁI SINH REPAYMENT_SOURCE| E
-    H -->|"LEFT JOIN WI_NAME=PROCESSINSTANCEID, loại 5 CREATEDBY hệ thống/test — sinh WORKSTEP_FLAG"| E
-    I -.->|"UWMAKERUSER/UWCHKRUSER/CREDAPPRUSER/CCOMMITUSER — fallback của TAKERESPON khi không khớp bước tại NG_SB_RLOS_USER_MAKE_WORK_STEP"| E
+    I -.->|"UWMAKERUSER/UWCHKRUSER/CREDAPPRUSER/CCOMMITUSER — fallback của *_USERMAKE khi không khớp bước tại NG_SB_RLOS_USER_MAKE_WORK_STEP"| E
+    I -->|"CHANGE_REQUEST(=REQ_TYPE), CHANGE_TYPE — giá trị thô, chuyển từ DIM_RLOS_APPLICATION (review 2026-09-25)"| E
     I -.->|"CHANGE_TYPE — input của CHANGE_TYPE_SK ở dưới"| CT
-    J -.->|"LEFT JOIN WI_NAME+WORK_STEP=WORKSTEP — sinh UNDERWRITERMAKER/CHECKER/APPROVAL_TAKERESPON (đã xác nhận tồn tại thật, Section 3 #20)"| E
-    K -.->|"APPLICANT_SK, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID (quan hệ 1:1)"| E
-    P1 -->|1:1 FULL_NAME, GENDER, DOB| K
-    P2 -->|1:1 MARR_STATUS, EDU_LEVEL, PERM_ADD, CITY/DISTRICT/WARD/HOUSNO_CURR_RES| K
-    P3 -.->|PHÁI SINH: PIVOT theo ID_TYPE thuộc nhóm TCC/CC vs còn lại, nối chuỗi dấu chấm phẩy nếu nhiều — sinh ADD_ID, ADD_ID_OTHER| K
-    WS -.->|"CURRENT_WORKSTEP_SK/LAST_WORKSTEP_SK, lookup WORKSTEP_CODE theo thời gian (review 2026-09-21, bổ sung vào lineage — 2 FK đã có sẵn trên cột nhưng thiếu vẽ)"| E
-    DC -.->|"LAST_DECISION_SK, lookup DECISION_CODE theo thời gian (review 2026-09-21, bổ sung vào lineage)"| E
+    I -->|"11 cột cờ nhánh phụ/trạng thái (C_PHONE/FI/LEGAL_CREATE_FLAG/DELETE_FLAG, REINITIATE, NORMALBRHOLD, REGBRHOLD, STP_FLAG, ELIGIBLE) — giá trị thô, chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30)"| E
+    J -.->|"LEFT JOIN WI_NAME+WORK_STEP=WORKSTEP — sinh input thô UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE (review 2026-09-27, đổi tên từ *_TAKERESPON — công thức COALESCE/CASE chuyển sang PDTD_DTM); bảng nguồn đã xác nhận tồn tại thật, Section 3 #20"| E
+    WD -.->|"CURRENT_WORKSTEP_SK/LAST_WORKSTEP_DECISION_SK (review 2026-09-24, 2 khóa sau gộp từ LAST_WORKSTEP_SK+LAST_DECISION_SK — CURRENT_WORKSTEP_SK RLOS vẫn giữ, chưa rà soát xóa như bản CLOS), lookup theo WORKSTEP_CODE (+DECISION_CODE cho khóa LAST) theo thời gian"| E
     US -.->|"LAST_USER_SK, lookup theo USERNAME (review 2026-09-21, bổ sung vào lineage)"| E
     PR -.->|"PRODUCT_SK, lookup PRODUCT_LINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, SCD2 hiệu lực tại DAYID (review 2026-09-21, bổ sung công thức + lineage — cột trước đây chỉ ghi 'Khóa tới DIM_RLOS_PRODUCT', chưa có công thức lookup, xem ghi chú bên dưới)"| E
-    OU -.->|"ORG_UNIT_SK, lookup COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, SCD2 hiệu lực tại DAYID (review 2026-09-21, bổ sung vào lineage — công thức đã có ở Section 2 → 1.3.2.1 cột 10, chỉ thiếu vẽ)"| E
+    OU -.->|"COMPANY_SK, lookup COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, SCD2 hiệu lực tại DAYID (review 2026-09-21, bổ sung vào lineage — công thức đã có ở Section 2 → 1.3.2.1 cột 10, chỉ thiếu vẽ)"| E
     CT -.->|"CHANGE_TYPE_SK, lookup CHANGE_TYPE=NG_SB_RLOS_EXTTABLE.CHANGE_TYPE (review 2026-09-21, bổ sung vào lineage)"| E
     CP -.->|"CARD_PROMOTION_SK, lookup PROMOTION_ID=NG_SB_RLOS_CBS.PROMOTION_ID, hồ sơ không phải thẻ dùng -1 (review 2026-09-21, bổ sung vào lineage)"| E
     P1 -->|"PRODUCT_LINE/SUB_PRODUCT — input của PRODUCT_SK ở trên"| PR
-    P1 -->|"COMPANY_CODE — input của ORG_UNIT_SK ở trên"| OU
+    P1 -->|"COMPANY_CODE — input của COMPANY_SK ở trên"| OU
     P4 -.->|"PROMOTION_ID — input của CARD_PROMOTION_SK ở trên"| CP
 ```
+
+**Bỏ `APPLICANT_SK`/`T24_CUSTOMER_SK` khỏi bảng này (review 2026-09-26,
+theo yêu cầu người dùng):** trước đây 2 cột này join `DIM_RLOS_APPLICANT`
+với giả định quan hệ 1:1 hồ sơ↔applicant. Sau khi `DIM_RLOS_APPLICANT`
+đổi thành `FCT_RLOS_CUSTOMER` (grain `WI_NAME+ID_TYPE+ID_NUMBER`, 1:N
+giấy tờ/hồ sơ — xem 1.3.2.x), không còn 1 SK đại diện duy nhất/hồ sơ để
+giữ ở đây nữa. Báo cáo cần thông tin applicant/T24 customer sẽ tự JOIN
+`FCT_RLOS_CUSTOMER` theo `WI_NAME` khi cần — `T24_CUSTOMER_SK` chuyển
+hẳn sang tính trực tiếp trên `FCT_RLOS_CUSTOMER` (đúng grain giấy tờ,
+xem 1.3.2.x).
 
 **Ghi chú lineage:** giữ nguyên grain `1 dòng = 1 hồ sơ x 1 ngày dữ liệu`,
 PK = `DAYID + WI_NAME`, và toàn bộ quy tắc load T-1 như tài liệu gốc — bảng
 gốc `FCT_LOS_APPLICATION_DAILY` chỉ tách vật lý theo hệ, không đổi grain/PK/
-quy tắc load. **✅ Đã giải quyết (PENDING #6):** `WFINSTRUMENTTABLE` nay
-đã nạp vào bảng này để tính cột phái sinh `WORKSTEP_FLAG` — xem chi tiết
-công thức tại Section 2 → 1.3.2.1. **✅ Đã giải quyết (review
-2026-09-21, Section 3 dòng #20):** 3 cột `*_TAKERESPON` (xem 1.2.2.1)
+quy tắc load. **Xóa node `WFINSTRUMENTTABLE` khỏi lineage (rà soát lại
+review 2026-09-27):** `WORKSTEP_FLAG` đã bị xóa khỏi bảng này từ trước
+(review 2026-09-21, BC4 đổi sang đọc bản tính độc lập trên
+`FCT_RLOS_WORKSTEP_EVENT`, 1.3.2.7) — `WFINSTRUMENTTABLE` không còn là
+nguồn thật của bảng này (khác nhánh CLOS, `FCT_CLOS_APPLICATION`
+mục 1.2.2.1, vẫn còn cấp `VAR_STR12`), đã xóa hẳn khỏi lineage. **✅ Đã
+giải quyết (review 2026-09-21, Section 3 dòng #20):** 3 cột `*_USERMAKE`
+(đổi tên từ `*_TAKERESPON`, review 2026-09-27 — xem Section 2 → 1.3.2.1)
 cần nguồn `NG_SB_RLOS_USER_MAKE_WORK_STEP` — không có trong
 `DS_BANG_202608.xlsx` nhưng đã xác nhận tồn tại thật qua
 `input/RLOS - Metadata.xlsx` (bảng "Đã xác nhận", cột "Chưa rà soát"
@@ -1574,19 +1806,29 @@ chi tiết nhưng không phải chưa xác nhận tồn tại).
 
 **Bổ sung 6 node DIM còn thiếu trong lineage + công thức `PRODUCT_SK`
 còn thiếu (review 2026-09-21):** cùng phát hiện và lý do đã áp dụng cho
-`FCT_CLOS_APPLICATION_DAILY` (1.2.2.1) — `CURRENT_WORKSTEP_SK`,
-`LAST_WORKSTEP_SK`, `LAST_DECISION_SK`, `LAST_USER_SK`, `PRODUCT_SK`,
-`ORG_UNIT_SK`, `CHANGE_TYPE_SK`, `CARD_PROMOTION_SK` đều có cột và DIM
-đích tồn tại thật, nhưng lineage trước đây chỉ vẽ `DIM_RLOS_APPLICANT`.
+`FCT_CLOS_APPLICATION` (1.2.2.1, trước khi cắt cột dư thừa review
+2026-09-24 — bản CLOS đã bỏ `CURRENT_WORKSTEP_SK`/`LAST_USER_SK` vì không
+báo cáo nào tiêu thụ, bản RLOS này vẫn giữ đủ vì `LAST_WORKSTEP_SK`/
+`LAST_DECISION_SK` có JOIN thật, còn `CURRENT_WORKSTEP_SK`/`LAST_USER_SK`
+RLOS chưa rà soát lại) — `LAST_WORKSTEP_SK`, `LAST_DECISION_SK`,
+`PRODUCT_SK`, `COMPANY_SK`, `CHANGE_TYPE_SK`, `CARD_PROMOTION_SK` đều có
+cột và DIM đích tồn tại thật, nhưng lineage trước đây chỉ vẽ `DIM_RLOS_
+APPLICANT`. **Gộp thêm (review 2026-09-24, tiếp theo, đồng bộ với
+CLOS):** `LAST_WORKSTEP_SK`+`LAST_DECISION_SK` gộp thành 1 `LAST_
+WORKSTEP_DECISION_SK` duy nhất, theo quyết định gộp `DIM_RLOS_WORKSTEP`+
+`DIM_RLOS_DECISION` (xem 1.3.1.3). `CURRENT_WORKSTEP_SK` vẫn giữ nguyên
+(chưa rà soát riêng việc có dư thừa hay không như bản CLOS), nay trỏ
+sang `DIM_RLOS_WORKSTEP_DECISION` — chỉ đổi DIM đích, không đổi ý nghĩa
+cột.
 Riêng `PRODUCT_SK` còn thiếu CẢ công thức lookup ở Section 2 (mô tả cột
 gốc chỉ ghi "Khóa tới DIM_RLOS_PRODUCT. Mặc định -1", không nêu nguồn) —
 đã bổ sung theo đúng pattern đối xứng với CLOS (`PRODUCT_SK` CLOS, cột 9,
 1.2.2.1): nguồn `NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE/SUB_PRODUCT`
 (đã xác nhận tồn tại thật, `input/RLOS - Metadata.xlsx` sheet "3. Column
 Review" — cùng bảng đã dùng cho `POLICY`/`EMPLOYEE_CODE`/`COMPANY_CODE`
-trên `DIM_RLOS_APPLICATION`/`ORG_UNIT_SK`), khớp `DIM_RLOS_PRODUCT.
+trên `DIM_RLOS_APPLICATION`/`COMPANY_SK`), khớp `DIM_RLOS_PRODUCT.
 PRODUCT_LINE_CODE`/`SUB_PRODUCT_CODE` (1.3.1.2), điều kiện SCD2 giống
-`ORG_UNIT_SK`/`PRODUCT_SK` bên CLOS. Đã cập nhật lại mô tả cột 9 tương
+`COMPANY_SK`/`PRODUCT_SK` bên CLOS. Đã cập nhật lại mô tả cột 9 tương
 ứng ở Section 2 → 1.3.2.1. `CHANGE_TYP_SK`/`CARD_PROMOTION_SK` giữ đúng
 công thức đã có (Section 2, cột 11-12), chỉ bổ sung vẽ lineage.
 
@@ -1601,84 +1843,42 @@ sang DIM đó.
 
 **Đánh giá kiến trúc — không tham chiếu ETL sang `FCT_RLOS_COLLATERAL`/
 `FCT_RLOS_DEVIATION`:** cùng đánh giá và kết luận đã áp dụng cho
-`FCT_CLOS_APPLICATION_DAILY` (1.2.2.1) — bỏ hẳn `DEVIATION_CNT`,
+`FCT_CLOS_APPLICATION` (1.2.2.1) — bỏ hẳn `DEVIATION_CNT`,
 `COLLATERAL_CNT` + 9 cột con khỏi thiết kế, để tầng report/OAS tự tính
 trực tiếp từ `FCT_RLOS_COLLATERAL`/`FCT_RLOS_DEVIATION` qua RPD (multi-fact/
 conformed dimension), tránh phụ thuộc thứ tự ETL giữa các fact.
 
-###### 1.3.2.2 FCT_RLOS_APPLICATION_PARTY — THAY ĐỔI KIẾN TRÚC (factless-fact liên kết, không còn giữ thuộc tính mô tả)
+###### 1.3.2.2 FCT_RLOS_APPLICATION_PARTY — ĐÃ XÓA (review 2026-09-26, theo yêu cầu người dùng)
 
-**Lineage đầy đủ (bao gồm cả nguồn của `DIM_RLOS_APPLICATION` 1.3.1.1,
-`DIM_RLOS_APPLICANT` 1.3.1.9, và `DIM_RLOS_COREPAYER` 1.3.1.10 — xem
-`hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của 3 DIM này; bản thân
-`FCT_RLOS_APPLICATION_PARTY` không đọc STG_LOS, xem ghi chú "Không có
-subgraph STG_LOS" bên dưới — mọi node STG_LOS ở đây chỉ phục vụ lineage
-của 3 DIM nó nối tới):**
+**Xóa hẳn bảng này (review 2026-09-26):** sau khi `DIM_RLOS_APPLICANT`
+đổi thành `FCT_RLOS_CUSTOMER` (bỏ `APPLICANT_SK` khỏi bảng này, xem lịch
+sử ở Section 3) và `DIM_RLOS_COREPAYER` đổi thành `FCT_RLOS_COREPAYER`
+(1.3.2.9, cùng lý do — grain đổi sang giấy tờ định danh, không còn 1
+surrogate key ổn định đại diện cho 1 corepayer/hồ sơ để giữ ở đây), bảng
+liên kết `FCT_RLOS_APPLICATION_PARTY` chỉ còn lại `DAYID + WI_NAME +
+DATASOURCE + APPLICATION_SK` — không còn giữ bất kỳ quan hệ N:N/1:N nào
+(applicant và corepayer đều có thể JOIN trực tiếp theo `WI_NAME` sang
+`FCT_RLOS_CUSTOMER`/`FCT_RLOS_COREPAYER` khi cần), trùng lặp hoàn toàn
+với thông tin đã có sẵn trên `FCT_RLOS_APPLICATION` (1.3.2.1, cũng
+có `DAYID+WI_NAME+APPLICATION_SK`). Không còn lý do kiến trúc để giữ
+bảng này — đã xóa hoàn toàn khỏi thiết kế. Giữ lại số hiệu `1.3.2.2` như
+một mục rỗng trỏ chuyển tiếp, không xóa số để không làm lệch số các
+bảng FCT khác trong nhóm RLOS.
 
-```mermaid
-flowchart LR
-    subgraph STG_LOS
-        P1(["NG_SB_RLOS_APPLICANT_GENERAL"])
-        P2(["NG_SB_RLOS_APPLICANT_DETAIL"])
-        P3(["NG_SB_RLOS_APPROVAL"])
-        P4(["NG_SB_RLOS_EXTTABLE"])
-        P5(["NG_SB_RLOS_SENT_CBS_LOG"])
-        P6(["NG_SB_RLOS_ENTRY_EXIT"])
-        P7(["NG_SB_RLOS_MANUAL_DEVIATION"])
-        P8(["NG_SB_RLOS_APPLICANT_IDGRID"])
-        Q1(["NG_SB_RLOS_COREPAYER_GENERAL"])
-        Q2(["NG_SB_RLOS_COREP_IDGRID"])
-    end
-    subgraph SB_DWH
-        A["DIM_RLOS_APPLICATION"]
-        B["DIM_RLOS_APPLICANT"]
-        C["DIM_RLOS_COREPAYER"]
-        E["FCT_RLOS_APPLICATION_PARTY"]
-    end
-    A -->|1:1 APPLICATION_SK| E
-    B -->|1:1 APPLICANT_SK| E
-    C -->|1:N COREPAYER_SK, mặc định -1 nếu hồ sơ không có corepayer| E
-    P1 -->|1:1 WI_NAME, POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG| A
-    P2 -->|1:1 CUS_SEGMENT| A
-    P3 -->|1:1 STREAM, APP_GRP| A
-    P4 -->|1:1 CHANGE_REQUEST REQ_TYPE, CHANGE_TYPE| A
-    P5 -->|1:1 RESULT_MAIN_CARD_ID| A
-    P6 -.->|PHÁI SINH CREATION_DATE, LAST_APPROVAL_DATE| A
-    P7 -.->|"PHÁI SINH đếm số dòng theo WI_NAME >=3 — sinh DEVIATION_G3"| A
-    P1 -->|1:1 FULL_NAME, GENDER, DOB| B
-    P2 -->|1:1 MARR_STATUS, EDU_LEVEL, PERM_ADD, CITY/DISTRICT/WARD/HOUSNO_CURR_RES| B
-    P8 -.->|PHÁI SINH: PIVOT theo ID_TYPE thuộc nhóm TCC/CC vs còn lại, nối chuỗi dấu chấm phẩy nếu nhiều — sinh ADD_ID, ADD_ID_OTHER| B
-    Q1 -->|1:1 REL_TO_APPLICANT, FULL_NAME, DOB_CO, NATIONALITY_CO| C
-    Q2 -.->|PHÁI SINH: PIVOT theo ID_TYPE thuộc nhóm TCC/CC vs còn lại, nối theo WI_NAME + PIN bằng ID_NO_CO, nối chuỗi dấu chấm phẩy nếu nhiều — sinh ADD_ID_COREPAYER, ADD_ID_OTHER_COREPAYER| C
-```
+**Khác biệt với phía CLOS (lịch sử — xem cập nhật 2026-09-26 ngay dưới):**
+ban đầu nhận định `FCT_CLOS_APPLICATION_PARTY` (1.2.2.2) VẪN GIỮ NGUYÊN —
+`DIM_CLOS_CUSTOMER`/`FCT_CLOS_LEGAL_PARTY` (chân applicant phía CLOS)
+không trải qua thay đổi tương tự, vẫn có `CUSTOMER_SK`/`LEGAL_PARTY_SK`
+ổn định để liên kết. Chỉ riêng nhánh RLOS mất cả 2 chân liên kết
+(applicant, rồi corepayer) nên bảng liên kết RLOS mới trở nên thừa.
 
-**Ghi chú lineage — thay đổi kiến trúc so với `FCT_LOS_APPLICATION_PARTY`
-gốc:** toàn bộ thuộc tính mô tả con người (FULL_NAME, GENDER, địa chỉ,
-giấy tờ...) đã chuyển hết sang `DIM_RLOS_APPLICANT`/`DIM_RLOS_COREPAYER`
-(1.3.1.9, 1.3.1.10). Bảng này chỉ còn vai trò **factless-fact liên kết**
-thể hiện quan hệ `1 hồ sơ × 1 applicant × N corepayer` — đã đánh giá và
-xác nhận với người dùng: quan hệ hồ sơ-applicant là 1:1 (không cần bảng
-liên kết riêng) nhưng quan hệ hồ sơ-corepayer là 1:N thực sự, nên giữ 1
-bảng factless duy nhất để thể hiện đồng thời cả 3 khóa (đúng theo yêu cầu
-người dùng, thay vì tách 2 bảng liên kết riêng).
-
-**Grain:** 1 dòng = 1 hồ sơ × 1 corepayer. Hồ sơ KHÔNG có corepayer nào vẫn
-có đúng 1 dòng, với `COREPAYER_SK = -1` (Unknown) — theo đúng quy ước SK
-mặc định -1 đã dùng xuyên suốt thiết kế, đảm bảo mọi hồ sơ đều có ít nhất
-1 dòng để lấy `APPLICANT_SK`.
-
-`FCT_LOS_PARTY_DOCUMENT` (giấy tờ tùy thân) **bị loại bỏ hoàn toàn** phía
-RLOS — không còn bảng document nào: giấy tờ applicant/corepayer đã pivot
-thành 2 cột `ADD_ID`/`ADD_ID_OTHER` và `ADD_ID_COREPAYER`/
-`ADD_ID_OTHER_COREPAYER` ngay trên `DIM_RLOS_APPLICANT`/`DIM_RLOS_
-COREPAYER` (xem 1.3.1.9, 1.3.1.10).
-
-**Không có subgraph STG_LOS (review 2026-09-17):** khác các FCT chi tiết
-khác trong tài liệu (luôn đọc trực tiếp STG_LOS), bảng này không đọc lại
-STG_LOS — nó được build hoàn toàn bằng cách join lại 3 DIM đã có sẵn tại
-SB_DWH (mỗi dòng `DIM_RLOS_COREPAYER` đang hiện hành của 1 hồ sơ sinh ra
-đúng 1 dòng FCT). Đây là hệ quả tất yếu của kiến trúc factless-fact liên
-kết DIM×DIM×DIM, không phải thiếu sót lineage.
+⚠️ **Cập nhật (review 2026-09-26, cùng ngày):** xác nhận lại theo yêu cầu
+người dùng — `FCT_CLOS_LEGAL_PARTY` (1.2.2.7) tự nó đã đủ `WI_NAME`/
+`CUSTOMER_SK`/`APPLICATION_SK` để join trực tiếp, không cần bảng cầu nối
+trung gian — cùng bản chất dư thừa như bên RLOS dù lý do kỹ thuật khác
+nhau (RLOS mất surrogate key ổn định; CLOS thì đích đến đã tự đủ khóa
+join trực tiếp). `FCT_CLOS_APPLICATION_PARTY` nay cũng đã **xóa hẳn** —
+xem 1.2.2.2.
 
 ###### 1.3.2.3 FCT_RLOS_COLLATERAL
 
@@ -1757,7 +1957,7 @@ nguyên dạng FCT ảnh chụp toàn bộ theo ngày; báo cáo BC1/BC2/BC3/BC9
 theo `DAYID` cụ thể nên không bị ảnh hưởng bởi việc 1 tài sản vật lý có thể
 ứng với nhiều `COLLATERAL_BK` qua các ngày.
 
-###### 1.3.2.4 FCT_RLOS_SUB_PRODUCT
+###### 1.3.2.4 FCT_RLOS_SUB_PRODUCT — ⚠️ review 2026-09-27 (theo yêu cầu người dùng): sửa lại toàn bộ cơ chế nạp cho khớp SRS BC1 BR 1.2 (driving table đúng là NG_SB_RLOS_SUB_PRODUCT, 5 bảng grid chỉ LEFT JOIN bổ sung chi tiết, không tự sinh dòng độc lập)
 
 **Lineage đầy đủ (bao gồm cả nguồn của `DIM_RLOS_APPLICATION`, 1.3.1.1, và
 `DIM_RLOS_PRODUCT`, 1.3.1.2 — xem `hld/HLD_DIM_SB_DWH.md` để đối chiếu
@@ -1772,7 +1972,6 @@ flowchart LR
         A4(["NG_SB_RLOS_CIVIL_APP"])
         A5(["NG_SB_RLOS_TEACHER_APP"])
         A6(["NG_SB_RLOS_WOMAN_APP"])
-        A7(["NG_SB_RLOS_SENT_CBS_LOG"])
         P1(["NG_SB_RLOS_APPLICANT_GENERAL"])
         P2(["NG_SB_RLOS_APPLICANT_DETAIL"])
         P3(["NG_SB_RLOS_APPROVAL"])
@@ -1784,55 +1983,92 @@ flowchart LR
         D["DIM_RLOS_APPLICATION"]
         C["FCT_RLOS_SUB_PRODUCT"]
     end
-    A1 -->|1:1 WI_NAME, SUB_PRODUCT_LINE| C
-    A2 -->|"PHÁI SINH SUB_PRODUCT_TYPE_CODE=CREDIT_CARD (SUB_PRODUCT_LINE='Thẻ tín dụng') + hash SUB_PRODUCT_BK, nhiều dòng/hồ sơ"| C
-    A3 -->|"PHÁI SINH SUB_PRODUCT_TYPE_CODE=SEABUY (SUB_PRODUCT_LINE='SeABuy'), khóa CDC=WI_NAME"| C
-    A4 -->|"PHÁI SINH SUB_PRODUCT_TYPE_CODE=CIVIL (SUB_PRODUCT_LINE='SeACivil') + hash SUB_PRODUCT_BK"| C
-    A5 -->|"PHÁI SINH SUB_PRODUCT_TYPE_CODE=TEACHER (SUB_PRODUCT_LINE='SeATeacher'), khóa CDC=WI_NAME"| C
-    A6 -->|"PHÁI SINH SUB_PRODUCT_TYPE_CODE=WOMAN (SUB_PRODUCT_LINE='SeAWoman'), khóa CDC=WI_NAME"| C
-    A7 -.->|tham gia hash SUB_PRODUCT_BK của dòng CREDIT_CARD/CIVIL khi liên quan| C
+    A1 -->|"driving table (review 2026-09-27, sửa lại — khớp SRS BC1 BR 1.2) — 1 dòng = 1 hồ sơ x 1 lần đăng ký sản phẩm phụ, WI_NAME + SUB_PRODUCT_LINE ('SeABuy'/'SeACivil'/'SeATeacher'/'SeAWoman'/'Thẻ tín dụng') tự phân biệt loại"| C
+    A2 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='Thẻ tín dụng' — bổ sung SPP_AMOUNT/SPP_TERM/CARD_TYPE_CODE, 1 hồ sơ có thể khớp NHIỀU dòng (nhiều thẻ phụ) nên tự nhân dòng qua JOIN"| C
+    A3 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='SeABuy' — bổ sung SPP_AMOUNT/SPP_TERM"| C
+    A4 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='SeACivil' — bổ sung SPP_AMOUNT/SPP_TERM"| C
+    A5 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='SeATeacher' — bổ sung SPP_AMOUNT/SPP_TERM"| C
+    A6 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='SeAWoman' — bổ sung SPP_AMOUNT/SPP_TERM"| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
     P1 -->|1:1 WI_NAME, POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG| D
     P2 -->|1:1 CUS_SEGMENT| D
     P3 -->|1:1 STREAM, APP_GRP| D
     P4 -->|1:1 CHANGE_REQUEST REQ_TYPE, CHANGE_TYPE| D
-    A7 -->|1:1 RESULT_MAIN_CARD_ID| D
     P6 -.->|PHÁI SINH CREATION_DATE, LAST_APPROVAL_DATE| D
     P7 -.->|"PHÁI SINH đếm số dòng theo WI_NAME >=3 — sinh DEVIATION_G3"| D
 ```
 
-**Ghi chú lineage:** giữ nguyên grain `1 dòng = 1 lần đăng ký sản phẩm phụ
-trong ảnh chụp của ngày DAYID` và cơ chế nạp của bảng gốc
-`FCT_LOS_SUB_PRODUCT` — bảng gộp 7 nguồn với 2 hình dạng khóa khác nhau,
-đã xác nhận qua `input/DS_BANG_202608.xlsx`: `NG_SB_RLOS_SEABUY_APP`/
-`NG_SB_RLOS_TEACHER_APP`/`NG_SB_RLOS_WOMAN_APP` là LOẠI 1 (khai khóa CDC =
-`WI_NAME`, tối đa 1 dòng/hồ sơ/loại); `NG_SB_RLOS_SUB_PRODUCT`/
-`NG_SB_RLOS_CREDIT_CARD_APP`/`NG_SB_RLOS_CIVIL_APP`/
-`NG_SB_RLOS_SENT_CBS_LOG` là LOẠI 2 (không khai khóa CDC). Vì vậy
-`SUB_PRODUCT_BK` giữ dạng hash toàn bộ cột không phải CLOB của đúng bảng
-nguồn sinh ra dòng đó (loại trừ `COMMENT_CO`/`REQUEST`), cộng `DATASOURCE`
-+ tên bảng nguồn — riêng `NG_SB_RLOS_CREDIT_CARD_APP` là grid thẻ tín dụng
-phụ, 1 hồ sơ có thể có NHIỀU thẻ nên nhiều dòng cùng
-`SUB_PRODUCT_TYPE_CODE='CREDIT_CARD'`/hồ sơ — đây là lý do bảng phải nhân
-dòng (không phải 1:1 với hồ sơ như 3 nguồn LOẠI 1 kia). Ảnh chụp đầy đủ
-theo ngày dựng theo quy trình A2, PK = `DAYID + WI_NAME +
-SUB_PRODUCT_TYPE_CODE + SUB_PRODUCT_BK`. `SUB_PRODUCT_TYPE_CODE` gán cố
-định theo đúng bảng nguồn bản ghi đến từ đó (hằng số kiến trúc, không đọc
-từ 1 cột dữ liệu) — đổi tên từ `SUB_PRODUCT_CODE` gốc để tránh trùng
-nghĩa với `SUB_PRODUCT_CODE` đã có sẵn trên `DIM_RLOS_PRODUCT` (sản phẩm
-nhánh của sản phẩm CHÍNH, khác hẳn khái niệm sản phẩm PHỤ ở đây).
+**⚠️ Sửa lại toàn bộ cơ chế nạp (review 2026-09-27, theo phát hiện +
+xác nhận của người dùng, đối chiếu `input/srs_report/BC1_PDTD_DTM_SRS_
+v1.0.docx` BR 1.2):** bản trước hiểu sai bản chất — coi 5 bảng grid
+(`CREDIT_CARD_APP`/`SEABUY_APP`/`CIVIL_APP`/`TEACHER_APP`/`WOMAN_APP`)
+là 5 nguồn tự sinh dòng độc lập, `SUB_PRODUCT_TYPE_CODE` gán theo "dòng
+đến từ bảng nào". SRS gốc xác nhận khác hẳn:
 
-**Ghi chú thiết kế — không tách DIM:** cùng bản chất "nguồn gộp nhiều
-LOẠI 2 không khóa" với `FCT_RLOS_COLLATERAL` (1.3.2.3) cho 4/7 nguồn —
-tuy 3 nguồn còn lại (`SEABUY`/`TEACHER`/`WOMAN`) có khóa CDC thật
-(`WI_NAME`), bảng vẫn giữ dạng FCT vì bản chất dữ liệu là **sự kiện đăng
-ký sản phẩm phụ theo hồ sơ** (số tiền, thời hạn có thể thay đổi theo lần
-đăng ký), không phải một thực thể danh mục độc lập với hồ sơ — không có
-"sản phẩm phụ" nào tồn tại tách rời khỏi hồ sơ đã đăng ký nó.
+- **`NG_SB_RLOS_SUB_PRODUCT` (A1) là driving table DUY NHẤT** — BR 1.2
+  ghi rõ A1 (alias `f`) LEFT JOIN thẳng vào driving table của cả báo cáo
+  (`NG_SB_RLOS_ENTRY_EXIT`, alias `a`) theo `WI_NAME`. Mỗi dòng của A1 =
+  1 hồ sơ × 1 lần đăng ký sản phẩm phụ, với `SUB_PRODUCT_LINE` đã tự
+  phân biệt đủ 5 loại — không cần suy từ "bảng nguồn nào".
+- **5 bảng grid chỉ LEFT JOIN bổ sung chi tiết vào A1**, có điều kiện
+  lọc đúng loại (nguyên văn BR 1.2): `f.WI_NAME=af.WI_NAME AND
+  f.SUB_PRODUCT_LINE='Thẻ tín dụng'` (CREDIT_CARD_APP), tương tự cho 4
+  bảng còn lại với `SUB_PRODUCT_LINE='SeABuy'/'SeACivil'/'SeATeacher'/
+  'SeAWoman'`. Đây KHÔNG phải UNION 5 nguồn độc lập — chỉ là JOIN thêm
+  cột `SPP_AMOUNT`/`SPP_TERM`/`CARD_TYPE_CODE` vào đúng dòng của A1.
+  Riêng `CREDIT_CARD_APP`: LEFT JOIN theo bản chất SQL sẽ tự NHÂN DÒNG
+  nếu khớp N dòng thẻ phụ của cùng 1 hồ sơ — đúng lý do bảng có thể
+  nhiều dòng/hồ sơ, nhưng nguồn gốc nhân dòng là ở JOIN, không phải 5
+  driving table độc lập.
+- **`NG_SB_RLOS_SENT_CBS_LOG` KHÔNG liên quan gì tới bảng này** — đối
+  chiếu SRS xác nhận bảng này (alias `n`) LEFT JOIN thẳng vào `a`
+  (ENTRY_EXIT), chỉ cấp `RESULT_SEAB_MAIN_CARD_ID` để tra `K_TYPE`/
+  `HOME_ADDRESS` qua `STG_DIM_CARD`/`STG_DIM_SEAB_MAIN_CARD` (vai trò đã
+  có sẵn ở `FCT_RLOS_APPLICATION`, cột `T24_CARD_SK`/
+  `T24_SEAB_MAIN_CARD_SK`, review 2026-09-21) — không join vào `f`. Đã
+  xóa hẳn khỏi lineage/nguồn của bảng này (bản trước liệt kê nhầm vào
+  danh sách 7 nguồn và ghi "tham gia hash SUB_PRODUCT_BK" — sai).
+- **`SUB_PRODUCT_TYPE_CODE` XÓA HẲN khỏi thiết kế (review 2026-09-27,
+  theo yêu cầu người dùng, phát hiện tiếp theo cùng ngày):** sau khi sửa
+  lại cơ chế nạp, cột này chỉ còn là CASE WHEN ánh xạ 1-1 từ
+  `SUB_PRODUCT_LINE` (`'SeACivil'→'CIVIL'`, `'SeATeacher'→'TEACHER'`,
+  `'SeAWoman'→'WOMAN'`, `'SeABuy'→'SEABUY'`, `'Thẻ tín dụng'→
+  'CREDIT_CARD'`) — không còn mang thêm giá trị phân biệt nào so với
+  chính `SUB_PRODUCT_LINE` đã có sẵn trên driving table. Giữ cả 2 cột là
+  dư thừa thật (khác các trường hợp "cột kỹ thuật, một phần PK" khác
+  trong cùng bảng review — đây là ánh xạ 1-1, không phải khóa độc lập).
+- **`SUB_PRODUCT_BK`** — `NG_SB_RLOS_SUB_PRODUCT` không khai KEY CDC
+  trong `input/DS_BANG_202608.xlsx` (rỗng), nên vẫn phải hash, không
+  dùng thẳng `WI_NAME`. Công thức (theo yêu cầu người dùng):
+  `STANDARD_HASH(WI_NAME || '~' || SUB_PRODUCT_LINE || '~' ||
+  NVL(TO_CHAR(SPP_AMOUNT), '<NULL>') || '~' || NVL(TO_CHAR(SPP_TERM),
+  '<NULL>') || '~' || DATASOURCE, 'SHA256')` — hash trên cặp khóa
+  driving table (`WI_NAME`+`SUB_PRODUCT_LINE`, dùng trực tiếp giá trị
+  gốc thay cho `SUB_PRODUCT_TYPE_CODE` đã xóa) cộng 2 giá trị đã JOIN
+  bổ sung (`SPP_AMOUNT`/`SPP_TERM`) để phân biệt nhiều dòng thẻ phụ
+  nhân ra từ JOIN — không hash gộp toàn bộ cột của 5 bảng grid như bản
+  gốc ban đầu. `CARD_TYPE_CODE` KHÔNG đưa vào hash — luôn NULL với 4
+  nhóm không phải thẻ, và dù có giá trị cũng không đủ phân biệt 2 thẻ
+  cùng loại (rủi ro nhận diện đã trao đổi với người dùng). Rủi ro đụng
+  độ PK còn lại (2 thẻ phụ cùng hồ sơ trùng cả `SPP_AMOUNT` lẫn
+  `SPP_TERM`) — người dùng xác nhận CHẤP NHẬN, cùng bản chất rủi ro đã
+  chấp nhận ở `FCT_CLOS_DEVIATION`/`FCT_RLOS_DEVIATION` (2 ngoại lệ chỉ
+  khác `REASON`, bị hash trùng). **PK rút gọn còn `DAYID + SUB_PRODUCT_
+  BK`** (theo yêu cầu người dùng) — `SUB_PRODUCT_BK` tự nó đã hash đủ
+  `WI_NAME`+`SUB_PRODUCT_LINE`+`SPP_AMOUNT`+`SPP_TERM` để đảm bảo tính
+  duy nhất, không cần thêm `WI_NAME`/`SUB_PRODUCT_LINE`/
+  `SUB_PRODUCT_TYPE_CODE` làm thành phần PK riêng nữa.
+
+**Ghi chú thiết kế — không tách DIM:** bảng vẫn giữ dạng FCT vì bản chất
+dữ liệu là **sự kiện đăng ký sản phẩm phụ theo hồ sơ** (số tiền, thời
+hạn có thể thay đổi theo lần đăng ký), không phải một thực thể danh mục
+độc lập với hồ sơ — không có "sản phẩm phụ" nào tồn tại tách rời khỏi
+hồ sơ đã đăng ký nó. `NG_SB_RLOS_SUB_PRODUCT` không khai CDC key (xem
+trên) nên không đủ điều kiện SCD2 ngay cả khi muốn tách riêng.
 
 ###### 1.3.2.5 FCT_RLOS_EXCEPTION — review 2026-09-18 (SRS BC7 cập nhật: CHECK_FTR/PHAN_LOAI_DDE đổi công thức)
 
-**Lineage đầy đủ (bao gồm cả nguồn của `DIM_RLOS_EXCEPTION_REASON`,
+**Lineage đầy đủ (bao gồm cả nguồn của `DIM_RLOS_EXCEPTION`,
 1.3.1.5, `DIM_RLOS_APPLICATION`, 1.3.1.1, và `DIM_LOS_USER`, 1.1.2 — xem
 `hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của 3 DIM này):**
 
@@ -1851,18 +2087,16 @@ flowchart LR
         U(["NG_SB_RLOS_MAS_USER"])
     end
     subgraph SB_DWH
-        B["DIM_RLOS_EXCEPTION_REASON"]
+        B["DIM_RLOS_EXCEPTION"]
         D["DIM_RLOS_APPLICATION"]
         F["DIM_LOS_USER"]
         C["FCT_RLOS_EXCEPTION"]
     end
     A -->|1:1, khóa CDC khai đủ, không hash| C
-    B -.->|EXCEPTION_REASON_SK, LEFT JOIN EXCEPTION_CATEGORY+EXCEPTION_NAME rồi EXISTS-filter qua E| C
+    B -.->|EXCEPTION_SK, LEFT JOIN EXCEPTION_CATEGORY+EXCEPTION_NAME rồi EXISTS-filter qua E| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
-    F -.->|RAISED_BY_USER_SK, lookup theo RAISED_BY| C
-    A -.->|"PHÁI SINH CHECK_FTR — whitelist theo BI_SUB_PRODUCT (review 2026-09-18)"| C
-    P1 -.->|"SUB_PRODUCT — derive BI_SUB_PRODUCT (Credit Card hay không) cho whitelist CHECK_FTR (review 2026-09-18)"| C
-    E -.->|"PHÁI SINH FIRST_WORKSTEP_RETURN (review 2026-09-18: thêm nhánh Send_Back to BranchSupport) + EXISTS-filter ACTIVITYNAME/DECISION cho EXCEPTION_REASON_SK"| C
+    F -.->|USER_SK, lookup theo RAISED_BY| C
+    P1 -.->|"SUB_PRODUCT — cột thô (review 2026-09-27, bổ sung), LEFT JOIN theo WI_NAME; CHECK_FTR (whitelist theo BI_SUB_PRODUCT phái sinh từ cột này) đã chuyển hẳn sang PDTD_DTM, xem mục 16 PDTD_DTM review"| C
     R -->|1:1 ACTIVITYNAME, DECISION_CODE, EXCEPTION_CATEGORY, EXCEPTION_NAME| B
     P1 -->|1:1 WI_NAME, POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG| D
     P2 -->|1:1 CUS_SEGMENT| D
@@ -1883,32 +2117,30 @@ khóa với `NG_SB_CLOS_EXCEPTION`) nên PK giữ thẳng trên cột gốc, kh�
 hash. Ảnh chụp đầy đủ theo ngày dựng theo quy trình A2, PK = `DAYID +
 WI_NAME + EXCEPTION_CATEGORY + RAISED_BY + RAISED_DATE_TIME`.
 
-**`EXCEPTION_REASON_SK` — lookup 2 bước, giống hệt cơ chế đã áp dụng cho
-CLOS (xem giải thích đầy đủ tại 1.2.2.4):** `DIM_RLOS_EXCEPTION_REASON`
+**`EXCEPTION_SK` — lookup 2 bước, giống hệt cơ chế đã áp dụng cho
+CLOS (xem giải thích đầy đủ tại 1.2.2.4):** `DIM_RLOS_EXCEPTION`
 (1.3.1.5) khai Natural Key đủ 4 cột (`ACTIVITYNAME + DECISION_CODE +
 EXCEPTION_CATEGORY + EXCEPTION_NAME`), nguồn FCT không có ACTIVITYNAME/
 DECISION để join thẳng. SRS BC7 (nhánh RLOS) dùng đúng 2 bước: (1)
-`LEFT JOIN DIM_RLOS_EXCEPTION_REASON` theo `EXCEPTION_CATEGORY +
+`LEFT JOIN DIM_RLOS_EXCEPTION` theo `EXCEPTION_CATEGORY +
 EXCEPTION_NAME`; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi
 `NG_SB_RLOS_ENTRY_EXIT` thỏa `WI_NAME` khớp + `WORKSTEP=ACTIVITYNAME` +
 `DECISION=DECISION_CODE` của dòng DIM đó. Không còn dòng nào khớp → `-1`.
 
-**Đánh giá kiến trúc — vì sao không gộp vào `FCT_RLOS_APPLICATION_DAILY`
+**Đánh giá kiến trúc — vì sao không gộp vào `FCT_RLOS_APPLICATION`
 (1.3.2.1):** cùng lý do khác grain đã áp dụng cho `FCT_CLOS_EXCEPTION`
 (1.2.2.4) — 1 hồ sơ có thể phát sinh nhiều lần nêu lý do (nhiều loại,
 nhiều người, nhiều thời điểm, qua các vòng Raise/Clear), BC7 cần liệt kê
 chi tiết từng lần chứ không phải rollup. Giữ bảng riêng.
 
-**Đánh giá kiến trúc — `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` (và ban đầu cả
-`PHAN_LOAI_DDE`) chuyển từ `FCT_RLOS_APPLICATION_DAILY` sang đây, cùng lý
-do đã áp dụng cho CLOS (xem 1.2.2.4):** rà soát SRS BC7 xác nhận cả 3 cột
-gốc chỉ phục vụ đúng BC7, đúng grain của bảng này. `CHECK_FTR`/
-`FIRST_WORKSTEP_RETURN` tính ngay ở tầng SB_DWH, giữ nguyên tắc "DTM chỉ
-đọc DWH" cho tầng PDTD_DTM (xem 2.3.2.5). `FCT_RLOS_APPLICATION_DAILY`
-(1.3.2.1) đã bỏ cả 3 cột gốc này từ trước. `PHAN_LOAI_DDE` riêng KHÔNG
-tính tại SB_DWH — đã chuyển hẳn sang tính tại PDTD_DTM (review
-2026-09-22), cùng lý do đã áp dụng cho CLOS: xem "⚠️ Đánh giá kiến trúc —
-`PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" tại 1.2.2.4.
+**Đánh giá kiến trúc — `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE`
+chuyển từ `FCT_RLOS_APPLICATION` sang đây, cùng lý do đã áp dụng cho
+CLOS (xem 1.2.2.4):** rà soát SRS BC7 xác nhận cả 3 cột gốc chỉ phục vụ
+đúng BC7, đúng grain của bảng này. `FCT_RLOS_APPLICATION` (1.3.2.1)
+đã bỏ cả 3 cột gốc này từ trước. Cả 3 cột đều KHÔNG tính tại SB_DWH —
+`PHAN_LOAI_DDE` đã chuyển hẳn sang PDTD_DTM từ review 2026-09-22;
+`CHECK_FTR`/`FIRST_WORKSTEP_RETURN` chuyển tiếp sang PDTD_DTM ở review
+2026-09-27 (xem ngay dưới) — cùng lý do đã áp dụng cho CLOS.
 
 **Review 2026-09-18 — SRS BC7 cập nhật đổi hẳn công thức `CHECK_FTR` và
 `PHAN_LOAI_DDE` (không còn khớp bản SRS trước, `FIRST_WORKSTEP_RETURN`
@@ -1941,12 +2173,29 @@ xem 1.2.2.4):**
   `REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE` — cùng bảng REF_ mới dùng chung với
   CLOS (khác `SYSTEMNAME`), xem `hld/HLD_REF.md` mục 2.4.10.
 
+**⚠️ Đánh giá kiến trúc — `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` chuyển hẳn
+sang PDTD_DTM (review 2026-09-27, theo yêu cầu người dùng, cùng cơ chế đã
+áp dụng cho CLOS tại 1.2.2.4):** rà soát lại xác nhận `CHECK_FTR` là công
+thức CASE WHEN/whitelist theo business rule (không phải giá trị gốc từ
+STG_LOS), vi phạm nguyên tắc "SB_DWH ảnh chụp sạch nguồn, PDTD_DTM chuẩn
+hóa/tính business rule". Dữ liệu thô `CHECK_FTR` cần (`EXCEPTION_CATEGORY`/
+`EXCEPTION_NAME` đã có sẵn, cộng `SUB_PRODUCT` bổ sung mới) đủ để tính
+ngay tại chính bảng này, không cần join thêm bảng SB_DWH khác — PDTD_DTM
+tự CASE WHEN phân loại `BI_SUB_PRODUCT` từ `SUB_PRODUCT` khi tính
+`CHECK_FTR`. `FIRST_WORKSTEP_RETURN` tuy là mechanical MIN(EXITDATE)+lọc
+(không phải business rule tự thân) nhưng chuyển theo để nhất quán kiến
+trúc với CLOS — đọc lịch sử `WORKSTEP_CODE`/`EXITDATE`/`DECISION_CODE` từ
+`SB_DWH.FCT_RLOS_WORKSTEP_EVENT` (1.3.2.7) thay vì `NG_SB_RLOS_ENTRY_EXIT`
+trực tiếp. Bảng này (SB_DWH) từ 14 cột xuống còn **13 cột** (xóa
+`CHECK_FTR`/`FIRST_WORKSTEP_RETURN`, thêm `SUB_PRODUCT`). Xem công thức
+đầy đủ tại `hld/hld_review/HLD_FCT_PDTD_DTM_review.md` mục 16.
+
 **⚠️ Đánh giá kiến trúc — `PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM (review
 2026-09-22, cùng lý do đã áp dụng cho CLOS tại 1.2.2.4):** công thức trên
 bị phát hiện sai kiến trúc — `REF_PHAN_LOAI_DDE` chỉ tồn tại vật lý ở
 PDTD_DTM (xem `hld/HLD_REF.md` đầu Section 2.4), không có bản SB_DWH, nên
 không thể JOIN trực tiếp từ tầng SB_DWH. **`FCT_RLOS_EXCEPTION` ở tầng
-SB_DWH (bảng này) KHÔNG còn cột `PHAN_LOAI_DDE`** — chỉ còn 14 cột. Công
+SB_DWH (bảng này) KHÔNG còn cột `PHAN_LOAI_DDE`** — chỉ còn 13 cột. Công
 thức đã chuyển hẳn sang tính tại `hld/HLD_FCT_PDTD_DTM.md` mục 2.3.2.5.
 
 ###### 1.3.2.6 FCT_RLOS_DEVIATION
@@ -1971,7 +2220,7 @@ flowchart LR
     end
     A -->|1:1 + PHÁI SINH DEVIATION_BK bằng hash toàn bộ cột| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
-    E -.->|PHÁI SINH PROCESSED_DATE, cùng công thức FCT_RLOS_APPLICATION_DAILY| C
+    E -.->|PHÁI SINH PROCESSED_DATE, cùng công thức FCT_RLOS_APPLICATION| C
     P1 -->|1:1 WI_NAME, POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG| D
     P2 -->|1:1 CUS_SEGMENT| D
     P3 -->|1:1 STREAM, APP_GRP| D
@@ -1999,15 +2248,15 @@ nội dung thuộc tính, SCD2/DIM không khả thi. Giữ dạng FCT ảnh ch�
 bộ theo ngày.
 
 **Đánh giá kiến trúc — vì sao `PROCESSED_DATE` tính trực tiếp tại đây
-thay vì JOIN `FCT_RLOS_APPLICATION_DAILY`:** cùng lý do và kết luận đã áp
+thay vì JOIN `FCT_RLOS_APPLICATION`:** cùng lý do và kết luận đã áp
 dụng cho `FCT_CLOS_DEVIATION` (1.2.2.5) — để `FCT_RLOS_DEVIATION` và
-`FCT_RLOS_APPLICATION_DAILY` là 2 luồng ETL hoàn toàn độc lập, không phụ
+`FCT_RLOS_APPLICATION` là 2 luồng ETL hoàn toàn độc lập, không phụ
 thuộc thứ tự chạy trước/sau lẫn nhau (`DEVIATION_CNT` đã bỏ khỏi
-`FCT_RLOS_APPLICATION_DAILY`, xem đánh giá kiến trúc tại 1.3.2.1),
+`FCT_RLOS_APPLICATION`, xem đánh giá kiến trúc tại 1.3.2.1),
 `PROCESSED_DATE` tính độc lập ngay tại đây, đọc thẳng
 `NG_SB_RLOS_ENTRY_EXIT` — cùng công thức 3 mức ưu tiên (ngày phê duyệt
 cuối/ngày hủy/ngày thoát bước gần nhất, đã đối chiếu khớp SRS BC6) đã
-dùng cho `FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE` (1.3.2.1), không
+dùng cho `FCT_RLOS_APPLICATION.PROCESSED_DATE` (1.3.2.1), không
 JOIN bảng nào khác. PDTD_DTM của bảng này chỉ còn bê 1:1 (xem 2.3.2.6).
 
 **Phát hiện khi đối chiếu SRS — nghi vấn lỗi đánh máy ở khối RLOS của
@@ -2026,10 +2275,9 @@ theo SRS — cùng quyết định đã chốt cho `FCT_CLOS_DEVIATION`.
 
 ###### 1.3.2.7 FCT_RLOS_WORKSTEP_EVENT — TÁCH TỪ FCT_LOS_WORKSTEP_EVENT (đánh giá lại 2026-09-14, xem lý do tách bên dưới)
 
-**Lineage đầy đủ (bao gồm cả nguồn của `DIM_RLOS_WORKSTEP` 1.3.1.3,
-`DIM_RLOS_DECISION` 1.3.1.4, `DIM_LOS_USER` 1.1.2, và `DIM_RLOS_APPLICATION`
-1.3.1.1 — xem `hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của 4 DIM
-này):**
+**Lineage đầy đủ (bao gồm cả nguồn của `DIM_RLOS_WORKSTEP_DECISION`
+1.3.1.3, `DIM_LOS_USER` 1.1.2, và `DIM_RLOS_APPLICATION` 1.3.1.1 — xem
+`hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của 3 DIM này):**
 
 ```mermaid
 flowchart LR
@@ -2038,40 +2286,49 @@ flowchart LR
         MW(["NG_SB_RLOS_MAS_DECISION"])
         U(["NG_SB_RLOS_MAS_USER"])
         P1(["NG_SB_RLOS_APPLICANT_GENERAL"])
-        P2(["NG_SB_RLOS_APPLICANT_DETAIL"])
         P3(["NG_SB_RLOS_APPROVAL"])
         P4(["NG_SB_RLOS_EXTTABLE"])
         P5(["NG_SB_RLOS_SENT_CBS_LOG"])
-        P7(["NG_SB_RLOS_MANUAL_DEVIATION"])
         WF(["WFINSTRUMENTTABLE"])
+        CR(["NG_SB_RLOS_CREDIT_PROPOSAL"])
     end
     subgraph SB_DWH
-        WS["DIM_RLOS_WORKSTEP"]
-        DC["DIM_RLOS_DECISION"]
+        WD["DIM_RLOS_WORKSTEP_DECISION"]
         US["DIM_LOS_USER"]
         AP["DIM_RLOS_APPLICATION"]
-        AC["DIM_RLOS_APPLICANT"]
         E["FCT_RLOS_WORKSTEP_EVENT"]
     end
     B -->|1:1 + PHÁI SINH, khóa CDC khai đủ, không hash| E
-    WS -.->|WORKSTEP_SK, lookup WORKSTEP_CODE theo thời gian| E
-    DC -.->|DECISION_SK, lookup DECISION_CODE theo thời gian| E
+    WD -.->|"WORKSTEP_DECISION_SK (review 2026-09-24, gộp từ WORKSTEP_SK+DECISION_SK), lookup theo cặp WORKSTEP_CODE+DECISION_CODE theo thời gian — khóa JOIN chính thức duy nhất để lấy DECISION_CODE (đã xóa khỏi fact, không denormalize)"| E
     US -.->|USER_SK, lookup theo USERNAME, USERNAME có thể rỗng khi bước chưa EXIT — vẫn map -1 bình thường| E
     AP -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| E
-    AC -.->|"APPLICANT_SK (review 2026-09-21, bổ sung), join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID (quan hệ 1:1) — cùng điều kiện đã dùng trên FCT_RLOS_APPLICATION_DAILY.APPLICANT_SK, 2.3.2.1"| E
-    MW -->|"DISTINCT QUEUE_NAME, CDC xác định thay đổi (review 2026-09-18)"| WS
-    MW -->|"DISTINCT DECISION, CDC xác định thay đổi (review 2026-09-18)"| DC
+    MW -->|"1:1 QUEUE_NAME+DECISION, CDC xác định thay đổi (review 2026-09-24, gộp từ 2 lần DISTINCT riêng lẻ)"| WD
     U -->|"grain 1 dòng/LOGIN_ID, CDC xác định thay đổi (review 2026-09-18)"| US
-    P1 -->|1:1 WI_NAME, POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG| AP
-    P2 -->|1:1 CUS_SEGMENT| AP
+    P1 -->|"1:1 POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG, APPLICATION_DATE"| AP
     P3 -->|1:1 STREAM, APP_GRP| AP
-    P4 -->|1:1 CHANGE_REQUEST REQ_TYPE, CHANGE_TYPE| AP
+    P4 -->|"driving table: WI_NAME, LOANCASEID + 6 cột dư thừa (review 2026-09-30, 3 lượt: xóa 22 cột username/routing/state/deviation/cancel, chuyển 13 cột (11 cờ + TOTALNONELIGIBLE/REASON) sang FCT_RLOS_APPLICATION — xem 1.3.1.1)"| AP
     P5 -->|1:1 RESULT_MAIN_CARD_ID| AP
     B -.->|PHÁI SINH CREATION_DATE, LAST_APPROVAL_DATE| AP
-    P7 -.->|"PHÁI SINH đếm số dòng theo WI_NAME >=3 — sinh DEVIATION_G3"| AP
     B -.->|"PHÁI SINH (review 2026-09-21, trực tiếp trên E): PROCESSED_DATE 3 mức ưu tiên"| E
     WF -.->|"LEFT JOIN WI_NAME=PROCESSINSTANCEID, loại 5 CREATEDBY hệ thống/test — PHÁI SINH WORKSTEP_FLAG (review 2026-09-21, trực tiếp trên E, nhánh RLOS)"| E
+    CR -->|"1:1 LOAN_AMOUNT/LOAN_TERM/LOAN_CURRENCY — sinh APPROVED_AMT_FINAL/APPROVED_TERM/CURRENCY_CODE (review 2026-09-25, chuyển từ DIM_RLOS_APPLICATION, tính độc lập tại E)"| E
 ```
+
+**Gộp WORKSTEP_SK+DECISION_SK thành 1 khóa (review 2026-09-24):** cùng
+thay đổi đã áp dụng cho `FCT_CLOS_WORKSTEP_EVENT` (1.2.2.6) — 2 khóa gộp
+thành `WORKSTEP_DECISION_SK`, xóa cột `DECISION_CODE` denormalize trên
+fact. `WORKSTEP_CODE` KHÔNG đổi — vẫn denormalize trực tiếp và nằm
+trong PK.
+
+**✅ Đã giải quyết — bổ sung `APPROVED_AMT_FINAL`/`CURRENCY_CODE`/
+`APPROVED_TERM` trực tiếp trên `E` (review 2026-09-25):** trước đây 3
+cột này lấy dạng "dư thừa có chủ đích" từ `DIM_RLOS_APPLICATION` (cùng
+nguồn/giá trị với `FCT_RLOS_APPLICATION`). Theo yêu cầu người
+dùng: bỏ khỏi DIM, tính độc lập ngay tại đây (đọc trực tiếp
+`NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT`/`LOAN_TERM`/`LOAN_CURRENCY`) —
+cùng pattern `PROCESSED_DATE`/`WORKSTEP_FLAG` đã có (phái sinh trực tiếp
+trên bảng, lặp lại giống nhau trên mọi dòng event của cùng hồ sơ, không
+qua JOIN DIM/FCT khác).
 
 **Vì sao tách vật lý CLOS/RLOS:** cùng lý do và kết luận đã áp dụng cho
 `FCT_CLOS_WORKSTEP_EVENT` (1.2.2.6) — cả 3 cột FK (`WORKSTEP_SK`,
@@ -2127,14 +2384,261 @@ event đã lọc `WHERE WORKSTEP_CODE IN ('UnderwriterMaker',
 'UnderwriterChecker')` trên bảng này (không phải `FCT_RLOS_
 APPLICATION_DAILY`). `UND_MAKER` = `CASE WHEN WORKSTEP_CODE=
 'UnderwriterMaker' THEN USERNAME END` trên chính dòng event. Các thuộc
-tính (`CUSTOMER_NAME` qua `DIM_RLOS_APPLICANT`) đọc trực tiếp trên DIM
-liên quan, không cần JOIN sang `FCT_RLOS_APPLICATION_DAILY`. **Cập nhật
+tính (`CUSTOMER_NAME` qua `FCT_RLOS_CUSTOMER`, join theo `WI_NAME` —
+⚠️ review 2026-09-26: đổi từ `DIM_RLOS_APPLICANT` sau khi bảng đó đổi
+thành FCT) đọc trực tiếp trên bảng liên quan, không cần JOIN sang
+`FCT_RLOS_APPLICATION`. **Cập nhật
 tiếp (review 2026-09-21):** `REPORT_DATE`(=`PROCESSED_DATE`) và
 `FLAG`(=`WORKSTEP_FLAG`) nay ĐÃ bổ sung làm cột phái sinh MỚI tính độc
 lập ngay trên `FCT_RLOS_WORKSTEP_EVENT` (cột 24-26, xem cột table ngay
 dưới và `hld/HLD_FCT_SB_DWH.md` 1.3.2.7/2.3.2.7) — cùng lý do/công thức
 đã áp dụng cho nhánh CLOS (1.2.2.6). Xem `lld/BC4.csv` các dòng
 15/17/18/19/20/22.
+
+**✅ Đã giải quyết — bỏ `APPLICANT_SK` (review 2026-09-26, theo yêu cầu
+người dùng):** cột `APPLICANT_SK` (review 2026-09-21, bổ sung) join
+`DIM_RLOS_APPLICANT` với giả định 1:1 hồ sơ↔applicant. Sau khi `DIM_RLOS_
+APPLICANT` đổi thành `FCT_RLOS_CUSTOMER` (grain `WI_NAME+ID_TYPE+
+ID_NUMBER`, xem 1.3.2.8), không còn 1 SK đại diện duy nhất/hồ sơ để giữ
+ở đây — đã bỏ cột này khỏi bảng (24→23 cột), báo cáo cần thông tin
+applicant tự JOIN `FCT_RLOS_CUSTOMER` theo `WI_NAME`.
+
+###### 1.3.2.8 FCT_RLOS_CUSTOMER — MỚI (đổi từ DIM_RLOS_APPLICANT, review 2026-09-26, theo yêu cầu người dùng)
+
+**Lineage đầy đủ (bao gồm cả nguồn của `DIM_RLOS_APPLICATION`, 1.3.1.1 —
+xem `hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của DIM này, cùng
+pattern đã áp dụng cho `FCT_RLOS_COLLATERAL`/`FCT_RLOS_DEVIATION`):**
+
+```mermaid
+flowchart LR
+    subgraph STG_LOS
+        A(["NG_SB_RLOS_APPLICANT_IDGRID"])
+        B(["NG_SB_RLOS_APPLICANT_GENERAL"])
+        C(["NG_SB_RLOS_APPLICANT_DETAIL"])
+        D(["NG_SB_RLOS_MAS_CITY"])
+        F(["NG_SB_RLOS_MAS_DISTRICT"])
+        T(["STG_DTM.STG_DIM_CUSTOMER"])
+        P3(["NG_SB_RLOS_APPROVAL"])
+        P4(["NG_SB_RLOS_EXTTABLE"])
+        P5(["NG_SB_RLOS_SENT_CBS_LOG"])
+        P6(["NG_SB_RLOS_ENTRY_EXIT"])
+        P7(["NG_SB_RLOS_MANUAL_DEVIATION"])
+    end
+    subgraph SB_DWH
+        AP["DIM_RLOS_APPLICATION"]
+        E["FCT_RLOS_CUSTOMER"]
+    end
+    A -->|"driving table — 1 dòng/giấy tờ, KHÔNG dedup: WI_NAME, ID_TYPE, ID_NUMBER, CIF + 7 cột dư thừa"| E
+    AP -.->|"APPLICATION_SK, join theo WI_NAME"| E
+    B -->|"1:1 theo WI_NAME của chính dòng IDGRID: FULL_NAME, DOB, GENDER, NATIONALITY, TITLE, HOME_PHONE, PHONE_1, PHONE2"| E
+    C -->|"1:1 theo WI_NAME của chính dòng IDGRID: MARR_STATUS, EDU_LEVEL, VEHICLE, PERM_ADD, HOUSNO/WARD_CURR_RES, CUS_SEGMENT"| E
+    D -->|"LEFT JOIN theo CITY_CURR_RES=CITY_CODE — bổ sung CITY_NAME/CITY_NAME_VN"| E
+    F -.->|"LEFT JOIN theo DISTRICT_CURR_RES=DISTRICT_CODE — bổ sung DISTRICT_NAME, PHÁI SINH DISTRICT_NAME_VN"| E
+    T -.->|"LEFT JOIN theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME (đúng nguyên văn SRS BC1 BR 1.2) — sinh T24_CUSTOMER_SK"| E
+    B --> AP
+    C --> AP
+    P3 --> AP
+    P4 --> AP
+    P5 --> AP
+    P6 -.-> AP
+    P7 -.-> AP
+```
+
+**Đổi kiến trúc DIM → FACT, đổi grain (review 2026-09-26, theo yêu cầu
+người dùng):** trước đây `DIM_RLOS_APPLICANT` ở grain 1 dòng/1 hồ sơ
+(`WI_NAME`, SCD2), pivot giấy tờ định danh thành 2 cột chuỗi `ADD_ID`/
+`ADD_ID_OTHER`. Người dùng yêu cầu đổi sang chi tiết tới từng giấy tờ:
+grain mới là **1 dòng = 1 ngày × 1 giấy tờ định danh của người vay chính
+trên 1 hồ sơ** (`DAYID + WI_NAME + ID_TYPE + ID_NUMBER`), snapshot hàng
+ngày giống `FCT_RLOS_APPLICATION` (mỗi ngày lặp lại toàn bộ giấy
+tờ của mọi hồ sơ đang active).
+
+**Vì sao đổi thành FACT, không giữ DIM:** cân nhắc ban đầu là dedup xuyên
+hồ sơ để tạo `DIM_RLOS_CUSTOMER` (1 dòng/khách hàng, chọn hồ sơ mới nhất
+làm đại diện thuộc tính) — nhưng đã quyết định KHÔNG đi hướng này: nguồn
+`NG_SB_RLOS_APPLICANT_IDGRID` **không có KEY CDC** trong
+`DS_BANG_202608.xlsx` (cùng "red flag" đã khiến `DIM_CLOS_LEGAL_PARTY`
+đổi thành `FCT_CLOS_LEGAL_PARTY`, xem 1.2.2.7), và không có căn cứ chuẩn
+hóa đủ tin cậy để dedup nhiều hồ sơ về đúng 1 khách hàng (rủi ro trộn sai
+dữ liệu giữa 2 khách hàng nếu giấy tờ ghi lỗi/trùng). Theo yêu cầu người
+dùng: giữ grain chi tiết theo `WI_NAME` (mỗi dòng gắn với đúng 1 hồ sơ
+cụ thể, không dedup/merge xuyên hồ sơ) — ít rủi ro hơn, nhất quán với
+cách `FCT_CLOS_LEGAL_PARTY` đã xử lý vấn đề tương tự bên CLOS. Không
+SCD2 — snapshot trung thực theo `DAYID`, không có `EFF_DATE`/`EXP_DATE`.
+
+**Driving table đổi từ GENERAL sang IDGRID:** trước đây `NG_SB_RLOS_
+APPLICANT_GENERAL` là driving table (1 dòng/hồ sơ), `IDGRID` chỉ dùng để
+pivot 2 cột `ADD_ID`/`ADD_ID_OTHER`. Nay đảo lại: `IDGRID` là driving
+table (1 dòng/giấy tờ, không dedup — 1 hồ sơ có thể có nhiều giấy tờ,
+cùng 1 giấy tờ có thể xuất hiện lại ở hồ sơ khác nếu khách hàng nộp lại
+hồ sơ), `GENERAL`/`DETAIL` LEFT JOIN vào theo đúng `WI_NAME` của chính
+dòng `IDGRID` đang xét (không group by/dedup theo ID_NUMBER — mỗi dòng
+IDGRID giữ nguyên ngữ cảnh hồ sơ gốc của nó).
+
+**Bỏ `ADD_ID`/`ADD_ID_OTHER` (pivot logic cũ):** không còn cần thiết vì
+mỗi giấy tờ đã là 1 dòng riêng trên bảng này. BC1 cần dạng chuỗi nối
+nhiều giấy tờ (`ADD_ID`/`ADD_ID_OTHER`) sẽ tính lại ở tầng PDTD_DTM bằng
+LISTAGG từ bảng này — xử lý khi review PDTD_DTM (2.3.2.x), chưa xử lý
+trong lượt này.
+
+**Bổ sung `CUSTOMER_BK` (theo yêu cầu người dùng):** `VARCHAR2(64)`,
+PHÁI SINH: `STANDARD_HASH(WI_NAME || '~' || ID_TYPE || '~' || ID_NUMBER,
+'SHA256')` — cùng công thức/mục đích với `EXCEPTION_BK` (`DIM_CLOS_
+EXCEPTION`/`DIM_RLOS_EXCEPTION`), gộp khóa composite 3 cột thành 1 khóa
+đơn. PK của bảng: `DAYID + CUSTOMER_BK`.
+
+**Bổ sung `T24_CUSTOMER_SK` (chuyển từ `FCT_RLOS_APPLICATION`,
+review 2026-09-26):** trước đây đặt trên `FCT_RLOS_APPLICATION`,
+tra qua `ADD_ID`/`ADD_ID_OTHER` (chuỗi đã nối nhiều giấy tờ, phải tách
+ngược theo thứ tự ưu tiên TCC>CC). Nay mỗi dòng của bảng này đã tự mang
+đúng 1 cặp `(ID_TYPE, ID_NUMBER)` — join trực tiếp, đúng nguyên văn SRS
+BC1 (BR 1.2): `LEFT JOIN STG_DTM.STG_DIM_CUSTOMER (ac) ON u.ID_NUMBER =
+ac.LEGAL_ID AND u.ID_TYPE = ac.LEGAL_DOC_NAME` (u = `NG_SB_RLOS_
+APPLICANT_IDGRID`, chính là driving table của bảng này) — không cần logic
+ưu tiên/tách chuỗi nào nữa. Mặc định -1 nếu không khớp.
+
+**Chuyển 9 cột hồ sơ-scoped VỀ `DIM_RLOS_APPLICATION` (review 2026-09-26,
+xác nhận qua dữ liệu thực):** `ZONE`, `SALE_TYPE`, `BROKER_TYPE`/
+`BROKER_ID`/`BROKER_NAME`, `ACC_OFFICER`, `ACCOUNT_OFFICER_NAME`,
+`EXISTING_CUSTOMER`, `APPLICANT_CIF` (nguồn `GENERAL.APPLICANTCIF`,
+khác `CIF` của IDGRID — xem cột riêng ở dưới), `BUSINESS_MODEL`, `KYC1`
+— người dùng xác nhận trực tiếp qua dữ liệu thực: các cột này gắn với
+HỒ SƠ (vd. AO/broker phụ trách có thể khác nhau giữa 2 hồ sơ của cùng 1
+khách hàng), không phải thuộc tính ổn định của khách hàng như đã giả
+định ở thiết kế trước (xem `DIM_RLOS_APPLICATION`, 1.3.1.1). Vẫn giữ ở
+đây (con người thật): `NATIONALITY`, `TITLE`, `HOME_PHONE`, `PHONE_1`,
+`PHONE_2`.
+
+**Bổ sung `CIF` (từ `IDGRID.CIF`, review 2026-09-26):** "Mã CIF khách
+hàng, nếu đã định danh" — hiện chưa có báo cáo nào dùng trực tiếp (SRS
+BC1 dùng `T24_CUSTOMER_SK`→`STG_DIM_CUSTOMER` làm chân T24 chính thức,
+không dùng cột này), nhưng giữ lại vì có ý nghĩa nghiệp vụ thật, tương
+tự các cột "thiết kế dư thừa" khác trong tài liệu.
+
+**Bổ sung 7 cột dư thừa còn lại từ `IDGRID` (review 2026-09-26, theo yêu
+cầu người dùng):** `ISSUE_DATE`, `EXPIRY_DATE`, `ISSUE_PLACE`,
+`ISSUE_DATE_VISA`, `EXPIRY_DATE_VISA`, `CUST_CLASS`, `IS_FETCH` — có ý
+nghĩa nghiệp vụ thật (ngày cấp/hết hạn giấy tờ, nơi cấp, phân loại khách
+hàng, cờ tự động lấy từ hệ định danh), giữ dạng dư thừa cho thông tin
+nguồn dù chưa có report nào dùng. Loại 3 cột kỹ thuật thuần: `RSPAN`
+(trường không rõ nghĩa, dữ liệu thưa), `TIME_UPDATE` (mốc cập nhật kỹ
+thuật của nguồn, không phải ngày nghiệp vụ), `RECID` (số thứ tự bản ghi
+nội bộ, không có ý nghĩa nghiệp vụ).
+
+**Chuyển `CUSTOMER_SEGMENT` sang PDTD_DTM (review 2026-09-26):** SB_DWH chỉ
+giữ `CUS_SEGMENT` thô (nguồn `DETAIL.CUS_SEGMENT`); cột phái sinh
+`CUSTOMER_SEGMENT` (CASE WHEN chuẩn hóa XANH/CBNV/THUONG) chuyển hẳn sang
+tính tại PDTD_DTM (2.3.2.x) — theo yêu cầu người dùng, giữ SB_DWH đơn
+thuần là snapshot nguồn, đẩy logic phân loại report-facing xuống tầng
+report-ready.
+
+**Ripple — các bảng khác tham chiếu `APPLICANT_SK`/`DIM_RLOS_APPLICANT`
+cũ:** đã xử lý đồng thời trong lượt review này —
+`FCT_RLOS_APPLICATION_PARTY` (1.3.2.2, ban đầu bỏ `APPLICANT_SK`, sau đó
+xóa hẳn cả bảng khi `DIM_RLOS_COREPAYER` cũng đổi thành FACT — xem
+1.3.2.9), `FCT_RLOS_APPLICATION` (1.3.2.1, bỏ `APPLICANT_SK`/
+`T24_CUSTOMER_SK`), `FCT_RLOS_WORKSTEP_EVENT` (1.3.2.7, bỏ
+`APPLICANT_SK`) — xem ghi chú tại từng bảng.
+
+###### 1.3.2.9 FCT_RLOS_COREPAYER — MỚI (đổi từ DIM_RLOS_COREPAYER, review 2026-09-26, theo yêu cầu người dùng)
+
+**Lineage đầy đủ (bao gồm cả nguồn của `DIM_RLOS_APPLICATION`, 1.3.1.1 —
+xem `hld/HLD_DIM_SB_DWH.md` để đối chiếu lineage gốc của DIM này, cùng
+pattern đã áp dụng cho `FCT_RLOS_COLLATERAL`/`FCT_RLOS_DEVIATION`):**
+
+```mermaid
+flowchart LR
+    subgraph STG_LOS
+        B(["NG_SB_RLOS_COREP_IDGRID"])
+        A(["NG_SB_RLOS_COREPAYER_GENERAL"])
+        P1(["NG_SB_RLOS_APPLICANT_GENERAL"])
+        P2(["NG_SB_RLOS_APPLICANT_DETAIL"])
+        P3(["NG_SB_RLOS_APPROVAL"])
+        P4(["NG_SB_RLOS_EXTTABLE"])
+        P5(["NG_SB_RLOS_SENT_CBS_LOG"])
+        P6(["NG_SB_RLOS_ENTRY_EXIT"])
+        P7(["NG_SB_RLOS_MANUAL_DEVIATION"])
+    end
+    subgraph SB_DWH
+        AP["DIM_RLOS_APPLICATION"]
+        E["FCT_RLOS_COREPAYER"]
+    end
+    B -->|"driving table — 1 dòng/giấy tờ, KHÔNG pivot: WI_NAME, REL_TO_APPLICANT, ID_NO_CO(=PIN), ID_TYPE, ID_NUMBER"| E
+    AP -.->|"APPLICATION_SK, join theo WI_NAME"| E
+    A -.->|"LEFT JOIN theo WI_NAME + PIN=ID_NO_CO: FULL_NAME, DOB_CO, NATIONALITY_CO, TITLE_CO, HOUSEHOLD, PHONE1, PHONE2, HOMEPHONE"| E
+    P1 --> AP
+    P2 --> AP
+    P3 --> AP
+    P4 --> AP
+    P5 --> AP
+    P6 -.-> AP
+    P7 -.-> AP
+```
+
+**Đổi kiến trúc DIM → FACT, bỏ pivot giấy tờ (review 2026-09-26, theo yêu
+cầu người dùng):** trước đây `DIM_RLOS_COREPAYER` ở grain 1 dòng/1
+corepayer (`WI_NAME+REL_TO_APPLICANT+ID_NO_CO`, SCD2), pivot giấy tờ định
+danh của corepayer thành 2 cột chuỗi `ADD_ID_COREPAYER`/`ADD_ID_OTHER_
+COREPAYER`. Người dùng yêu cầu bỏ pivot, giữ chi tiết theo từng dòng giấy
+tờ — grain mới là **1 dòng = 1 ngày × 1 giấy tờ định danh của 1 corepayer
+trên 1 hồ sơ** (`DAYID + WI_NAME + REL_TO_APPLICANT + ID_NO_CO + ID_TYPE +
+ID_NUMBER`), snapshot hàng ngày giống `FCT_RLOS_CUSTOMER` (mỗi ngày lặp
+lại toàn bộ giấy tờ của mọi corepayer đang active). Không SCD2 — không có
+`EFF_DATE`/`EXP_DATE`.
+
+**Khác với `FCT_RLOS_CUSTOMER` — nguồn có CDC key, nhưng vẫn đổi thành
+FACT để nhất quán kiến trúc:** `NG_SB_RLOS_COREP_IDGRID` (driving table
+mới) **CÓ** khai khóa CDC trong `DS_BANG_202608.xlsx` (`WI_NAME +
+ID_NUMBER + ID_TYPE`), khác hẳn `NG_SB_RLOS_APPLICANT_IDGRID` (không có
+CDC key — lý do buộc `FCT_RLOS_CUSTOMER` phải đổi thành FACT, xem
+1.3.2.8) và `NG_SB_CLOS_CUST_INFO_LEGAL` (không có CDC key — lý do buộc
+`FCT_CLOS_LEGAL_PARTY` phải đổi thành FACT, xem 1.2.2.7). Về lý thuyết,
+SCD2 vẫn khả thi ở đây (khóa tự nhiên ổn định độc lập với nội dung thuộc
+tính). Người dùng quyết định vẫn đổi thành FACT theo yêu cầu "chi tiết
+theo dòng" (bỏ pivot) — ưu tiên nhất quán kiến trúc với 2 bảng chị em
+(`FCT_RLOS_CUSTOMER`, `FCT_CLOS_LEGAL_PARTY`, cùng vai trò "giấy tờ định
+danh của 1 vai trò liên quan tới hồ sơ, không dedup xuyên hồ sơ") hơn là
+giữ SCD2 chỉ vì nguồn cho phép.
+
+**Bổ sung `COREPAYER_BK` (theo yêu cầu người dùng, cùng công thức
+`CUSTOMER_BK`/`EXCEPTION_BK`):** `VARCHAR2(64)`, PHÁI SINH:
+`STANDARD_HASH(WI_NAME || '~' || REL_TO_APPLICANT || '~' || ID_NO_CO ||
+'~' || ID_TYPE || '~' || ID_NUMBER, 'SHA256')` — gộp khóa composite 5 cột
+thành 1 khóa đơn. PK của bảng: `DAYID + COREPAYER_BK`.
+
+**Không có `T24_CUSTOMER_SK` (quyết định người dùng, review 2026-09-26):**
+khác `FCT_RLOS_CUSTOMER` (có `T24_CUSTOMER_SK` vì đó là chân người vay
+chính), corepayer không cần nối sang T24 — chỉ khách hàng chính và người
+liên quan pháp lý mới cần chân T24, người đồng trả nợ thì không.
+
+**Driving table đổi từ GENERAL sang IDGRID:** trước đây `NG_SB_RLOS_
+COREPAYER_GENERAL` là driving table (1 dòng/corepayer), `COREP_IDGRID`
+chỉ dùng để pivot 2 cột `ADD_ID_COREPAYER`/`ADD_ID_OTHER_COREPAYER`. Nay
+đảo lại: `COREP_IDGRID` là driving table (1 dòng/giấy tờ, không dedup —
+1 corepayer có thể có nhiều giấy tờ), `COREPAYER_GENERAL` LEFT JOIN vào
+theo đúng `WI_NAME + PIN=ID_NO_CO` (điều kiện join đã xác nhận nghiệp vụ
+trước đây, giữ nguyên) để lấy thông tin cá nhân của chính corepayer đó.
+
+**Bỏ `ADD_ID_COREPAYER`/`ADD_ID_OTHER_COREPAYER` (pivot logic cũ):**
+không còn cần thiết vì mỗi giấy tờ đã là 1 dòng riêng trên bảng này. BC1
+cần dạng chuỗi nối nhiều giấy tờ sẽ tính lại ở tầng PDTD_DTM bằng
+LISTAGG từ bảng này — xử lý khi review PDTD_DTM (2.3.2.x), chưa xử lý
+trong lượt này.
+
+**Giữ nguyên 5 cột làm giàu (TITLE/HOUSEHOLD/PHONE_1/PHONE_2/HOME_PHONE,
+review 2026-09-21):** không đổi nguồn/công thức, chỉ đổi cách join — LEFT
+JOIN từ `COREPAYER_GENERAL` vào đúng dòng `WI_NAME+PIN` đang xét trên
+driving table `IDGRID`, thay vì đọc trực tiếp trên chính driving table
+như trước.
+
+**Ripple — `FCT_RLOS_APPLICATION_PARTY` xóa hẳn (review 2026-09-26):**
+bảng liên kết factless (1.3.2.2) trước đây có `COREPAYER_SK` trỏ
+`DIM_RLOS_COREPAYER.DIMENSION_KEY` — nay không còn 1 surrogate key ổn
+định đại diện cho 1 corepayer/hồ sơ để giữ (cùng lý do đã khiến
+`APPLICANT_SK` bị bỏ trước đó). Sau khi bỏ cả 2 cột, bảng liên kết chỉ
+còn `DAYID+WI_NAME+DATASOURCE+APPLICATION_SK` — trùng lặp hoàn toàn với
+`FCT_RLOS_APPLICATION`, không còn lý do tồn tại — đã xóa hẳn, xem
+1.3.2.2.
 
 
 ---
@@ -2144,15 +2648,15 @@ dưới và `hld/HLD_FCT_SB_DWH.md` 1.3.2.7/2.3.2.7) — cùng lý do/công th�
 
 #### 2.1 Bộ bảng CHUNG
 
-##### 2.1.1 DIM_LOS_ORG_UNIT — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_RLOS_MAS_COMPANY/MAS_BRANCH/MAS_REGION từ SB_DWH, review 2026-09-18)
+##### 2.1.1 DIM_LOS_COMPANY — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_RLOS_MAS_COMPANY/MAS_BRANCH/MAS_REGION từ SB_DWH, review 2026-09-18)
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        C["DIM_LOS_ORG_UNIT"]
+        C["DIM_LOS_COMPANY"]
     end
     subgraph PDTD_DTM
-        D["DIM_LOS_ORG_UNIT"]
+        D["DIM_LOS_COMPANY"]
     end
     C -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| D
 ```
@@ -2229,13 +2733,22 @@ trình A1 (khác toàn bộ DIM khác trong tài liệu này).
 **Vai trò cầu nối duy nhất giữa LOS và T24:** đây là chỗ DUY NHẤT nối được
 hồ sơ tín dụng LOS (CLOS/RLOS) sang khách hàng lõi T24 — join qua số giấy
 tờ định danh (`LEGAL_ID` + `LEGAL_DOC_NAME`, đã chuẩn hóa ở T24) khớp với số
-giấy tờ trên phía LOS: `DIM_CLOS_CUSTOMER.ORG_LEGAL_ID` (qua
-`DIM_CLOS_LEGAL_PARTY`, xem 2.2.1.7/2.2.1.8) phía CLOS, và
-`DIM_RLOS_APPLICANT.ADD_ID`/`ADD_ID_OTHER` phía RLOS — đúng như đã thiết kế
-sẵn trên `FCT_CLOS_APPLICATION_DAILY.T24_CUSTOMER_SK`/
-`FCT_RLOS_APPLICATION_DAILY.T24_CUSTOMER_SK` (2.2.2.1/2.3.2.1, review
-2026-09-17: đổi tên từ `CUSTOMER_SK` để phân biệt rõ với khách hàng LOS).
-Giữ thành chiều
+giấy tờ trên phía LOS: `DIM_CLOS_CUSTOMER.ID_NUMBER` (⚠️ review 2026-09-25:
+đổi từ `ORG_LEGAL_ID` — cột này đã bị xóa khỏi `DIM_CLOS_CUSTOMER` vì
+trùng lặp hoàn toàn với NK mới `ID_NUMBER` sau khi đổi grain sang 1
+dòng/khách hàng, xem 1.2.1.6/2.2.1.6; giá trị/nguồn dữ liệu không đổi,
+chỉ đổi tên cột tham chiếu) phía CLOS, và
+`ID_TYPE`/`ID_NUMBER` trên `FCT_RLOS_CUSTOMER` phía RLOS (⚠️ review
+2026-09-26: đổi từ `DIM_RLOS_APPLICANT.ADD_ID`/`ADD_ID_OTHER` — bảng đó
+đã đổi hẳn thành `FCT_RLOS_CUSTOMER`, đổi grain sang
+`WI_NAME+ID_TYPE+ID_NUMBER`; join T24 giờ theo đúng cặp `ID_TYPE`/
+`ID_NUMBER` của từng dòng giấy tờ, không cần tách chuỗi `ADD_ID` nữa —
+xem 1.3.2.x/2.3.2.x) — đúng như đã thiết kế sẵn trên
+`FCT_CLOS_APPLICATION.T24_CUSTOMER_SK` (2.2.2.1) và
+`FCT_RLOS_CUSTOMER.T24_CUSTOMER_SK` (1.3.2.x/2.3.2.x, review 2026-09-17:
+đổi tên từ `CUSTOMER_SK` để phân biệt rõ với khách hàng LOS; review
+2026-09-26: chuyển vị trí đặt cột từ `FCT_RLOS_APPLICATION` sang
+`FCT_RLOS_CUSTOMER` theo đúng grain giấy tờ). Giữ thành chiều
 riêng (không gộp vào từng fact) vì được 4 báo cáo tham chiếu (BC1, BC2,
 BC10, BC11) — gộp sẽ nhân bản dữ liệu 4 lần và mất khả năng lọc theo phân
 khúc.
@@ -2278,11 +2791,11 @@ flowchart LR
 (2.1.3):** phát sinh khi thiết kế `FCT_CLOS_LOAN_DISBURSEMENT`/
 `FCT_RLOS_LOAN_DISBURSEMENT` (2.2.2.7/2.3.2.8) — SRS
 BC10/BC11 ghi `BRANCH_NAME`/`COMPANY_NAME` lấy từ `STG_DIM_COMPANY`, một
-bảng T24 riêng biệt (`SB_DWH.DIM_COMPANY`), **khác** `DIM_LOS_ORG_UNIT`
+bảng T24 riêng biệt (`SB_DWH.DIM_COMPANY`), **khác** `DIM_LOS_COMPANY`
 (nguồn LOS, do `NG_SB_CLOS_CUST_INFO`/`NG_SB_RLOS_APPLICANT_GENERAL` cấp).
 Theo yêu cầu người dùng: kéo `DIM_COMPANY` (T24) 1:1 lên PDTD_DTM thành
 DIM riêng (tiền tố `DIM_T24_*`, phân biệt rõ với `DIM_LOS_*` nguồn LOS),
-giữ FK vật lý (`COMPANY_SK`) trên `FCT_CLOS_LOAN_DISBURSEMENT`/
+giữ FK vật lý (`T24_COMPANY_SK`) trên `FCT_CLOS_LOAN_DISBURSEMENT`/
 `FCT_RLOS_LOAN_DISBURSEMENT` thay vì mô tả
 join-time bằng lời — cùng pattern đã áp dụng cho `DIM_T24_CUSTOMER` (chỉ
 tồn tại ở PDTD_DTM, không có bản SB_DWH, bê 1:1 qua vùng chìa
@@ -2297,7 +2810,7 @@ e.COMPANY_EXP_DATE IS NULL` — cột trên `STG_FCT_LOAN` mang tên `CO_CODE`
 NULL` xác nhận `DIM_COMPANY` phía T24 cũng là SCD2 — chỉ lấy bản ghi hiện
 hành khi join. `TMP_REF_COMPANY_REGION_KHCN`/`_KHDN` (lấy `ZONE`) cũng
 join theo `a.CO_CODE = g.COMPANY_CODE` — cùng cột nguồn `CO_CODE` trên
-`STG_FCT_LOAN`, không phải qua `DIM_LOS_ORG_UNIT.COMPANY_CODE` (nguồn LOS,
+`STG_FCT_LOAN`, không phải qua `DIM_LOS_COMPANY.COMPANY_CODE` (nguồn LOS,
 là 1 bảng company khác, giữ tách biệt).
 
 **Làm rõ: `COMPANY_EXP_DATE IS NULL` là điều kiện JOIN lúc dùng, KHÔNG
@@ -2412,7 +2925,19 @@ cần đúng khóa surrogate để join. Điều kiện join trên không kèm t
 giao dịch, không cần lọc thêm như trường hợp join qua business key
 (`CO_CODE` trên `DIM_T24_COMPANY`, 2.1.4).
 
-##### 2.1.7 REF_LOS_KPI_USER_YEAR — ĐỔI KIẾN TRÚC (đổi từ FCT_LOS_KPI_USER_YEAR sang bảng danh mục REF_, bỏ DAYID khỏi khóa)
+##### 2.1.7 AGG_LOS_KPI_USER_YEAR — ĐỔI TÊN TỪ REF_LOS_KPI_USER_YEAR (review 2026-09-27, theo yêu cầu người dùng)
+
+**⚠️ Đổi tên `REF_LOS_KPI_USER_YEAR` → `AGG_LOS_KPI_USER_YEAR` (review
+2026-09-27, theo yêu cầu người dùng):** để thống nhất quy ước đặt tên —
+tiền tố `REF_` chỉ dành cho bảng danh mục cung cấp thêm thông tin, khởi
+tạo/cập nhật THỦ CÔNG bởi BA, không qua ETL (9 bảng `REF_` gốc như
+`REF_RLOS_FLOW`, xem 2.4); còn bảng này lưu KẾT QUẢ TÍNH TOÁN qua cơ chế
+ETL TỰ ĐỘNG (INSERT-if-not-exists chạy mỗi ngày, tính `FIRST_ELIGIBLE_
+TS`), đúng bản chất phải mang tiền tố `AGG_` giống `AGG_LOS_KPI_
+APPLICATION`/`AGG_LOS_KPI_YTD_DAILY` — không phải bảng danh mục thuần
+túy. Thiết kế đầy đủ (lineage + cấu trúc cột) đã chuyển sang
+`hld/hld_review/HLD_FCT_PDTD_DTM_review.md` (cùng nhóm với 2 bảng
+`AGG_LOS_KPI_*` khác), không còn nằm trong `hld/HLD_REF.md`.
 
 ```mermaid
 flowchart LR
@@ -2421,25 +2946,19 @@ flowchart LR
         D["FCT_RLOS_WORKSTEP_EVENT"]
     end
     subgraph PDTD_DTM
-        E["REF_LOS_KPI_USER_YEAR"]
+        E["AGG_LOS_KPI_USER_YEAR"]
     end
-    C -->|"UNION theo USERNAME, lọc BI_APPSTATUS + BI_FLOW (join APPLICATION_SK), loại 2 tài khoản test, MIN(EXITDATE) trong năm — chỉ INSERT nếu (KPI_YEAR, USERNAME) chưa tồn tại"| E
-    D -->|"UNION theo USERNAME, lọc BI_APPSTATUS + BI_FLOW (join APPLICATION_SK), loại 2 tài khoản test, MIN(EXITDATE) trong năm — chỉ INSERT nếu (KPI_YEAR, USERNAME) chưa tồn tại"| E
+    C -->|"UNION theo USERNAME, lọc APPLICATION_STATUS + BUSINESS_FLOW (join APPLICATION_SK), loại 2 tài khoản test, MIN(EXITDATE) trong năm — chỉ INSERT nếu (KPI_YEAR, USERNAME) chưa tồn tại"| E
+    D -->|"UNION theo USERNAME, lọc APPLICATION_STATUS + BUSINESS_FLOW (join APPLICATION_SK), loại 2 tài khoản test, MIN(EXITDATE) trong năm — chỉ INSERT nếu (KPI_YEAR, USERNAME) chưa tồn tại"| E
 ```
 
-**Ghi chú lineage — đổi từ FCT sang REF_ theo yêu cầu người dùng:** tài
-liệu lineage gốc (`FCT_PDTD_KPI_USER_YEAR`) thiết kế bảng này với PK
-`DAYID + KPI_YEAR + USERNAME`, nhưng bản chất không có metric nào biến
-đổi theo `DAYID` — đây thuần túy là **danh sách user đã tham gia xử lý
-trong năm** (registry/seed), không phải bảng sự kiện đo lường theo
-ngày. Người dùng xác nhận: bỏ `DAYID` khỏi khóa, chỉ giữ `KPI_YEAR +
-USERNAME` làm PK, đổi tiền tố `FCT_` → `REF_` cho đồng bộ nhóm bảng
-danh mục đặt tại PDTD_DTM. Lưu ý khác biệt so với 9 bảng `REF_` gốc
-(`REF_RLOS_FLOW`...): 9 bảng đó là danh mục TĨNH, khởi tạo/cập nhật THỦ
-CÔNG bởi BA, không qua ETL — còn `REF_LOS_KPI_USER_YEAR` vẫn giữ nguyên
-cơ chế ETL TỰ ĐỘNG (INSERT-if-not-exists chạy mỗi ngày), chỉ mượn tiền
-tố `REF_` theo đúng yêu cầu người dùng để thể hiện đây là bảng danh mục
-nhỏ tại PDTD_DTM, không phải fact đo lường theo ngày như `FCT_`. Nguồn:
+**Ghi chú lineage — đổi từ FCT sang bảng danh mục/tổng hợp theo yêu cầu
+người dùng:** tài liệu lineage gốc (`FCT_PDTD_KPI_USER_YEAR`) thiết kế
+bảng này với PK `DAYID + KPI_YEAR + USERNAME`, nhưng bản chất không có
+metric nào biến đổi theo `DAYID` — đây thuần túy là **danh sách user đã
+tham gia xử lý trong năm** (registry/seed), không phải bảng sự kiện đo
+lường theo ngày. Người dùng xác nhận: bỏ `DAYID` khỏi khóa, chỉ giữ
+`KPI_YEAR + USERNAME` làm PK. Nguồn:
 UNION
 `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT` (thay
 `FCT_PDTD_WORKSTEP_EVENT` gộp cũ, theo đúng 2 bảng đã tách CLOS/RLOS ở
@@ -2451,17 +2970,19 @@ theo công thức `NHAN_SU` của SRS BC9.
 **Bổ sung 2 điều kiện lọc còn thiếu (review 2026-09-17):** đối chiếu lại
 nguyên văn SRS BC9 phát hiện công thức `NHAN_SU` có đủ 4 điều kiện, HLD
 trước đó chỉ mới thiết kế 2 (8 workstep + loại 2 tài khoản test):
-- `BI_APPSTATUS`: `(DECISION_CODE IN ('Submit','Send To PostSanction',
+- `APPLICATION_STATUS`: `(DECISION_CODE IN ('Submit','Send To PostSanction',
   'Submit To DisbursementMaker','Send To HOSupport') OR DECISION_CODE =
   'Reject' OR WORKSTEP_CODE IN ('CancelRevoke','CancelPermanent'))` —
   dùng thẳng cột `DECISION_CODE`/`WORKSTEP_CODE` đã có sẵn trên
   `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT`, không cần join
   thêm.
-- `BI_FLOW IN ('BL','KHCN_HO')`: JOIN `APPLICATION_SK` (đã có sẵn trên
-  `FCT_CLOS/RLOS_WORKSTEP_EVENT`) sang `DIM_CLOS_APPLICATION.BI_FLOW`/
-  `DIM_RLOS_APPLICATION.BI_FLOW` (2.2.1.1/2.3.1.1) — cùng cột `BI_FLOW`
-  đã dùng cho điều kiện lọc `SLHS_RLOS_DAY`/`SLGN_RLOS_DAY` tại
-  `AGG_LOS_KPI_YTD_DAILY` (2.1.8).
+- `BUSINESS_FLOW IN ('BL','KHCN_HO')`: JOIN `APPLICATION_SK` (đã có sẵn trên
+  `FCT_CLOS/RLOS_WORKSTEP_EVENT`) sang `BUSINESS_FLOW` (⚠️ review 2026-09-26:
+  cột này đã chuyển từ `DIM_CLOS_APPLICATION`/`DIM_RLOS_APPLICATION`
+  sang `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION`,
+  2.2.2.1/2.3.2.1 — JOIN tiếp `APPLICATION_SK` sang FCT đó thay vì DIM)
+  — cùng cột `BUSINESS_FLOW` đã dùng cho điều kiện lọc `SLHS_RLOS_DAY`/
+  `SLGN_RLOS_DAY` tại `AGG_LOS_KPI_YTD_DAILY` (2.1.8).
 
 Thiếu 2 điều kiện này sẽ làm `NHAN_SU` đếm dư user chỉ xử lý hồ sơ ngoài
 phạm vi luồng BL/KHCN_HO hoặc hồ sơ chưa có quyết định hợp lệ (đang xử lý
@@ -2475,7 +2996,7 @@ năng suất lao động (`NSLD`) của cả Khối PDTD.
 APPLICATION` (2.1.9, loại theo HỒ SƠ cho `SLHS_*`/`SLGN_*`/`TAT_*`) —
 2 tài khoản này không bao giờ được INSERT vào bảng, không phải lọc khi
 đếm. Quy tắc load: mỗi lần chạy, với mỗi `USERNAME` mới xuất hiện
-(đã lọc đủ 4 điều kiện: 8 workstep, BI_APPSTATUS, BI_FLOW, loại 2 tài
+(đã lọc đủ 4 điều kiện: 8 workstep, APPLICATION_STATUS, BUSINESS_FLOW, loại 2 tài
 khoản test), kiểm tra `(KPI_YEAR, USERNAME)` đã tồn
 tại chưa — chưa có thì INSERT kèm `FIRST_ELIGIBLE_TS` = thời điểm đầu
 tiên trong năm user đó thỏa điều kiện; đã có thì bỏ qua, không UPDATE.
@@ -2496,16 +3017,16 @@ flowchart LR
         A["AGG_LOS_KPI_APPLICATION"]
         D1["DIM_RLOS_APPLICATION"]
         D3["DIM_CLOS_APPLICATION"]
-        D2["DIM_LOS_ORG_UNIT"]
-        M["REF_LOS_KPI_USER_YEAR"]
+        D2["DIM_LOS_COMPANY"]
+        M["AGG_LOS_KPI_USER_YEAR"]
         F["AGG_LOS_KPI_YTD_DAILY"]
     end
-    A -->|"SUM QUY_DOI theo PROCESSED_DATE=DAYID, loại IS_TEST_ACCOUNT='Y', tách RLOS/CLOS theo DATASOURCE — sinh QUY_DOI_*_DAY"| F
-    A -->|"COUNT hồ sơ theo PROCESSED_DATE=DAYID, loại IS_TEST_ACCOUNT='Y', CLOS thêm VAR_STR12 IS NOT NULL — sinh SLHS_*_DAY, SLGN_*_DAY"| F
-    D1 -.->|"BI_FLOW IN ('BL','KHCN_HO'), lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
-    D2 -.->|"COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002'), lookup qua ORG_UNIT_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
-    D3 -.->|"STREAM = 'Phê duyệt tín dụng', lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY/TAT_CLOS_*_DAY (tương đương BI_FLOW của RLOS)"| F
-    A -->|"SUM/COUNT TAT_APPLICATION_HOUR theo PROCESSED_DATE=DAYID, loại IS_TEST_ACCOUNT='Y' — sinh TAT_*_SUM_HOUR_DAY, TAT_*_CASE_CNT_DAY"| F
+    A -->|"SUM QUY_DOI theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập, review 2026-09-27), loại IS_TEST_ACCOUNT='Y', tách RLOS/CLOS theo DATASOURCE — sinh QUY_DOI_*_DAY"| F
+    A -->|"COUNT hồ sơ theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập), loại IS_TEST_ACCOUNT='Y', CLOS thêm VAR_STR12 IS NOT NULL — sinh SLHS_*_DAY, SLGN_*_DAY"| F
+    D1 -.->|"BUSINESS_FLOW IN ('BL','KHCN_HO'), lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
+    D2 -.->|"COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002'), lookup qua COMPANY_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
+    D3 -.->|"STREAM = 'Phê duyệt tín dụng', lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY/TAT_CLOS_*_DAY (tương đương BUSINESS_FLOW của RLOS)"| F
+    A -->|"SUM/COUNT TAT_APPLICATION_HOUR theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập), loại IS_TEST_ACCOUNT='Y' — sinh TAT_*_SUM_HOUR_DAY, TAT_*_CASE_CNT_DAY"| F
     M -->|"COUNT theo FIRST_ELIGIBLE_TS=DAYID (đã loại 2 tài khoản test tại nguồn) — sinh NEW_USER_CNT_DAY"| F
 ```
 
@@ -2531,13 +3052,14 @@ tồn tại qua `STG_FCT_LOAN` (LD, cả CLOS/RLOS) và `STG_DTM.STG_FCT_MD`
 (2026-09-15):** đối chiếu lại nguyên văn Business Rules của SRS BC9 cho
 `SLHS_RLOS`/`SLGN_RLOS` phát hiện 2 điều kiện lọc chưa đưa vào thiết kế
 trước đó (chỉ áp dụng cho RLOS, không có ở công thức CLOS tương ứng):
-`f.BI_FLOW IN ('BL', 'KHCN_HO')` (phạm vi luồng, lookup qua `REF_RLOS_
-FLOW` — chính là `DIM_RLOS_APPLICATION.BI_FLOW` đã tính sẵn, xem 2.3.1.1)
+`f.BUSINESS_FLOW IN ('BL', 'KHCN_HO')` (phạm vi luồng, lookup qua `REF_RLOS_
+FLOW` — cột `BUSINESS_FLOW` đã tính sẵn, ⚠️ review 2026-09-26: nay đặt tại
+`FCT_RLOS_APPLICATION` thay vì `DIM_RLOS_APPLICATION`, xem 2.3.2.1)
 và loại trừ 3 chi nhánh khởi tạo hồ sơ `COMPANY_CODE NOT IN
-('VN0010401','VN0010101','VN0010002')` (lookup qua `DIM_LOS_ORG_UNIT`,
+('VN0010401','VN0010101','VN0010002')` (lookup qua `DIM_LOS_COMPANY`,
 xem 2.1.1). Đã bổ sung cả 2 điều kiện vào công thức `SLHS_RLOS_DAY`/
-`SLGN_RLOS_DAY` (join thêm `DIM_RLOS_APPLICATION`/`DIM_LOS_ORG_UNIT` qua
-`APPLICATION_SK`/`ORG_UNIT_SK` đã có sẵn trên `AGG_LOS_KPI_APPLICATION`,
+`SLGN_RLOS_DAY` (join thêm `DIM_RLOS_APPLICATION`/`DIM_LOS_COMPANY` qua
+`APPLICATION_SK`/`COMPANY_SK` đã có sẵn trên `AGG_LOS_KPI_APPLICATION`,
 không cần thêm cột mới trên bảng đó).
 
 **Rà soát bổ sung — điều kiện `STREAM` còn thiếu ở `SLHS_CLOS_DAY`/
@@ -2545,7 +3067,7 @@ không cần thêm cột mới trên bảng đó).
 nguyên văn SRS BC9 cho `SLHS_CLOS`/`SLGN_CLOS`/`TAT_CLOS` phát hiện cả
 3 công thức đều có điều kiện `b.STREAM = 'Phê duyệt tín dụng'` (join
 `NG_SB_CLOS_APPROVAL b`) mà thiết kế trước đó chưa đưa vào — đây là
-điều kiện "phạm vi luồng nghiệp vụ" tương đương `BI_FLOW` của RLOS,
+điều kiện "phạm vi luồng nghiệp vụ" tương đương `BUSINESS_FLOW` của RLOS,
 nhưng CLOS dùng khái niệm `STREAM` riêng (không qua `REF_*_FLOW`). Đã
 bổ sung vào công thức `SLHS_CLOS_DAY`/`SLGN_CLOS_DAY`/
 `TAT_CLOS_SUM_HOUR_DAY`/`TAT_CLOS_CASE_CNT_DAY` (join `DIM_CLOS_
@@ -2564,7 +3086,7 @@ bộ hồ sơ thỏa "II. Điều kiện lọc dữ liệu" chung, không có h�
 loại/thêm khi tách nhóm rồi cộng lại. Vì vậy KHÔNG cần đưa điều kiện
 `SUB_PRODUCT`/`PRODUCT_NAME` (Nhóm 1/2) vào công thức `SLHS_RLOS_DAY`/
 `SLGN_RLOS_DAY` — COUNT theo đúng "II. Điều kiện lọc dữ liệu" (đã đủ với
-`PROCESSED_DATE`, `IS_TEST_ACCOUNT`, `BI_FLOW`, `COMPANY_CODE` như trên)
+`PROCESSED_DATE`, `IS_TEST_ACCOUNT`, `BUSINESS_FLOW`, `COMPANY_CODE` như trên)
 cho kết quả toán học giống hệt. Cách phân nhóm "Nhóm 1/Nhóm 2" này khác
 hẳn cách phân nhóm SEC/UNSEC của `TAT_RLOS` (dùng danh sách `PRODUCT_
 NAME` khác và điều kiện `COLLREQUIRE`, đã cài đúng ở `TAT_RLOS_SEC_*`/
@@ -2606,80 +3128,119 @@ lưu trùng dữ liệu đã có thể suy ra được.
 như các chỉ tiêu COUNT khác:** `NHAN_SU` là `COUNT(DISTINCT USERNAME)`
 — không có tính cộng dồn tự nhiên (1 user active nhiều ngày sẽ bị đếm
 trùng nếu cộng thẳng theo ngày). Theo phương án đã thống nhất:
-`NEW_USER_CNT_DAY` = COUNT user trên `REF_LOS_KPI_USER_YEAR` (2.1.7) có
+`NEW_USER_CNT_DAY` = COUNT user trên `AGG_LOS_KPI_USER_YEAR` (2.1.7) có
 `TRUNC(FIRST_ELIGIBLE_TS) = DAYID` (đúng ngày lần đầu user đó đủ điều
-kiện trong năm — không trùng lặp vì `REF_LOS_KPI_USER_YEAR` chỉ INSERT
+kiện trong năm — không trùng lặp vì `AGG_LOS_KPI_USER_YEAR` chỉ INSERT
 1 lần/user/năm, và đã loại sẵn 2 tài khoản test tại nguồn — xem 2.1.7),
 rồi cộng dồn `NHAN_SU(D) = NHAN_SU(D-1) + NEW_USER_CNT_DAY(D)`, reset
 về 0 vào ngày 1/1 mỗi năm.
 
-##### 2.1.9 AGG_LOS_KPI_APPLICATION — ĐỔI TIỀN TỐ FCT_ → AGG_ (review 2026-09-22)
+##### 2.1.9 AGG_LOS_KPI_APPLICATION — ĐỔI SANG SNAPSHOT HÀNG NGÀY, THÊM DAYID VÀO PK (review 2026-09-27, theo yêu cầu người dùng)
 
-**Đổi tên `FCT_LOS_KPI_APPLICATION` → `AGG_LOS_KPI_APPLICATION`:** grain vẫn
-giữ 1 dòng/hồ sơ/hệ (không đổi PK/grain), nhưng toàn bộ cột đều là chỉ tiêu
-KPI đã tính sẵn phục vụ thẳng báo cáo BC9 (`VOLUME`, `POINT`, `QUY_DOI`,
-`TAT_APPLICATION_HOUR`, `DEVIATION_G2/G3`, `TSBD_G2`...) — không đọc trực
-tiếp 1 sự kiện nghiệp vụ thô nào, bản chất là bảng chỉ tiêu tổng hợp/phái
-sinh (derived KPI), không phải transaction fact như các FCT_ khác. Đổi
-tiền tố cho nhất quán với `AGG_LOS_KPI_YTD_DAILY` (2.1.8) — bảng này là
-input trực tiếp duy nhất của bảng đó.
+**⚠️ Đổi grain: thêm `DAYID` vào PK, bỏ điều kiện lọc "hồ sơ đã kết
+thúc" (review 2026-09-27, theo yêu cầu người dùng):** trước đây bảng có
+grain 1 dòng/hồ sơ/hệ (PK `WI_NAME, DATASOURCE`), chỉ nhận hồ sơ đã tới
+1 trong các quyết định/kết thúc (INNER JOIN lọc `DECISION`/`WORKSTEP`).
+Đối chiếu lại SRS BC9 gốc (BR 1.1/1.2) xác nhận: SRS **không có khái
+niệm point-in-time snapshot theo ngày** cho các chỉ tiêu application-
+level (`VOLUME`/`POINT`/`QUY_DOI`/`TSBD_G2`/`INCOM_3`/`BUSINESS_INCOM`/
+`DEVIATION_G2`/`DEVIATION_G3`) — mọi công thức đều là hàm của lịch sử
+hồ sơ tính đến thời điểm chạy, gán `NULL` khi hồ sơ chưa kết thúc
+(nguyên văn `VOLUME`: "Các trường hợp còn lại gán giá trị NULL"), và
+tham số "Ngày báo cáo" của SRS chỉ là filter hiển thị theo
+`PROCESSED_DATE`, không phải tham số snapshot đa-thời-điểm.
+
+Tuy nhiên, theo yêu cầu người dùng (không xuất phát từ SRS, mà từ nhu
+cầu kỹ thuật/vận hành ETL): bảng này cần có `DAYID` để tại **mỗi ngày
+chạy batch (`v_batch_date`)**, luôn có đủ **toàn bộ tập hồ sơ đang tồn
+tại tại DAYID đó** (kế thừa nguyên trạng từ `FCT_CLOS_APPLICATION_
+DAILY`/`FCT_RLOS_APPLICATION` đã lọc `DAYID = v_batch_date` —
+2 bảng đó vốn đã là full snapshot mọi ngày, không lọc theo trạng thái
+kết thúc), với các chỉ tiêu KPI được tính **point-in-time** (chỉ dựa
+trên lịch sử sự kiện đã xảy ra tính đến đúng `v_batch_date`, không đọc
+sự kiện tương lai). Hồ sơ chưa kết thúc tại `v_batch_date` vẫn có mặt
+trong bảng — các cột `VOLUME`/`POINT`/`QUY_DOI`/`TSBD_G2`/`INCOM_3`/
+`BUSINESS_INCOM`/`DEVIATION_G2`/`DEVIATION_G3` sẽ NULL cho tới khi hồ
+sơ đạt điều kiện có giá trị xác định (đúng nhánh else của SRS), rồi giữ
+nguyên giá trị đó ở mọi DAYID sau đó (vì input là lịch sử đã đóng băng,
+không đổi ngược).
+
+**Nguyên tắc ETL bắt buộc (theo yêu cầu người dùng): `DAYID` trên bảng
+đích luôn gán = `v_batch_date` của lần chạy — KHÔNG BAO GIỜ dùng `DAYID`
+đã có sẵn trên chính bảng này (hay `AGG_LOS_KPI_YTD_DAILY`) làm điều
+kiện JOIN/so sánh ngược lại để tính ra chính `DAYID` đó (tránh vòng lặp
+tự tham chiếu).** Mọi điều kiện "point-in-time tính đến DAYID" bên dưới
+đều lọc theo `v_batch_date` trực tiếp trên bảng NGUỒN (event log/
+snapshot khác), không bao giờ đọc lại `DAYID` của chính `AGG_LOS_KPI_
+APPLICATION`.
+
+**Khóa chính của bảng (PK) mới: `DAYID, WI_NAME, DATASOURCE`.**
 
 ```mermaid
 flowchart LR
-    subgraph SB_DWH
-        A["FCT_CLOS_APPLICATION_DAILY"]
-        B["FCT_RLOS_APPLICATION_DAILY"]
+    subgraph PDTD_DTM
+        A["FCT_CLOS_APPLICATION"]
+        B["FCT_RLOS_APPLICATION"]
         L["FCT_RLOS_COLLATERAL"]
         V["FCT_CLOS_DEVIATION / FCT_RLOS_DEVIATION"]
         W["FCT_CLOS_WORKSTEP_EVENT / FCT_RLOS_WORKSTEP_EVENT"]
-    end
-    subgraph PDTD_DTM
         K["AGG_LOS_KPI_APPLICATION"]
     end
-    A -->|PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, ORG_UNIT_SK, VAR_STR12 — nhánh CLOS| K
-    B -->|PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, ORG_UNIT_SK — nhánh RLOS| K
-    L -.->|"RLOS-only, lọc DAYID=MAX(DAYID) mỗi WI_NAME (ảnh chụp gần nhất), COUNT(*) theo WI_NAME — sinh TSBD_G2, NULL nhánh CLOS"| K
-    V -->|"UNION theo WI_NAME, lọc DAYID=MAX(DAYID) mỗi WI_NAME (ảnh chụp gần nhất), COUNT(*) theo WI_NAME — sinh DEVIATION_G2/DEVIATION_G3"| K
-    W -->|"EXISTS USERNAME thuộc 2 tài khoản test toàn bộ lịch sử hồ sơ — sinh IS_TEST_ACCOUNT; tổng thời gian xử lý theo nhóm bước, chỉ tính event BI_FLAG_APPROVAL='First Approval' — sinh TAT_APPLICATION_HOUR"| K
+    A -->|"driving table CLOS — lọc DAYID=v_batch_date (full snapshot, KHÔNG lọc hồ sơ đã kết thúc): DAYID, WI_NAME, PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, COMPANY_SK, VAR_STR12"| K
+    B -->|"driving table RLOS — lọc DAYID=v_batch_date (full snapshot): DAYID, WI_NAME, PROCESSED_DATE, APPLICATION_SK, PRODUCT_SK, COMPANY_SK"| K
+    L -.->|"RLOS-only, lọc DAYID=v_batch_date trực tiếp (point-in-time, không còn MAX(DAYID) toàn lịch sử) trên chính DAYID đang nạp, COUNT(*) theo WI_NAME — sinh TSBD_G2, NULL nhánh CLOS"| K
+    V -->|"UNION theo WI_NAME, lọc DAYID=v_batch_date trực tiếp (point-in-time), COUNT(*) theo WI_NAME — sinh DEVIATION_G2/DEVIATION_G3"| K
+    W -->|"EXISTS USERNAME thuộc 2 tài khoản test trong lịch sử CÓ ENTRYDATE<=v_batch_date — sinh IS_TEST_ACCOUNT; tổng thời gian xử lý theo nhóm bước, chỉ tính event APPROVAL_FLAG='First Approval' VÀ EXITDATE<=v_batch_date — sinh TAT_APPLICATION_HOUR; VOLUME tính theo lịch sử bước xa nhất đã đạt VỚI ENTRYDATE/EXITDATE<=v_batch_date (point-in-time)"| K
 ```
 
-**Ghi chú lineage — thay thế `FCT_LOS_APPLICATION_MILESTONE` đã loại
-bỏ:** bảng này giữ đúng vai trò "điểm KPI theo hồ sơ" đã ghi trong split
-proposal — grain **1 dòng/hồ sơ (`WI_NAME`)/hệ (`DATASOURCE`)**, là input
-duy nhất để `AGG_LOS_KPI_YTD_DAILY` (2.1.8) SUM/COUNT lên grain ngày.
-Không có vai trò "pre-aggregate SLHS/SLGN/TAT" như ghi chú "chưa thiết
-kế" cũ từng viết — vai trò đó thuộc hẳn về `AGG_LOS_KPI_YTD_DAILY`
-(SLHS_*/SLGN_*/TAT_* là số lũy kế theo NGÀY, khác grain hồ sơ của bảng
-này). Cột `VOLUME`/`POINT`/`QUY_DOI`/`TAT_APPLICATION_HOUR` tính theo
-đúng công thức SRS BC9 (BR 1.2, STT 4-6, 20-21) — `POINT` đọc từ file
-cam kết SLA (BC5TAT, đã có tại `RLOS_REF_SLA_TDKHCN`/`CLOS_REF_SLA_
-TDKHDNL`/`CLOS_REF_SLA_TDKHDN`, xem 2.1.1.1/2.2.1.1), `VOLUME` tính
-theo lịch sử bước xa nhất đã đạt (UNION `FCT_CLOS_WORKSTEP_EVENT`/
-`FCT_RLOS_WORKSTEP_EVENT`), `TAT_APPLICATION_HOUR` tổng thời gian xử lý
-theo nhóm bước (khác công thức RLOS/CLOS — CLOS cộng thêm bước
-`CreditCommittee`). `DEVIATION_G2`/`DEVIATION_G3` UNION trực tiếp bảng
-ngoại lệ tương ứng (`FCT_CLOS_DEVIATION`/`FCT_RLOS_DEVIATION`) rồi đếm
-theo `WI_NAME`, đúng công thức SRS — không qua cột đếm trung gian nào
-trên `*_APPLICATION_DAILY` (đã bỏ theo quyết định tại 1.2.2.1/1.3.2.1).
-`TSBD_G2` RLOS-only, đọc trực tiếp `FCT_RLOS_COLLATERAL` (xem rà soát
-nguồn bên dưới).
+**Đổi nguồn A/B/L/V/W sang bản PDTD_DTM (review 2026-09-27, theo yêu
+cầu người dùng):** trước đây `AGG_LOS_KPI_APPLICATION` (bảng PDTD_DTM)
+JOIN trực tiếp vào 5 bảng **SB_DWH** — vi phạm nguyên tắc phân tầng (một
+bảng PDTD_DTM không nên JOIN ngược lại SB_DWH, bỏ qua tầng bê-1:1 trung
+gian). Nhân dịp chuyển `APPROVAL_FLAG` (CLOS) từ SB_DWH sang PDTD_DTM
+— khiến `W` không còn tồn tại đồng nhất ở SB_DWH cho cả 2 nhánh — đã rà
+soát lại và coi `AGG_LOS_KPI_APPLICATION` là bảng FACT tổng hợp thuần
+PDTD_DTM: cả 5 cạnh A/B/L/V/W nay đọc từ bản **PDTD_DTM** (bê 1:1 từ
+SB_DWH, cấu trúc cột giống hệt, xem `hld/hld_review/HLD_FCT_PDTD_DTM_
+review.md` mục 3/5/7/8/10/12/15/16), không còn JOIN ngược SB_DWH.
 
-**Bổ sung điều kiện lọc DAYID cho `TSBD_G2`/`DEVIATION_G2`/`DEVIATION_G3`
-(review 2026-09-17):** bảng nguồn `FCT_RLOS_COLLATERAL`,
-`FCT_CLOS/RLOS_DEVIATION` đều là **full-snapshot-mỗi-ngày** (PK gồm
-`DAYID + WI_NAME + COLLATERAL_BK`/`DEVIATION_BK`, dựng theo quy trình A2
-— 1 tài sản/1 ngoại lệ còn hiệu lực N ngày sẽ có N dòng, không phải 1
-dòng cố định). Thiết kế trước đó chỉ ghi "UNION rồi đếm theo WI_NAME",
-thiếu điều kiện lọc DAYID — nếu ETL thực thi đúng nguyên văn sẽ đếm
-nhân theo số ngày tài sản/ngoại lệ còn tồn tại, làm sai gần như toàn bộ
-giá trị `TSBD_G2`/`DEVIATION_G2`/`DEVIATION_G3`. Đã bổ sung: CHỈ lấy
-`DAYID = MAX(DAYID)` của từng `WI_NAME` (ảnh chụp gần nhất), rồi
-`COUNT(*)` theo `WI_NAME` trên các dòng đã lọc. `BUSINESS_INCOM`
-chỉ có công thức ở nhánh RLOS (SRS không định nghĩa cho CLOS) — để NULL
-ở nhánh CLOS.
+**Ghi chú lineage — thay thế `FCT_LOS_APPLICATION_MILESTONE` đã loại
+bỏ:** bảng này giữ đúng vai trò "điểm KPI theo hồ sơ theo ngày" — grain
+**1 dòng/hồ sơ (`WI_NAME`) × 1 hệ (`DATASOURCE`) × 1 ngày (`DAYID`)**,
+là input duy nhất để `AGG_LOS_KPI_YTD_DAILY` (2.1.8) SUM/COUNT lên grain
+ngày. Không có vai trò "pre-aggregate SLHS/SLGN/TAT" — vai trò đó thuộc
+hẳn về `AGG_LOS_KPI_YTD_DAILY` (SLHS_*/SLGN_*/TAT_* là số phát sinh/lũy
+kế theo NGÀY PHÁT SINH `PROCESSED_DATE`, khác khái niệm DAYID snapshot
+của bảng này). `POINT` đọc từ file cam kết SLA (đã có tại `RLOS_REF_
+SLA_TDKHCN`/`CLOS_REF_SLA_TDKHDNL`/`CLOS_REF_SLA_TDKHDN`, xem
+2.1.1.1/2.2.1.1) — không phụ thuộc DAYID (khóa tra là `PRODUCT_LINE_
+NAME`/`APP_GRP`, ổn định theo hồ sơ). `VOLUME` tính theo lịch sử bước xa
+nhất đã đạt TÍNH ĐẾN `v_batch_date` (UNION `FCT_CLOS_WORKSTEP_EVENT`/
+`FCT_RLOS_WORKSTEP_EVENT`, lọc `ENTRYDATE`/`EXITDATE` <= `v_batch_date`
+— point-in-time). `TAT_APPLICATION_HOUR` tổng thời gian xử lý theo nhóm
+bước tính đến `v_batch_date` (khác công thức RLOS/CLOS — CLOS cộng thêm
+bước `CreditCommittee`). `DEVIATION_G2`/`DEVIATION_G3` đếm trực tiếp
+bảng ngoại lệ tương ứng (`FCT_CLOS_DEVIATION`/`FCT_RLOS_DEVIATION`) lọc
+`DAYID=v_batch_date` rồi đếm theo `WI_NAME`, đúng công thức SRS. `TSBD_
+G2` RLOS-only, đọc trực tiếp `FCT_RLOS_COLLATERAL` lọc
+`DAYID=v_batch_date` (xem rà soát nguồn bên dưới).
+
+**Đổi cơ chế lọc DAYID cho `TSBD_G2`/`DEVIATION_G2`/`DEVIATION_G3` sang
+point-in-time trực tiếp (review 2026-09-27, thay thế cơ chế
+`DAYID=MAX(DAYID)` cũ):** trước đây (khi bảng chưa có `DAYID`), phải
+lọc `DAYID = MAX(DAYID)` của từng `WI_NAME` trên bảng nguồn
+(`FCT_RLOS_COLLATERAL`/`FCT_CLOS/RLOS_DEVIATION`, đều full-snapshot-
+mỗi-ngày theo PK `DAYID + WI_NAME + COLLATERAL_BK`/`DEVIATION_BK`) để
+lấy "ảnh chụp gần nhất" duy nhất cho hồ sơ. Nay bảng này tự có `DAYID`,
+nên đơn giản hơn: lọc trực tiếp `DAYID = v_batch_date` (đúng DAYID đang
+nạp) trên bảng nguồn — không cần `MAX(DAYID)`/window function nữa. Vẫn
+giữ `COUNT(*)` theo `WI_NAME` (không phải `COUNT DISTINCT` — xem lý do
+gốc bên dưới), `TSBD_G2 >= 2` → 'YES', `DEVIATION_G2 = 2` → 'YES',
+`DEVIATION_G3 >= 3` → 'YES'.
 
 **Rà soát lại nguồn/công thức `TSBD_G2` và `DEVIATION_G2`/`DEVIATION_G3`
-(review 2026-09-17):** đọc trực tiếp nguyên văn SRS BC9 (và BC5 cho
+(review 2026-09-17, vẫn giữ nguyên các kết luận sau khi đổi sang
+point-in-time):** đọc trực tiếp nguyên văn SRS BC9 (và BC5 cho
 `DEVIATION_G3`) phát hiện 3 vấn đề, đã sửa:
 1. **`TSBD_G2` là RLOS-only, không phải CLOS+RLOS như bản cũ.** SRS BC9
    định nghĩa field-list theo 3 khối tách biệt ("Nguồn RLOS" 11 field,
@@ -2700,35 +3261,32 @@ chỉ có công thức ở nhánh RLOS (SRS không định nghĩa cho CLOS) — 
    cột CLOB (tương ứng), 2 dòng thật khác nhau chỉ khác nội dung CLOB
    sẽ bị hash trùng và đếm hụt nếu dùng COUNT DISTINCT — sai với ý SRS.
    Đã sửa cả 3 cột (`TSBD_G2`, `DEVIATION_G2`, `DEVIATION_G3`) từ COUNT
-   DISTINCT sang `COUNT(*)` trên các dòng đã lọc `DAYID=MAX(DAYID)`.
+   DISTINCT sang `COUNT(*)`.
 3. **Ngưỡng `TSBD_G2`: SRS mâu thuẫn nội bộ giữa "Ý nghĩa" (≥2) và
    "Cách lấy dữ liệu" (=2)** — áp dụng `>=2` theo đúng ý nghĩa nghiệp
    vụ của tên field, coi "=2" trong công thức là lỗi soạn thảo SRS.
 
-**Bổ sung điều kiện lọc tập hồ sơ nền — hồ sơ phải đã kết thúc (review
-2026-09-18, SRS BC9 cập nhật):** SRS bản mới đổi bước dựng nguồn cơ sở
-của cả khối "Nguồn RLOS" lẫn "Nguồn CLOS" từ `LEFT JOIN
-NG_SB_*_EXTTABLE (a) — NG_SB_*_ENTRY_EXIT (b) theo a.WI_NAME=b.WINAME`
-thành `INNER JOIN ... AND (b.DECISION IN ('Submit','Send To
-PostSanction','Submit To DisbursementMaker','Send To HOSupport','Reject')
-OR b.WORKSTEP IN ('CancelRevoke','CancelPermanent'))` — trước đây mọi
-hồ sơ trên `EXTTABLE` đều lọt vào (LEFT JOIN, cột `b` có thể NULL); nay
-CHỈ hồ sơ đã đến 1 trong các quyết định/kết thúc kể trên (đã phê duyệt/
-từ chối/gửi hỗ trợ/gửi giải ngân, hoặc đã hủy) mới được đưa vào. Vì
-`WI_NAME` (grain của bảng này) hiện lấy nguồn từ `FCT_CLOS_APPLICATION_
-DAILY`/`FCT_RLOS_APPLICATION_DAILY` (đã có mọi hồ sơ, kể cả đang xử lý
-dở dang), cần bổ sung điều kiện lọc tương đương khi nạp
-`AGG_LOS_KPI_APPLICATION`: chỉ giữ hồ sơ có tồn tại bản ghi lịch sử
-(`NG_SB_CLOS/RLOS_ENTRY_EXIT`) thỏa `DECISION` hoặc `WORKSTEP` kể trên
-— hồ sơ đang xử lý dở (chưa tới quyết định cuối, chưa hủy) sẽ KHÔNG còn
-xuất hiện trong bảng này nữa (khác thiết kế trước đây, vốn nhận mọi hồ
-sơ và để `PROCESSED_DATE` xử lý nhánh "hồ sơ chưa đến bước phê duyệt").
-Hệ quả kéo theo: nhánh 3 của công thức `PROCESSED_DATE` (cột 6 — "ngày
-thoát bước cuối cùng của hồ sơ chưa đến bước phê duyệt và không ở
-CancelRevoke") giờ không còn xảy ra nữa đối với dữ liệu nạp vào bảng
-này, vì điều kiện lọc đầu vào đã loại sẵn nhóm hồ sơ đó — giữ nguyên
-công thức 3 nhánh (không sai, chỉ là nhánh 3 sẽ luôn rỗng), không cần
-xóa nhánh này khỏi thiết kế.
+**Bỏ hẳn điều kiện lọc tập hồ sơ nền "hồ sơ phải đã kết thúc" (review
+2026-09-27, đảo ngược quyết định review 2026-09-18):** quyết định
+2026-09-18 (dựa trên SRS BC9 cập nhật đổi driving table báo cáo từ LEFT
+JOIN sang INNER JOIN theo `DECISION`/`WORKSTEP` kết thúc) đã áp dụng
+điều kiện lọc "hồ sơ phải tồn tại bản ghi lịch sử thỏa DECISION đã
+phê duyệt/từ chối/gửi hỗ trợ/gửi giải ngân, hoặc WORKSTEP đã hủy" khi
+nạp bảng này. Sau khi đối chiếu lại kỹ SRS gốc (review 2026-09-27): SRS
+không có đoạn nào phát biểu điều kiện này như 1 "driving-table filter"
+độc lập — đây là diễn giải/tổng hợp của HLD từ nhánh else "Các trường
+hợp còn lại gán giá trị NULL" của cột `VOLUME`. Theo yêu cầu người dùng
+(đổi sang snapshot hàng ngày, mục đích khác — theo dõi được cả hồ sơ
+đang xử lý dở dang qua từng DAYID): **bỏ hẳn điều kiện lọc này** — bảng
+nhận TOÀN BỘ hồ sơ có mặt trên `FCT_CLOS/RLOS_APPLICATION_DAILY` tại
+`v_batch_date`, kể cả hồ sơ chưa kết thúc (các cột `VOLUME`/`POINT`/
+`QUY_DOI`/`TSBD_G2`/`INCOM_3`/`BUSINESS_INCOM`/`DEVIATION_G2`/
+`DEVIATION_G3` sẽ NULL cho hồ sơ đó, đúng nhánh else nguyên văn SRS —
+không phải lỗi thiết kế, mà là trạng thái hợp lệ của hồ sơ đang xử lý).
+Hệ quả: nhánh 3 của công thức `PROCESSED_DATE` ("ngày thoát bước cuối
+cùng của hồ sơ chưa đến bước phê duyệt và không ở CancelRevoke") nay
+LẠI có thể xảy ra thật (khác kết luận tạm thời của review 2026-09-18),
+vì hồ sơ đang xử lý dở dang giờ có mặt trong bảng.
 
 **Bổ sung `IS_TEST_ACCOUNT`/`VAR_STR12` — rà soát lại toàn bộ điều kiện
 lọc SRS BC9 chưa đưa vào thiết kế:** mọi công thức KPI của BC9
@@ -2736,18 +3294,32 @@ lọc SRS BC9 chưa đưa vào thiết kế:** mọi công thức KPI của BC9
 `TAT_CLOS`, `NHAN_SU`) đều có điều kiện "Loại bỏ các hồ sơ có **tồn
 tại** `USERNAME` in ('hanh.nh2', 'hai.bt2')" — tài khoản test/kỹ thuật,
 loại **toàn bộ hồ sơ** khỏi mọi phép đếm KPI nếu bất kỳ dòng lịch sử
-nào của hồ sơ có `USERNAME` thuộc danh sách này (không phải lọc theo
-sự kiện đơn lẻ). Điều kiện này trước đây chưa được đưa vào thiết kế ở
-bất kỳ cột nào — bổ sung cờ `IS_TEST_ACCOUNT` (EXISTS trên UNION
+nào của hồ sơ (tính đến `v_batch_date`, point-in-time) có `USERNAME`
+thuộc danh sách này. Bổ sung cờ `IS_TEST_ACCOUNT` (EXISTS trên UNION
 `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT` theo `USERNAME`,
-toàn bộ lịch sử hồ sơ, không chỉ sự kiện hoàn tất gần nhất) để
-`AGG_LOS_KPI_YTD_DAILY` loại hồ sơ này khỏi mọi phép COUNT/SUM `_DAY`.
-Riêng nhánh CLOS của `SLHS_CLOS`/`SLGN_CLOS` còn thêm điều kiện lọc
-`WFINSTRUMENTTABLE.VAR_STR12 IS NOT NULL` (xem cột 61 tại `FCT_CLOS_
-APPLICATION_DAILY`, 1.2.2.1) — không áp dụng cho `TAT_CLOS`/`QUY_DOI_
-CLOS` (khác công thức, cùng nhánh CLOS nhưng SRS không nhắc điều kiện
-này), nên giữ `VAR_STR12` là cột riêng, không gộp chung với
-`IS_TEST_ACCOUNT`.
+lọc `ENTRYDATE <= v_batch_date`) để `AGG_LOS_KPI_YTD_DAILY` loại hồ sơ
+này khỏi mọi phép COUNT/SUM `_DAY`. Riêng nhánh CLOS của `SLHS_CLOS`/
+`SLGN_CLOS` còn thêm điều kiện lọc `WFINSTRUMENTTABLE.VAR_STR12 IS NOT
+NULL` (xem cột 61 tại `FCT_CLOS_APPLICATION`, 1.2.2.1) — không áp
+dụng cho `TAT_CLOS`/`QUY_DOI_CLOS` (khác công thức, cùng nhánh CLOS
+nhưng SRS không nhắc điều kiện này), nên giữ `VAR_STR12` là cột riêng,
+không gộp chung với `IS_TEST_ACCOUNT`.
+
+**Ảnh hưởng tới `AGG_LOS_KPI_YTD_DAILY` (2.1.8): KHÔNG đổi logic.** Dù
+`AGG_LOS_KPI_APPLICATION` giờ có N dòng/hồ sơ (1 dòng/DAYID), công thức
+`SLHS_*_DAY`/`SLGN_*_DAY`/`TAT_*_DAY`/`QUY_DOI_*_DAY` vẫn lọc
+`PROCESSED_DATE = DAYID` (với `DAYID` ở đây là `v_batch_date` của
+`AGG_LOS_KPI_YTD_DAILY`, không phải đọc `DAYID` của `AGG_LOS_KPI_
+APPLICATION`) — vì `PROCESSED_DATE` là thuộc tính cố định gắn với hồ sơ
+(ngày hồ sơ thực sự chốt, không đổi theo DAYID snapshot), điều kiện này
+vẫn chỉ chọn đúng 1 dòng cho mỗi hồ sơ (dòng có `DAYID = PROCESSED_DATE`
+của chính nó) — kết quả toán học giữ nguyên, không đếm nhân bản. Cần
+lưu ý duy nhất khi viết ETL: JOIN `AGG_LOS_KPI_YTD_DAILY` vào `AGG_LOS_
+KPI_APPLICATION` phải có điều kiện `AGG_LOS_KPI_APPLICATION.DAYID =
+v_batch_date` (để chỉ đọc đúng snapshot ngày đang chạy, đúng nguyên tắc
+ETL) VÀ `PROCESSED_DATE = v_batch_date` (điều kiện nghiệp vụ "phát sinh
+trong ngày") — 2 điều kiện độc lập, cùng so với `v_batch_date`, không
+đối chiếu `DAYID` nguồn với `DAYID` đích.
 
 
 
@@ -2801,7 +3373,7 @@ flowchart LR
 
 **Ghi chú lineage — bảng đặc thù, nguồn T24 giống `DIM_T24_CUSTOMER`
 (2.1.3):** phát sinh khi đóng gap `BC1.K_TYPE` (loại thẻ tín dụng) tại
-`FCT_RLOS_APPLICATION_DAILY` (2.3.2.1) — SRS BC1 (BR 1.2, nested table)
+`FCT_RLOS_APPLICATION` (2.3.2.1) — SRS BC1 (BR 1.2, nested table)
 xác nhận nguồn `STG_DTM.STG_DIM_CARD`, join qua `RESULT_MAIN_CARD_ID`
 (có sẵn trên `DIM_RLOS_APPLICATION`) = `STG_DIM_CARD.MAIN_ID`. Cùng
 pattern `DIM_T24_CUSTOMER`/`DIM_T24_COMPANY`/`DIM_T24_LOAN`/`DIM_T24_
@@ -2837,7 +3409,7 @@ flowchart LR
 
 **Ghi chú lineage — bảng đặc thù, nguồn T24 giống `DIM_T24_CARD`
 (2.1.11):** phát sinh khi đóng gap `BC1.HOME_ADDRESS` (địa chỉ nhận
-Pin/Thẻ) tại `FCT_RLOS_APPLICATION_DAILY` (2.3.2.1) — SRS BC1 (BR 1.2,
+Pin/Thẻ) tại `FCT_RLOS_APPLICATION` (2.3.2.1) — SRS BC1 (BR 1.2,
 nested table) xác nhận nguồn `STG_DTM.STG_DIM_SEAB_MAIN_CARD`, join qua
 `RESULT_MAIN_CARD_ID` = `STG_DIM_SEAB_MAIN_CARD.RECID`. Cùng pattern
 `DIM_T24_CARD` (2.1.11) — không denormalize `HOME_ADDRESS` trực tiếp
@@ -2853,79 +3425,43 @@ SRS (`RECID`, `HOME_ADDRESS`), không cần thể hiện đầy đủ cấu trú
 
 ##### 2.2.1 DIM
 
-###### 2.2.1.1 DIM_CLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (xem DQ-11 ở SB_DWH; đã bổ sung REF_PRODUCT, SLA_*)
+###### 2.2.1.1 DIM_CLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (xem DQ-11 ở SB_DWH). ⚠️ review 2026-09-26 (theo yêu cầu người dùng): chuyển hẳn BUSINESS_FLOW/REF_PRODUCT/SLA_* sang FCT_CLOS_APPLICATION — bảng này quay lại bê nguyên 1:1 từ SB_DWH, không còn cột phái sinh nào. ⚠️ review 2026-09-30 (theo yêu cầu người dùng): kế thừa 26 cột từ SB_DWH sau khi chuyển FIRST_APPROVED_DATE/LG_REQ/FI_REQ/PHONE_REQ sang FCT_CLOS_APPLICATION và xóa APPROVAL_TYPE/DECISION/CURR_WSNAME/PREV_WSNAME — xem Section 1 → 1.2.1.1
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
         F["DIM_CLOS_APPLICATION"]
-        H["DIM_CLOS_PRODUCT"]
     end
     subgraph PDTD_DTM
-        R{{"CLOS_REF_SLA_TDKHDNL / CLOS_REF_SLA_TDKHDN"}}
         G["DIM_CLOS_APPLICATION"]
     end
-    F -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1 — BI_FLOW: PHÁI SINH bằng CASE theo CUST_GROUP| G
-    H -.->|PRODUCT_LINE_NAME, PRODUCT_NAME — đầu vào tra SLA| G
-    R -->|LEFT JOIN theo CUST_GROUP, PRODUCT_LINE, SUB_PRODUCT, HAVE_ANY_DEVIATION, APP_GRP — sinh REF_PRODUCT, SLA nhóm| G
+    F -->|"SCD2, giữ nguyên DIMENSION_KEY, bê 1:1, không còn cột phái sinh nào — nay 26 cột (review 2026-09-30)"| G
 ```
 
-**Ghi chú lineage:** cột `BI_FLOW` (luồng nghiệp vụ chuẩn hóa hiển thị báo
-cáo) được **sinh hoàn chỉnh tại PDTD_DTM cho cả 2 hệ**, nhưng theo 2 cách
-khác nhau: RLOS lookup qua `REF_RLOS_FLOW` (theo `STREAM`), còn CLOS tính
-bằng `CASE` theo `CUST_GROUP` — không qua bảng `REF_` nào. Công thức đầy đủ
-(nguyên văn SRS BC2, đối chiếu trực tiếp docx gốc, table 8 hàng `BI_FLOW`):
-`CASE WHEN CUST_GROUP IN ('MSME','SME','USME') THEN 'PDTD_KHDN' WHEN
-CUST_GROUP IN ('NBFI','JSC','FDI','BANK','STR','SOC') THEN 'PDTD_KHDNL' ELSE
-NULL END`. Xem Section 2 (2.2.1.1, cột 27).
-
-**Ghi chú lineage — bổ sung `REF_PRODUCT`, `SLA_CREDIT_OFFICER`,
-`SLA_MARKER`, `SLA_CHECKER`, `SLA_CREDIT_APPROVER`:** đây là nơi duy nhất
-tính được các cột này — `CLOS_REF_SLA_TDKHDNL`/`CLOS_REF_SLA_TDKHDN`
-(2.4.6/2.4.7) chỉ tồn tại ở tầng PDTD_DTM, không có ở SB_DWH. Chọn bảng
-theo `CUST_GROUP` (`NBFI/JSC/FDI/BANK/STR/SOC` → `TDKHDNL`;
-`MSME/SME/USME` → `TDKHDN_2`), rồi LEFT JOIN theo `PRODUCT_LINE`+
-`SUB_PRODUCT` + `HAVE_ANY_DEVIATION` (đã có trên `DIM_CLOS_APPLICATION`,
-SB_DWH) + `APP_GRP` quy đổi sang `FLAG_APP_GRP` (xem công thức quy đổi ở
-Section 2). Riêng hồ sơ `APP_GRP='C1'`: `REF_PRODUCT` vẫn lookup bình
-thường vào `CLOS_REF_SLA_TDKHDN`, còn 4 cột `SLA_*` dùng hằng số cứng 4
-giờ (xem 2.4.7). Xem Section 3 dòng #13.
-
-**Lưu ý về `PRODUCT_LINE`/`SUB_PRODUCT` dùng làm khóa tra:** `DIM_CLOS_
-APPLICATION` KHÔNG có cột `PRODUCT_SK` — quan hệ hồ sơ↔sản phẩm là 1
-chiều, chỉ tồn tại trên `FCT_CLOS_APPLICATION_DAILY` (khóa `PRODUCT_SK`,
-grain 1 hồ sơ × 1 ngày, xem 2.2.2.1). ETL lấy `PRODUCT_LINE_NAME`/
-`PRODUCT_NAME` bằng cách join gián tiếp qua FCT (`FCT_CLOS_
-APPLICATION_DAILY.PRODUCT_SK` → `DIM_CLOS_PRODUCT`) tại phiên bản hồ sơ
-tương ứng, rồi đưa 2 giá trị đó vào làm input cho công thức LEFT JOIN
-`REF_PRODUCT`/`SLA_*` ngay tại `DIM_CLOS_APPLICATION` — kết quả `REF_
-PRODUCT`/`SLA_*` vẫn là thuộc tính ổn định 1:1 với hồ sơ (giống `BI_FLOW`,
-`APP_GRP`), chỉ khác là *đầu vào* của công thức phải lấy gián tiếp qua
-FCT chứ không phải một khóa có sẵn trên chính DIM này.
-
-**Đính chính khóa tra — dùng `PRODUCT_LINE_NAME`/`PRODUCT_NAME` (tên
-hiển thị), không phải `PRODUCT_LINE_CODE`/`SUB_PRODUCT_CODE` (mã)
-(review 2026-09-21):** đối chiếu trực tiếp dữ liệu seed thật của
-`CLOS_REF_SLA_TDKHDN` (`input/BC5TAT - Team PDTD cung cấp(cam kết SLA
-TDKHDN luồng 2).csv`, cột "Product Line"/"Sub Product") cho thấy giá
-trị lưu là tên hiển thị tiếng Việt (`Hạn mức`, `Vay cầm cố GTCG theo
-món`...), khớp `DIM_CLOS_PRODUCT.PRODUCT_LINE_NAME` (cột 5)/`PRODUCT_
-NAME` (cột 8, tên sản phẩm nhánh) — không khớp `PRODUCT_LINE_CODE`/
-`SUB_PRODUCT_CODE` (mã nội bộ). Cùng loại sai đã sửa ở `DIM_RLOS_
-APPLICATION` (2.3.1.1) — áp dụng nhất quán cho cả 2 hệ.
+**Chuyển `BUSINESS_FLOW`/`REF_PRODUCT`/`SLA_CREDIT_OFFICER`/`SLA_MARKER`/
+`SLA_CHECKER`/`SLA_CREDIT_APPROVER` sang `FCT_CLOS_APPLICATION`
+(review 2026-09-26, theo yêu cầu người dùng):** sơ đồ join `CUSTOMER_SK`
+→ `DIM_CLOS_CUSTOMER` (lấy `CUST_GROUP`), `CLOS_REF_SLA_TDKHDNL`/
+`CLOS_REF_SLA_TDKHDN` và `DIM_CLOS_PRODUCT` (qua `PRODUCT_SK`) để sinh 6
+cột này nay chuyển hẳn sang `FCT_CLOS_APPLICATION` (2.2.2.1) — xem
+lineage đầy đủ tại đó. Lý do: khóa tra các cột này (`CUST_GROUP`/
+`APP_GRP`) là thuộc tính ổn định/gán một lần của hồ sơ hoặc khách hàng
+(không phải SCD2-sensitive theo lịch sử phiên bản hồ sơ), nên đặt phép
+JOIN REF ở tầng FCT không làm mất tính đúng point-in-time, đồng thời giữ
+nguyên tắc "DIM PDTD_DTM giống hệt DIM SB_DWH" xuyên suốt toàn bộ layer
+— cùng lý do áp dụng cho `DIM_RLOS_APPLICATION` (2.3.1.1).
 
 **Gap CLOS chưa thiết kế `REF_SLA_NLTT` — ĐÃ ĐÁNH GIÁ, KHÔNG bổ sung cột
-vào DIM này (review 2026-09-21):** SRS BC5/BC9 yêu cầu CLOS cũng đọc
-cam kết SLA nhập liệu tập trung từ `REF_SLA_NLTT` (`SYSTEM_CODE='CLOS'`,
-điều kiện JOIN theo `New/Change Request`+`Product Line`+`Sub Product` —
-đọc trực tiếp từ bảng lồng "Các bảng sử dụng" BR 1.2 của SRS BC5,
-trước đây bị bỏ sót khi chỉ đọc dòng RLOS liền kề). Khác với `REF_
-PRODUCT`/`SLA_CREDIT_*` (đã denormalize ở trên), quyết định người dùng
-cho `SLA_DE_RESULT`/`SLA_QC_RESULT`/`SLA_DE_TOTAL_RESULT`/`QD_DDE`/
-`QD_QC` là KHÔNG thêm cột vào DIM này (và bỏ luôn 3 cột tương ứng đã có
-ở `DIM_RLOS_APPLICATION`) — chuyển hẳn sang report-time lookup
-`REF_SLA_NLTT`. Xem logic JOIN runtime đầy đủ (cả 2 hệ) tại `REF_SLA_
-NLTT` (2.4.8) và ghi chú `POINT` của BC9 (2.1.9).
+vào DIM này (review 2026-09-21, vẫn giữ nguyên sau review 2026-09-26):**
+SRS BC5/BC9 yêu cầu CLOS cũng đọc cam kết SLA nhập liệu tập trung từ
+`REF_SLA_NLTT` (`SYSTEM_CODE='CLOS'`, điều kiện JOIN theo `New/Change
+Request`+`Product Line`+`Sub Product` — đọc trực tiếp từ bảng lồng "Các
+bảng sử dụng" BR 1.2 của SRS BC5, trước đây bị bỏ sót khi chỉ đọc dòng
+RLOS liền kề). Quyết định người dùng cho `SLA_DE_RESULT`/`SLA_QC_RESULT`/
+`SLA_DE_TOTAL_RESULT`/`QD_DDE`/`QD_QC` là KHÔNG thêm cột vào DIM này (và
+bỏ luôn 3 cột tương ứng đã có ở `DIM_RLOS_APPLICATION`) — chuyển hẳn sang
+report-time lookup `REF_SLA_NLTT`. Xem logic JOIN runtime đầy đủ (cả 2
+hệ) tại `REF_SLA_NLTT` (2.4.8) và ghi chú `POINT` của BC9 (2.1.9).
 
 ###### 2.2.1.2 DIM_CLOS_PRODUCT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_PRO_LINE/MAS_SUB_PROD, review 2026-09-18; IS_CREDIT_CARD/IS_FAST_PRODUCT chuyển khỏi bảng này)
 
@@ -2950,66 +3486,55 @@ hoàn toàn khác (`PRODUCT_LINE`/`SUB_PRODUCT` theo `NG_SB_CLOS_CUST_INFO`,
 không liên quan gì đến 2 cờ này) — xem chi tiết ở ghi chú
 `DIM_RLOS_PRODUCT` (2.3.1.2) và Section 3 dòng #3.
 
-###### 2.2.1.3 DIM_CLOS_WORKSTEP — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_CLOS_MAS_DECISION từ SB_DWH, review 2026-09-18)
+###### 2.2.1.3 DIM_CLOS_WORKSTEP_DECISION — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_CLOS_MAS_DECISION từ SB_DWH, review 2026-09-24, gộp từ DIM_CLOS_WORKSTEP + DIM_CLOS_DECISION)
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        D["DIM_CLOS_WORKSTEP"]
+        D["DIM_CLOS_WORKSTEP_DECISION"]
     end
     subgraph PDTD_DTM
-        E["DIM_CLOS_WORKSTEP"]
+        E["DIM_CLOS_WORKSTEP_DECISION"]
     end
     D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
 ```
 
-**Ghi chú lineage:** nguồn kế thừa từ SB_DWH nay đã giải quyết
-(`NG_SB_CLOS_MAS_DECISION`, DISTINCT QUEUE_NAME — review 2026-09-18, xem
-1.2.1.3 trong `HLD_DIM_SB_DWH.md`), thay thế `MAP_CLOS_WORKSTEP`. Bản
-PDTD_DTM bê 1:1, không có cột phái sinh nào ở tầng này.
+**Ghi chú lineage:** nguồn kế thừa từ SB_DWH (`NG_SB_CLOS_MAS_DECISION`,
+1:1 QUEUE_NAME+DECISION — xem 1.2.1.3). Bản PDTD_DTM bê 1:1, không có
+cột phái sinh nào ở tầng này.
 
-**Đã loại bỏ cột `IS_PDTD_STEP` (review 2026-09-15):** thiết kế trước
-đây có cột `IS_PDTD_STEP` (LEFT JOIN `Q_RLOS_REF_WORKSTEP_2SYSTEMS` theo
-`WORKSTEP_CODE = WORKSTEP`), ghi chú "dùng làm đầu vào lọc nhân sự Khối
-PDTD ở BC9 (`NHAN_SU`, `NSLD`)" — nhưng đối chiếu lại công thức thật của
-`NHAN_SU`/`NSLD` (`REF_LOS_KPI_USER_YEAR`, 2.1.7) xác nhận công thức đó
+**Gộp 2 DIM thành 1 (review 2026-09-24):** cùng lý do đã áp dụng cho bản
+SB_DWH (1.2.1.3) — `DIM_CLOS_WORKSTEP`/`DIM_CLOS_DECISION` gộp thành
+`DIM_CLOS_WORKSTEP_DECISION`, giữ đúng grain "1 dòng = 1 cặp (WORKSTEP,
+DECISION) hợp lệ" của bảng nguồn.
+
+**Đã loại bỏ cột `IS_PDTD_STEP` (review 2026-09-15, vẫn giữ nguyên quyết
+định này sau khi gộp DIM):** thiết kế trước đây có cột `IS_PDTD_STEP`
+(LEFT JOIN `Q_RLOS_REF_WORKSTEP_2SYSTEMS` theo `WORKSTEP_CODE =
+WORKSTEP`), ghi chú "dùng làm đầu vào lọc nhân sự Khối PDTD ở BC9
+(`NHAN_SU`, `NSLD`)" — nhưng đối chiếu lại công thức thật của
+`NHAN_SU`/`NSLD` (`AGG_LOS_KPI_USER_YEAR`, 2.1.7) xác nhận công thức đó
 lọc bằng danh sách 8 `WORKSTEP` literal hardcode trực tiếp trên UNION
 `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT`, **không hề JOIN qua
 `IS_PDTD_STEP`** — cột này không được dùng ở bất kỳ đâu trong toàn bộ
 thiết kế. Đã xóa hẳn cột này (và join `Q_RLOS_REF_WORKSTEP_2SYSTEMS`
-tương ứng) khỏi cả `DIM_CLOS_WORKSTEP`/`DIM_RLOS_WORKSTEP` (SB_DWH và
-PDTD_DTM) — không mất thông tin gì vì không báo cáo nào tiêu thụ giá trị
-này; đồng thời tránh rủi ro nhân bản DIM khi join (grain thật của
-`Q_RLOS_REF_WORKSTEP_2SYSTEMS` là `WORKSTEP+DECISION`, trong khi DIM chỉ
-có 1 dòng/`WORKSTEP_CODE`, không có `DECISION` để join kèm).
+tương ứng) khỏi cả `DIM_CLOS_WORKSTEP_DECISION`/`DIM_RLOS_WORKSTEP_
+DECISION` (SB_DWH và PDTD_DTM). Ghi chú lịch sử: quyết định xóa này ban
+đầu còn viện dẫn lý do "grain thật của `Q_RLOS_REF_WORKSTEP_2SYSTEMS` là
+`WORKSTEP+DECISION`, trong khi DIM chỉ có 1 dòng/`WORKSTEP_CODE`" — sau
+khi gộp DIM, lý do đó không còn áp dụng (DIM composite mới đã có sẵn cả
+2 cột), nhưng quyết định xóa `IS_PDTD_STEP` vẫn giữ nguyên vì lý do
+chính (không báo cáo nào tiêu thụ) không đổi.
 
-###### 2.2.1.4 DIM_CLOS_DECISION — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_CLOS_MAS_DECISION từ SB_DWH, review 2026-09-18)
-
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        D["DIM_CLOS_DECISION"]
-    end
-    subgraph PDTD_DTM
-        E["DIM_CLOS_DECISION"]
-    end
-    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
-```
-
-**Ghi chú lineage:** nguồn kế thừa từ SB_DWH nay đã giải quyết
-(`NG_SB_CLOS_MAS_DECISION`, DISTINCT DECISION — review 2026-09-18, xem
-1.2.1.4 trong `HLD_DIM_SB_DWH.md`), thay thế `MAP_CLOS_DECISION`. Bản
-PDTD_DTM bê 1:1, không có REF_ nào join thêm.
-
-###### 2.2.1.5 DIM_CLOS_EXCEPTION_REASON
+###### 2.2.1.5 DIM_CLOS_EXCEPTION
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        D["DIM_CLOS_EXCEPTION_REASON"]
+        D["DIM_CLOS_EXCEPTION"]
     end
     subgraph PDTD_DTM
-        E["DIM_CLOS_EXCEPTION_REASON"]
+        E["DIM_CLOS_EXCEPTION"]
     end
     D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
 ```
@@ -3017,23 +3542,7 @@ flowchart LR
 **Ghi chú lineage:** bản PDTD_DTM bê 1:1 từ SB_DWH, không có REF_ nào join
 thêm — cấu trúc giữ nguyên như tài liệu gốc.
 
-###### 2.2.1.6 DIM_CLOS_COLLATERAL_TYPE
-
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        D["DIM_CLOS_COLLATERAL_TYPE"]
-    end
-    subgraph PDTD_DTM
-        E["DIM_CLOS_COLLATERAL_TYPE"]
-    end
-    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
-```
-
-**Ghi chú lineage:** bản PDTD_DTM bê 1:1 từ SB_DWH, không có REF_ nào join
-thêm — cấu trúc giữ nguyên như tài liệu gốc.
-
-###### 2.2.1.7 DIM_CLOS_CUSTOMER
+###### 2.2.1.6 DIM_CLOS_CUSTOMER — ĐỔI GRAIN (review 2026-09-25, xem lý do đầy đủ tại 1.2.1.6). ⚠️ review 2026-09-26 (theo yêu cầu người dùng): chuyển hẳn LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE sang FCT_CLOS_APPLICATION
 
 ```mermaid
 flowchart LR
@@ -3041,90 +3550,203 @@ flowchart LR
         C["DIM_CLOS_CUSTOMER"]
     end
     subgraph PDTD_DTM
-        R{{"DIM_CLOS_LEGAL_PARTY"}}
         D["DIM_CLOS_CUSTOMER"]
     end
-    C -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| D
-    R -.->|LEFT JOIN theo WI_NAME + LEGAL_TYPE bằng CUSTOMER — sinh ORG_LEGAL_ID| D
+    C -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1, không còn cột phái sinh nào| D
 ```
 
-**Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain (1:1 với hồ sơ).
-Bổ sung `ORG_LEGAL_ID` — LEFT JOIN `DIM_CLOS_LEGAL_PARTY` (2.2.1.8) theo
-`WI_NAME` + `LEGAL_TYPE='CUSTOMER'`, lưu dư thừa số giấy tờ pháp lý của
-chính khách hàng vay ngay trên `DIM_CLOS_CUSTOMER` để tiện tra cứu — đã
-xác nhận với người dùng: chấp nhận trùng lặp dữ liệu giữa 2 DIM thay vì
-buộc báo cáo phải tự JOIN thêm. Join an toàn không fan-out — người dùng
-xác nhận nghiệp vụ: `OBJ_TYPE='Khách hàng'` luôn đúng 1 dòng/hồ sơ trên
-`NG_SB_CLOS_CUST_INFO_LEGAL` (khác với các vai trò khác — đại diện/thành
-viên góp vốn — có thể nhiều dòng, xem 2.2.1.8).
+**Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain (1 dòng/khách
+hàng — review 2026-09-25, xem 1.2.1.6). Cột `ORG_LEGAL_ID` (trước đây
+LEFT JOIN `DIM_CLOS_LEGAL_PARTY` theo `WI_NAME`+`LEGAL_TYPE='CUSTOMER'`
+lấy ID_NUMBER của khách hàng chính) đã **XÓA** — trùng lặp hoàn toàn với
+NK mới `ID_NUMBER` của chính bảng này (xem 2.2.1.6 Section 2).
 
-###### 2.2.1.8 DIM_CLOS_LEGAL_PARTY
+**Chuyển `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` sang
+`FCT_CLOS_APPLICATION` (review 2026-09-26, theo yêu cầu người
+dùng):** join sang `FCT_CLOS_LEGAL_PARTY` (2.2.2.8) theo `WI_NAME`+
+`LEGAL_TYPE='LEGAL_REPRESENTATIVE'` để sinh 2 cột này (nối chuỗi
+`FULL_NAME`/`ID_NUMBER` bằng ";" nếu nhiều đại diện) nay đặt tại
+`FCT_CLOS_APPLICATION` (2.2.2.1) — cùng lý do đã áp dụng cho
+`BUSINESS_FLOW`/`REF_PRODUCT`/`SLA_*` ở `DIM_CLOS_APPLICATION` (2.2.1.1): DIM
+không còn được phép JOIN sang FCT khác (`FCT_CLOS_LEGAL_PARTY`) để giữ
+đúng nguyên tắc "DIM PDTD_DTM giống hệt DIM SB_DWH". Bảng này từ 15 cột
+xuống còn 13 cột (xem Section 2 → 2.2.1.6).
 
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        C["DIM_CLOS_LEGAL_PARTY"]
-    end
-    subgraph PDTD_DTM
-        R{{"REF_CLOS_LEGAL"}}
-        D["DIM_CLOS_LEGAL_PARTY"]
-    end
-    C -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| D
-    R -->|LEFT JOIN theo OBJ_TYPE — sinh LEGAL_TYPE| D
-```
+###### 2.2.1.7 DIM_CLOS_LEGAL_PARTY — xem `FCT_CLOS_LEGAL_PARTY` (2.2.2.8)
 
-**Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain (1:N với hồ sơ,
-không giới hạn). Bổ sung `LEGAL_TYPE` — LEFT JOIN `REF_CLOS_LEGAL` (2.4.2)
-theo `OBJ_TYPE`, chuẩn hóa vai trò pháp lý tiếng Việt (Người đại diện theo
-pháp luật, Khách hàng, Chủ sở hữu TSBĐ, Thành viên góp vốn chính, Khác)
-sang mã tiếng Anh (`LEGAL_REPRESENTATIVE`, `CUSTOMER`, `COLLATERAL_OWNER`,
-`MAIN_CONTRIBUTING_MEMBERS`, `OTHER`) — đúng theo đề xuất trong
-split-proposal. BC2 lọc `LEGAL_TYPE = 'CUSTOMER'` để chỉ lấy giấy tờ của
-chính khách hàng khi tra CIF.
+**Đổi phân loại DIM → FACT (review 2026-09-25):** bảng này đã đổi tên
+thành `FCT_CLOS_LEGAL_PARTY` và chuyển sang nhóm FCT — xem 2.2.2.8 để
+tránh trùng lặp nội dung. Giữ lại số hiệu `2.2.1.7` như một mục rỗng trỏ
+chuyển tiếp, không xóa số để không làm lệch số các bảng DIM khác trong
+nhóm CLOS.
 
 ##### 2.2.2 FCT
 
-###### 2.2.2.1 FCT_CLOS_APPLICATION_DAILY
+###### 2.2.2.1 FCT_CLOS_APPLICATION — ⚠️ review 2026-09-26 (theo yêu cầu người dùng): nhận thêm 6 cột BUSINESS_FLOW/REF_PRODUCT/SLA_* từ DIM_CLOS_APPLICATION + 2 cột LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE từ DIM_CLOS_CUSTOMER (không nhận ORG_LEGAL_ID — xóa khỏi ETL) + 5 cột business rule APPLICATION_STATUS/FLAG_AUTO_CANCEL/*_TAKERESPON chuyển từ SB_DWH (đổi driving table sang EXTTABLE, full snapshot)
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        C["FCT_CLOS_APPLICATION_DAILY"]
+        C["FCT_CLOS_APPLICATION"]
+        SK["DIM_CLOS_CUSTOMER"]
+        SH["DIM_CLOS_PRODUCT"]
+        SCA["DIM_CLOS_APPLICATION"]
+        SLP["FCT_CLOS_LEGAL_PARTY"]
     end
     subgraph PDTD_DTM
-        D["FCT_CLOS_APPLICATION_DAILY"]
+        R{{"CLOS_REF_SLA_TDKHDNL / CLOS_REF_SLA_TDKHDN"}}
+        D["FCT_CLOS_APPLICATION"]
     end
-    C -->|bê 1:1, thêm khóa T24_CUSTOMER_SK| D
+    C -->|"bê 1:1 (driving table đổi sang NG_SB_CLOS_EXTTABLE, full snapshot — review 2026-09-26, xem Section 1 → 1.2.2.1), thêm khóa T24_CUSTOMER_SK"| D
+    SK -.->|"CUSTOMER_SK — cấp CUST_GROUP, JOIN ngay tại SB_DWH (đúng luồng ETL SB_DWH→PDTD_DTM), kết quả là thành phần khóa chọn bảng TDKHDNL/TDKHDN"| C
+    SH -.->|"PRODUCT_SK — cấp PRODUCT_LINE_NAME/SUB_PRODUCT_NAME, JOIN ngay tại SB_DWH"| C
+    SCA -.->|"APPLICATION_SK — cấp HAVE_ANY_DEVIATION và APP_GRP (quy đổi CASE WHEN → FLAG_APP_GRP ngay tại bước JOIN), JOIN ngay tại SB_DWH"| C
+    C -->|"CUST_GROUP/PRODUCT_LINE_NAME/SUB_PRODUCT_NAME/HAVE_ANY_DEVIATION/FLAG_APP_GRP đã tính sẵn tại SB_DWH — LEFT JOIN R"| R
+    R -->|"LEFT JOIN theo CUST_GROUP, PRODUCT_LINE, SUB_PRODUCT, HAVE_ANY_DEVIATION, APP_GRP — sinh REF_PRODUCT, SLA nhóm (review 2026-09-26, chuyển từ DIM_CLOS_APPLICATION)"| D
+    SCA -->|"WI_NAME (qua APPLICATION_SK) → FCT_CLOS_LEGAL_PARTY (SB_DWH) lọc OBJ_TYPE='Người đại diện theo pháp luật' — sinh LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE"| SLP
+    SLP -->|"nối chuỗi FULL_NAME/ID_NUMBER bằng ';' nếu nhiều đại diện"| D
 ```
+
+> Ghi chú: đúng luồng ETL SB_DWH → PDTD_DTM → report, mọi JOIN dùng để TÍNH SẴN cột (`REF_PRODUCT`/`SLA_*`, `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE`) đều thực hiện ngay tại SB_DWH — `DIM_CLOS_CUSTOMER`/`DIM_CLOS_PRODUCT`/`DIM_CLOS_APPLICATION`/`FCT_CLOS_LEGAL_PARTY` ở đây đều là bản SB_DWH, KHÔNG phải bản PDTD_DTM. PDTD_DTM chỉ còn 2 bảng liên quan trực tiếp lineage: `R` (REF, chỉ tồn tại ở PDTD_DTM — nơi duy nhất JOIN REF_ được phép xảy ra) và `D` (bảng đích). **Không còn `ORG_LEGAL_ID`** (xóa khỏi ETL, review 2026-09-26 — theo yêu cầu người dùng) — giá trị này chỉ là `ID_NUMBER` của khách hàng chính, báo cáo tự JOIN report-time `D.CUSTOMER_SK` → `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER` khi cần, không ETL sẵn. Riêng `DIM_CLOS_WORKSTEP_DECISION` KHÔNG xuất hiện trong sơ đồ — bảng này chỉ được JOIN RA để tra `WORKSTEP_CODE`/`DECISION_CODE` làm điều kiện CASE WHEN trực tiếp cho `APPLICATION_STATUS`/`FLAG_AUTO_CANCEL` (không phải thành phần khóa dẫn tới một nguồn REF/FCT khác), nên không tính là nguồn theo đúng nghĩa lineage. Chi tiết JOIN đầy đủ xem cột "Mô tả" của bảng cấu trúc bên dưới.
 
 **Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain/PK. Không có cột
-vật lý `BI_FLOW`/`ZONE` riêng trên bảng này — báo cáo lấy `BI_FLOW` bằng
-JOIN `APPLICATION_SK` sang `DIM_CLOS_APPLICATION` (cột đã có sẵn, tính bằng
-CASE theo `CUST_GROUP`, xem 2.2.1.1), và lấy `ZONE` chuẩn hóa bằng JOIN
-`ORG_UNIT_SK` sang `DIM_LOS_ORG_UNIT` rồi LEFT JOIN tiếp `TMP_REF_COMPANY_
+vật lý `ZONE` riêng trên bảng này — báo cáo lấy `ZONE` chuẩn hóa bằng JOIN
+`COMPANY_SK` sang `DIM_LOS_COMPANY` rồi LEFT JOIN tiếp `TMP_REF_COMPANY_
 REGION_KHDN` tại tầng truy vấn báo cáo (xem 2.1.1) — nhất quán với quyết
-định "ZONE là join-time-only, không lưu vật lý" đã chốt ở `DIM_LOS_ORG_UNIT`.
-Bổ sung duy nhất khóa kỹ thuật `T24_CUSTOMER_SK` (tra qua `DIM_CLOS_CUSTOMER`,
-xem 2.2.1.7 — review 2026-09-17: đổi tên từ `CUSTOMER_SK` để phân biệt rõ
-với khách hàng LOS) để báo cáo join sang `DIM_T24_CUSTOMER` (T24) khi cần.
+định "ZONE là join-time-only, không lưu vật lý" đã chốt ở `DIM_LOS_COMPANY`.
+Bổ sung khóa kỹ thuật `T24_CUSTOMER_SK` (tra qua `DIM_CLOS_CUSTOMER
+.ID_NUMBER` — ⚠️ review 2026-09-25: đổi từ `ORG_LEGAL_ID` sau khi cột đó bị
+xóa khỏi `DIM_CLOS_CUSTOMER` do trùng lặp với NK mới, xem 2.2.1.6 — review
+2026-09-17: đổi tên từ `CUSTOMER_SK` để phân biệt rõ với khách hàng LOS)
+để báo cáo join sang `DIM_T24_CUSTOMER` (T24) khi cần.
 
-###### 2.2.2.2 FCT_CLOS_APPLICATION_PARTY — MỚI (factless-fact liên kết, tương tự FCT_RLOS_APPLICATION_PARTY)
+**Chuyển `BUSINESS_FLOW`/`REF_PRODUCT`/`SLA_CREDIT_OFFICER`/`SLA_MARKER`/
+`SLA_CHECKER`/`SLA_CREDIT_APPROVER` từ `DIM_CLOS_APPLICATION` sang đây
+(review 2026-09-26, theo yêu cầu người dùng):** `BUSINESS_FLOW` — PHÁI SINH:
+`CASE WHEN CUST_GROUP IN ('MSME','SME','USME') THEN 'PDTD_KHDN' WHEN
+CUST_GROUP IN ('NBFI','JSC','FDI','BANK','STR','SOC') THEN 'PDTD_KHDNL'
+ELSE NULL END` (nguyên văn SRS BC2, không qua bảng REF_ nào), `CUST_
+GROUP` lấy qua `CUSTOMER_SK` (cột có sẵn trên bảng này) → `DIM_CLOS_
+CUSTOMER` (⚠️ rà soát lại review 2026-09-26, cùng ngày, theo yêu cầu
+người dùng: đúng luồng ETL SB_DWH→PDTD_DTM, JOIN này thực hiện ngay tại
+`SB_DWH.DIM_CLOS_CUSTOMER` khi tính sẵn giá trị `BUSINESS_FLOW`, không phải
+tra bản `DIM_CLOS_CUSTOMER` ở PDTD_DTM). `REF_PRODUCT`/`SLA_*` — PHÁI
+SINH: LEFT JOIN `CLOS_REF_SLA_TDKHDNL`/`CLOS_REF_SLA_TDKHDN` (chọn theo
+`CUST_GROUP`: `NBFI/JSC/FDI/BANK/STR/SOC` → `TDKHDNL`; `MSME/SME/USME`
+→ `TDKHDN_2`) theo `PRODUCT_LINE_NAME`+`SUB_PRODUCT_NAME` (lấy qua
+`PRODUCT_SK`, cột có sẵn trên bảng này, → `SB_DWH.DIM_CLOS_PRODUCT`) +
+`HAVE_ANY_DEVIATION` (đã có trên `SB_DWH.DIM_CLOS_APPLICATION`, tra qua
+`APPLICATION_SK`) + `FLAG_APP_GRP` (quy đổi từ `APP_GRP` — cột thật duy
+nhất trên DIM, cũng tra qua `APPLICATION_SK` → `SB_DWH.DIM_CLOS_
+APPLICATION` — công thức quy đổi xem Section 2 → 2.2.1.1). Toàn bộ khóa
+tra (`CUST_GROUP`/`PRODUCT_LINE_NAME`/`SUB_PRODUCT_NAME`/
+`HAVE_ANY_DEVIATION`/`APP_GRP`) được tính NGAY TẠI SB_DWH — chỉ riêng
+LEFT JOIN vào `CLOS_REF_SLA_TDKHDNL`/`CLOS_REF_SLA_TDKHDN` (bảng REF_,
+chỉ tồn tại ở PDTD_DTM) mới thực hiện tại PDTD_DTM, đúng nguyên tắc
+"JOIN vào bảng REF_ là đặc quyền riêng của tầng PDTD_DTM". Riêng hồ sơ
+`APP_GRP='C1'`: `REF_PRODUCT` vẫn lookup bình thường vào `CLOS_REF_SLA_
+TDKHDN`, còn 4 cột `SLA_*` dùng hằng số cứng 4 giờ (xem 2.4.7). Lý do
+dời khỏi DIM: khóa tra (`CUST_GROUP`/`APP_GRP`) là thuộc tính ổn định
+của hồ sơ/khách hàng, không SCD2-sensitive, nên đặt JOIN ở tầng FCT
+không ảnh hưởng tính đúng point-in-time — đồng thời giữ nguyên tắc "DIM
+PDTD_DTM giống hệt DIM SB_DWH". Xem Section 3 dòng #13.
 
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        C["FCT_CLOS_APPLICATION_PARTY"]
-    end
-    subgraph PDTD_DTM
-        D["FCT_CLOS_APPLICATION_PARTY"]
-    end
-    C -->|bê 1:1| D
-```
+**Chuyển `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` từ
+`DIM_CLOS_CUSTOMER` sang đây (review 2026-09-26, theo yêu cầu người
+dùng):** `APPLICATION_SK` (cột có sẵn) → `SB_DWH.DIM_CLOS_APPLICATION`
+lấy `WI_NAME` → LEFT JOIN `SB_DWH.FCT_CLOS_LEGAL_PARTY` (Section 1 →
+1.2.2.7 — KHÔNG phải bản PDTD_DTM 2.2.2.8) theo `WI_NAME`+`OBJ_TYPE`=
+'Người đại diện theo pháp luật': `LEGAL_REPRESENTATIVE` = nối chuỗi
+`NAMEE` bằng ";" nếu nhiều đại diện, `ADD_ID_REPRESENTATIVE` = nối
+chuỗi `ID_NUMBER` cùng cách. Đúng nguồn SRS BC2 (`NG_SB_CLOS_CUST_INFO_
+LEGAL.NAMEE`/`ID_NUMBER`, lọc `OBJ_TYPE`); cách nối chuỗi khi nhiều
+dòng đã được BA xác nhận chính thức, xem Section 3 #19. **Không nhận
+`ORG_LEGAL_ID`** (rà soát lại review 2026-09-26, cùng ngày, theo yêu
+cầu người dùng) — giá trị này chỉ là `ID_NUMBER` của khách hàng chính
+trên hồ sơ, báo cáo BC2 tự JOIN report-time `CUSTOMER_SK` (cột có sẵn)
+→ `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER` khi cần hiển thị, không cần
+ETL sẵn một cột riêng cho việc này — khác `LEGAL_REPRESENTATIVE`/
+`ADD_ID_REPRESENTATIVE`, 2 cột này bắt buộc ETL sẵn vì phải nối chuỗi
+nhiều dòng khớp (report không tự làm được).
 
-**Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain (1 dòng = 1 hồ sơ
-× 1 người liên quan pháp lý trên `DIM_CLOS_LEGAL_PARTY`). Không có REF_ nào
-join thêm ở tầng này — bảng chỉ chứa khóa liên kết, xem thiết kế đầy đủ tại
-Section 1 → 1. SB_DWH → 1.2.2.2.
+**Đổi driving table + chuyển 6 cột business rule từ SB_DWH sang đây
+(review 2026-09-26, theo yêu cầu người dùng — đánh giá đầy đủ tại Section 1
+→ 1.2.2.1 "Đổi driving table + chuyển business rule sang PDTD_DTM"):**
+driving table của SB_DWH đổi sang `NG_SB_CLOS_EXTTABLE` (full snapshot, PK
+`DAYID+WI_NAME` sinh dòng ở MỌI ngày cho mọi hồ sơ còn hiệu lực) để đảm bảo
+tại mỗi `DAYID` xem được trạng thái mới nhất của toàn bộ tập hồ sơ — bảng
+này bê 1:1 nên PK/grain cũng thay đổi theo cùng cách. 6 cột công thức
+CASE WHEN/COALESCE dựa trên "sự kiện hoàn tất gần nhất" viết lại tham
+chiếu cột đã có sẵn trên chính `FCT_CLOS_APPLICATION` (SB_DWH),
+KHÔNG đọc lại STG_LOS:
+
+- `APPLICATION_STATUS` — PHÁI SINH: tra `WORKSTEP_CODE`/`DECISION_CODE` qua
+  `LAST_WORKSTEP_DECISION_SK` (cột có sẵn, → `DIM_CLOS_WORKSTEP_DECISION`),
+  áp `CASE WHEN DECISION_CODE IN ('Submit','Send To PostSanction','Submit
+  To DisbursementMaker','Send To HOSupport') THEN 'Approved' WHEN
+  DECISION_CODE='Reject' THEN 'Rejected' WHEN WORKSTEP_CODE IN
+  ('CancelRevoke','CancelPermanent') THEN 'Cancelled' ELSE 'Processing'
+  END` — nguyên văn công thức SRS BC2, chỉ đổi nguồn tra WORKSTEP/DECISION
+  từ ENTRY_EXIT trực tiếp (bản SB_DWH cũ) sang qua FK có sẵn.
+- `FLAG_AUTO_CANCEL` — PHÁI SINH: `CASE WHEN CANCEL_DATE IS NOT NULL AND
+  DECISION_CODE (qua LAST_WORKSTEP_DECISION_SK) = 'Auto-Cancel' THEN
+  'YES' ELSE 'NO' END` — nguyên văn công thức SRS BC2 field FLAG_AUTO_CAN,
+  cùng đọc chung `LAST_WORKSTEP_DECISION_SK`/`CANCEL_DATE` (cột có sẵn),
+  giữ đúng nguyên tắc đã chốt ở bản SB_DWH gốc. **Không có cột
+  `AUTO_CANCEL_DATE`** (rà soát lại review 2026-09-26, cùng ngày, sau khi
+  đối chiếu SRS BC1 gốc do người dùng cung cấp) — field `AUTO_CAN_DATE`
+  chỉ tồn tại trong SRS BC1 (RLOS, xem `lld/BC1.csv` dòng 76, công thức
+  hoàn toàn khác: MIN(ENTRYDATE) + điều kiện NULL 3 cột + treo
+  BranchSupport ≥2400 phút làm việc + không có DECISION='Cancel' trước
+  đó); SRS BC2 (CLOS) không định nghĩa field này, chỉ định nghĩa trực
+  tiếp `FLAG_AUTO_CAN`; không báo cáo nào trong BC1-BC11 tiêu thụ
+  `AUTO_CANCEL_DATE` cho nhánh CLOS — cột dư thừa, loại khỏi thiết kế.
+**⚠️ Review 2026-10-01 (theo yêu cầu người dùng): xóa `UNDERWRITERMAKER_
+TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/`APPROVAL_TAKERESPON`** —
+3 cột này trước đây được PHÁI SINH bằng cách map thẳng, không đổi giá
+trị, từ `UNDERWRITERMAKER_USERMAKE`/`UNDERWRITERCHECKER_USERMAKE`/
+`APPROVAL_USERMAKE` (cột có sẵn trên SB_DWH, đã là kết quả COALESCE
+cuối cùng) — tức là trùng giá trị 100% với 3 cột đó, chỉ khác tên. Phát
+hiện đây là thiết kế dư thừa thật: không cần giữ cả 2 tên cột cho cùng
+1 giá trị. BC2 (`lld/BC2.csv`) nay map thẳng vào `*_USERMAKE`, không
+còn cột `*_TAKERESPON` nào ở tầng PDTD_DTM. Xem Section 2 → 2.2.2.1 để
+biết vị trí cột đầy đủ (nay `*_USERMAKE` ở cột 42-44, kế thừa 1:1 từ
+SB_DWH, không có cột output riêng).
+
+**⚠️ Review 2026-09-30 (theo yêu cầu người dùng): kế thừa 4 cột từ
+SB_DWH, bổ sung `APPROVAL_TYPE` riêng tại tầng này:** `FIRST_APPROVED_
+DATE`/`LG_REQ`/`FI_REQ`/`PHONE_REQ` đã chuyển từ `DIM_CLOS_APPLICATION`
+sang `FCT_CLOS_APPLICATION` tầng SB_DWH (xem Section 1 → 1.2.2.1) — bảng
+này bê 1:1 nên kế thừa nguyên trạng, không cần thêm gì. Riêng
+`APPROVAL_TYPE` (cột 63) — khác 4 cột trên, đây là business rule (điều
+kiện lọc `STREAM IN ('Phê duyệt tín dụng','Sent To Disbursement
+Request')`, đúng nguyên văn SRS BC2), không phải ảnh chụp sạch nguồn nên
+KHÔNG đặt ở SB_DWH — bổ sung riêng tại PDTD_DTM: PHÁI SINH `CASE WHEN
+STREAM IN ('Phê duyệt tín dụng','Sent To Disbursement Request') THEN
+STREAM ELSE NULL END`, `STREAM` lấy qua `APPLICATION_SK` (cột có sẵn) →
+`DIM_CLOS_APPLICATION.STREAM` (giữ nguyên giá trị gốc, không lọc — vẫn
+phục vụ BC3/BC9). `APPROVAL_TYPE` đã xóa khỏi `DIM_CLOS_APPLICATION` cả
+2 tầng (xem Section 2 → 2.2.1.1).
+
+###### 2.2.2.2 FCT_CLOS_APPLICATION_PARTY — ĐÃ XÓA (review 2026-09-26, theo yêu cầu người dùng) — hợp nhất vào FCT_CLOS_LEGAL_PARTY (2.2.2.8), xem mục đó
+
+**Đã xóa hẳn bảng này tại tầng PDTD_DTM.** `FCT_CLOS_LEGAL_PARTY`
+(2.2.2.8) nay bổ sung `DAYID` vào grain/PK, hấp thụ luôn vai trò cầu nối
+hồ sơ × khách hàng chính × người liên quan pháp lý theo ngày mà bảng này
+từng đảm nhiệm (cùng 3 khóa `APPLICATION_SK`/`CUSTOMER_SK`/
+`LEGAL_PARTY_SK` — 2 khóa đầu nay cũng có mặt trực tiếp trên
+`FCT_CLOS_LEGAL_PARTY`, xem 2.2.2.8) — không còn lý do giữ 1 bảng liên
+kết riêng chỉ để lặp lại đúng 3 khóa đó ở grain ngày. Giữ lại số hiệu
+`2.2.2.2` như một mục rỗng trỏ chuyển tiếp, không xóa số để không làm
+lệch số các bảng FCT khác trong nhóm CLOS.
+
+⚠️ **Lưu ý phạm vi (cập nhật 2026-09-26, cùng ngày):** ban đầu chỉ bản
+PDTD_DTM (2.2.2.2) bị xóa, bản SB_DWH được nhận định VẪN GIỮ NGUYÊN. Xác
+nhận lại theo yêu cầu người dùng cùng ngày: bản SB_DWH
+(`FCT_CLOS_APPLICATION_PARTY`, 1.2.2.2) **nay cũng đã xóa hẳn** — cùng lý
+do (`FCT_CLOS_LEGAL_PARTY` tự đủ `WI_NAME`/`CUSTOMER_SK`/`APPLICATION_SK`
+để join trực tiếp) — xem Section 1 → 1. SB_DWH → 1.2.2.2. Vậy bảng này
+nay đã xóa ở CẢ 2 tầng.
 
 ###### 2.2.2.3 FCT_CLOS_COLLATERAL
 
@@ -3150,27 +3772,36 @@ SB_DWH → 1.2.2.3.
 flowchart LR
     subgraph SB_DWH
         C["FCT_CLOS_EXCEPTION"]
+        WE["FCT_CLOS_WORKSTEP_EVENT"]
+        DE["DIM_CLOS_EXCEPTION"]
+        KC["DIM_CLOS_CUSTOMER"]
+    end
+    subgraph REF_DTM["Bảng REF tại PDTD_DTM"]
+        REF(["REF_PHAN_LOAI_DDE"])
     end
     subgraph PDTD_DTM
-        REF(["REF_PHAN_LOAI_DDE"])
         D["FCT_CLOS_EXCEPTION"]
     end
     C -->|bê 1:1| D
     REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='CLOS' — sinh PHAN_LOAI_DDE (review 2026-09-22, chuyển từ SB_DWH)"| D
+    WE -.->|"JOIN theo WI_NAME (không phải STG_LOS) — sinh FIRST_WORKSTEP_RETURN: WORKSTEP_CODE tại MIN(EXITDATE) thỏa 3 nhánh WORKSTEP/DECISION_CODE (review 2026-09-26, chuyển từ SB_DWH)"| D
+    DE -.->|"EXCEPTION_SK → ACTIVITYNAME/DECISION_CODE, dùng làm điều kiện EXISTS-check với WE — sinh CHECK_FTR (review 2026-09-26, chuyển từ SB_DWH)"| D
+    KC -.->|"CUSTOMER_SK → CUST_GROUP, phân nhóm whitelist miễn trừ CHECK_FTR (review 2026-09-26)"| D
 ```
 
 **Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain/PK (`DAYID +
 WI_NAME + EXCEPTION_CATEGORY + RAISED_BY + RAISED_DATE_TIME`), cùng đầy
-đủ 13 cột (11 cột gốc + `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` đã tính sẵn
-ở tầng SB_DWH — xem Section 1 → 1. SB_DWH → 1.2.2.4). Không đọc thêm
-`NG_SB_CLOS_ENTRY_EXIT` hay bất kỳ bảng STG_LOS nào ở tầng này, giữ đúng
-nguyên tắc "DTM chỉ đọc DWH". Bổ sung 2 cột phái sinh tại DTM:
-`LOANCASEID` (join qua `DIM_CLOS_APPLICATION.LOANCASEID` theo
-`APPLICATION_SK`, cùng cách `FCT_PDTD_EXCEPTION` gốc lấy "Tính ở DTM từ
-DIM_PDTD_APPLICATION.LOANCASEID") và **`PHAN_LOAI_DDE`** (review
-2026-09-22, chuyển tầng từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" bên
-dưới): `LEFT JOIN REF_PHAN_LOAI_DDE` theo `EXCEPTION_CATEGORY +
-SYSTEMNAME='CLOS'`, lấy `REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE`.
+đủ 13 cột gốc (11 cột nguyên bản + `CUSTOMER_SK` bổ sung review
+2026-09-26 — xem Section 1 → 1. SB_DWH → 1.2.2.4). Không đọc thẳng
+`NG_SB_CLOS_ENTRY_EXIT` hay bất kỳ bảng STG_LOS nào ở tầng này — mọi JOIN
+bổ sung tại đây đều xuất phát từ bảng SB_DWH đã materialize sẵn
+(`FCT_CLOS_WORKSTEP_EVENT`, `DIM_CLOS_EXCEPTION`, `DIM_CLOS_CUSTOMER`),
+giữ đúng nguyên tắc "DTM không JOIN thẳng STG_LOS". Bổ sung 4 cột phái
+sinh tại DTM: `LOANCASEID` (join qua `DIM_CLOS_APPLICATION.LOANCASEID`
+theo `APPLICATION_SK`), **`PHAN_LOAI_DDE`** (review 2026-09-22, xem
+"⚠️ Đánh giá kiến trúc" bên dưới), và **`CHECK_FTR`/`FIRST_WORKSTEP_
+RETURN`** (review 2026-09-26, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến
+trúc" thứ hai bên dưới).
 
 **⚠️ Đánh giá kiến trúc — `PHAN_LOAI_DDE` chuyển từ SB_DWH sang đây
 (review 2026-09-22, sửa lỗi vi phạm layer boundary):** thiết kế ban đầu
@@ -3185,9 +3816,47 @@ PDTD_DTM (vi phạm chiều dữ liệu chuẩn STG_LOS→SB_DWH→STG_DTM→PDT
 Đúng theo nguyên tắc thiết kế của tài liệu này (xem "PDTD_DTM copies 1:1
 from SB_DWH... **may then** LEFT JOIN REF_" — JOIN vào bảng REF_ là đặc
 quyền riêng của tầng PDTD_DTM), công thức đã chuyển hẳn sang tính tại
-đây, cùng cách `LOANCASEID` đang làm. `FCT_CLOS_EXCEPTION` ở tầng SB_DWH
-nay KHÔNG còn cột `PHAN_LOAI_DDE` (còn 14 cột, xem
-`hld/HLD_FCT_SB_DWH.md` mục 1.2.2.4).
+đây, cùng cách `LOANCASEID` đang làm.
+
+**⚠️ Đánh giá kiến trúc — `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` chuyển từ
+SB_DWH sang đây (review 2026-09-26, theo yêu cầu người dùng):** cả 2 cột
+là công thức CASE WHEN/whitelist theo business rule SRS BC7 (không phải
+giá trị gốc STG_LOS hay phép JOIN+lọc thuần túy) — đặt tại SB_DWH vi phạm
+nguyên tắc "SB_DWH ảnh chụp sạch nguồn, PDTD_DTM chuẩn hóa/tính business
+rule". Công thức thực hiện tại đây:
+- **`FIRST_WORKSTEP_RETURN`:** `WORKSTEP_CODE` của dòng `SB_DWH.FCT_CLOS_
+  WORKSTEP_EVENT (we)` có `MIN(EXITDATE)` theo `WI_NAME` (không phải
+  `DAYID` — `WE` là nhật ký toàn bộ lịch sử, không snapshot theo ngày),
+  với điều kiện `we.EXITDATE IS NOT NULL AND ((we.WORKSTEP_CODE=
+  'DetailDataEntry' AND wd.DECISION_CODE='Send_Back') OR
+  (we.WORKSTEP_CODE IN ('DataInputerChecker','UnderwriterMaker',
+  'CreditApproval') AND wd.DECISION_CODE='Additional_Doc_Required') OR
+  (we.WORKSTEP_CODE='UnderwriterMaker' AND wd.DECISION_CODE='Send_Back to
+  BranchSupport'))` — `wd.DECISION_CODE` tra qua
+  `we.WORKSTEP_DECISION_SK → SB_DWH.DIM_CLOS_WORKSTEP_DECISION` (vì `WE`
+  đã xóa denormalize `DECISION_CODE`, review 2026-09-24).
+- **`CHECK_FTR`:** per-hồ-sơ (mọi dòng cùng `WI_NAME` trên
+  `PDTD_DTM.FCT_CLOS_EXCEPTION` phải cùng đạt điều kiện) — mặc định
+  `'Not First Time Right'`; là `'First Time Right'` CHỈ KHI với MỌI dòng
+  `x` cùng `WI_NAME`, tồn tại (EXISTS) dòng `we` trong
+  `SB_DWH.FCT_CLOS_WORKSTEP_EVENT` thỏa `we.WI_NAME=x.WI_NAME AND
+  wd.WORKSTEP_CODE=de.ACTIVITYNAME AND wd.DECISION_CODE=de.DECISION_CODE`
+  (`de`=`SB_DWH.DIM_CLOS_EXCEPTION`, tra qua `x.EXCEPTION_SK`) VÀ
+  `de.EXCEPTION_CATEGORY` nằm trong danh sách whitelist miễn trừ tương
+  ứng — whitelist chọn theo `CUST_GROUP` (tra qua `x.CUSTOMER_SK →
+  SB_DWH.DIM_CLOS_CUSTOMER.CUST_GROUP`): nhóm KHDN
+  (`MSME`/`SME`/`USME`) và nhóm KHDNL/ĐT&ĐCTC
+  (`FDI`/`SOC`/`JSC`/`NBFI`/`BANK`/`STR`), mỗi nhóm 4 tổ hợp
+  WORKSTEP+DECISION với danh sách `EXCEPTION_CATEGORY` miễn trừ riêng
+  (xem đầy đủ literal tại SRS BC7 BR 1.2, và diễn giải công thức gốc tại
+  Section 1 → 1.2.2.4).
+Cơ chế chuyển không cần thêm cột thô mới nào trên `SB_DWH.FCT_CLOS_
+EXCEPTION` ngoài `CUSTOMER_SK` (đã bổ sung, xem Section 1) — toàn bộ dữ
+liệu lịch sử `WORKSTEP_CODE`/`EXITDATE`/`DECISION_CODE` theo `WI_NAME`
+cần thiết đã có sẵn, đầy đủ trên `SB_DWH.FCT_CLOS_WORKSTEP_EVENT`
+(1.2.2.6). `FCT_CLOS_EXCEPTION` ở tầng SB_DWH nay KHÔNG còn cột
+`CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE` (còn 13 cột, xem
+Section 1 → 1.2.2.4).
 
 ###### 2.2.2.5 FCT_CLOS_DEVIATION
 
@@ -3206,8 +3875,8 @@ flowchart LR
 WI_NAME + DEVIATION_BK`), cùng đầy đủ 8 cột (7 cột gốc + `PROCESSED_DATE`
 đã tính sẵn ở tầng SB_DWH, đọc thẳng `NG_SB_CLOS_ENTRY_EXIT` — xem đánh
 giá kiến trúc tại Section 1 → 1. SB_DWH → 1.2.2.5). Không JOIN sang
-`FCT_CLOS_APPLICATION_DAILY` hay đọc thêm bảng STG_LOS nào ở tầng này —
-`FCT_CLOS_DEVIATION` và `FCT_CLOS_APPLICATION_DAILY` là 2 luồng ETL độc
+`FCT_CLOS_APPLICATION` hay đọc thêm bảng STG_LOS nào ở tầng này —
+`FCT_CLOS_DEVIATION` và `FCT_CLOS_APPLICATION` là 2 luồng ETL độc
 lập hoàn toàn (không còn cột đếm trung gian nào giữa 2 bảng, xem đánh giá
 kiến trúc tại Section 1/2 → 1.2.2.1), giữ đúng nguyên tắc "DTM chỉ đọc
 DWH".
@@ -3250,15 +3919,15 @@ flowchart LR
     end
     SA -->|1:1 SEAB_LOS_ID, LIMIT_REF + PHÁI SINH DISBURSEMENT_AMT/CUR_BALANCE + self-join PD_CONTRACT sinh NO_DAYS_OVERDUE/CUR_BUCKET| E
     CUST -.->|CUSTOMER_SK, tra theo CUSTOMER_SK có sẵn trên STG_FCT_LOAN| E
-    COMP -.->|COMPANY_SK, tra theo CO_CODE| E
+    COMP -.->|T24_COMPANY_SK, tra theo CO_CODE| E
     LOAN -.->|CONTRACT_SK, tra theo CONTRACT_SK có sẵn trên STG_FCT_LOAN| E
     PROD -.->|SEAB_PRODUCTS_DE_SK, tra theo SEAB_PRODUCTS_DE_SK có sẵn trên STG_FCT_LOAN — SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả| E
-    CAPP -.->|APPLICATION_SK theo SEAB_LOS_ID — PHÁI SINH CUST_GROUP/LOANCASEID/APPROVAL_WINAME_LOS/APPROVAL_DATE cho BC11| E
+    CAPP -.->|"APPLICATION_SK theo SEAB_LOS_ID — PHÁI SINH LOANCASEID/APPROVAL_WINAME_LOS/APPROVAL_DATE cho BC11; CUST_GROUP (⚠️ review 2026-09-25: qua CUSTOMER_SK có sẵn trên DIM_CLOS_APPLICATION → DIM_CLOS_CUSTOMER, không còn cột local trên DIM_CLOS_APPLICATION)"| E
 ```
 
 **Vì sao tách khỏi `FCT_LOS_DISBURSEMENT` (bảng CHUNG cũ):** rà soát lại
 18 cột gốc phát hiện chỉ 13 cột đầu (`DAYID`, `CONTRACT`, `CUSTOMER_SK`,
-`COMPANY_SK`, `CONTRACT_SK`, `SEAB_PRODUCTS_DE_SK`, `SEAB_LOS_ID`, `ZONE`,
+`T24_COMPANY_SK`, `CONTRACT_SK`, `SEAB_PRODUCTS_DE_SK`, `SEAB_LOS_ID`, `ZONE`,
 `DISBURSEMENT_AMT`, `CUR_BALANCE`, `NO_DAYS_OVERDUE`, `CUR_BUCKET`,
 `LIMIT_REFERENCE`) là T24 thuần CHUNG thật (FK trỏ 4 DIM_T24_* dùng
 chung CLOS/RLOS) — 5 cột còn lại phụ thuộc hệ nguồn: `APPLICATION_SK`
@@ -3315,7 +3984,7 @@ ban đầu:
 
 **Bổ sung 5 trường theo yêu cầu bám sát SRS:**
 - `BRANCH_NAME`, `COMPANY_NAME` — chuyển hẳn vào `DIM_T24_COMPANY`
-  (2.1.4), fact chỉ giữ FK `COMPANY_SK`.
+  (2.1.4), fact chỉ giữ FK `T24_COMPANY_SK`.
 - `ZONE` — nguồn `TMP_REF_COMPANY_REGION_KHDN` (bảng REF_ tĩnh, seed
   Excel, không phải DIM SCD2) — lưu **trực tiếp giá trị** trên fact
   (denormalize), không tách FK riêng.
@@ -3324,99 +3993,134 @@ ban đầu:
   `NG_SB_CLOS_EXTTABLE`/`NG_SB_CLOS_CHANGEREQ`/`NG_SB_CLOS_ENTRY_EXIT`
   qua `SEAB_LOS_ID = WI_NAME` — nhưng vì `FCT_CLOS_LOAN_DISBURSEMENT` là
   bảng PDTD_DTM, giữ nguyên tắc "DTM chỉ đọc DWH" (đã xác nhận với người
-  dùng): dùng `DIM_CLOS_APPLICATION.CUST_GROUP`/`.LOANCASEID`/
-  `.FIRST_APPROVED_WI_NAME`/`.FIRST_APPROVED_DATE` (SB_DWH, đã có sẵn) —
-  join qua `APPLICATION_SK` đã có sẵn trên fact, denormalize giá trị vào
-  fact tại thời điểm ETL, không thêm FK mới. Riêng `LOANCASEID`: SRS lọc
+  dùng): dùng `DIM_CLOS_APPLICATION.LOANCASEID`/`.FIRST_APPROVED_WI_NAME`
+  (SB_DWH, đã có sẵn) + `FCT_CLOS_APPLICATION.FIRST_APPROVED_DATE` (⚠️
+  review 2026-09-30: đổi nguồn sau khi cột này chuyển từ DIM sang FCT,
+  xem 1.2.2.1) — join qua `APPLICATION_SK`
+  đã có sẵn trên fact, denormalize giá trị vào fact tại thời điểm ETL,
+  không thêm FK mới. `CUST_GROUP` (⚠️ review 2026-09-25: đổi nguồn sau khi
+  cột này chuyển khỏi `DIM_CLOS_APPLICATION` về `DIM_CLOS_CUSTOMER`) lấy
+  qua `CUSTOMER_SK` có sẵn trên `DIM_CLOS_APPLICATION` (2.2.1.1, cột 34)
+  → `DIM_CLOS_CUSTOMER.CUST_GROUP`, không denormalize trực tiếp từ cột
+  local nữa. Riêng `LOANCASEID`: SRS lọc
   thêm điều kiện `NG_SB_CLOS_CHANGEREQ.CHANGE_REQUEST = 'New'` (nếu không
   khớp thì NULL) — áp dụng cùng điều kiện lọc này khi denormalize từ
   `DIM_CLOS_APPLICATION.LOANCASEID` (cột DIM giữ nguyên văn không lọc,
   lọc tại đây theo đúng nhu cầu BC11 — khớp ghi chú gốc "DTM lọc riêng
   theo nhu cầu BC11" tại 1.2.1.1). Công thức `APPROVAL_WINAME_LOS`/
-  `APPROVAL_DATE` denormalize thẳng từ `FIRST_APPROVED_WI_NAME`/
-  `FIRST_APPROVED_DATE` — sau khi đính chính lại 2 cột đó tại
-  `DIM_CLOS_APPLICATION` (1.2.1.1, review 2026-09-15) theo đúng nguyên
-  văn SRS BC11 (MIN(WI_NAME) group theo LOANCASEID trên
-  `NG_SB_CLOS_EXTTABLE`; MAX(EXITDATE) trên `NG_SB_CLOS_ENTRY_EXIT`), 2
-  cột này tại `FCT_CLOS_LOAN_DISBURSEMENT` nay đã khớp tuyệt đối SRS BC11,
-  không còn khác biệt nào cần lưu ý.
+  `APPROVAL_DATE` denormalize thẳng từ `DIM_CLOS_APPLICATION.
+  FIRST_APPROVED_WI_NAME`/`FCT_CLOS_APPLICATION.FIRST_APPROVED_DATE` —
+  công thức gốc đã đính chính theo đúng nguyên văn SRS BC11 (MIN(WI_NAME)
+  group theo LOANCASEID trên `NG_SB_CLOS_EXTTABLE`; MAX(EXITDATE) trên
+  `NG_SB_CLOS_ENTRY_EXIT`, review 2026-09-15), 2 cột này tại
+  `FCT_CLOS_LOAN_DISBURSEMENT` nay đã khớp tuyệt đối SRS BC11, không còn
+  khác biệt nào cần lưu ý.
+
+###### 2.2.2.8 FCT_CLOS_LEGAL_PARTY — ĐỔI PHÂN LOẠI DIM → FACT (review 2026-09-25, trước đây là DIM_CLOS_LEGAL_PARTY, 2.2.1.7). ⚠️ review 2026-09-26 (theo yêu cầu người dùng): thêm DAYID vào PK/grain, hấp thụ vai trò cầu nối của FCT_CLOS_APPLICATION_PARTY (2.2.2.2, đã xóa)
+
+```mermaid
+flowchart LR
+    subgraph SB_DWH
+        C["FCT_CLOS_LEGAL_PARTY"]
+    end
+    subgraph PDTD_DTM
+        R{{"REF_CLOS_LEGAL"}}
+        D["FCT_CLOS_LEGAL_PARTY"]
+    end
+    C -->|"bê 1:1 (WI_NAME+ID_NUMBER+CUSTOMER_SK+APPLICATION_SK), thêm DAYID vào PK — snapshot theo ngày (review 2026-09-26)"| D
+    R -->|LEFT JOIN theo OBJ_TYPE — sinh LEGAL_TYPE| D
+```
+
+**Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH (bao gồm cả `CUSTOMER_SK`/
+`APPLICATION_SK` đã có sẵn ở SB_DWH, xem 1.2.2.7), cùng grain gốc (1
+người/1 vai trò/1 hồ sơ, N dòng/hồ sơ không giới hạn — review 2026-09-25:
+không còn SCD2, không có `DIMENSION_KEY`). Bổ sung `LEGAL_TYPE` — LEFT
+JOIN `REF_CLOS_LEGAL` (2.4.2) theo `OBJ_TYPE`, chuẩn hóa vai trò pháp lý
+tiếng Việt (Người đại diện theo pháp luật, Khách hàng, Chủ sở hữu TSBĐ,
+Thành viên góp vốn chính, Khác) sang mã tiếng Anh (`LEGAL_REPRESENTATIVE`,
+`CUSTOMER`, `COLLATERAL_OWNER`, `MAIN_CONTRIBUTING_MEMBERS`, `OTHER`) —
+đúng theo đề xuất trong split-proposal. BC2 lọc `LEGAL_TYPE = 'CUSTOMER'`
+để chỉ lấy giấy tờ của chính khách hàng khi tra CIF;
+`FCT_CLOS_APPLICATION.LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE`
+(2.2.2.1) lọc `LEGAL_TYPE='LEGAL_REPRESENTATIVE'` để lấy người đại diện
+theo pháp luật.
+
+⚠️ **Thêm `DAYID` vào PK/grain, xóa `FCT_CLOS_APPLICATION_PARTY` (2.2.2.2)
+— review 2026-09-26, theo yêu cầu người dùng:** bảng `FCT_CLOS_
+APPLICATION_PARTY` (2.2.2.2, factless-fact liên kết theo `DAYID+WI_NAME+
+LEGAL_PARTY_SK`, 6 cột gồm `APPLICATION_SK`/`CUSTOMER_SK`/`LEGAL_PARTY_SK`)
+đã bị xóa hẳn khỏi tầng PDTD_DTM — hợp nhất vào bảng này. Lý do: bảng đó
+chỉ tồn tại để "chụp lại theo ngày" đúng 3 khóa liên kết mà
+`FCT_CLOS_LEGAL_PARTY` đã có sẵn 2/3 (`CUSTOMER_SK`, `APPLICATION_SK`,
+bổ sung tại SB_DWH từ review 2026-09-25) — thêm `DAYID` vào PK của chính
+bảng này (PK mới: **DAYID, WI_NAME, ID_NUMBER**) là đủ để nó tự đóng vai
+trò cầu nối theo ngày, không cần bảng trung gian riêng nữa.
+
+**⚠️ Rà soát lại (review 2026-09-26, cùng ngày, theo yêu cầu người
+dùng):** `FCT_CLOS_APPLICATION.LEGAL_REPRESENTATIVE`/
+`ADD_ID_REPRESENTATIVE` (2.2.2.1) KHÔNG LEFT JOIN bản PDTD_DTM này —
+đúng luồng ETL SB_DWH→PDTD_DTM, 2 cột này ETL từ bản **SB_DWH** của
+`FCT_CLOS_LEGAL_PARTY` (`APPLICATION_SK` → `SB_DWH.DIM_CLOS_APPLICATION.
+WI_NAME` → LEFT JOIN `SB_DWH.FCT_CLOS_LEGAL_PARTY`). Bảng PDTD_DTM này
+chỉ còn phục vụ report-time lookup `ID_NUMBER` (`LEGAL_TYPE='CUSTOMER'`)
+khi BC2 cần đối chiếu — không phải nguồn ETL cho `FCT_CLOS_APPLICATION_
+DAILY` nữa. `ORG_LEGAL_ID` cũng không còn ETL — báo cáo tự JOIN
+report-time `CUSTOMER_SK` → `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER`. Cơ
+chế nạp: mỗi `DAYID`, lặp lại toàn bộ dòng `FCT_CLOS_LEGAL_PARTY` (SB_DWH, không snapshot theo ngày) — tức
+1 dòng SB_DWH sinh N dòng PDTD_DTM (1 dòng/ngày còn hiệu lực), giống cách
+`FCT_CLOS_APPLICATION_PARTY` cũ snapshot `FCT_CLOS_LEGAL_PARTY` theo
+`DAYID` trước đây (xem 1.2.2.2 lịch sử) — không phải cơ chế mới, chỉ gộp
+vào đúng 1 bảng thay vì 2. `APPLICATION_SK`/`CUSTOMER_SK` trên bảng này
+(vốn đã bê 1:1 từ SB_DWH, không đổi công thức) nay đồng thời phục vụ cả
+vai trò gốc (thuộc tính của chính `FCT_CLOS_LEGAL_PARTY`) lẫn vai trò cầu
+nối cũ của `FCT_CLOS_APPLICATION_PARTY` — không cần thêm cột nào khác
+ngoài `DAYID`.
 
 #### 2.3 Bộ bảng RLOS
 
 ##### 2.3.1 DIM
 
-###### 2.3.1.1 DIM_RLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (đã bổ sung REF_PRODUCT, SLA_*)
+###### 2.3.1.1 DIM_RLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT. ⚠️ review 2026-09-26 (theo yêu cầu người dùng): chuyển hẳn BUSINESS_FLOW/DEVIATION_G3/REF_PRODUCT/SLA_* sang FCT_RLOS_APPLICATION — bảng này quay lại bê nguyên 1:1 từ SB_DWH, không còn cột phái sinh nào
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
         F["DIM_RLOS_APPLICATION"]
-        H["DIM_RLOS_PRODUCT"]
     end
     subgraph PDTD_DTM
-        R{{"REF_RLOS_FLOW"}}
-        S{{"RLOS_REF_SLA_TDKHCN"}}
         G["DIM_RLOS_APPLICATION"]
     end
-    F -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| G
-    R -->|LEFT JOIN theo STREAM — sinh BI_FLOW| G
-    H -.->|PRODUCT_LINE_NAME, PRODUCT_NAME — đầu vào tra SLA| G
-    S -->|"LEFT JOIN theo PRODUCT_LINE/CHANGE_TYPE either-or, DEVIATION_G3, SECONDARY_PRODUCTLINE (bỏ qua nếu NULL — review 2026-09-18), APP_GRP — sinh REF_PRODUCT, SLA nhóm"| G
+    F -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1, không còn cột phái sinh nào| G
 ```
 
-**Ghi chú lineage:** xem ghi chú BI_FLOW ở `DIM_CLOS_APPLICATION` (2.2.1.1) —
-cùng cột đích nhưng công thức khác nhau theo hệ.
-
-**Ghi chú lineage — bổ sung `REF_PRODUCT`, `SLA_CREDIT_OFFICER`,
-`SLA_MARKER`, `SLA_CHECKER`, `SLA_CREDIT_APPROVER`:** đây là nơi duy nhất
-tính được các cột này — `RLOS_REF_SLA_TDKHCN` (2.4.5) chỉ tồn tại ở tầng
-PDTD_DTM. Khóa tra gồm `PRODUCT_LINE` hoặc `CHANGE_TYPE` (either/or — chỉ
-so khớp `CHANGE_TYPE` khi dòng REF_ có `PRODUCT_LINE = 'Trường Change
-Request'`, ngược lại so khớp theo `PRODUCT_LINE`), `DEVIATION_G3`,
-`SECONDARY_PRODUCTLINE` (=`IS_SEC_PRODUCT`, map Có→YES/Không→NO),
-`APP_GRP` — `DEVIATION_G3`/`SECONDARY_PRODUCTLINE`/`APP_GRP` đã có sẵn
-trên `DIM_RLOS_APPLICATION` (SB_DWH, 1.3.1.1), riêng `PRODUCT_LINE` không
-có khóa `PRODUCT_SK` trực tiếp trên DIM này (quan hệ hồ sơ↔sản phẩm là 1
-chiều, chỉ tồn tại trên `FCT_RLOS_APPLICATION_DAILY.PRODUCT_SK`, grain 1
-hồ sơ × 1 ngày, xem 2.3.2.1) — ETL join gián tiếp qua FCT sang `DIM_RLOS_
-PRODUCT` để lấy `PRODUCT_LINE_NAME` làm input cho công thức, rồi ghi kết
-quả `REF_PRODUCT`/`SLA_*` (vẫn ổn định 1:1 với hồ sơ) thẳng lên `DIM_RLOS_
-APPLICATION`. Xem Section 3 dòng #13.
-
-**Đính chính khóa tra — dùng `PRODUCT_LINE_NAME` (tên hiển thị), không
-phải `PRODUCT_LINE_CODE` (mã) (review 2026-09-21):** đối chiếu trực tiếp
-dữ liệu seed thật của `RLOS_REF_SLA_TDKHCN`/`REF_SLA_NLTT`
-(`input/BC5TAT(REF_SLA).xlsx`, cột "Product Line") cho thấy giá trị lưu
-là tên hiển thị (`SeAHome-Buy`, `SeAHome-TTD`...), khớp với
-`DIM_RLOS_PRODUCT.PRODUCT_LINE_NAME` (cột 5, nguồn `MAS_PRODUCT_LINE.
-PRODUCT_LINE_NAME`) — không khớp `PRODUCT_LINE_CODE` (mã nội bộ, cột 4).
-Thiết kế trước đây (và Section 3 dòng #13/#46) ghi nhầm `PRODUCT_LINE_
-CODE` làm input JOIN — đã sửa lại toàn bộ chỗ dùng khóa này sang
-`PRODUCT_LINE_NAME` (ở đây và ở `REF_SLA_NLTT`, xem ghi chú report-time
-lookup bên dưới).
-
-**Bổ sung logic "bỏ qua nếu NULL" cho `DEVIATION_G3`/`SECONDARY_PRODUCTLINE`
-(review 2026-09-18, theo SRS BC5/BC9 cập nhật):** SRS bản mới bổ sung rõ
-*"Nếu file1.'DEVIATION_G3' NULL thì không xét điều kiện này"* và tương tự
-cho `SECONDARY_PRODUCTLINE` — 2 điều kiện MỚI không có trong SRS cũ. Khi
-dòng REF_ (`RLOS_REF_SLA_TDKHCN`) có `DEVIATION_G3`/`SECONDARY_PRODUCTLINE`
-để trống, ETL không so khớp cột đó nữa (bỏ qua khỏi điều kiện AND), khác
-với trước đây vốn luôn so khớp cả 2 cột này với giá trị đã tính trên DIM.
+**Chuyển `BUSINESS_FLOW`/`DEVIATION_G3`/`REF_PRODUCT`/`SLA_CREDIT_OFFICER`/
+`SLA_MARKER`/`SLA_CHECKER`/`SLA_CREDIT_APPROVER` sang
+`FCT_RLOS_APPLICATION` (review 2026-09-26, theo yêu cầu người
+dùng):** sơ đồ join `REF_RLOS_FLOW` (theo `STREAM`, sinh `BUSINESS_FLOW`),
+`FCT_RLOS_DEVIATION` (report-time, sinh `DEVIATION_G3`), `DIM_RLOS_
+PRODUCT` (qua `PRODUCT_SK`, đầu vào tra SLA) và `RLOS_REF_SLA_TDKHCN`
+(sinh `REF_PRODUCT`/`SLA_*`) để sinh 7 cột này nay chuyển hẳn sang
+`FCT_RLOS_APPLICATION` (2.3.2.1) — xem lineage đầy đủ tại đó. Lý
+do: cùng lý do đã áp dụng cho `DIM_CLOS_APPLICATION` (2.2.1.1) — khóa
+tra (`STREAM`/`APP_GRP`) là thuộc tính ổn định của hồ sơ, `DEVIATION_G3`
+vốn đã là event-grain report-time từ `FCT_RLOS_DEVIATION`, nên đặt các
+JOIN này ở tầng FCT không làm mất tính đúng point-in-time, đồng thời giữ
+nguyên tắc "DIM PDTD_DTM giống hệt DIM SB_DWH".
 
 **✅ ĐÃ GIẢI QUYẾT (review 2026-09-21) — đảo lại quyết định đóng PENDING
 #12: KHÔNG denormalize `SLA_DE_RESULT`/`SLA_QC_RESULT`/`SLA_DE_TOTAL_
-RESULT` vào DIM này nữa, chuyển sang report-time lookup:** thiết kế
-trước đây (đóng PENDING #12) đặt 3 cột này ngay tại `DIM_RLOS_
-APPLICATION` cùng 1 LEFT JOIN input với `REF_PRODUCT`/`SLA_CREDIT_*`.
-Rà soát lại khi xử lý gap tương ứng bên CLOS (SRS BC5 cũng yêu cầu CLOS
-đọc `REF_SLA_NLTT` nhưng chưa từng được thiết kế ở `DIM_CLOS_APPLICATION`,
-xem 2.2.1.1) — quyết định người dùng (review 2026-09-21): bỏ hẳn cách
-denormalize cho **cả 2 hệ**, để báo cáo/OAS tự `LEFT JOIN REF_SLA_NLTT`
-runtime bằng các khóa đã có sẵn trên DIM/FCT, không thêm cột phái sinh
-nào vào `DIM_RLOS_APPLICATION`/`DIM_CLOS_APPLICATION` nữa. Xem logic
-JOIN runtime đầy đủ tại `REF_SLA_NLTT` (2.4.8) và ghi chú `POINT` của
-BC9 (2.1.9). `SYSTEM_CODE` phân biệt CLOS/RLOS trong cùng 1 bảng REF_
-dùng chung.
+RESULT` vào DIM này nữa, chuyển sang report-time lookup (vẫn giữ nguyên
+sau review 2026-09-26):** thiết kế trước đây (đóng PENDING #12) đặt 3
+cột này ngay tại `DIM_RLOS_APPLICATION` cùng 1 LEFT JOIN input với `REF_
+PRODUCT`/`SLA_CREDIT_*`. Rà soát lại khi xử lý gap tương ứng bên CLOS
+(SRS BC5 cũng yêu cầu CLOS đọc `REF_SLA_NLTT` nhưng chưa từng được thiết
+kế ở `DIM_CLOS_APPLICATION`, xem 2.2.1.1) — quyết định người dùng (review
+2026-09-21): bỏ hẳn cách denormalize cho **cả 2 hệ**, để báo cáo/OAS tự
+`LEFT JOIN REF_SLA_NLTT` runtime bằng các khóa đã có sẵn trên DIM/FCT,
+không thêm cột phái sinh nào vào `DIM_RLOS_APPLICATION`/`DIM_CLOS_
+APPLICATION` nữa. Xem logic JOIN runtime đầy đủ tại `REF_SLA_NLTT`
+(2.4.8) và ghi chú `POINT` của BC9 (2.1.9). `SYSTEM_CODE` phân biệt
+CLOS/RLOS trong cùng 1 bảng REF_ dùng chung.
 
 ###### 2.3.1.2 DIM_RLOS_PRODUCT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_PRODUCT_LINE/MAS_SUB_PRODUCT, review 2026-09-18; IS_CREDIT_CARD/IS_FAST_PRODUCT chuyển xuống FCT)
 
@@ -3453,54 +4157,39 @@ không phải cùng 1 loại rule với `TAT_RLOS`. Xem chi tiết đối chiế
 đầy đủ tại `AGG_LOS_KPI_YTD_DAILY` (2.1.8, Section 1). Xem Section 3
 dòng #3.
 
-###### 2.3.1.3 DIM_RLOS_WORKSTEP — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_RLOS_MAS_DECISION từ SB_DWH, review 2026-09-18)
+###### 2.3.1.3 DIM_RLOS_WORKSTEP_DECISION — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_RLOS_MAS_DECISION từ SB_DWH, review 2026-09-24, gộp từ DIM_RLOS_WORKSTEP + DIM_RLOS_DECISION)
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        D["DIM_RLOS_WORKSTEP"]
+        D["DIM_RLOS_WORKSTEP_DECISION"]
     end
     subgraph PDTD_DTM
-        E["DIM_RLOS_WORKSTEP"]
+        E["DIM_RLOS_WORKSTEP_DECISION"]
     end
     D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
 ```
 
-**Ghi chú lineage:** xem ghi chú đầy đủ ở `DIM_CLOS_WORKSTEP` (2.2.1.3) —
-cùng thiết kế: nguồn kế thừa đã giải quyết (`NG_SB_RLOS_MAS_DECISION`,
-DISTINCT QUEUE_NAME — review 2026-09-18, xem 1.3.1.3 trong
-`HLD_DIM_SB_DWH.md`), thay thế `MAP_RLOS_WORKSTEP`. Bản PDTD_DTM bê 1:1,
-không có cột phái sinh nào. Cột `IS_PDTD_STEP` đã bị loại bỏ (review
-2026-09-15, xem lý do đầy đủ tại 2.2.1.3) — không báo cáo nào tiêu thụ
-giá trị này.
+**Ghi chú lineage:** xem ghi chú đầy đủ ở `DIM_CLOS_WORKSTEP_DECISION`
+(2.2.1.3) — cùng thiết kế: nguồn kế thừa (`NG_SB_RLOS_MAS_DECISION`, 1:1
+QUEUE_NAME+DECISION — xem 1.3.1.3). Bản PDTD_DTM bê 1:1, không có cột
+phái sinh nào. Cột `IS_PDTD_STEP` đã bị loại bỏ (review 2026-09-15, xem
+lý do đầy đủ tại 2.2.1.3) — không báo cáo nào tiêu thụ giá trị này,
+quyết định giữ nguyên sau khi gộp DIM.
 
-###### 2.3.1.4 DIM_RLOS_DECISION — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_RLOS_MAS_DECISION từ SB_DWH, review 2026-09-18)
+**Gộp 2 DIM thành 1 (review 2026-09-24):** cùng lý do đã áp dụng cho
+bản SB_DWH (1.3.1.3) — `DIM_RLOS_WORKSTEP`/`DIM_RLOS_DECISION` gộp
+thành `DIM_RLOS_WORKSTEP_DECISION`.
 
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        D["DIM_RLOS_DECISION"]
-    end
-    subgraph PDTD_DTM
-        E["DIM_RLOS_DECISION"]
-    end
-    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
-```
-
-**Ghi chú lineage:** nguồn kế thừa từ SB_DWH nay đã giải quyết
-(`NG_SB_RLOS_MAS_DECISION`, DISTINCT DECISION — review 2026-09-18, xem
-1.3.1.4 trong `HLD_DIM_SB_DWH.md`), thay thế `MAP_RLOS_DECISION`. Bản
-PDTD_DTM bê 1:1, không có REF_ nào join thêm.
-
-###### 2.3.1.5 DIM_RLOS_EXCEPTION_REASON
+###### 2.3.1.5 DIM_RLOS_EXCEPTION
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        D["DIM_RLOS_EXCEPTION_REASON"]
+        D["DIM_RLOS_EXCEPTION"]
     end
     subgraph PDTD_DTM
-        E["DIM_RLOS_EXCEPTION_REASON"]
+        E["DIM_RLOS_EXCEPTION"]
     end
     D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
 ```
@@ -3524,23 +4213,7 @@ flowchart LR
 **Ghi chú lineage:** bản PDTD_DTM bê 1:1 từ SB_DWH, không có REF_ nào join
 thêm — cấu trúc giữ nguyên như tài liệu gốc.
 
-###### 2.3.1.7 DIM_RLOS_GEO
-
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        D["DIM_RLOS_GEO"]
-    end
-    subgraph PDTD_DTM
-        E["DIM_RLOS_GEO"]
-    end
-    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
-```
-
-**Ghi chú lineage:** bản PDTD_DTM bê 1:1 từ SB_DWH, không có REF_ nào join
-thêm — cấu trúc giữ nguyên như tài liệu gốc.
-
-###### 2.3.1.8 DIM_RLOS_CARD_PROMOTION
+###### 2.3.1.7 DIM_RLOS_CARD_PROMOTION
 
 ```mermaid
 flowchart LR
@@ -3556,94 +4229,115 @@ flowchart LR
 **Ghi chú lineage:** bản PDTD_DTM bê 1:1 từ SB_DWH, không có REF_ nào join
 thêm — cấu trúc giữ nguyên như tài liệu gốc.
 
-###### 2.3.1.9 DIM_RLOS_APPLICANT
-
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        D["DIM_RLOS_APPLICANT"]
-    end
-    subgraph PDTD_DTM
-        E["DIM_RLOS_APPLICANT"]
-    end
-    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
-```
-
-**Ghi chú lineage:** bản PDTD_DTM bê 1:1 từ SB_DWH, không có REF_ nào join
-thêm — cấu trúc giữ nguyên như tài liệu gốc.
-
-###### 2.3.1.10 DIM_RLOS_COREPAYER
-
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        D["DIM_RLOS_COREPAYER"]
-    end
-    subgraph PDTD_DTM
-        E["DIM_RLOS_COREPAYER"]
-    end
-    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E
-```
-
-**Ghi chú lineage:** bản PDTD_DTM bê 1:1 từ SB_DWH, không có REF_ nào join
-thêm — cấu trúc giữ nguyên như tài liệu gốc.
-
 ##### 2.3.2 FCT
 
-###### 2.3.2.1 FCT_RLOS_APPLICATION_DAILY
+###### 2.3.2.1 FCT_RLOS_APPLICATION — ⚠️ review 2026-09-26 (theo yêu cầu người dùng): nhận thêm 7 cột BUSINESS_FLOW/DEVIATION_G3/REF_PRODUCT/SLA_* từ DIM_RLOS_APPLICATION
 
 ```mermaid
 flowchart LR
     subgraph SB_DWH
-        C["FCT_RLOS_APPLICATION_DAILY"]
+        C["FCT_RLOS_APPLICATION"]
+        DV["FCT_RLOS_DEVIATION"]
+        WD["DIM_RLOS_WORKSTEP_DECISION"]
+        WE["FCT_RLOS_WORKSTEP_EVENT"]
     end
     subgraph PDTD_DTM
+        FLW{{"REF_RLOS_FLOW"}}
         R{{"RLOS_REF_SLA_TDKHCN"}}
         S{{"REF_SLA_NLTT"}}
+        H["DIM_RLOS_PRODUCT"]
         CARD["DIM_T24_CARD"]
         SMC["DIM_T24_SEAB_MAIN_CARD"]
-        D["FCT_RLOS_APPLICATION_DAILY"]
+        D["FCT_RLOS_APPLICATION"]
     end
-    C -->|bê 1:1, thêm khóa T24_CUSTOMER_SK| D
-    R -->|LEFT JOIN SLA cam kết theo APPROVAL_GROUP/PRODUCT — tính sẵn tại DIM_RLOS_APPLICATION| D
+    C -->|bê 1:1| D
+    FLW -->|"LEFT JOIN theo STREAM — sinh BUSINESS_FLOW (review 2026-09-26, chuyển từ DIM_RLOS_APPLICATION)"| D
+    DV -.->|"report-time: lọc DAYID=MAX(DAYID) mỗi WI_NAME, COUNT(*) >=3 → 'YES' — sinh DEVIATION_G3 (cùng Ý NGHĨA NGHIỆP VỤ với AGG_LOS_KPI_APPLICATION.DEVIATION_G3, 2.1.9, nhưng khác cơ chế lọc DAYID sau review 2026-09-27 — 2 luồng tính độc lập; review 2026-09-26, chuyển từ DIM_RLOS_APPLICATION)"| D
+    H -.->|"PRODUCT_SK (cột có sẵn) → PRODUCT_LINE_NAME — đầu vào tra SLA"| D
+    R -->|"LEFT JOIN theo PRODUCT_LINE/CHANGE_TYPE either-or (CHANGE_TYPE có sẵn trên chính bảng này), DEVIATION_G3, SECONDARY_PRODUCTLINE, APP_GRP — sinh REF_PRODUCT, SLA nhóm (review 2026-09-26, chuyển từ DIM_RLOS_APPLICATION)"| D
     S -.->|"LEFT JOIN SLA Nhập liệu tập trung, phục vụ BC9 — report-time qua PRODUCT_SK trên chính bảng này, KHÔNG denormalize (review 2026-09-21)"| D
     CARD -.->|"T24_CARD_SK (review 2026-09-21, đóng gap BC1.K_TYPE) — lookup theo RESULT_MAIN_CARD_ID có sẵn trên DIM_RLOS_APPLICATION (2.3.1.1) = MAIN_ID"| D
     SMC -.->|"T24_SEAB_MAIN_CARD_SK (review 2026-09-21, đóng gap BC1.HOME_ADDRESS) — lookup theo RESULT_MAIN_CARD_ID = RECID"| D
+    WD -.->|"WORKSTEP_DECISION_SK (qua LAST_WORKSTEP_DECISION_SK, cột có sẵn) → WORKSTEP_CODE/DECISION_CODE — sinh APPLICATION_STATUS/FLAG_AUTO_CANCEL (review 2026-09-27, chuyển từ SB_DWH)"| D
+    WE -.->|"MIN(ENTRYDATE) tại WORKSTEP_CODE='CancelRevoke' thỏa 3 nhánh OR — sinh AUTO_CANCEL_DATE (review 2026-09-27, chuyển từ SB_DWH); *_USERMAKE (đã bê 1:1) map thẳng sang *_TAKERESPON"| D
 ```
 
 **Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain/PK. Không có cột
-vật lý `BI_FLOW`/`ZONE` riêng trên bảng này — báo cáo lấy `BI_FLOW` bằng
-JOIN `APPLICATION_SK` sang `DIM_RLOS_APPLICATION` (cột đã có sẵn, LEFT JOIN
-`REF_RLOS_FLOW` theo `STREAM`, xem 2.3.1.1), và lấy `ZONE` chuẩn hóa bằng
-JOIN `ORG_UNIT_SK` sang `DIM_LOS_ORG_UNIT` rồi LEFT JOIN tiếp
+vật lý `ZONE` riêng trên bảng này — báo cáo lấy `ZONE` chuẩn hóa bằng JOIN
+`COMPANY_SK` sang `DIM_LOS_COMPANY` rồi LEFT JOIN tiếp
 `TMP_REF_COMPANY_REGION_KHCN` tại tầng truy vấn báo cáo (xem 2.1.1) — nhất
-quán với quyết định "ZONE là join-time-only" đã chốt. `RLOS_REF_SLA_TDKHCN`
-phục vụ `REF_PRODUCT`/`SLA_CREDIT_*` của BC5/BC9, đã tính sẵn tại
-`DIM_RLOS_APPLICATION` (2.3.1.1). `REF_SLA_NLTT` (2.4.8, review
-2026-09-21) phục vụ `SLA_DE_RESULT`/`SLA_QC_RESULT`/`SLA_DE_TOTAL_
-RESULT`/`QD_DDE`/`QD_QC` — KHÔNG denormalize (đảo lại quyết định đóng
-PENDING #12), báo cáo tự `LEFT JOIN` runtime bằng `PRODUCT_LINE_NAME`
-(qua `PRODUCT_SK` có sẵn trên chính bảng này → `DIM_RLOS_PRODUCT`) +
-`SYSTEM_CODE='RLOS'`. Bổ sung duy nhất khóa kỹ thuật `T24_CUSTOMER_SK`
-(review 2026-09-17: đổi tên từ `CUSTOMER_SK` để phân biệt rõ với khách
-hàng LOS/applicant) để báo cáo join sang `DIM_T24_CUSTOMER` (T24).
+quán với quyết định "ZONE là join-time-only" đã chốt. `REF_SLA_NLTT`
+(2.4.8, review 2026-09-21) phục vụ `SLA_DE_RESULT`/`SLA_QC_RESULT`/
+`SLA_DE_TOTAL_RESULT`/`QD_DDE`/`QD_QC` — KHÔNG denormalize (đảo lại
+quyết định đóng PENDING #12), báo cáo tự `LEFT JOIN` runtime bằng
+`PRODUCT_LINE_NAME` (qua `PRODUCT_SK` có sẵn trên chính bảng này →
+`DIM_RLOS_PRODUCT`) + `SYSTEM_CODE='RLOS'`. ⚠️ Review 2026-09-26: KHÔNG
+còn bổ sung `T24_CUSTOMER_SK` ở tầng này nữa — cột này đã chuyển hẳn sang
+`FCT_RLOS_CUSTOMER` (1.3.2.8/2.3.2.x, đúng grain giấy tờ, join trực
+tiếp `ID_NUMBER`/`ID_TYPE` không cần qua `ADD_ID` chuỗi nối); báo cáo
+cần `T24_CUSTOMER_SK` sẽ tự JOIN `FCT_RLOS_CUSTOMER` theo `WI_NAME`.
 
-###### 2.3.2.2 FCT_RLOS_APPLICATION_PARTY
+**Chuyển `BUSINESS_FLOW`/`DEVIATION_G3`/`REF_PRODUCT`/`SLA_CREDIT_OFFICER`/
+`SLA_MARKER`/`SLA_CHECKER`/`SLA_CREDIT_APPROVER` từ `DIM_RLOS_APPLICATION`
+sang đây (review 2026-09-26, theo yêu cầu người dùng):** `BUSINESS_FLOW` —
+PHÁI SINH: LEFT JOIN `REF_RLOS_FLOW` theo `STREAM` (`STREAM` đã có sẵn
+trên `DIM_RLOS_APPLICATION`, tra qua `APPLICATION_SK`). `DEVIATION_G3` —
+PHÁI SINH: đọc `FCT_RLOS_DEVIATION` (SB_DWH, 1.3.2.x), lọc `DAYID=
+MAX(DAYID)` mỗi `WI_NAME` (ảnh chụp gần nhất), `COUNT(*)` theo `WI_NAME`,
+>=3 → 'YES', còn lại → 'NO'. Cùng nguồn/công thức với `AGG_LOS_KPI_
+APPLICATION.DEVIATION_G3` (2.1.9) — không phải 2 luồng tính độc lập.
+`REF_PRODUCT`/`SLA_*` — PHÁI SINH: LEFT JOIN `RLOS_REF_SLA_TDKHCN` theo
+`PRODUCT_LINE_NAME` (lấy qua `PRODUCT_SK`, cột có sẵn trên bảng này, →
+`DIM_RLOS_PRODUCT`) hoặc `CHANGE_TYPE` (either/or — chỉ so khớp `CHANGE_
+TYPE` khi dòng REF_ có `PRODUCT_LINE = 'Trường Change Request'`; `CHANGE_
+TYPE` đã có sẵn trên chính bảng này, cột 78, không cần tra qua bảng khác)
++ `DEVIATION_G3` (cột vừa tính ở trên, bỏ qua điều kiện nếu REF_ để
+trống — review 2026-09-18) + `SECONDARY_PRODUCTLINE` (=`IS_SEC_PRODUCT`,
+map Có→YES/Không→NO, đã có trên `DIM_RLOS_APPLICATION`, tra qua
+`APPLICATION_SK`, bỏ qua điều kiện nếu REF_ để trống) + `APP_GRP` (đã có
+trên `DIM_RLOS_APPLICATION`, tra qua `APPLICATION_SK`). Khóa tra dùng
+`PRODUCT_LINE_NAME` (tên hiển thị), không phải `PRODUCT_LINE_CODE` (mã)
+— xác nhận theo dữ liệu seed thật của `RLOS_REF_SLA_TDKHCN` (review
+2026-09-21). Lý do dời khỏi DIM: khóa tra (`STREAM`/`APP_GRP`) là thuộc
+tính ổn định của hồ sơ, `DEVIATION_G3` vốn đã là event-grain report-time,
+nên đặt JOIN ở tầng FCT không ảnh hưởng tính đúng point-in-time — đồng
+thời giữ nguyên tắc "DIM PDTD_DTM giống hệt DIM SB_DWH", cùng lý do áp
+dụng cho `DIM_CLOS_APPLICATION`/`FCT_CLOS_APPLICATION` (2.2.1.1/
+2.2.2.1). Xem Section 3 dòng #13.
 
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        C["FCT_RLOS_APPLICATION_PARTY"]
-    end
-    subgraph PDTD_DTM
-        D["FCT_RLOS_APPLICATION_PARTY"]
-    end
-    C -->|bê 1:1| D
-```
+**Chuyển thêm 3 cột business rule từ SB_DWH về đây (review 2026-09-27,
+theo yêu cầu người dùng — đồng bộ RLOS theo đúng pattern đã áp dụng cho
+CLOS 2.2.2.1):** `AUTO_CANCEL_DATE`/`APPLICATION_STATUS`/`FLAG_AUTO_CANCEL`
+— công thức viết lại tham chiếu cột đã có sẵn trên chính bảng này (qua
+`LAST_WORKSTEP_DECISION_SK`/`CANCEL_DATE`) hoặc lịch sử sự kiện trên
+`SB_DWH.FCT_RLOS_WORKSTEP_EVENT` (1.3.2.7), không đọc lại STG_LOS.
+`APPLICATION_STATUS`: tra `WORKSTEP_CODE`/`DECISION_CODE` qua
+`LAST_WORKSTEP_DECISION_SK` → `DIM_RLOS_WORKSTEP_DECISION`, áp
+`CASE WHEN DECISION_CODE IN ('Submit','Send To PostSanction',
+'Submit To DisbursementMaker','Send To HOSupport') THEN 'Approved' WHEN
+DECISION_CODE='Reject' THEN 'Rejected' WHEN WORKSTEP_CODE IN
+('CancelRevoke','CancelPermanent') THEN 'Cancelled' ELSE 'Processing'
+END` (cùng công thức đã dùng cho CLOS). `AUTO_CANCEL_DATE`: giữ nguyên
+công thức 3 nhánh OR theo nguyên văn SRS BC1 (xem Section 2 → 1.3.2.1
+cột 31 cũ), nay đọc `MIN(ENTRYDATE)` trên `SB_DWH.FCT_RLOS_WORKSTEP_
+EVENT` thay vì `NG_SB_RLOS_ENTRY_EXIT` trực tiếp. `FLAG_AUTO_CANCEL`:
+`CASE WHEN AUTO_CANCEL_DATE IS NOT NULL THEN 'YES' ELSE 'NO' END`.
+**Review 2026-10-01 (theo yêu cầu người dùng):** trước đây dự kiến thêm
+3 cột `UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/
+`APPROVAL_TAKERESPON` map thẳng từ `*_USERMAKE` trong cùng lô chuyển
+này — đã xóa khỏi thiết kế vì trùng giá trị 100% với `*_USERMAKE` (đã
+bê 1:1 từ SB_DWH, kết quả COALESCE cuối cùng), không mang business
+logic riêng; BC1 nay map thẳng vào `*_USERMAKE`. SB_DWH nay chỉ giữ
+input thô `CANCEL_DATE`/`*_USERMAKE`, không cần thêm cột thô mới nào
+khác vì `LAST_WORKSTEP_DECISION_SK`/`FCT_RLOS_WORKSTEP_EVENT` đã có
+sẵn. Xem Section 2 → 2.3.2.1 để biết chi tiết đánh số cột.
 
-**Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain (1 dòng = 1 hồ sơ
-× 1 corepayer, `COREPAYER_SK = -1` nếu không có corepayer). Không có REF_
-nào join thêm ở tầng này — bảng chỉ chứa khóa liên kết.
+###### 2.3.2.2 FCT_RLOS_APPLICATION_PARTY — ĐÃ XÓA (review 2026-09-26, theo yêu cầu người dùng)
+
+**Đã xóa hẳn bảng này** — xem lý do đầy đủ tại Section 1 → 1.3.2.2 (SB_DWH):
+sau khi cả `FCT_RLOS_CUSTOMER` (2.3.2.9) và `FCT_RLOS_COREPAYER`
+(2.3.2.10) đều là FACT chi tiết theo giấy tờ, bảng liên kết này mất cả
+`APPLICANT_SK` lẫn `COREPAYER_SK`, không còn lý do tồn tại.
 
 ###### 2.3.2.3 FCT_RLOS_COLLATERAL
 
@@ -3677,13 +4371,17 @@ flowchart LR
 ```
 
 **Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain/PK (`DAYID +
-WI_NAME + SUB_PRODUCT_TYPE_CODE + SUB_PRODUCT_BK`). Không có REF_ nào
-join thêm ở tầng này — cấu trúc giữ nguyên như tài liệu gốc, xem thiết kế
-đầy đủ tại Section 1 → 1. SB_DWH → 1.3.2.4. Cột `CARD_TYPE_CODE` (chỉ có
-giá trị ở dòng `SUB_PRODUCT_TYPE_CODE='CREDIT_CARD'`) là loại thẻ đăng ký
-lúc đề xuất sản phẩm phụ — khác khái niệm `BC1.K_TYPE` (loại thẻ thật sau
-giải ngân, nguồn `STG_DIM_CARD.K_TYPE` qua `NG_SB_RLOS_SENT_CBS_LOG`,
-nằm ngoài phạm vi datamart hiện tại, không đi qua cột này).
+SUB_PRODUCT_BK` — review 2026-09-27, theo yêu cầu người dùng: xóa hẳn
+`SUB_PRODUCT_TYPE_CODE` khỏi PK vì chỉ là ánh xạ 1-1 của `SUB_PRODUCT_
+LINE`, còn `WI_NAME`+`SUB_PRODUCT_LINE`+`SPP_AMOUNT`+`SPP_TERM` đã được
+hash vào `SUB_PRODUCT_BK` nên tự nó đủ đảm bảo duy nhất). Không có REF_
+nào join thêm ở tầng này — cấu trúc giữ nguyên như tài liệu gốc, xem
+thiết kế đầy đủ tại Section 1 → 1. SB_DWH → 1.3.2.4. Cột `CARD_TYPE_CODE`
+(chỉ có giá trị ở dòng `SUB_PRODUCT_LINE='Thẻ tín dụng'`) là loại thẻ
+đăng ký lúc đề xuất sản phẩm phụ — khác khái niệm `BC1.K_TYPE` (loại thẻ
+thật sau giải ngân, nguồn `STG_DIM_CARD.K_TYPE` qua `NG_SB_RLOS_
+SENT_CBS_LOG`, nằm ngoài phạm vi datamart hiện tại, không đi qua cột
+này).
 
 ###### 2.3.2.5 FCT_RLOS_EXCEPTION
 
@@ -3691,6 +4389,7 @@ nằm ngoài phạm vi datamart hiện tại, không đi qua cột này).
 flowchart LR
     subgraph SB_DWH
         C["FCT_RLOS_EXCEPTION"]
+        WE["FCT_RLOS_WORKSTEP_EVENT"]
     end
     subgraph PDTD_DTM
         REF(["REF_PHAN_LOAI_DDE"])
@@ -3698,22 +4397,27 @@ flowchart LR
     end
     C -->|bê 1:1| D
     REF -.->|"LEFT JOIN EXCEPTION_CATEGORY + SYSTEMNAME='RLOS' — sinh PHAN_LOAI_DDE (review 2026-09-22, chuyển từ SB_DWH)"| D
+    WE -.->|"JOIN theo WI_NAME (không phải STG_LOS) — sinh FIRST_WORKSTEP_RETURN: WORKSTEP_CODE tại MIN(EXITDATE) thỏa 3 nhánh WORKSTEP/DECISION_CODE (review 2026-09-27, chuyển từ SB_DWH)"| D
+    C -.->|"EXCEPTION_CATEGORY/EXCEPTION_NAME (có sẵn) + SUB_PRODUCT (cột thô mới) — sinh CHECK_FTR: whitelist miễn trừ phân nhóm theo BI_SUB_PRODUCT (review 2026-09-27, chuyển từ SB_DWH)"| D
 ```
 
 **Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain/PK (`DAYID +
 WI_NAME + EXCEPTION_CATEGORY + RAISED_BY + RAISED_DATE_TIME`), cùng đầy
-đủ 13 cột (11 cột gốc + `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` đã tính sẵn
-ở tầng SB_DWH — xem Section 1 → 1. SB_DWH → 1.3.2.5). Không đọc thêm
-`NG_SB_RLOS_ENTRY_EXIT` hay bất kỳ bảng STG_LOS nào ở tầng này, giữ đúng
-nguyên tắc "DTM chỉ đọc DWH". Bổ sung 2 cột phái sinh tại DTM:
-`LOANCASEID` (join qua `DIM_RLOS_APPLICATION.LOANCASEID` theo
-`APPLICATION_SK` — cùng cách `FCT_CLOS_EXCEPTION`, 2.2.2.4, đã làm) và
+đủ 13 cột (11 cột gốc + `SUB_PRODUCT` cột thô — xem Section 1 → 1. SB_DWH
+→ 1.3.2.5). Không đọc thêm `NG_SB_RLOS_ENTRY_EXIT` hay bất kỳ bảng STG_LOS
+nào ở tầng này, giữ đúng nguyên tắc "DTM chỉ đọc DWH". Bổ sung 4 cột phái
+sinh tại DTM: `LOANCASEID` (join qua `DIM_RLOS_APPLICATION.LOANCASEID`
+theo `APPLICATION_SK` — cùng cách `FCT_CLOS_EXCEPTION`, 2.2.2.4, đã làm),
 **`PHAN_LOAI_DDE`** (review 2026-09-22, chuyển tầng từ SB_DWH, cùng lý do
 đã áp dụng cho CLOS — xem "⚠️ Đánh giá kiến trúc" tại 2.2.2.4): `LEFT
 JOIN REF_PHAN_LOAI_DDE` theo `EXCEPTION_CATEGORY + SYSTEMNAME='RLOS'`,
 lấy `REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE` — cùng bảng REF_ dùng chung với
-CLOS. `FCT_RLOS_EXCEPTION` ở tầng SB_DWH nay KHÔNG còn cột
-`PHAN_LOAI_DDE` (còn 14 cột, xem `hld/HLD_FCT_SB_DWH.md` mục 1.3.2.5).
+CLOS, và **`CHECK_FTR`/`FIRST_WORKSTEP_RETURN`** (review 2026-09-27,
+chuyển tầng từ SB_DWH, xem mục 6.3 chi tiết công thức tại
+`hld/hld_review/HLD_FCT_PDTD_DTM_review.md` mục 16). `FCT_RLOS_EXCEPTION`
+ở tầng SB_DWH nay KHÔNG còn cột `PHAN_LOAI_DDE`/`CHECK_FTR`/
+`FIRST_WORKSTEP_RETURN` (còn 13 cột, xem
+`hld/hld_review/HLD_FCT_SB_DWH_review.md` mục 12).
 
 ###### 2.3.2.6 FCT_RLOS_DEVIATION
 
@@ -3732,8 +4436,8 @@ flowchart LR
 WI_NAME + DEVIATION_BK`), cùng đầy đủ 8 cột (7 cột gốc + `PROCESSED_DATE`
 đã tính sẵn ở tầng SB_DWH, đọc thẳng `NG_SB_RLOS_ENTRY_EXIT` — xem đánh
 giá kiến trúc tại Section 1 → 1. SB_DWH → 1.3.2.6). Không JOIN sang
-`FCT_RLOS_APPLICATION_DAILY` hay đọc thêm bảng STG_LOS nào ở tầng này —
-`FCT_RLOS_DEVIATION` và `FCT_RLOS_APPLICATION_DAILY` là 2 luồng ETL độc
+`FCT_RLOS_APPLICATION` hay đọc thêm bảng STG_LOS nào ở tầng này —
+`FCT_RLOS_DEVIATION` và `FCT_RLOS_APPLICATION` là 2 luồng ETL độc
 lập hoàn toàn (không còn cột đếm trung gian nào giữa 2 bảng, xem đánh giá
 kiến trúc tại Section 1/2 → 1.3.2.1), giữ đúng nguyên tắc "DTM chỉ đọc
 DWH".
@@ -3755,7 +4459,10 @@ flowchart LR
 WI_NAME + WORKSTEP_CODE + ENTRYDATE`), cùng đầy đủ 25 cột (đã tăng từ 23
 lên 26 sau khi bổ sung PROCESSED_DATE/WORKSTEP_FLAG/APPLICANT_SK, review
 2026-09-21, rồi giảm còn 25 sau khi bỏ EVENT_SEQ_DESC — cột dư thừa,
-review 2026-09-22). Không có bảng
+review 2026-09-22; ⚠️ review 2026-09-26: bỏ tiếp `APPLICANT_SK` sau khi
+`DIM_RLOS_APPLICANT` đổi thành `FCT_RLOS_CUSTOMER` — vẫn còn 25 cột vì
+`APPROVED_AMT_FINAL`/`CURRENCY_CODE`/`APPROVED_TERM` đánh số lại lấp
+đúng chỗ trống). Không có bảng
 `REF_` nào join thêm ở tầng này — cấu trúc giữ nguyên như bản SB_DWH, xem
 thiết kế đầy đủ tại Section 1 → 1. SB_DWH → 1.3.2.7.
 
@@ -3776,7 +4483,7 @@ flowchart LR
     end
     SA -->|1:1 SEAB_LOS_ID, LIMIT_REF + PHÁI SINH DISBURSEMENT_AMT/CUR_BALANCE + self-join PD_CONTRACT sinh NO_DAYS_OVERDUE/CUR_BUCKET| E
     CUST -.->|CUSTOMER_SK, tra theo CUSTOMER_SK có sẵn trên STG_FCT_LOAN| E
-    COMP -.->|COMPANY_SK, tra theo CO_CODE| E
+    COMP -.->|T24_COMPANY_SK, tra theo CO_CODE| E
     LOAN -.->|CONTRACT_SK, tra theo CONTRACT_SK có sẵn trên STG_FCT_LOAN| E
     PROD -.->|SEAB_PRODUCTS_DE_SK, tra theo SEAB_PRODUCTS_DE_SK có sẵn trên STG_FCT_LOAN — SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả| E
     RAPP -.->|APPLICATION_SK theo SEAB_LOS_ID — PHÁI SINH APPROVAL_DATE qua LAST_APPROVAL_DATE cho BC10| E
@@ -3832,7 +4539,7 @@ hiện `STG_FCT_LOAN` (alias `a`) đã sẵn có các khóa surrogate
 
 **Bổ sung 2 trường theo yêu cầu bám sát SRS:**
 - `BRANCH_NAME`, `COMPANY_NAME` — chuyển hẳn vào `DIM_T24_COMPANY`
-  (2.1.4), fact chỉ giữ FK `COMPANY_SK`.
+  (2.1.4), fact chỉ giữ FK `T24_COMPANY_SK`.
 - `ZONE` — nguồn `TMP_REF_COMPANY_REGION_KHCN` (bảng REF_ tĩnh, seed
   Excel, không phải DIM SCD2) — lưu **trực tiếp giá trị** trên fact
   (denormalize), không tách FK riêng.
@@ -3844,7 +4551,7 @@ hiện `STG_FCT_LOAN` (alias `a`) đã sẵn có các khóa surrogate
   `DIM_RLOS_APPLICATION.LAST_APPROVAL_DATE` (đã bổ sung ở SB_DWH, xem
   1.3.1.1) qua `APPLICATION_SK` đã có sẵn trên fact, không đọc thẳng
   `NG_SB_RLOS_ENTRY_EXIT` tại đây, không JOIN fact-to-fact sang
-  `FCT_RLOS_APPLICATION_DAILY`.
+  `FCT_RLOS_APPLICATION`.
 
 **Đã bỏ `LIMIT_REFERENCE` (review 2026-09-17):** cột này có trên bản CLOS
 (`FCT_CLOS_LOAN_DISBURSEMENT`, 2.2.2.7 — đúng theo SRS BC11, trường
@@ -3852,6 +4559,46 @@ hiện `STG_FCT_LOAN` (alias `a`) đã sẵn có các khóa surrogate
 chứng riêng — rà soát toàn bộ 19 trường output của SRS BC10 xác nhận
 không có trường nào tên gần "LIMIT". Đã xóa khỏi bảng cột (2.3.2.8,
 Section 2), giảm từ 16 xuống 15 cột.
+
+###### 2.3.2.9 FCT_RLOS_CUSTOMER — MỚI (đổi từ DIM_RLOS_APPLICANT, review 2026-09-26)
+
+```mermaid
+flowchart LR
+    subgraph SB_DWH
+        C["FCT_RLOS_CUSTOMER"]
+    end
+    subgraph PDTD_DTM
+        D["FCT_RLOS_CUSTOMER"]
+    end
+    C -.->|"bê 1:1, PHÁI SINH thêm CUSTOMER_SEGMENT từ CUS_SEGMENT"| D
+```
+
+**Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain/PK (`DAYID +
+CUSTOMER_BK`). Bổ sung duy nhất `CUSTOMER_SEGMENT` (PHÁI SINH: `CASE WHEN
+UPPER(CUS_SEGMENT) LIKE '%XANH' THEN 'XANH' WHEN CUS_SEGMENT = 'CBNV'
+THEN 'CBNV' ELSE 'THUONG' END`) — cùng công thức đã dùng khi cột này còn
+ở SB_DWH (trước review 2026-09-26), nay chuyển hẳn xuống PDTD_DTM theo
+đúng nguyên tắc "SB_DWH là ảnh chụp sạch của nguồn, không biến đổi giá
+trị; PDTD_DTM mới là tầng chuẩn hóa/phục vụ báo cáo" — cùng lý do đã áp
+dụng cho `PROOF_OF_INCOME`/`COLL_REQUIRE` trên `DIM_RLOS_APPLICATION`
+(xem 2.3.1.1). Không có bảng `REF_` nào join thêm ở tầng này.
+
+###### 2.3.2.10 FCT_RLOS_COREPAYER — MỚI (đổi từ DIM_RLOS_COREPAYER, review 2026-09-26)
+
+```mermaid
+flowchart LR
+    subgraph SB_DWH
+        C["FCT_RLOS_COREPAYER"]
+    end
+    subgraph PDTD_DTM
+        D["FCT_RLOS_COREPAYER"]
+    end
+    C -->|bê 1:1| D
+```
+
+**Ghi chú lineage:** bê nguyên 1:1 từ SB_DWH, cùng grain/PK (`DAYID +
+COREPAYER_BK`). Không có cột phái sinh nào ở tầng này, không có bảng
+`REF_` nào join thêm.
 
 ---
 
@@ -3861,15 +4608,15 @@ Section 2), giảm từ 16 xuống 15 cột.
 
 #### 1.1 Bộ bảng CHUNG
 
-##### 1.1.1 DIM_LOS_ORG_UNIT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_COMPANY/MAS_BRANCH/MAS_REGION, review 2026-09-18)
+##### 1.1.1 DIM_LOS_COMPANY — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_COMPANY/MAS_BRANCH/MAS_REGION, review 2026-09-18)
 
-**Bảng cũ (trước tách):** `DIM_LOS_ORG_UNIT` (không đổi tên — thuộc nhóm CHUNG)
+**Bảng cũ (trước tách):** `DIM_LOS_COMPANY` (không đổi tên — thuộc nhóm CHUNG)
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_LOS_ORG_UNIT, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_LOS_COMPANY, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
 | 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Nguồn hệ dùng chung cho cả hai hệ CLOS và RLOS — cột kỹ thuật, luôn cố định 'LOS' |
-| 3 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_ORG_UNIT, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
+| 3 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_COMPANY, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
 | 4 | COMPANY_CODE | VARCHAR2 | Y | 50 | NK | Mã đơn vị kinh doanh (PGD/CN — mức chi tiết nhất) — nguồn NG_SB_RLOS_MAS_COMPANY.COMPANY_CODE (review 2026-09-18: đổi nguồn từ hồ sơ LOS sang bảng danh mục thật, xem Section 3) |
 | 5 | COMPANY_NAME | VARCHAR2 | N | 200 |  | Tên đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_NAME_VN |
 | 6 | COMPANY_ADDRESS | VARCHAR2 | N | 500 |  | Địa chỉ đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_ADDRESS_VN (mới, review 2026-09-18) |
@@ -3963,7 +4710,7 @@ nào khai thác trực tiếp — xem Section 3.
 
 ##### 1.2.1 DIM
 
-###### 1.2.1.1 DIM_CLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (xem DQ-11; đã bổ sung CHANGE_TYPE, APP_GRP, HAVE_ANY_DEVIATION)
+###### 1.2.1.1 DIM_CLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (xem DQ-11; APP_GRP, HAVE_ANY_DEVIATION). ⚠️ review 2026-09-25 (lượt 3): xóa INDUSTRY_LVL1/2/3_CODE (trùng DIM_CLOS_CUSTOMER), đổi nguồn EMPLOYEE_CODE/NAME sang EXTTABLE. ⚠️ review 2026-09-30 (theo yêu cầu người dùng): xóa CREDIT_LIMIT_COMMITTEE/CURRENCY_CODE/APPROVED_TERM (BC3 đã trỏ thẳng FCT_CLOS_WORKSTEP_EVENT, không cần bản dư thừa trên DIM nữa) và xóa 12 cột "username/routing tại 1 bước" (DATACHKUSER/UWMAKERUSER/UWCHKRUSER/CREDAPPRUSER/CCOMMITUSER/HOSUPPORTUSER/POSTSANCUSER/PREDISBMAKUSER/PREDISBCHKUSER/DISBCHKUSER/DISBMAKUSER/CHECKER3_TARGET) — các cột set-tại-chỗ (NULL→username khi hồ sơ qua bước) trên EXTTABLE khiến DIM (SCD2) sinh thêm phiên bản mới mỗi lần 1 bước hoàn tất, trong khi thông tin USERNAME/WORKSTEP_CODE tương đương đã có sẵn trên FCT_CLOS_WORKSTEP_EVENT (bảng nhật ký, không bị vấn đề phình version); công thức COALESCE cho UNDERWRITERMAKER_USERMAKE/UNDERWRITERCHECKER_USERMAKE/APPROVAL_USERMAKE tại FCT_CLOS_APPLICATION (1.2.2.1) đọc thẳng NG_SB_CLOS_EXTTABLE, không phụ thuộc DIM nên không ảnh hưởng. ⚠️ review 2026-09-30 (lượt tiếp theo, theo yêu cầu người dùng): chuyển FIRST_APPROVED_DATE sang FCT_CLOS_APPLICATION (đặt cạnh LAST_APPROVAL_DATE — cùng lý do: chỉ có giá trị từ khi hồ sơ tới bước phê duyệt, không phải thuộc tính hồ sơ ổn định phù hợp DIM); xóa APPROVAL_TYPE (chuyển tính CASE lọc STREAM tại FCT_CLOS_APPLICATION tầng PDTD_DTM — xem 2.2.2.1); chuyển LG_REQ/FI_REQ/PHONE_REQ sang FCT_CLOS_APPLICATION (cùng lý do 11 cờ đã chuyển bên DIM_RLOS_APPLICATION: cờ yêu cầu gắn với nguồn NG_SB_CLOS_CUST_INFO, bảng phát sinh dòng mới khi bàn giao nhân viên khác xử lý, không phải thuộc tính hồ sơ ổn định); xóa DECISION/CURR_WSNAME/PREV_WSNAME (trùng bản chất với LAST_WORKSTEP_DECISION_SK/PRE_WORKSTEP_CODE đã có report dùng qua BC2 trên FCT_CLOS_APPLICATION, cùng FCT_CLOS_WORKSTEP_EVENT — đúng tiền lệ đã xóa 3 cột cùng tên trên DIM_RLOS_APPLICATION) — nay 26 cột
 
 **Bảng cũ (trước tách):** `DIM_LOS_APPLICATION` → tách phần thuộc tính CLOS thành `DIM_CLOS_APPLICATION`
 
@@ -3972,44 +4719,124 @@ nào khai thác trực tiếp — xem Section 3.
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_APPLICATION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
 | 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
 | 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_APPLICATION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 4 | WI_NAME | VARCHAR2 | Y | 100 | NK | Mã hồ sơ tín dụng CLOS — nguồn NG_SB_CLOS_CUST_INFO.WI_NAME. UNIQUE (WI_NAME, EFF_DATE) |
+| 4 | WI_NAME | VARCHAR2 | Y | 100 | NK | Mã hồ sơ tín dụng CLOS — nguồn đổi thành NG_SB_CLOS_EXTTABLE.WI_NAME (review 2026-09-25 lượt 2: đổi driving table, KEY CDC=WI_NAME xác nhận qua DS_BANG_202608.xlsx, cùng grain với NG_SB_CLOS_CUST_INFO nên không đổi ý nghĩa dữ liệu). UNIQUE (WI_NAME, EFF_DATE) |
 | 5 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ — nguồn NG_SB_CLOS_EXTTABLE.LOANCASEID, giữ nguyên văn không lọc ở SB_DWH (DTM lọc riêng theo nhu cầu BC11) |
 | 6 | FIRST_APPROVED_WI_NAME | VARCHAR2 | N | 100 |  | Mã hồ sơ cha (BC11.APPROVAL_WINAME_LOS) — PHÁI SINH: MIN(WI_NAME) trên NG_SB_CLOS_EXTTABLE, group theo LOANCASEID (cùng bảng nguồn với cột LOANCASEID ở trên), gán cho mọi hồ sơ cùng LOANCASEID. Đúng nguyên văn công thức SRS BC11 ("lấy WI_NAME nhỏ nhất của LOANCASEID"), không lọc WORKSTEP/DECISION nào thêm |
-| 7 | FIRST_APPROVED_DATE | DATE | N |  |  | Ngày phê duyệt (BC11.APPROVAL_DATE) — PHÁI SINH: MAX(EXITDATE) trên NG_SB_CLOS_ENTRY_EXIT của hồ sơ thỏa USERNAME IS NOT NULL AND WORKSTEP IN ('CreditApproval','CreditCommittee') AND DECISION IN ('Submit','Send To HOSupport','Send To PostSanction'). Đúng nguyên văn công thức SRS BC11 — không đi cặp cùng WI_NAME với FIRST_APPROVED_WI_NAME (SRS định nghĩa 2 cột độc lập, khác bảng nguồn) |
-| 8 | STREAM | VARCHAR2 | N | 200 |  | Luồng nghiệp vụ của hồ sơ — nguồn NG_SB_CLOS_APPROVAL.STREAM |
-| 9 | APPROVAL_TYPE | VARCHAR2 | N | 200 |  | Loại luồng phê duyệt — nguồn NG_SB_CLOS_APPROVAL.STREAM đọc theo nghĩa luồng phê duyệt tại bước kiểm soát nhập liệu |
-| 10 | CHANGE_REQUEST | VARCHAR2 | N | 200 |  | Yêu cầu điều chỉnh hồ sơ — nguồn NG_SB_CLOS_CHANGEREQ.CHANGE_REQUEST |
-| 11 | CHANGE_TYPE | VARCHAR2 | N | 500 |  | Loại thay đổi điều kiện phê duyệt (BC2) — nguồn NG_SB_CLOS_CHANGEREQ.CHANGE_TYPE, giữ nguyên chuỗi gốc kể cả dạng đa giá trị nối bằng dấu `~` (1 yêu cầu có thể thay đổi nhiều loại hạn mức cùng lúc, ví dụ "Hạn mức Chiết khấu~Hạn mức bảo lãnh~") |
-| 12 | CREDIT_PROFILE | VARCHAR2 | N | 50 |  | Cấp tín dụng của hồ sơ (TVTD/CTD) — nguồn NG_SB_CLOS_EXTTABLE.CREDIT_PROFILE. Đã xác nhận trực tiếp trên database: cột tồn tại thật, khớp SRS BC2 — metadata Column Review trước đây thiếu sót |
-| 13 | CUST_GROUP | VARCHAR2 | N | 100 |  | Nhóm khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUST_GROUP |
-| 14 | INDUSTRY_LVL1_CODE | VARCHAR2 | N | 200 |  | Mã ngành cấp 1 — nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_1. Đã xác nhận trực tiếp trên database: cột tồn tại thật, khớp SRS BC2 — metadata Column Review trước đây thiếu sót |
-| 15 | INDUSTRY_LVL2_CODE | VARCHAR2 | N | 200 |  | Mã ngành cấp 2 — nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_2. Cùng xác nhận như INDUSTRY_LVL1_CODE |
-| 16 | INDUSTRY_LVL3_CODE | VARCHAR2 | N | 200 |  | Mã ngành cấp 3 — nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_3. Cùng xác nhận như INDUSTRY_LVL1_CODE |
-| 17 | EMPLOYEE_CODE | VARCHAR2 | N | 50 |  | Mã cán bộ quản lý hồ sơ — nguồn NG_SB_CLOS_CUST_INFO.EMP_CODE, quan hệ 1:1 với WI_NAME (LEFT JOIN thẳng, không cần tiêu chí chọn dòng). Metadata Table Review mô tả lý thuyết khóa kỹ thuật WI_NAME+EMP_CODE (bàn giao sinh dòng mới) nhưng người dùng đã kiểm tra trực tiếp dữ liệu thực tế xác nhận mỗi hồ sơ chỉ có đúng 1 dòng trên NG_SB_CLOS_CUST_INFO |
-| 18 | EMPLOYEE_NAME | VARCHAR2 | N | 200 |  | Tên cán bộ quản lý hồ sơ — nguồn NG_SB_CLOS_CUST_INFO.EMP_NAME, cùng quan hệ 1:1 như EMPLOYEE_CODE |
-| 19 | CREATION_DATE | DATE | N | 10 |  | Ngày khởi tạo hồ sơ — PHÁI SINH: MIN(ENTRYDATE) theo WI_NAME trên NG_SB_CLOS_ENTRY_EXIT, TRUNC về ngày |
-| 20 | APP_GRP | VARCHAR2 | N | 50 |  | Cấp thẩm quyền phê duyệt của hồ sơ (A1-C3, BOD, CC, SCC, RCC) — nguồn NG_SB_CLOS_APPROVAL.APP_GRP. BC1/BC2 hiển thị trực tiếp; BC9 dùng làm khóa tra điểm KPI (POINT); dùng làm khóa tra cam kết SLA ở PDTD_DTM (xem 2.2.1.1) |
-| 21 | HAVE_ANY_DEVIATION | VARCHAR2 | N | 10 |  | Hồ sơ có ngoại lệ/độ lệch so với chính sách chuẩn hay không (Có/Không) — nguồn NG_SB_CLOS_CREDITINFO_COMM.HAVE_ANY_DEVIATION. Chỉ có giá trị từ khi hồ sơ tới bước Hội đồng tín dụng, NULL ở các phiên bản trước đó |
-| 22 | CREDIT_LIMIT_COMMITTEE | NUMBER | N | 20,2 |  | Hạn mức do hội đồng phê duyệt (BC3.CREDIT_LIMIT) — DƯ THỪA CÓ CHỦ ĐÍCH (review 2026-09-21, theo yêu cầu người dùng): cùng nguồn/giá trị với FCT_CLOS_APPLICATION_DAILY.CREDIT_LIMIT_COMMITTEE (cột 51, 1.2.2.1, nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_LIMIT — cùng bảng LOẠI 1, grain 1 dòng/hồ sơ, đã dùng để nạp HAVE_ANY_DEVIATION ở trên) — đặt thêm 1 bản trên DIM để BC3 lookup thẳng qua APPLICATION_SK (đã có sẵn trên FCT_CLOS_WORKSTEP_EVENT), không cần JOIN fan-out sang FCT_CLOS_APPLICATION_DAILY. KHÔNG thay thế/đổi APPROVED_AMT_FINAL hay công thức CASE chọn CREDIT_LIMIT_APPROVAL/_COMMITTEE hiện có trên FCT — bản trên FCT giữ nguyên |
-| 23 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền (BC3.CURRENCY) — DƯ THỪA CÓ CHỦ ĐÍCH, cùng lý do cột 22 — cùng nguồn/giá trị với FCT_CLOS_APPLICATION_DAILY.CURRENCY_CODE (cột 56, nguồn NG_SB_CLOS_CREDITINFO_COMM.CURRENCY) |
-| 24 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt (BC3.CREDIT_TERM) — DƯ THỪA CÓ CHỦ ĐÍCH, cùng lý do cột 22 — cùng nguồn/giá trị với FCT_CLOS_APPLICATION_DAILY.APPROVED_TERM (cột 53, nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_TERM) |
+| 7 | STREAM | VARCHAR2 | N | 200 |  | Luồng nghiệp vụ của hồ sơ — nguồn NG_SB_CLOS_APPROVAL.STREAM |
+| 8 | CREDIT_PROFILE | VARCHAR2 | N | 50 |  | Cấp tín dụng của hồ sơ (TVTD/CTD) — nguồn NG_SB_CLOS_EXTTABLE.CREDIT_PROFILE. Đã xác nhận trực tiếp trên database: cột tồn tại thật, khớp SRS BC2 — metadata Column Review trước đây thiếu sót |
+| 9 | EMPLOYEE_CODE | VARCHAR2 | N | 100 |  | Mã cán bộ quản lý hồ sơ — nguồn NG_SB_CLOS_EXTTABLE.EMPLOYEE_CODE (review 2026-09-25 lượt 3: đổi nguồn từ NG_SB_CLOS_CUST_INFO.EMP_CODE sang EXTTABLE — cùng driving table với WI_NAME/LOANCASEID/CREDIT_PROFILE, theo yêu cầu người dùng) |
+| 10 | EMPLOYEE_NAME | VARCHAR2 | N | 225 |  | Tên cán bộ quản lý hồ sơ — nguồn NG_SB_CLOS_EXTTABLE.EMPLOYEE_NAME (review 2026-09-25 lượt 3: đổi nguồn từ NG_SB_CLOS_CUST_INFO.EMP_NAME sang EXTTABLE, cùng lý do cột 9) |
+| 11 | CREATION_DATE | DATE | N | 10 |  | Ngày khởi tạo hồ sơ — PHÁI SINH: MIN(ENTRYDATE) theo WI_NAME trên NG_SB_CLOS_ENTRY_EXIT, TRUNC về ngày |
+| 12 | APP_GRP | VARCHAR2 | N | 50 |  | Cấp thẩm quyền phê duyệt của hồ sơ (A1-C3, BOD, CC, SCC, RCC) — nguồn NG_SB_CLOS_APPROVAL.APP_GRP. BC1/BC2 hiển thị trực tiếp; BC9 dùng làm khóa tra điểm KPI (POINT); dùng làm khóa tra cam kết SLA ở PDTD_DTM (xem 2.2.1.1) |
+| 13 | HAVE_ANY_DEVIATION | VARCHAR2 | N | 10 |  | Hồ sơ có ngoại lệ/độ lệch so với chính sách chuẩn hay không (Có/Không) — nguồn NG_SB_CLOS_CREDITINFO_COMM.HAVE_ANY_DEVIATION. Chỉ có giá trị từ khi hồ sơ tới bước Hội đồng tín dụng, NULL ở các phiên bản trước đó |
+| 14 | ZONE | VARCHAR2 | N | 200 |  | Khu vực/vùng quản lý tự khai theo hồ sơ (BC1/BC2.ZONE) — NHẬN LẠI TỪ DIM_CLOS_CUSTOMER (review 2026-09-25, xác định lại là thuộc tính hồ sơ, không phải khách hàng — xem 1.2.1.6): nguồn NG_SB_CLOS_CUST_INFO.ZONEE (đổi tên bỏ chữ E cuối cho gọn). Khác bản chất với DIM_LOS_COMPANY.ZONE (mã nội bộ chuẩn hóa từ MAS_COMPANY, dùng làm khóa join đơn vị kinh doanh) — cột này là giá trị tự khai gắn với hồ sơ, không dùng để join |
+| 15 | APP_DATE | DATE | N |  |  | Ngày khởi tạo/nộp hồ sơ — NHẬN LẠI TỪ DIM_CLOS_CUSTOMER (review 2026-09-25) — nguồn NG_SB_CLOS_CUST_INFO.APP_DATE |
+| 16 | LOAN_PURPOSE | VARCHAR2 | N | 200 |  | Mục đích vay của khoản đang xin trong hồ sơ này (có/không tạo doanh thu) — NHẬN LẠI TỪ DIM_CLOS_CUSTOMER (review 2026-09-25) — nguồn NG_SB_CLOS_CUST_INFO.LOAN_PURPOSE |
+| 17 | EMAIL | VARCHAR2 | N | 200 |  | Email liên hệ khai theo hồ sơ — NHẬN LẠI TỪ DIM_CLOS_CUSTOMER (review 2026-09-25) — nguồn NG_SB_CLOS_CUST_INFO.EMAIL |
+| 18 | DISTANCE_BRANCH_CUSTOMER | VARCHAR2 | N | 100 |  | Dải khoảng cách từ khách hàng đến chi nhánh xử lý hồ sơ này (đã phân nhóm sẵn, không phải số đo thô) — NHẬN LẠI TỪ DIM_CLOS_CUSTOMER (review 2026-09-25) — nguồn NG_SB_CLOS_CUST_INFO.DISTANCE_BRANCH_CUSTOMER. ⚠️ Metadata: cần BA xác nhận đơn vị đo (nghi vấn km) |
+| 19 | PRODUCT_LINE | VARCHAR2 | N | 200 |  | Dòng sản phẩm tự khai theo hồ sơ (mã PRO01-06) — BỔ SUNG (review 2026-09-25 lượt 2, theo SRS BC2 STT27) — nguồn NG_SB_CLOS_CUST_INFO.PRODUCT_LINE. Text as-is, KHÔNG join DIM_CLOS_PRODUCT (xem ghi chú dưới) |
+| 20 | SUB_PRODUCT | VARCHAR2 | N | 255 |  | Sản phẩm vay chi tiết tự khai theo hồ sơ — BỔ SUNG (review 2026-09-25 lượt 2, theo SRS BC2 STT28) — nguồn NG_SB_CLOS_CUST_INFO.SUB_PRODUCT. Text as-is, cùng lý do cột 19 |
+| 21 | ID_NUMBER | VARCHAR2 | N | 100 |  | Số ĐKKD/CMND của khách hàng đứng tên vay chính — BỔ SUNG (review 2026-09-25 lượt 2, theo yêu cầu người dùng) — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' (mỗi hồ sơ đúng 1 dòng, xem FCT_CLOS_LEGAL_PARTY 1.2.2.7). Thể hiện tường minh quan hệ hồ sơ↔khách hàng trên chính DIM này |
+| 22 | CUSTOMER_NAME | VARCHAR2 | N | 200 |  | Tên khách hàng vay — BỔ SUNG (review 2026-09-25 lượt 2) — nguồn NG_SB_CLOS_EXTTABLE.CUSTOMER_NAME (driving table đã có sẵn cột này, không cần lấy qua LEGAL). Thiết kế dư thừa lưu vết nguồn EXTTABLE, cùng nhóm cột dưới |
+| 23 | PRODUCT_NAME | VARCHAR2 | N | 150 |  | Tên sản phẩm vay (đầy đủ hơn SUB_PRODUCT ở cột 20) — BỔ SUNG (review 2026-09-25 lượt 2), nguồn NG_SB_CLOS_EXTTABLE.PRODUCT_NAME. Thiết kế dư thừa, cùng lý do cột 22 |
+| 24 | CHANNEL | VARCHAR2 | N | 200 |  | Kênh nộp hồ sơ (eBanking/khác) — BỔ SUNG (review 2026-09-25 lượt 2), nguồn NG_SB_CLOS_EXTTABLE.CHANNEL. Thiết kế dư thừa, cùng lý do cột 22 |
 | 25 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
 | 26 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
 - Bảng DIM lưu danh mục hồ sơ tín dụng CLOS (doanh nghiệp/tổ chức), 1 dòng = 1 phiên bản thuộc tính của 1 hồ sơ theo thời gian (SCD Type 2).
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
 
+**✅ Đã giải quyết — đổi driving table sang `NG_SB_CLOS_EXTTABLE` (review
+2026-09-25, lượt 2, theo yêu cầu người dùng):** `input/DS_BANG_202608.xlsx`
+xác nhận `NG_SB_CLOS_EXTTABLE` và `NG_SB_CLOS_CUST_INFO` đều có `KEY CDC =
+WI_NAME`, cùng grain hồ sơ — đổi bảng cầm trịch NK `WI_NAME` (cột 4) sang
+`NG_SB_CLOS_EXTTABLE`, không đổi ý nghĩa dữ liệu. `NG_SB_CLOS_CUST_INFO`
+vẫn tiếp tục LEFT JOIN theo `WI_NAME` để cấp các cột của nó (industry,
+8 cột hồ sơ-grain, `PRODUCT_LINE`/`SUB_PRODUCT`).
+
+**Rà soát lại 2 nhóm cột theo đúng ranh giới KHÁCH HÀNG vs HỒ SƠ (review
+2026-09-25, sau khi đánh giá lại grain của `DIM_CLOS_CUSTOMER`, xem
+1.2.1.6):** xóa `CUST_GROUP` — phân khúc khách hàng doanh nghiệp là
+thuộc tính khách hàng thật, không phải hồ sơ, đã chuyển hẳn về `DIM_CLOS_
+CUSTOMER`. Nhận lại 8 cột (cột 22-29): `ZONE`, `APP_DATE`, `LOAN_PURPOSE`,
+`LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER` —
+các cột này từng bị đưa nhầm sang `DIM_CLOS_CUSTOMER` (review 2026-09-21,
+dưới tên "làm giàu"), nay xác định lại đúng grain là thuộc tính HỒ SƠ
+(khu vực đơn vị xử lý, mục đích vay của khoản đang xin, cờ yêu cầu phát
+sinh theo hồ sơ, liên hệ khai theo hồ sơ, khoảng cách tới chi nhánh xử
+lý cụ thể) — cùng nguồn `NG_SB_CLOS_CUST_INFO`, quan hệ 1:1 với hồ sơ.
+
+**✅ Đã giải quyết — xóa `CHANGE_REQUEST`/`CHANGE_TYPE`, chuyển hẳn sang
+Fact (review 2026-09-25, lượt 2, theo yêu cầu người dùng):** nguồn
+`NG_SB_CLOS_CHANGEREQ` mang bản chất "thay đổi thường xuyên" theo hồ sơ,
+không phù hợp là cột ổn định SCD2 trên DIM — sẽ thêm vào `FCT_CLOS_
+APPLICATION_DAILY` (1.2.2.1) khi review riêng bảng đó. Trước đây từng
+"bổ sung `CHANGE_TYPE`, không tách `DIM_CLOS_CHANGE_TYPE`" (kết luận giữ
+làm text trực tiếp, không phải DIM danh mục — kết luận đó về **bản chất
+dữ liệu** vẫn đúng, chỉ đổi **nơi lưu trữ** từ DIM sang FCT). ⚠️ Tham
+chiếu treo cho tới khi FCT_CLOS_APPLICATION được review: `FCT_CLOS_
+WORKSTEP_EVENT` (1.2.2.6), `FCT_CLOS_EXCEPTION` (1.2.2.4), `FCT_CLOS_
+DEVIATION`, `FCT_CLOS_COLLATERAL`, và công
+thức `REF_PRODUCT`/`SLA_*` ở PDTD_DTM (2.2.1.1) dùng `CHANGE_TYPE` làm
+khóa either/or. (⚠️ review 2026-09-26: `FCT_CLOS_APPLICATION_PARTY`
+PDTD_DTM, 2.2.2.2, đã xóa hẳn — loại khỏi danh sách.) Xem Section 3.
+
 **So với thiết kế cũ (`DIM_LOS_APPLICATION` gộp, 29 cột):** bỏ `DATASOURCE`
 (luôn cố định 'CLOS', không cần cột phân biệt hệ nữa); bỏ 10 cột chỉ populate
 từ RLOS (`POLICY`, `CAMPAIGN`, `PROOF_OF_INCOME`, `CUS_SEGMENT`,
-`BI_CUS_SEGMENT`, `COLL_REQUIRE`, `IS_SEC_PRODUCT`, `DEVIATION_FLAG`,
-`RESULT_MAIN_CARD_ID`); **thêm mới `CHANGE_TYPE`, `APP_GRP`,
-`HAVE_ANY_DEVIATION`** (xem giải trình bên dưới); thêm cột kỹ thuật
-`DATASOURCE`. Còn 23 cột, **nay 26 cột (review 2026-09-21):** bổ sung
-dư thừa `CREDIT_LIMIT_COMMITTEE`/`CURRENCY_CODE`/`APPROVED_TERM` (xem
-cột 22-24 ở trên) — phục vụ BC3 lookup thẳng qua `APPLICATION_SK` trên
+`CUSTOMER_SEGMENT`, `COLL_REQUIRE`, `IS_SEC_PRODUCT`, `DEVIATION_FLAG`,
+`RESULT_MAIN_CARD_ID`); thêm cột kỹ thuật `DATASOURCE`, `APP_GRP`,
+`HAVE_ANY_DEVIATION` (xem giải trình bên dưới); bổ sung dư thừa
+`CREDIT_LIMIT_COMMITTEE`/`CURRENCY_CODE`/`APPROVED_TERM` (review
+2026-09-21) — phục vụ BC3 lookup thẳng qua `APPLICATION_SK` trên
 `FCT_CLOS_WORKSTEP_EVENT`, không cần JOIN fan-out sang `FCT_CLOS_
-APPLICATION_DAILY`.
+APPLICATION_DAILY`. **Review 2026-09-25 lượt 2:** đổi driving table,
+xóa `CUST_GROUP`/`CHANGE_REQUEST`/`CHANGE_TYPE`, thêm 8 cột hồ sơ-grain +
+`PRODUCT_LINE`/`SUB_PRODUCT`/`ID_NUMBER` + 18 cột dư thừa từ EXTTABLE.
+**Review 2026-09-25 lượt 3:** xóa `INDUSTRY_LVL1/2/3_CODE` (đã có ở
+`DIM_CLOS_CUSTOMER`, 1.2.1.6 — thuộc tính khách hàng, trùng lặp tại đây);
+đổi nguồn `EMPLOYEE_CODE`/`EMPLOYEE_NAME` từ `NG_SB_CLOS_CUST_INFO` sang
+`NG_SB_CLOS_EXTTABLE` (cùng driving table với `WI_NAME`, theo yêu cầu
+người dùng) — nay 49 cột. **Review 2026-09-30 (theo yêu cầu người dùng):**
+xóa `CREDIT_LIMIT_COMMITTEE`/`CURRENCY_CODE`/`APPROVED_TERM` (dư thừa
+không còn cần thiết vì BC3 đã trỏ thẳng `FCT_CLOS_WORKSTEP_EVENT`) và xóa
+12 cột "username/routing tại 1 bước" (`DATACHKUSER`/`UWMAKERUSER`/
+`UWCHKRUSER`/`CREDAPPRUSER`/`CCOMMITUSER`/`HOSUPPORTUSER`/`POSTSANCUSER`/
+`PREDISBMAKUSER`/`PREDISBCHKUSER`/`DISBCHKUSER`/`DISBMAKUSER`/
+`CHECKER3_TARGET`) — xem giải trình đầy đủ ở đầu mục này — nay 34 cột.
+**Review 2026-09-30 (lượt tiếp theo, theo yêu cầu người dùng):** rà soát
+4 nhóm cột còn lại theo cùng pattern đã áp dụng cho `DIM_RLOS_APPLICATION`:
+- `FIRST_APPROVED_DATE` — chuyển sang `FCT_CLOS_APPLICATION` (1.2.2.1),
+  đặt cạnh `LAST_APPROVAL_DATE`: không phải thuộc tính hồ sơ ổn định, chỉ
+  có giá trị từ khi hồ sơ tới bước phê duyệt (MAX(EXITDATE) lọc DECISION
+  IN ('Submit','Send To HOSupport','Send To PostSanction')) — cùng bản
+  chất grain-theo-sự-kiện với `LAST_APPROVAL_DATE` đã đặt ở FCT. Không
+  trùng lặp: `LAST_APPROVAL_DATE` không lọc DECISION (phục vụ BC2),
+  `FIRST_APPROVED_DATE` lọc DECISION (phục vụ BC11 qua `FCT_CLOS_
+  LOAN_DISBURSEMENT.APPROVAL_DATE`, 2.2.2.7 PDTD_DTM) — 2 metric khác
+  nhau, giữ cả 2 nhưng cùng chuyển sang FCT.
+- `APPROVAL_TYPE` — xóa khỏi DIM (cả SB_DWH và PDTD_DTM). Không phải cột
+  trùng lặp với `STREAM` (cùng nguồn `NG_SB_CLOS_APPROVAL.STREAM` nhưng
+  khác điều kiện: `APPROVAL_TYPE` lọc `STREAM IN ('Phê duyệt tín dụng',
+  'Sent To Disbursement Request')` theo SRS BC2, `STREAM` giữ nguyên giá
+  trị gốc phục vụ BC3/BC9) — nhưng điều kiện lọc là business rule, không
+  phù hợp tính tại SB_DWH (ảnh chụp sạch nguồn); chuyển sang tính tại
+  `FCT_CLOS_APPLICATION` tầng PDTD_DTM (2.2.2.1), giữ `STREAM` thô ở DIM.
+- `LG_REQ`/`FI_REQ`/`PHONE_REQ` — chuyển sang `FCT_CLOS_APPLICATION`
+  (1.2.2.1): cùng lý do đã áp dụng cho 11 cờ nhánh phụ/trạng thái tương
+  ứng bên `DIM_RLOS_APPLICATION` — nguồn `NG_SB_CLOS_CUST_INFO` tự thân
+  phát sinh dòng mới khi hồ sơ bàn giao nhân viên khác xử lý (xác nhận
+  qua `input/CLOS - Metadata.xlsx` sheet "2. Table Review"), không phải
+  thuộc tính hồ sơ ổn định phù hợp SCD2; hiện chưa có report nào tiêu thụ
+  trực tiếp (đối chiếu toàn bộ SRS BC1-BC11).
+- `DECISION`/`CURR_WSNAME`/`PREV_WSNAME` — xóa hẳn: trùng bản chất với
+  `LAST_WORKSTEP_DECISION_SK`(cột 5)/`PRE_WORKSTEP_CODE`(cột 27) đã có
+  report dùng qua BC2 trên `FCT_CLOS_APPLICATION` (1.2.2.1), và
+  `FCT_CLOS_WORKSTEP_EVENT` (1.2.2.6) tái tạo được đầy đủ lịch sử — đúng
+  tiền lệ đã xóa 3 cột cùng tên trên `DIM_RLOS_APPLICATION`. Không có
+  report hay bảng PDTD_DTM nào tham chiếu 3 cột này làm nguồn.
+
+Nay **26 cột**.
 
 **✅ Đã giải quyết — loại bỏ `DIM_CLOS_APPROVAL_GROUP`, bổ sung `APP_GRP` +
 `HAVE_ANY_DEVIATION` thẳng lên đây (trước đây `APP_GRP_CODE` nằm trên
@@ -4017,7 +4844,7 @@ APPLICATION_DAILY`.
 `NG_SB_CLOS_APPROVAL` xác nhận grain thật là 1 dòng = 1 hồ sơ (không phải
 nhiều lần phê duyệt theo thời gian như giả định ban đầu ở Section 3 dòng
 #9) — nên `APP_GRP` là thuộc tính ổn định của hồ sơ, đọc thẳng từ cùng
-bảng đã cấp `STREAM`/`APPROVAL_TYPE`, không cần DIM danh mục riêng nữa.
+bảng đã cấp `STREAM`, không cần DIM danh mục riêng nữa.
 `DIM_CLOS_APPROVAL_GROUP` và `MAP_CLOS_APPROVAL_GROUP` đã bị loại bỏ hoàn
 toàn (xem Section 3 dòng #9, đã cập nhật). `HAVE_ANY_DEVIATION` là cột có
 sẵn trên `NG_SB_CLOS_CREDITINFO_COMM` (cùng bảng nguồn của
@@ -4040,24 +4867,46 @@ chỉ tồn tại ở đó), xem 2.2.1.1. Xem Section 3 dòng #13.
   database và xác nhận cả 4 cột **thật sự tồn tại**, đúng tên/bảng như SRS
   BC2 mô tả. Kết luận: **tài liệu `CLOS - Metadata.xlsx` (sheet Column
   Review) bị thiếu sót/lỗi thời** — không phải database thiếu cột, và BA đã
-  phân tích đúng ngay từ đầu trong SRS. Giữ nguyên 4 cột trong thiết kế
-  (không cần thay đổi gì), không cần hành động gì thêm từ BA/DEV.
+  phân tích đúng ngay từ đầu trong SRS.
+- **Review 2026-09-25 lượt 3 — `INDUSTRY_LVL1/2/3_CODE` chuyển hẳn khỏi
+  bảng này:** dù đã xác nhận tồn tại thật, 3 cột này là thuộc tính khách
+  hàng (ngành nghề kinh doanh cố hữu, không đổi giữa các hồ sơ khác nhau
+  của cùng khách hàng), không phải hồ sơ — đã có sẵn ở `DIM_CLOS_CUSTOMER`
+  (1.2.1.6, cột 9-11), giữ ở cả 2 bảng là trùng lặp. Xóa khỏi
+  `DIM_CLOS_APPLICATION`, chỉ còn `CREDIT_PROFILE` (cột 10) giữ nguyên
+  trong thiết kế theo kết luận DQ-11 trên.
 
-**✅ Đã giải quyết — bổ sung `CHANGE_TYPE`, không tách `DIM_CLOS_CHANGE_TYPE`:**
-đối chiếu SRS BC2 xác nhận `CHANGE_TYPE` lấy thẳng từ
-`NG_SB_CLOS_CHANGEREQ.CHANGE_TYPE`, không join qua bảng danh mục nào —
-khác hẳn RLOS có `SB_RLOS_MAS_CHANGE_TYPE` (danh mục gốc thật, dùng cho
-BC1). Metadata CLOS (`input/CLOS - Metadata.xlsx`, sheet "2./3. Table/
-Column Review", bảng `NG_SB_CLOS_CHANGEREQ`) xác nhận cột này là chuỗi tự
-do đa giá trị (nhiều loại hạn mức tín dụng bị thay đổi trong 1 yêu cầu,
-nối bằng dấu `~`) — bản thân giá trị đã là tên tiếng Việt sẵn, không phải
-mã cần tra danh mục, và không có `DETAIL_CHANGE_TYPE` nào cho CLOS trong
-SRS (BC1/BC2/BC5/BC9/BC11 đã rà soát toàn bộ). Vì không có danh mục chuẩn
-hóa thật và không có nhu cầu SCD2 lịch sử cho field này, `DIM_CLOS_CHANGE_TYPE`
-**không được tách** như đề xuất ban đầu trong
-`output/Table_Split_Proposal_CLOS_RLOS.md` (dòng 80) — `CHANGE_TYPE` giữ
-làm cột text trực tiếp trên `DIM_CLOS_APPLICATION`, cùng nguồn với
-`CHANGE_REQUEST`. Xem Section 3 dòng liên quan.
+**✅ Đã giải quyết — thêm `PRODUCT_LINE`/`SUB_PRODUCT` as-is, không join
+`DIM_CLOS_PRODUCT` (review 2026-09-25, lượt 2, theo yêu cầu người dùng):**
+SRS BC2 (STT27/28) xác nhận cả 2 trường lấy trực tiếp từ `NG_SB_CLOS_
+CUST_INFO.PRODUCT_LINE`/`SUB_PRODUCT` — đây là giá trị tự khai theo hồ sơ,
+chưa xác nhận khớp 1:1 với mã chuẩn hóa `PRODUCT_LINE_CODE`/`SUB_PRODUCT_
+CODE` của `DIM_CLOS_PRODUCT` (nguồn khác: `NG_SB_CLOS_MAS_PRO_LINE`/
+`MAS_SUB_PROD`). Giữ độc lập, tránh join sai — quan hệ hồ sơ↔sản phẩm
+chuẩn hóa (`PRODUCT_SK`) vẫn tiếp tục chỉ tồn tại trên `FCT_CLOS_
+APPLICATION_DAILY` như thiết kế cũ, không đổi.
+
+**✅ Đã giải quyết — 18 cột dư thừa từ `NG_SB_CLOS_EXTTABLE` (review
+2026-09-25, lượt 2, theo yêu cầu người dùng):** đối chiếu SRS (BC2/BC3/
+BC5/BC9) không phát hiện report nào dùng trực tiếp `DECISION`,
+`CURR_WSNAME`, `PREV_WSNAME`, `PRODUCT_NAME`, `DATACHKUSER`,
+`UWMAKERUSER`, `UWCHKRUSER`, `CREDAPPRUSER`, `CCOMMITUSER`,
+`HOSUPPORTUSER`, `POSTSANCUSER`, `PREDISBMAKUSER`, `PREDISBCHKUSER`,
+`DISBCHKUSER`, `DISBMAKUSER`, `CHECKER3_TARGET`, `CHANNEL` (17 cột, cộng
+`CUSTOMER_NAME` ở cột 33 = 18) — quyết định người dùng vẫn thêm vào để
+không bỏ sót thuộc tính gốc của driving table mới, đánh dấu "Thiết kế dư
+thừa" (cùng cách đã làm với `CHANNEL` trên `DIM_CLOS_WORKSTEP_DECISION`,
+1.2.1.3). ⚠️ Review 2026-09-30 (theo yêu cầu người dùng): 12 trong số đó
+(`DATACHKUSER`…`CHECKER3_TARGET`) đã xóa lại khỏi DIM — xem giải trình
+đầu mục 1.2.1.1; chỉ còn `PRODUCT_NAME`/`CHANNEL`/`CUSTOMER_NAME` trong
+nhóm này (⚠️ review 2026-09-30, lượt tiếp theo: `DECISION`/`CURR_WSNAME`/
+`PREV_WSNAME` đã xóa hẳn — xem giải trình đầu mục 1.2.1.1). Loại trừ `RN`
+(100% rỗng trên metadata, không có ý nghĩa
+nghiệp vụ). `COMPANY_CODE`/`COMPANY_NAME`/`BRANCH_CODE`/`BRANCH_NAME`
+(trùng tên giữa EXTTABLE và CUST_INFO) **không** đưa vào DIM này — quyết
+định người dùng: quan hệ hồ sơ↔đơn vị kinh doanh đã có sẵn qua
+`COMPANY_SK` → `DIM_LOS_COMPANY`, thêm lại 4 cột text song song là dư
+thừa/rủi ro lệch dữ liệu với `COMPANY_SK`.
 
 ###### 1.2.1.2 DIM_CLOS_PRODUCT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_PRO_LINE/MAS_SUB_PROD, review 2026-09-18)
 
@@ -4112,135 +4961,90 @@ sản phẩm đó cần xuất hiện trên DIM, không còn phụ thuộc việ
 nào dùng sản phẩm đó hay chưa. Xem giải pháp kiến trúc chung tại
 `.claude/skills/design-hld/references/design-method.md`.
 
-###### 1.2.1.3 DIM_CLOS_WORKSTEP — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_DECISION, review 2026-09-18)
+###### 1.2.1.3 DIM_CLOS_WORKSTEP_DECISION — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_DECISION, review 2026-09-24, gộp từ DIM_CLOS_WORKSTEP + DIM_CLOS_DECISION)
 
-**Bảng cũ (trước tách):** `DIM_LOS_WORKSTEP` → tách phần thuộc tính CLOS thành `DIM_CLOS_WORKSTEP`
+**Bảng cũ (trước tách):** `DIM_LOS_WORKSTEP`/`DIM_LOS_DECISION` → tách phần thuộc tính CLOS, sau đó gộp lại (review 2026-09-24) thành `DIM_CLOS_WORKSTEP_DECISION`
 
 **Nguồn:** `NG_SB_CLOS_MAS_DECISION` (bảng danh mục thật, tầng STG_LOS, BA
-LOS xác nhận 16/09) — lấy `DISTINCT QUEUE_NAME` (review 2026-09-18, thay
-thế `MAP_CLOS_WORKSTEP`; cùng bảng nguồn với `DIM_CLOS_DECISION`, 1.2.1.4).
+LOS xác nhận 16/09, cấu trúc cột xác nhận thêm qua `input/DS Bảng danh
+mục.xlsx` sheet cùng tên — 3 cột QUEUE_NAME/DECISION/CHANNEL) — lấy 1:1
+QUEUE_NAME+DECISION (review 2026-09-24, gộp từ 2 lần DISTINCT riêng lẻ
+trước đây).
 
-**`DIM_CLOS_WORKSTEP` (SB_DWH):**
+**`DIM_CLOS_WORKSTEP_DECISION` (SB_DWH):**
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_WORKSTEP, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_WORKSTEP_DECISION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
 | 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_WORKSTEP, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 4 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | NK | Mã bước xử lý trên workflow CLOS — nguồn DISTINCT NG_SB_CLOS_MAS_DECISION.QUEUE_NAME (review 2026-09-18: đổi nguồn, không còn cột riêng WORKSTEP_CODE — MAS_DECISION gộp WORKSTEP+DECISION dạng N-N, DIM này chỉ lấy phần WORKSTEP). UNIQUE (WORKSTEP_CODE, EFF_DATE) |
-| 5 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION (không có cột khai báo tay như MAP_CLOS_WORKSTEP trước đây) |
-| 6 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
+| 3 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_WORKSTEP_DECISION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
+| 4 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | NK | Mã bước xử lý trên workflow CLOS — nguồn NG_SB_CLOS_MAS_DECISION.QUEUE_NAME. Cùng với DECISION_CODE tạo thành khóa nghiệp vụ composite |
+| 5 | DECISION_CODE | VARCHAR2 | Y | 200 | NK | Mã quyết định phát sinh tại bước xử lý trên — nguồn NG_SB_CLOS_MAS_DECISION.DECISION. UNIQUE (WORKSTEP_CODE, DECISION_CODE, EFF_DATE) |
+| 6 | CHANNEL | VARCHAR2 | N | 200 |  | Kênh áp dụng của cặp (bước xử lý, quyết định) — nguồn NG_SB_CLOS_MAS_DECISION.CHANNEL. Giữ có chủ đích để bảo toàn dữ liệu nguồn (review 2026-09-24, theo yêu cầu người dùng) — hiện chưa có báo cáo nào tiêu thụ, tương tự trường hợp FCT_CLOS_DEVIATION.AS_REGULAR |
+| 7 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION |
+| 8 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
-- Bảng DIM lưu danh mục bước xử lý trong quy trình BPM của hồ sơ tín dụng CLOS, 1 dòng = 1 bước xử lý.
+- Bảng DIM lưu danh mục cặp (bước xử lý, quyết định) hợp lệ trong quy trình BPM của hồ sơ tín dụng CLOS, 1 dòng = 1 cặp (WORKSTEP_CODE, DECISION_CODE) hợp lệ.
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
 
-**Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #2):**
-giữ nguyên cấu trúc 6 cột, chỉ đổi **nguồn nạp**: trước đây đọc từ
-`MAP_CLOS_WORKSTEP` (tạm thay cho `NG_SB_CLOS_ENTRY_EXIT`, bảng event
-log); nay BA LOS xác nhận (16/09) dùng bảng danh mục thật
-`NG_SB_CLOS_MAS_DECISION`. Bảng này gộp chung WORKSTEP (`QUEUE_NAME`) và
-DECISION (`DECISION`) dạng quan hệ N-N (mỗi WORKSTEP có thể có nhiều
-DECISION và ngược lại), không có danh mục WORKSTEP độc lập riêng như
-`MAP_CLOS_WORKSTEP` giả định trước — theo quyết định người dùng, **giữ
-tách 2 DIM** (`DIM_CLOS_WORKSTEP`/`DIM_CLOS_DECISION`) như thiết kế hiện
-tại, mỗi DIM suy ra danh mục bằng `DISTINCT` trên cột tương ứng của cùng
-bảng `MAS_DECISION`, chấp nhận không giữ lại thông tin quan hệ N-N cụ thể
-(WORKSTEP nào cho phép DECISION nào) vì không báo cáo nào cần khai thác
-quan hệ đó hiện tại — xem Section 3.
+**Bổ sung cột `CHANNEL` (review 2026-09-24, theo yêu cầu người dùng):**
+bảng nguồn có 3 cột (`QUEUE_NAME`, `DECISION`, `CHANNEL`), trước đây DIM
+chỉ nạp 2 cột đầu — bổ sung `CHANNEL` để không bỏ sót thuộc tính gốc
+của bảng nguồn, giữ có chủ đích dù chưa có báo cáo nào tiêu thụ trực
+tiếp (thiết kế dư thừa cho thông tin nguồn).
+
+**Gộp 2 DIM thành 1 (review 2026-09-24, thay thế quyết định cũ 2026-09-18):**
+`NG_SB_CLOS_MAS_DECISION` gộp chung WORKSTEP (`QUEUE_NAME`) và DECISION
+(`DECISION`) — 1 WORKSTEP có thể xuất hiện ở nhiều dòng với DECISION
+khác nhau, nhưng **mỗi cặp (QUEUE_NAME, DECISION) là duy nhất trên bảng
+nguồn**: grain thật là "1 dòng = 1 cặp (WORKSTEP, DECISION) hợp lệ",
+không phải 2 danh mục độc lập tự do kết hợp N×M. Quyết định cũ (2026-09-18)
+tách 2 DIM riêng (mỗi DIM DISTINCT 1 cột) làm mất thông tin cặp nào thực
+sự hợp lệ — nay gộp lại thành 1 DIM composite, giữ đúng grain bảng nguồn.
+
+⚠️ **Giả định cần BA xác nhận lại trước khi sinh LLD:**
+`input/DS Bảng danh mục.xlsx` chỉ xác nhận bảng nguồn tồn tại thật với
+cấu trúc cột (không có dữ liệu mẫu) — chưa có bằng chứng dữ liệu thật
+trong repo để tự kiểm chứng độc lập việc mỗi cặp (QUEUE_NAME, DECISION)
+là duy nhất; grain trên dựa theo xác nhận nghiệp vụ của người dùng.
 
 **Đối chiếu SRS (BC1, BC2, BC3, BC4, BC5, BC7, BC8, BC9 — theo "Báo cáo sử
-dụng" của lineage doc):** BC3, BC4, BC8 dùng `WORKSTEP` cho mục đích hiển
-thị/lọc trên FCT (`NG_SB_CLOS_ENTRY_EXIT> WORKSTEP`, không đổi — ENTRY_EXIT
-vẫn là nguồn của FCT như trước). BC1/BC2/BC5/BC7/BC9 dùng `WORKSTEP`/
-`DECISION` cùng nguồn `ENTRY_EXIT` cho mục đích lọc điều kiện. Không phát
-hiện lệch tài liệu nào về công thức cột.
-
-**✅ Đã giải quyết (trước đây "⚠️ PENDING — Nguồn gốc là hằng số cấu hình
-BPM"):** nguồn nạp trước đây (`NG_SB_CLOS_ENTRY_EXIT`, bảng lịch sử xử lý)
-chỉ phản ánh được các mã bước đã từng được ghi nhận qua giao dịch thực tế,
-có thể thiếu bước mới cấu hình nhưng chưa có hồ sơ đi qua. Đã thay thế hoàn
-toàn bằng bảng khai báo thủ công `MAP_CLOS_WORKSTEP` — BA/DevOps khai báo
-đúng theo danh sách bước đã cấu hình trên BPM engine, không còn phụ thuộc
-việc đã có hồ sơ đi qua bước đó hay chưa.
+dụng" của lineage doc):** BC3, BC4, BC8 dùng `WORKSTEP`/`DECISION` cho
+mục đích hiển thị/lọc — nay đọc qua JOIN `WORKSTEP_DECISION_SK` sang DIM
+này thay vì cột denormalize trên `FCT_CLOS_WORKSTEP_EVENT` (xem 1.2.2.6,
+2 cột đã xóa). BC1/BC2/BC5/BC7/BC9 dùng cùng cách. Không phát hiện lệch
+tài liệu nào về công thức cột.
 
 `WFINSTRUMENTTABLE` (giữ `PROCESSNAME`/`ACTIVITYNAME` — trạng thái tức thời
 của workflow instance) vẫn không thuộc phạm vi bảng này: nó không phải
-nguồn nạp cho `DIM_CLOS_WORKSTEP`. **✅ Đã giải quyết (PENDING #6):**
-`PROCESSNAME`/`ACTIVITYNAME` nay đã nạp trực tiếp vào
-`FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (1.2.2.1/
+nguồn nạp cho `DIM_CLOS_WORKSTEP_DECISION`. **✅ Đã giải quyết (PENDING
+#6):** `PROCESSNAME`/`ACTIVITYNAME` nay đã nạp trực tiếp vào
+`FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (1.2.2.1/
 1.3.2.1) để tính cột phái sinh `WORKSTEP_FLAG` (đổi tên từ "BC4.FLAG" cho
 rõ nghĩa hơn) theo đúng 5 nhánh SRS BC4.
 
-###### 1.2.1.4 DIM_CLOS_DECISION — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_DECISION, review 2026-09-18)
+###### 1.2.1.5 DIM_CLOS_EXCEPTION
 
-**Bảng cũ (trước tách):** `DIM_LOS_DECISION` → tách phần thuộc tính CLOS thành `DIM_CLOS_DECISION`
-
-**Nguồn:** `NG_SB_CLOS_MAS_DECISION` (bảng danh mục thật, tầng STG_LOS, BA
-LOS xác nhận 16/09) — lấy `DISTINCT DECISION` (review 2026-09-18, thay thế
-`MAP_CLOS_DECISION`; cùng bảng nguồn với `DIM_CLOS_WORKSTEP`, 1.2.1.3).
-
-**`DIM_CLOS_DECISION` (SB_DWH):**
+**Bảng cũ (trước tách):** `DIM_LOS_EXCEPTION_REASON` → tách phần thuộc tính CLOS thành `DIM_CLOS_EXCEPTION`
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_DECISION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_EXCEPTION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
 | 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_DECISION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 4 | DECISION_CODE | VARCHAR2 | Y | 200 | NK | Mã quyết định tại bước xử lý trên workflow CLOS — nguồn DISTINCT NG_SB_CLOS_MAS_DECISION.DECISION (review 2026-09-18: đổi nguồn — MAS_DECISION gộp WORKSTEP+DECISION dạng N-N, DIM này chỉ lấy phần DECISION). UNIQUE (DECISION_CODE, EFF_DATE) |
-| 5 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION (không có cột khai báo tay như MAP_CLOS_DECISION trước đây) |
-| 6 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
-
-- Bảng DIM lưu danh mục quyết định có thể phát sinh tại một bước xử lý của hồ sơ tín dụng CLOS, 1 dòng = 1 quyết định.
-- Khóa chính của bảng (PK): **DIMENSION_KEY**.
-
-**Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #2):**
-giữ nguyên cấu trúc 6 cột, chỉ đổi **nguồn nạp**: trước đây đọc từ
-`MAP_CLOS_DECISION` (tạm thay cho `NG_SB_CLOS_ENTRY_EXIT`, event log); nay
-BA LOS xác nhận (16/09) dùng cùng bảng danh mục thật
-`NG_SB_CLOS_MAS_DECISION` đã dùng cho `DIM_CLOS_WORKSTEP` (1.2.1.3) — xem
-1.2.1.3 về lý do giữ tách 2 DIM dù bảng nguồn là quan hệ N-N. `MAS_DECISION`
-còn có cột `CHANNEL` (kênh) chưa xác nhận báo cáo nào cần — giữ nguyên kết
-luận cũ (bỏ `DECISION_GROUP`-kiểu, không thêm cột mới ngoài phạm vi đã rà
-soát SRS) trừ khi có yêu cầu mới, xem Section 3.
-
-**Đối chiếu SRS (BC1, BC2, BC3, BC4, BC7, BC8, BC9):** BC3, BC8 dùng
-`DECISION` trực tiếp từ `NG_SB_CLOS_ENTRY_EXIT.DECISION` cho mục đích hiển
-thị (không đổi — ENTRY_EXIT vẫn là nguồn của FCT như trước). BC1/BC2/BC5/
-BC9 dùng khái niệm phân loại duyệt/từ chối/hủy/trả về gần giống
-`DECISION_GROUP` cũ, nhưng **không lookup trực tiếp cột này** — `BI_APPSTATUS`
-(4 giá trị Approved/Rejected/Cancelled/Processing) là công thức CASE-WHEN
-riêng của từng báo cáo, tính thẳng trên `DECISION`/`WORKSTEP` của
-`NG_SB_*_ENTRY_EXIT` (ví dụ "Cancelled" dựa theo `WORKSTEP`, không dựa
-theo `DECISION_CODE`) — xác nhận không báo cáo nào cần cột `DECISION_GROUP`
-nên đã loại theo column-optimization rule.
-
-**✅ Đã giải quyết (áp dụng cùng pattern với `DIM_CLOS_WORKSTEP`,
-1.2.1.3):** nguồn nạp trước đây (`NG_SB_CLOS_ENTRY_EXIT`, bảng lịch sử xử
-lý) chỉ phản ánh được các mã quyết định đã từng được ghi nhận qua giao
-dịch thực tế, có thể thiếu quyết định mới cấu hình nhưng chưa có hồ sơ đi
-qua. Danh mục quyết định gốc là hằng số cấu hình cứng trong BPM engine,
-không phải một bảng database — cùng bản chất pattern "application-scoped
-source" đã xác định ở `DIM_LOS_USER`/`DIM_*_PRODUCT`/`DIM_*_WORKSTEP`. Đã
-thay thế hoàn toàn bằng bảng khai báo thủ công `MAP_CLOS_DECISION` — BA/
-DevOps khai báo đúng theo danh sách quyết định đã cấu hình trên BPM engine,
-không còn phụ thuộc việc đã có hồ sơ đi qua quyết định đó hay chưa.
-
-###### 1.2.1.5 DIM_CLOS_EXCEPTION_REASON
-
-**Bảng cũ (trước tách):** `DIM_LOS_EXCEPTION_REASON` → tách phần thuộc tính CLOS thành `DIM_CLOS_EXCEPTION_REASON`
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_EXCEPTION_REASON, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
-| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | EXCEPTION_REASON_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_EXCEPTION_REASON, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 4 | ACTIVITYNAME | VARCHAR2 | N | 200 | NK | Tên bước phát sinh nội dung cần làm rõ — nguồn NG_SB_CLOS_MAS_EXCEPTION.ACTIVITYNAME |
-| 5 | DECISION_CODE | VARCHAR2 | N | 200 | NK | Mã quyết định tại bước xử lý — nguồn NG_SB_CLOS_MAS_EXCEPTION.DECISION (đổi tên thêm hậu tố CODE cho thống nhất với DIM_CLOS_DECISION) |
-| 6 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 | NK | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY |
-| 7 | EXCEPTION_NAME | VARCHAR2 | N | 500 | NK | Tên nội dung cần làm rõ — nguồn NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_NAME |
-| 8 | EXCEPTION_CODE | VARCHAR2 | N | 50 |  | Mã nội dung cần làm rõ — PHÁI SINH: CASE WHEN INSTR(EXCEPTION_CATEGORY, ':') > 0 THEN REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END (review 2026-09-22: viết lại đúng cú pháp CASE WHEN, trước đây mô tả văn xuôi không parse được) |
-| 9 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
-| 10 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
+| 3 | EXCEPTION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_EXCEPTION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
+| 4 | EXCEPTION_BK | VARCHAR2 | Y | 64 |  | Khóa nghiệp vụ hash của tổ hợp (bước, quyết định, nhóm lý do, tên lý do) — PHÁI SINH: STANDARD_HASH(ACTIVITYNAME \|\| '~' \|\| DECISION_CODE \|\| '~' \|\| EXCEPTION_CATEGORY \|\| '~' \|\| EXCEPTION_NAME, 'SHA256') (bổ sung review 2026-09-24, theo yêu cầu người dùng) |
+| 5 | ACTIVITYNAME | VARCHAR2 | N | 200 | NK | Tên bước phát sinh nội dung cần làm rõ — nguồn NG_SB_CLOS_MAS_EXCEPTION.ACTIVITYNAME |
+| 6 | DECISION_CODE | VARCHAR2 | N | 200 | NK | Mã quyết định tại bước xử lý — nguồn NG_SB_CLOS_MAS_EXCEPTION.DECISION (đổi tên thêm hậu tố CODE cho thống nhất với DIM_CLOS_WORKSTEP_DECISION.DECISION_CODE) |
+| 7 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 | NK | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY |
+| 8 | EXCEPTION_NAME | VARCHAR2 | N | 500 | NK | Tên nội dung cần làm rõ — nguồn NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_NAME |
+| 9 | EXCEPTION_CODE | VARCHAR2 | N | 50 |  | Mã nội dung cần làm rõ — PHÁI SINH: CASE WHEN INSTR(EXCEPTION_CATEGORY, ':') > 0 THEN REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END (review 2026-09-22: viết lại đúng cú pháp CASE WHEN, trước đây mô tả văn xuôi không parse được) |
+| 10 | RAISE_FLAG | VARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Raise (nêu lý do) tại tổ hợp bước/quyết định này hay không — nguồn NG_SB_CLOS_MAS_EXCEPTION.RAISE (đổi tên thêm hậu tố FLAG, tránh trùng từ khóa RAISE). Bổ sung (review 2026-09-24, theo yêu cầu người dùng) để không bỏ sót thuộc tính gốc của bảng nguồn — giữ có chủ đích, thiết kế dư thừa cho thông tin nguồn | — | — |
+| 11 | CLEAR_FLAG | VARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Clear (trả lời làm rõ) tại tổ hợp bước/quyết định này hay không — nguồn NG_SB_CLOS_MAS_EXCEPTION.CLEAR (đổi tên thêm hậu tố FLAG cho nhất quán với RAISE_FLAG). Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn | — | — |
+| 12 | ID_SOURCE | NUMBER | N | 18 |  | Số định danh nội bộ của bản ghi danh mục trên bảng nguồn — nguồn NG_SB_CLOS_MAS_EXCEPTION.ID (đổi tên thêm hậu tố SOURCE, tránh trùng khái niệm với DIMENSION_KEY/ID kỹ thuật của DIM, đồng nhất với CODE_SOURCE). Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn | — | — |
+| 13 | CODE_SOURCE | VARCHAR2 | N | 255 |  | Mã viết tắt của tổ hợp ngoại lệ — nguồn NG_SB_CLOS_MAS_EXCEPTION.CODE (đổi tên thêm hậu tố SOURCE, tránh trùng khái niệm với EXCEPTION_CODE phái sinh ở cột 9, đồng nhất với ID_SOURCE). Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn | — | — |
+| 14 | STATUS | VARCHAR2 | N | 50 |  | Trạng thái bản ghi danh mục trên bảng nguồn (còn hiệu lực/đã ngừng áp dụng...) — nguồn NG_SB_CLOS_MAS_EXCEPTION.STATUS, giữ nguyên tên nguồn. Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn | — | — |
+| 15 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
+| 16 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
 - Bảng DIM lưu danh mục lý do ngoại lệ được cấu hình cho từng tổ hợp bước xử lý + quyết định trên workflow CLOS, 1 dòng = 1 tổ hợp bước + quyết định + nhóm lý do + tên lý do.
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
@@ -4259,10 +5063,25 @@ trên bảng log `NG_SB_CLOS_EXCEPTION` (FCT), không xác nhận trực tiếp 
 dụng lại công thức này trên `MAS_EXCEPTION.EXCEPTION_CATEGORY` (DIM) —
 không có báo cáo nào đọc `EXCEPTION_CODE` từ chính DIM này. Người dùng
 xác nhận chấp nhận giữ nguyên cột này trên DIM dù dư thừa (tiện tra cứu/
-đối soát), không cần xóa. Tương tự, bảng nguồn `NG_SB_CLOS_MAS_EXCEPTION`
-còn có 4 cột khác (`CODE`, `RAISE`, `CLEAR`, `ID`) không được đưa vào
-DIM — đã xác nhận không báo cáo nào cần (BA từng nêu rõ "BI không cần
-quan tâm mã CODE"), người dùng đồng ý không bổ sung.
+đối soát), không cần xóa.
+
+**Bổ sung 5 cột dư thừa cho thông tin nguồn + khóa hash EXCEPTION_BK
+(review 2026-09-24, theo yêu cầu người dùng — đảo lại quyết định cũ
+2026-09-17 "người dùng đồng ý không bổ sung"):** bảng nguồn
+`NG_SB_CLOS_MAS_EXCEPTION` còn có 5 cột (`RAISE`, `CLEAR`, `ID`, `CODE`,
+`STATUS`) chưa từng được đưa vào DIM. Đã bổ sung `RAISE_FLAG`,
+`CLEAR_FLAG`, `ID_SOURCE`, `CODE_SOURCE`, `STATUS` (giữ nguyên
+tên nguồn — trừ `RAISE`/`CLEAR`/`ID`/`CODE` phải đổi hậu tố/tiền tố để
+tránh trùng khái niệm với cột phái sinh/kỹ thuật đã có sẵn) — giữ có chủ
+đích để bảo toàn dữ liệu nguồn, chưa có báo cáo nào tiêu thụ. Đồng thời
+bổ sung `EXCEPTION_BK` (đặt ngay sau `EXCEPTION_SK`, cột 4) —
+khóa nghiệp vụ hash SHA256 nối 4 cột Natural Key hiện tại
+(`ACTIVITYNAME`+`DECISION_CODE`+`EXCEPTION_CATEGORY`+`EXCEPTION_NAME`),
+theo cùng pattern `*_BK` đã dùng cho
+`FCT_CLOS_COLLATERAL.COLLATERAL_BK`/`FCT_CLOS_DEVIATION.DEVIATION_BK`.
+Cấu trúc bổ sung này đồng nhất với bản RLOS song song
+(`DIM_RLOS_EXCEPTION`, 1.3.1.5) — cả 2 nguồn `NG_SB_CLOS_MAS_
+EXCEPTION`/`NG_SB_RLOS_MAS_EXCEPTION` đều có đủ 5 cột này.
 
 **Không rơi vào pattern "application-scoped source":** khác với
 `DIM_CLOS_WORKSTEP`/`DIM_CLOS_DECISION`,
@@ -4272,164 +5091,65 @@ danh mục cấu hình gốc thật sự, không phải bảng sự kiện/giao 
 sơ như `NG_SB_CLOS_ENTRY_EXIT`/`NG_SB_CLOS_APPROVAL`. Giữ nguyên nguồn
 trực tiếp, không cần bảng `MAP_` seed.
 
-###### 1.2.1.6 DIM_CLOS_COLLATERAL_TYPE
+###### 1.2.1.6 DIM_CLOS_CUSTOMER
 
-**Bảng cũ (trước tách):** `DIM_LOS_COLLATERAL_TYPE` → tách phần thuộc tính CLOS thành `DIM_CLOS_COLLATERAL_TYPE`
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_COLLATERAL_TYPE, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
-| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | COLLATERAL_TYPE_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_COLLATERAL_TYPE, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 4 | COLLATERAL_TYPE_CODE | VARCHAR2 | Y | 100 | NK | Mã loại tài sản bảo đảm — nguồn NG_SB_CLOS_COLL_CD.COLLTYPE, giữ nguyên giá trị gốc kể cả chuỗi tiếng Việt không dấu |
-| 5 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
-| 6 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
-
-- Bảng DIM lưu danh mục loại tài sản bảo đảm CLOS, 1 dòng = 1 loại tài sản bảo đảm.
-- Khóa chính của bảng (PK): **DIMENSION_KEY**.
-
-**So với thiết kế cũ (`DIM_LOS_COLLATERAL_TYPE` gộp, 7 cột):** giữ lại
-`DATASOURCE` làm cột kỹ thuật cố định 'CLOS' sau khi tách vật lý. Còn 6
-cột — nguồn nạp không đổi, vẫn đọc trực tiếp từ `NG_SB_CLOS_COLL_CD`.
-
-**Đối chiếu SRS (BC1, BC2, BC3, BC9):** BC3 dùng `COLLATERAL_TYPE_CODE`
-trực tiếp ("Types of Collaterals"). BC2 tự tính 9 cờ TSDB_* —
-`TSDB_NHOM_0`, `TSDB_BDS`, `TSDB_PTVT`, `TSDB_MMTB`, `TSDB_HTK`,
-`TSDB_KPT`, `TSDB_CP_TP`, `TSDB_TIN_CHAP`, `TIN_CHAP_TQD` — bằng 9 câu
-CASE so sánh trực tiếp `COLLTYPE` gốc, không qua cột nhóm trung gian nào
-ở DTM. BC1/BC9 là báo cáo RLOS, không liên quan bảng CLOS này. Không phát
-hiện lệch tài liệu nào về công thức cột `COLLATERAL_TYPE_CODE`.
-
-**Không rơi vào pattern "application-scoped source":** `NG_SB_CLOS_COLL_CD`
-là bảng danh mục 11 loại TSBĐ đặc thù doanh nghiệp, không phải bảng
-grain-theo-hồ-sơ hay event log — cùng bản chất danh mục cấu hình gốc như
-`NG_SB_CLOS_MAS_EXCEPTION` (1.2.1.6). Giữ nguyên nguồn trực tiếp, không
-cần bảng `MAP_` seed.
-
-###### 1.2.1.7 DIM_CLOS_CUSTOMER
-
-**Bảng cũ (trước tách):** `FCT_LOS_APPLICATION_PARTY` (20 cột, gộp CLOS+RLOS) — tách phần khách hàng chính (ORG_CUSTOMER) thành DIM riêng, không còn là FCT
+**Bảng cũ (trước tách):** `FCT_LOS_APPLICATION_PARTY` (20 cột, gộp CLOS+RLOS) — tách phần khách hàng chính (ORG_CUSTOMER) thành DIM riêng, không còn là FCT. **Đổi grain (review 2026-09-25):** từ "1 dòng/hồ sơ" sang "1 dòng/khách hàng" — xem lý do đầy đủ tại Section 1 → 1.2.1.6.
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_CUSTOMER, sinh bằng Oracle sequence tại SB_DWH |
 | 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
 | 3 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_CUSTOMER, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 |
-| 4 | WI_NAME | VARCHAR2 | Y | 100 | NK | Mã hồ sơ CLOS — nguồn NG_SB_CLOS_CUST_INFO.WI_NAME, quan hệ 1:1 với hồ sơ (LEFT JOIN thẳng, không cần tiêu chí chọn dòng — người dùng đã kiểm tra trực tiếp dữ liệu thực tế xác nhận mỗi hồ sơ chỉ có đúng 1 dòng trên NG_SB_CLOS_CUST_INFO, khác với mô tả lý thuyết 1:N trong metadata Table Review) |
-| 5 | FULL_NAME | VARCHAR2 | N | 200 |  | Tên doanh nghiệp khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME |
-| 6 | ZONE | VARCHAR2 | N | 200 |  | Khu vực/vùng quản lý tự khai theo hồ sơ (BC1/BC2.ZONE) — LÀM GIÀU (review 2026-09-21, đóng gap tài liệu BC1/BC2): nguồn NG_SB_CLOS_CUST_INFO.ZONEE (đổi tên bỏ chữ E cuối cho gọn). Khác bản chất với DIM_LOS_ORG_UNIT.ZONE (mã nội bộ chuẩn hóa từ MAS_COMPANY, dùng làm khóa join đơn vị kinh doanh) — cột này là giá trị tự khai gắn với hồ sơ/khách hàng, không dùng để join |
-| 7 | APP_DATE | DATE | N |  |  | Ngày khởi tạo/nộp hồ sơ — LÀM GIÀU (review 2026-09-21) — nguồn NG_SB_CLOS_CUST_INFO.APP_DATE |
-| 8 | LOAN_PURPOSE | VARCHAR2 | N | 200 |  | Mục đích vay (có/không tạo doanh thu) — LÀM GIÀU — nguồn NG_SB_CLOS_CUST_INFO.LOAN_PURPOSE |
-| 9 | CUST_CATEGORY | VARCHAR2 | N | 200 |  | Phân loại khách hàng — LÀM GIÀU — nguồn NG_SB_CLOS_CUST_INFO.CUST_CATEGORY. ⚠️ Metadata: dữ liệu ghi nhận cả loại hình pháp lý (VD "Công ty TNHH MTV") lẫn giá trị dạng mã số trong cùng cột — cần BA xác nhận quy tắc chuẩn |
-| 10 | PRECUSTGROUP | VARCHAR2 | N | 100 |  | Phân khúc khách hàng trước xử lý — LÀM GIÀU — nguồn NG_SB_CLOS_CUST_INFO.PRECUSTGROUP, cùng bộ giá trị với CUST_GROUP (SME/MSME/JSC/SOC/NBFI/FDI). ⚠️ Metadata: cần BA xác nhận khác biệt cụ thể với CUST_GROUP (cột 13 trên DIM_CLOS_APPLICATION) — có phải phân khúc trước khi hồ sơ được xử lý/phân loại lại |
-| 11 | LG_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu bảo lãnh (Letter of Guarantee) — LÀM GIÀU — nguồn NG_SB_CLOS_CUST_INFO.LG_REQ (boolean true/false). ⚠️ Metadata: cần BA xác nhận ý nghĩa và điều kiện phát sinh cụ thể |
-| 12 | FI_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu (tương tự LG_REQ) — LÀM GIÀU — nguồn NG_SB_CLOS_CUST_INFO.FI_REQ (boolean true/false). ⚠️ Metadata: cần BA xác nhận ý nghĩa và điều kiện phát sinh cụ thể |
-| 13 | PHONE_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu xác minh điện thoại (tương tự LG_REQ) — LÀM GIÀU — nguồn NG_SB_CLOS_CUST_INFO.PHONE_REQ (boolean true/false). ⚠️ Metadata: cần BA xác nhận ý nghĩa và điều kiện phát sinh cụ thể |
-| 14 | EMAIL | VARCHAR2 | N | 200 |  | Email liên hệ của khách hàng/hồ sơ — LÀM GIÀU — nguồn NG_SB_CLOS_CUST_INFO.EMAIL |
-| 15 | DISTANCE_BRANCH_CUSTOMER | VARCHAR2 | N | 100 |  | Dải khoảng cách từ khách hàng đến chi nhánh xử lý (đã phân nhóm sẵn, không phải số đo thô) — LÀM GIÀU — nguồn NG_SB_CLOS_CUST_INFO.DISTANCE_BRANCH_CUSTOMER. ⚠️ Metadata: cần BA xác nhận đơn vị đo (nghi vấn km) |
-| 16 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
-| 17 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
+| 4 | ID_NUMBER | VARCHAR2 | Y | 100 | NK | Số ĐKKD/CMND của khách hàng — định danh pháp lý ổn định, không đổi giữa các hồ sơ khác nhau (review 2026-09-25, đổi NK từ WI_NAME). Nguồn: NG_SB_CLOS_CUST_INFO LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' lấy ID_NUMBER; dedupe khi 1 ID_NUMBER xuất hiện ở nhiều WI_NAME bằng ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME) = 1 |
+| 5 | FULL_NAME | VARCHAR2 | N | 200 |  | Tên doanh nghiệp khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME (dòng đại diện đã chọn ở cột ID_NUMBER) |
+| 6 | CUST_GROUP | VARCHAR2 | N | 100 |  | Phân khúc khách hàng doanh nghiệp (SME/MSME/USME/STR/JSC/SOC/BANK/FDI/NBFI) — CHUYỂN TỪ DIM_CLOS_APPLICATION (review 2026-09-25, xác định lại là thuộc tính khách hàng, không phải hồ sơ). Nguồn NG_SB_CLOS_CUST_INFO.CUST_GROUP. Đã xóa khỏi DIM_CLOS_APPLICATION (1.2.1.1) khi review riêng bảng đó, không còn trùng lặp |
+| 7 | CUST_CATEGORY | VARCHAR2 | N | 200 |  | Phân loại khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUST_CATEGORY. ⚠️ Metadata: dữ liệu ghi nhận cả loại hình pháp lý (VD "Công ty TNHH MTV") lẫn giá trị dạng mã số trong cùng cột — cần BA xác nhận quy tắc chuẩn |
+| 8 | PRECUSTGROUP | VARCHAR2 | N | 100 |  | Phân khúc khách hàng trước xử lý — nguồn NG_SB_CLOS_CUST_INFO.PRECUSTGROUP, cùng bộ giá trị với CUST_GROUP (SME/MSME/JSC/SOC/NBFI/FDI). ⚠️ Metadata: cần BA xác nhận khác biệt cụ thể với CUST_GROUP — có phải phân khúc trước khi hồ sơ được xử lý/phân loại lại |
+| 9 | INDUSTRY_LVL1_CODE | VARCHAR2 | N | 200 |  | Mã ngành kinh doanh cấp 1 — BỔ SUNG (review 2026-09-25, gap SRS vs metadata). Nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_1 (SRS BC2 xác nhận, table 8 dòng INDUSTRY_GROUP). ⚠️ PENDING — cột không có trong CLOS - Metadata.xlsx (20 cột đã review), cần xác nhận trực tiếp trên database giống pattern DQ-11, xem Section 3 |
+| 10 | INDUSTRY_LVL2_CODE | VARCHAR2 | N | 200 |  | Mã ngành kinh doanh cấp 2 — BỔ SUNG (review 2026-09-25, gap SRS vs metadata). Nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_2 (SRS BC2 xác nhận, table 8 dòng INDUSTRY_CLASS). ⚠️ PENDING — xem cột 9 |
+| 11 | INDUSTRY_LVL3_CODE | VARCHAR2 | N | 200 |  | Mã ngành kinh doanh cấp 3 — BỔ SUNG (review 2026-09-25, gap SRS vs metadata). Nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_3 (SRS BC2 xác nhận, table 8 dòng INDUSTRY). ⚠️ PENDING — xem cột 9 |
+| 12 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
+| 13 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
-- Bảng DIM lưu thông tin doanh nghiệp vay chính của hồ sơ CLOS, 1 dòng = 1 phiên bản của 1 hồ sơ (quan hệ 1:1 với DIM_CLOS_APPLICATION). Phục vụ BC1, BC2, BC3, BC4.
+- Bảng DIM lưu thông tin doanh nghiệp khách hàng chính CLOS, 1 dòng = 1 khách hàng (theo ID_NUMBER) — KHÔNG còn theo hồ sơ (review 2026-09-25). Phục vụ BC1, BC2, BC3, BC4.
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
 
 **So với thiết kế cũ (tách từ `FCT_LOS_APPLICATION_PARTY` gộp):** đây là
 thay đổi kiến trúc — không còn là FCT mà trở thành DIM (đã đánh giá lại:
 `NG_SB_CLOS_CUST_INFO` thực chất là quan hệ 1:1 với hồ sơ, giống bản chất
-`DIM_RLOS_APPLICANT`, không phải bảng chi tiết N:1 như `NG_SB_CLOS_CUST_
+`DIM_RLOS_APPLICANT` tại thời điểm đó — ⚠️ bảng này đã đổi thành
+`FCT_RLOS_CUSTOMER` từ review 2026-09-26, xem 1.3.2.8, so sánh ở đây chỉ
+còn giá trị lịch sử), không phải bảng chi tiết N:1 như `NG_SB_CLOS_CUST_
 INFO_LEGAL`). Bỏ `PARTY_TYPE`, `PARTY_ROLE_CODE` (luôn cố
-định), `GEO_SK`, `ORG_LEGAL_ID`, `OBJ_TYPE` (thuộc về `DIM_CLOS_LEGAL_
-PARTY`, xem 1.2.1.8), 6 cột chỉ có nguồn RLOS; giữ lại `DATASOURCE` làm
-cột kỹ thuật cố định 'CLOS'. **Nay 17 cột (review 2026-09-21):** làm
-giàu thêm 10 cột mô tả từ NG_SB_CLOS_CUST_INFO (ZONE, APP_DATE,
-LOAN_PURPOSE, CUST_CATEGORY, PRECUSTGROUP, LG_REQ, FI_REQ, PHONE_REQ,
-EMAIL, DISTANCE_BRANCH_CUSTOMER) — xem lý do đầy đủ tại Section 1 →
-1.2.1.7.
+định), `GEO_SK`, `OBJ_TYPE` (thuộc về `FCT_CLOS_LEGAL_PARTY`, xem
+1.2.2.7), 6 cột chỉ có nguồn RLOS; giữ lại `DATASOURCE` làm cột kỹ thuật
+cố định 'CLOS'. Giai đoạn 2026-09-21 từng làm giàu thêm 10 cột mô tả
+(`ZONE`, `APP_DATE`, `LOAN_PURPOSE`, `CUST_CATEGORY`, `PRECUSTGROUP`,
+`LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER`),
+nâng lên 17 cột.
 
-###### 1.2.1.8 DIM_CLOS_LEGAL_PARTY
+**Đổi grain + rà soát lại toàn bộ cột (review 2026-09-25) — nay còn 13
+cột:** NK đổi từ `WI_NAME` sang `ID_NUMBER` (cột 4). Xóa `WI_NAME` khỏi
+danh sách cột (chỉ còn là điều kiện join ETL). Chuyển `CUST_GROUP` từ
+`DIM_CLOS_APPLICATION` vào đây (cột 6, ⚠️ TODO còn trùng lặp tạm ở nơi
+cũ). Thêm 3 cột `INDUSTRY_LVL1/2/3_CODE` (cột 9-11, gap SRS). Xóa 8 cột
+hồ sơ-grain (`ZONE`, `APP_DATE`, `LOAN_PURPOSE`, `LG_REQ`, `FI_REQ`,
+`PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER`) — thực chất là thuộc
+tính hồ sơ, không phải khách hàng; đích đến do người dùng quyết định ở
+lượt review `DIM_CLOS_APPLICATION` riêng. Xem lý do đầy đủ tại Section 1
+→ 1.2.1.6 và Section 3.
 
-**Bảng cũ (trước tách):** `FCT_LOS_APPLICATION_PARTY` + `FCT_LOS_PARTY_DOCUMENT` (20 + 11 cột, gộp CLOS+RLOS) — tách phần vai trò pháp lý liên quan (LEGAL_REP, COLLATERAL_OWNER, MAIN_CONTRIBUTING_MEMBERS, OTHER, và cả dòng CUSTOMER dạng pháp lý) thành 1 DIM duy nhất, gộp luôn giấy tờ
+###### 1.2.1.7 DIM_CLOS_LEGAL_PARTY — xem `FCT_CLOS_LEGAL_PARTY` (1.2.2.7)
 
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_LEGAL_PARTY, sinh bằng Oracle sequence tại SB_DWH |
-| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | LEGAL_PARTY_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_LEGAL_PARTY, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 |
-| 4 | WI_NAME | VARCHAR2 | Y | 100 | NK | Mã hồ sơ CLOS — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.WI_NAME. Quan hệ 1:N với hồ sơ, N không giới hạn (1 người có thể giữ nhiều vai trò, xác nhận qua RLOS/CLOS Metadata) |
-| 5 | ID_NUMBER | VARCHAR2 | Y | 100 | NK | Số giấy tờ định danh — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER |
-| 6 | FULL_NAME | VARCHAR2 | N | 200 | NK | Họ tên/tên đối tượng — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE. Nằm trong khóa nghiệp vụ theo cơ chế nạp "full-row-key" (xem ghi chú SCD2 bên dưới, review 2026-09-17) — không phải vì bản thân có ý nghĩa định danh |
-| 7 | OBJ_TYPE | VARCHAR2 | N | 100 | NK | Loại đối tượng của giấy tờ pháp lý — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.OBJ_TYPE. Bắt buộc nằm trong khóa nghiệp vụ (cùng WI_NAME + ID_NUMBER) — BA xác nhận trực tiếp 1 người (cùng ID_NUMBER) có thể giữ nhiều vai trò khác nhau trên cùng hồ sơ (ví dụ vừa là người đại diện theo pháp luật vừa là thành viên góp vốn chính), nên chỉ WI_NAME+ID_NUMBER không đủ phân biệt — thiếu OBJ_TYPE trong khóa sẽ khiến ETL SCD2 hiểu nhầm 2 vai trò song song là 2 phiên bản của cùng 1 bản ghi, làm mất dữ liệu 1 vai trò |
-| 8 | LEGAL_DOC | VARCHAR2 | N | 100 | NK | Tên loại giấy tờ pháp lý — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.LEGAL_DOC. Nằm trong khóa nghiệp vụ theo cơ chế nạp "full-row-key" (xem ghi chú SCD2 bên dưới) |
-| 9 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
-| 10 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
-
-- Bảng DIM lưu người/đối tượng liên quan vai trò pháp lý của hồ sơ CLOS (bao gồm cả giấy tờ), 1 dòng = 1 người/1 vai trò/1 hồ sơ (N dòng/hồ sơ, không giới hạn). Phục vụ BC2.
-- Khóa chính của bảng (PK): **DIMENSION_KEY**.
-
-**Cơ chế nạp SCD2 đặc biệt — "full-row-key", không dùng CDC nguồn để
-phân biệt update/insert (review 2026-09-17):** đối chiếu `DS_BANG_
-202608.xlsx` xác nhận `NG_SB_CLOS_CUST_INFO_LEGAL` có **KEY CDC RỖNG**
-(cùng nhóm "no CDC key" đã gặp ở `NG_SB_RLOS_MANUAL_DEVIATION`,
-`NG_SB_CLOS_CUST_INFO_LEGAL` — xem `.claude/skills/design-hld` danh
-sách bảng không khóa CDC). `CLOS - Metadata.xlsx` (Table Review) xác
-nhận cơ chế đồng bộ thực tế của nguồn so khớp bằng tổ hợp RỘNG
-(`WI_NAME+LEGAL_DOC+ID_NUMBER+NAMEE`) — không có định danh nghiệp vụ ổn
-định độc lập với nội dung mô tả. Theo yêu cầu người dùng, thay vì
-chuyển sang FCT snapshot theo DAYID (pattern đã áp dụng cho
-`FCT_*_DEVIATION`/`FCT_*_COLLATERAL`, không phù hợp ở đây vì
-`LEGAL_PARTY_SK` đang được dùng làm FK ổn định thật trên
-`FCT_CLOS_APPLICATION_PARTY` và được `DIM_CLOS_CUSTOMER` LEFT JOIN lấy
-giá trị hiện hành — chuyển FCT sẽ kéo theo sửa cấu trúc PK/join ở cả 2
-nơi đó), **giữ nguyên kiến trúc DIM/SCD2 nhưng đổi khóa nghiệp vụ dùng
-để so khớp SCD2 tại ETL PDTD_DTM thành TOÀN BỘ 5 cột nghiệp vụ**
-(`WI_NAME`, `ID_NUMBER`, `FULL_NAME`, `OBJ_TYPE`, `LEGAL_DOC` — tất cả
-đã đánh dấu NK) thay vì chỉ 3 cột định danh gốc. Quy tắc nạp mỗi lần
-chạy ETL:
-- Tổ hợp 5 cột nào đang hiện hành (`EXP_DATE IS NULL`) nhưng KHÔNG còn
-  xuất hiện ở lần đọc nguồn mới nhất → gán `EXP_DATE` = ngày chạy
-  (đóng phiên bản, coi như đã biến mất).
-- Tổ hợp 5 cột nào xuất hiện mà chưa từng tồn tại (kể cả khi chỉ khác 1
-  ký tự `FULL_NAME`/`LEGAL_DOC` so với 1 dòng đã có) → INSERT dòng mới,
-  sinh `DIMENSION_KEY` mới, `EFF_DATE` = ngày chạy.
-- Không có khái niệm UPDATE tại chỗ — mọi thay đổi nội dung (kể cả sửa
-  chính tả) đều thể hiện thành "đóng phiên bản cũ + mở phiên bản mới",
-  không cố suy luận danh tính xuyên suốt qua thay đổi nội dung.
-
-Cách này giải quyết đúng gốc rễ vấn đề CDC key rỗng (không cần hệ CDC
-nguồn phân biệt "update" hay "insert mới") mà KHÔNG làm thay đổi cấu
-trúc `DIMENSION_KEY`/`LEGAL_PARTY_SK` — mọi FK ở `FCT_CLOS_
-APPLICATION_PARTY` và cách `DIM_CLOS_CUSTOMER` LEFT JOIN lấy giá trị
-hiện hành giữ nguyên không đổi.
-
-**So với thiết kế cũ (tách từ `FCT_LOS_APPLICATION_PARTY` + `FCT_LOS_
-PARTY_DOCUMENT` gộp):** đã đánh giá lại toàn bộ kiến trúc — mặc dù bảng
-này vẫn là quan hệ 1:N với hồ sơ (không phải 1:1), vẫn phân loại là **DIM**
-(không phải FCT) vì bản chất dữ liệu là thông tin mô tả, không đo lường —
-nhất quán với cách `DIM_RLOS_COREPAYER` (cũng 1:N) được phân loại là DIM.
-Khác với `DIM_RLOS_COREPAYER` (N có giới hạn cứng 0-4, pivot được giấy tờ
-thành 2 cột cố định `ADD_ID_COREPAYER`/`ADD_ID_OTHER_COREPAYER`), nhóm vai
-trò pháp lý CLOS có **N không giới hạn và không cố định** (số người đại
-diện/chủ sở hữu TSBĐ/thành viên góp vốn tùy cấu trúc sở hữu doanh nghiệp
-thực tế), và **1 người có thể giữ nhiều vai trò cùng lúc** (xác nhận trực
-tiếp qua CLOS Metadata Table Review) — không đủ điều kiện pivot thành cột
-cố định như RLOS, nên **vẫn giữ dạng bảng danh sách** (grain nhân dòng),
-chỉ đổi từ FCT (đo lường) sang DIM (mô tả).
-
-Gộp luôn `FCT_LOS_PARTY_DOCUMENT` vào bảng này (bỏ hẳn bảng document
-riêng) — vì nguồn giấy tờ pháp lý CLOS chỉ có đúng 1 bảng gốc
-(`NG_SB_CLOS_CUST_INFO_LEGAL`) với đúng 1 cặp `LEGAL_DOC`/`ID_NUMBER`/
-`OBJ_TYPE` trên mỗi dòng — không có rủi ro "nhiều giấy tờ/nhóm" như RLOS
-IDGRID (14 loại giấy tờ, có thể nhiều dòng/nhóm TCC-CC), nên gộp trực tiếp
-an toàn, không mất dữ liệu.
-
-Bỏ `PARTY_TYPE`, `PARTY_ROLE_CODE` (thay bằng `OBJ_TYPE`/
-`LEGAL_TYPE` chuẩn hóa ở PDTD_DTM, xem 2.2.1.8), `APPLICATION_SK`,
-`GEO_SK` (không cần vì không phải khách hàng chính); sau đó thêm lại
-`DATASOURCE` làm cột kỹ thuật cố định 'CLOS'.
+**Đổi phân loại DIM → FACT (review 2026-09-25):** bảng này đã đổi tên
+thành `FCT_CLOS_LEGAL_PARTY` và chuyển sang nhóm FCT — xem 1.2.2.7 để
+tránh trùng lặp nội dung (cột, cơ chế nạp, lý do đổi phân loại). Giữ lại
+số hiệu `1.2.1.7` như một mục rỗng trỏ chuyển tiếp, không xóa số để
+không làm lệch số các bảng DIM khác trong nhóm CLOS.
 
 ##### 1.2.2 FCT
 
-###### 1.2.2.1 FCT_CLOS_APPLICATION_DAILY
+###### 1.2.2.1 FCT_CLOS_APPLICATION — ⚠️ review 2026-09-30 (theo yêu cầu người dùng): nhận thêm FIRST_APPROVED_DATE (đặt cạnh LAST_APPROVAL_DATE) + LG_REQ/FI_REQ/PHONE_REQ từ DIM_CLOS_APPLICATION — nay 47 cột
 
 **Bảng cũ (trước tách):** `FCT_LOS_APPLICATION_DAILY` (93 cột, gộp CLOS+RLOS)
 
@@ -4439,67 +5159,105 @@ Bỏ `PARTY_TYPE`, `PARTY_ROLE_CODE` (thay bằng `OBJ_TYPE`/
 | 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS |
 | 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
 | 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION. Mặc định -1 nếu không khớp |
-| 5 | CURRENT_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP, bước hồ sơ đang đứng tại ngày DAYID. Mặc định -1 |
-| 6 | LAST_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP của sự kiện hoàn tất gần nhất. Mặc định -1 |
-| 7 | LAST_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_DECISION của sự kiện hoàn tất gần nhất. Mặc định -1 |
-| 8 | LAST_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER của người xử lý sự kiện hoàn tất gần nhất. Mặc định -1 |
-| 9 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT — PHÁI SINH (review 2026-09-21, đóng PENDING BC2.PRODUCT_LINE/SUB_PRODUCT): lookup theo PRODUCT_LINE_CODE=NG_SB_CLOS_CUST_INFO.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_CLOS_PRODUCT. NG_SB_CLOS_CUST_INFO.PRODUCT_LINE/SUB_PRODUCT xác nhận CÙNG khái niệm với DIM_CLOS_PRODUCT.PRODUCT_LINE_CODE/SUB_PRODUCT_CODE (đã dùng nhất quán cho BC9 nhánh CLOS, xem 1.2.1.2) — không tạo cột text trùng lặp trên DIM_CLOS_APPLICATION, chỉ hợp nhất qua đúng 1 chiều sản phẩm này. Mặc định -1 nếu không khớp |
-| 10 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_ORG_UNIT — PHÁI SINH (review 2026-09-21, đóng gap tài liệu BC1/BC2.ZONE/BRANCH_CODE): lookup theo COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_LOS_ORG_UNIT (Natural Key COMPANY_CODE, 1.1.1) — cùng bảng nguồn NG_SB_CLOS_CUST_INFO đã dùng cho CUST_GROUP/EMPLOYEE_CODE trên DIM_CLOS_APPLICATION. Mặc định -1 nếu không khớp |
-| 11 | RI_USER | VARCHAR2 | N | 100 |  | User khởi tạo hồ sơ (bước RequestInitiate) |
-| 12 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất |
-| 13 | DDE_USER | VARCHAR2 | N | 100 |  | User xử lý bước DetailDataEntry, HOÀN TẤT gần nhất |
-| 14 | QC_USER | VARCHAR2 | N | 100 |  | User xử lý bước DataInputerChecker, HOÀN TẤT gần nhất |
-| 15 | UND_MAKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterMaker, HOÀN TẤT gần nhất |
-| 16 | UND_CHECKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterChecker, HOÀN TẤT gần nhất |
-| 17 | PHV_USER | VARCHAR2 | N | 100 |  | User xử lý bước PhoneVerification, HOÀN TẤT gần nhất |
-| 18 | FA_USER | VARCHAR2 | N | 100 |  | User Chuyên viên Thực địa — WORKSTEP='FieldAssessment' (đối chiếu SRS BC2, field FA_USER) |
-| 19 | APPROVER_USER | VARCHAR2 | N | 100 |  | User xử lý bước CreditApproval, HOÀN TẤT gần nhất |
-| 20 | COMMITTEE_USER | VARCHAR2 | N | 100 |  | User Hội đồng tín dụng |
-| 21 | HOS_USER | VARCHAR2 | N | 100 |  | User Hỗ trợ phê duyệt — WORKSTEP='HOSupport' (đối chiếu SRS BC2, field BI_HOS_USER) |
-| 22 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên: (1) MAX(EXITDATE) WHERE WORKSTEP IN ('CreditCommittee','CreditApproval') AND DECISION IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker'); (2) NVL(EXITDATE, ENTRYDATE) WHERE WORKSTEP='CancelRevoke'; (3) EXITDATE của sự kiện hoàn tất gần nhất. Đối chiếu nguyên văn SRS BC2 (review 2026-09-22) — nhánh (2) sửa lại đúng WORKSTEP='CancelRevoke' + NVL(EXITDATE,ENTRYDATE), bản trước đây ghi sai WORKSTEP='UnderwriterMaker' AND DECISION='Cancel' |
-| 23 | LAST_UWM_ENTRYDATE | TIMESTAMP | N |  |  | MAX(ENTRYDATE) tại UnderwriterMaker <= DAYID — mốc mở chu kỳ thẩm định hiện hành |
-| 24 | PROCESSED_DATE_UWM | DATE | N |  |  | Ngày chốt chu kỳ thẩm định hiện hành, tính tương đối theo LAST_UWM_ENTRYDATE |
-| 25 | CREATION_DATE | DATE | N |  |  | TRUNC(MIN(ENTRYDATE)) theo WI_NAME |
-| 26 | FIRST_APPROVAL_DATE | DATE | N |  |  | MIN(EXITDATE) tại bước phê duyệt — WORKSTEP IN ('CreditApproval','CreditCommittee'), không có điều kiện DECISION (đối chiếu SRS BC2 field LAST_APPROVAL_DATE, áp dụng nhất quán MIN cho FIRST) |
-| 27 | LAST_APPROVAL_DATE | DATE | N |  |  | MAX(EXITDATE) tại bước phê duyệt — WORKSTEP IN ('CreditApproval','CreditCommittee'), không có điều kiện DECISION (đối chiếu nguyên văn SRS BC2 field LAST_APPROVAL_DATE, review 2026-09-22 — bản trước đây ghi thừa điều kiện DECISION "đã phê duyệt hợp lệ" không có căn cứ SRS) |
-| 28 | MIN_UWM | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại UnderwriterMaker |
-| 29 | MIN_APP | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại CreditApproval/CreditCommittee |
-| 30 | AUTO_CANCEL_DATE | DATE | N |  |  | Ngày hồ sơ bị hệ thống tự hủy — CASE WHEN LAST_DECISION (DECISION tại dòng ENTRYDATE lớn nhất) = 'Auto-Cancel' THEN BI_CAN_DATE ELSE NULL END. Cột trung gian nuôi FLAG_AUTO_CANCEL (cột 40) — xác nhận CÓ report dùng gián tiếp: FLAG_AUTO_CANCEL chính là field FLAG_AUTO_CAN mà cả SRS BC1 (RLOS) và BC2 (CLOS) tiêu thụ trực tiếp ('YES' nếu BI_CAN_DATE IS NOT NULL AND LAST_DECISION='Auto-Cancel', review 2026-09-22) — thay thế mô tả cũ "theo quy tắc CancelRevoke rỗng liên tiếp" (không khớp SRS) |
-| 31 | CANCEL_USER_DATE | DATE | N |  |  | EXITDATE tại bản ghi DECISION='Cancel' và USERNAME khác NULL |
-| 32 | BI_CAN_DATE | DATE | N |  |  | ENTRYDATE tại bước CancelRevoke |
-| 33 | LAST_ENTRYDATE | TIMESTAMP | N |  |  | ENTRYDATE của sự kiện hoàn tất gần nhất |
-| 34 | LAST_EXITDATE | TIMESTAMP | N |  |  | EXITDATE của cùng sự kiện hoàn tất gần nhất |
-| 35 | BI_APPSTATUS | VARCHAR2 | N | 50 |  | Trạng thái hồ sơ chuẩn hóa: DECISION IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport') → 'Approved'; DECISION='Reject' → 'Rejected'; WORKSTEP IN ('CancelRevoke','CancelPermanent') → 'Cancelled'; còn lại → 'Processing' (đối chiếu nguyên văn SRS BC2 field BI_APPSTATUS, review 2026-09-22, áp dụng trên bản ghi hoàn tất gần nhất) |
-| 36 | HAS_ACTION_IN_DAY | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có phát sinh xử lý trong ngày DAYID |
-| 37 | LAST_ACTION_DATE | DATE | Y |  |  | Ngày business action gần nhất tính đến cuối DAYID |
-| 38 | INACTIVE_DAY_CNT | NUMBER | Y | 5 |  | TRUNC(DAYID) - TRUNC(LAST_ACTION_DATE) |
-| 39 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước (LAG theo ENTRYDATE) |
-| 40 | FLAG_AUTO_CANCEL | VARCHAR2 | N | 10 |  | 'YES'/'NO' theo nguyên văn SRS BC2 field FLAG_AUTO_CAN: BI_CAN_DATE IS NOT NULL AND LAST_DECISION='Auto-Cancel' → 'YES', else 'NO' (review 2026-09-22: công thức độc lập, không còn tham chiếu AUTO_CANCEL_DATE cùng dòng để tránh phụ thuộc vòng vo qua 2 lớp CASE — cả 2 cột nay cùng đọc chung điều kiện gốc) |
-| 41 | LAST_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của sự kiện hoàn tất gần nhất |
-| 42 | LAST_REMARK_DDE | VARCHAR2 | N | 4000 |  | Ghi chú tại bước DetailDataEntry |
-| 43 | LAST_CAN_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại lần hủy hồ sơ |
-| 44 | HAS_REACHED_DDE | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước DetailDataEntry hay chưa |
-| 45 | HAS_REACHED_QC | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước DataInputerChecker hay chưa |
-| 46 | HAS_REACHED_UWM | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước UnderwriterMaker hay chưa |
-| 47 | HAS_REACHED_UWC | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước UnderwriterChecker hay chưa |
-| 48 | HAS_REACHED_APPROVAL | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước CreditApproval/CreditCommittee hay chưa |
-| 49 | PROPOSED_AMT | NUMBER | N | 20,2 |  | Số tiền đề xuất — nguồn NG_SB_CLOS_CREDITINFO_COMM.PRECREDITLIMIT |
-| 50 | CREDIT_LIMIT_APPROVAL | NUMBER | N | 20,2 |  | Hạn mức do chuyên gia phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_CD.CREDIT_LIMIT |
-| 51 | CREDIT_LIMIT_COMMITTEE | NUMBER | N | 20,2 |  | Hạn mức do hội đồng phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_LIMIT |
-| 52 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng (BC3.CREDIT_LIMIT) — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_LIMIT, map thẳng 1 nguồn (review 2026-09-22: đổi từ CASE chọn CREDIT_LIMIT_APPROVAL/CREDIT_LIMIT_COMMITTEE theo bước phê duyệt cuối — đối chiếu SRS BC3 xác nhận không có CASE chọn 2 nguồn, và đối xứng với bản RLOS FCT_RLOS_APPLICATION_DAILY.APPROVED_AMT_FINAL cũng map thẳng 1 nguồn duy nhất) |
-| 53 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_TERM |
-| 54 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%), chỉ nhận khi nguồn là số |
-| 55 | INTEREST_RATE_DESC | VARCHAR2 | N | 1600 |  | Diễn giải lãi suất nguyên văn — nguồn NG_SB_CLOS_CREDITINFO_COMM.INTEREST_RATE (có thể là công thức nhiều giai đoạn) |
-| 56 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền — nguồn NG_SB_CLOS_CREDITINFO_COMM.CURRENCY |
-| 57 | RETURN_CNT_DATAENTRY | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu nhập liệu |
-| 58 | RETURN_CNT_UNDERWRITING | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu thẩm định |
-| 59 | RETURN_CNT_APPROVAL | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu phê duyệt |
-| 60 | KPI_VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH theo nguyên văn SRS BC9 (field VOLUME nhánh CLOS, review 2026-09-22): DECISION IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport','Reject') → 1.0 (SRS có cả 'Reject', bản HLD cũ ghi tắt "đã phê duyệt/từ chối" nhưng thiếu liệt kê literal); còn lại xét theo bước xa nhất từng đạt qua EXISTS độc lập theo thứ tự ưu tiên: WORKSTEP IN ('CreditApproval','CreditCommittee') → 0.8, 'UnderwriterChecker' → 0.6, 'UnderwriterMaker' → 0.5, 'DetailDataEntry' → 0.2; còn lại NULL. Nguồn tính từ toàn bộ lịch sử hồ sơ trên FCT_CLOS_WORKSTEP_EVENT (quyết định kiến trúc đã chốt, khác SRS gốc dùng trực tiếp NG_SB_CLOS_ENTRY_EXIT — cùng công thức đã chốt ở AGG_LOS_KPI_APPLICATION.VOLUME, 2.1.9) |
-| 61 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (KHÔNG lọc CREATEDBY, khác điều kiện join của WORKSTEP_FLAG — nay chỉ còn trên FCT_CLOS_WORKSTEP_EVENT, đã bỏ khỏi bảng này, xem 1.2.2.6). Dùng làm điều kiện lọc `IS NOT NULL` cho SLHS_CLOS/SLGN_CLOS (AGG_LOS_KPI_YTD_DAILY, 2.1.8) — CLOS-only, RLOS không có cột tương ứng vì SRS BC9 không nhắc WFINSTRUMENTTABLE ở nhánh KPI Khối (RLOS) |
-| 62 | UNDERWRITERMAKER_TAKERESPON | VARCHAR2 | N | 100 |  | CV Thẩm định chịu trách nhiệm (BC1/BC2) — PHÁI SINH theo nguyên văn SRS: COALESCE(CASE WHEN m.WORK_STEP='UnderwriterMaker' THEN m.USER_MAKE END, i.UWMAKERUSER) với i=NG_SB_CLOS_EXTTABLE, m=NG_SB_CLOS_USER_MAKE_WORK_STEP (LEFT JOIN theo WI_NAME=m.WI_NAME AND WORKSTEP=m.WORK_STEP). ✅ Bảng nguồn `NG_SB_CLOS_USER_MAKE_WORK_STEP` không có trong `DS_BANG_202608.xlsx` nhưng đã xác nhận tồn tại thật qua `input/CLOS - Metadata.xlsx` (review 2026-09-21, Section 3 dòng #20) |
-| 63 | UNDERWRITERCHECKER_TAKERESPON | VARCHAR2 | N | 100 |  | Kiểm soát thẩm định chịu trách nhiệm (BC1/BC2) — PHÁI SINH: cùng cơ chế trên, COALESCE(CASE WHEN m.WORK_STEP='UnderwriterChecker' THEN m.USER_MAKE END, i.UWCHKRUSER). Cùng nguồn `NG_SB_CLOS_USER_MAKE_WORK_STEP` đã xác nhận tồn tại thật (Section 3 dòng #20) |
-| 64 | APPROVAL_TAKERESPON | VARCHAR2 | N | 100 |  | Chuyên gia phê duyệt chịu trách nhiệm (BC1/BC2) — PHÁI SINH theo nguyên văn SRS: COALESCE(m.USER_MAKE, CASE e.APP_GRP WHEN 'A1' THEN 'long.lq' WHEN 'CC' THEN 'UBTD' WHEN 'BOD' THEN 'HDQT' END) với e=NG_SB_CLOS_APPROVAL, m=NG_SB_CLOS_USER_MAKE_WORK_STEP. Có hằng số hardcode theo APP_GRP (khác hẳn công thức RLOS dùng CREDAPPRUSER/CCOMMITUSER, xem 1.3.2.1) — cùng nguồn đã xác nhận tồn tại thật, xem Section 3 dòng #20 |
-| 65 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (1.2.1.7, review 2026-09-17: bổ sung — quan hệ 1:1 với hồ sơ qua WI_NAME, join theo WI_NAME + điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) để lấy đúng phiên bản hiệu lực tại DAYID, không phải business key tĩnh). Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK (chân T24) |
+| 5 | LAST_WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP_DECISION (review 2026-09-24, gộp từ LAST_WORKSTEP_SK+LAST_DECISION_SK) của sự kiện hoàn tất gần nhất, lookup theo cặp WORKSTEP_CODE+DECISION_CODE của sự kiện đó. Mặc định -1 |
+| 6 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT — PHÁI SINH (review 2026-09-21, đóng PENDING BC2.PRODUCT_LINE/SUB_PRODUCT): lookup theo PRODUCT_LINE_CODE=NG_SB_CLOS_CUST_INFO.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_CLOS_PRODUCT. NG_SB_CLOS_CUST_INFO.PRODUCT_LINE/SUB_PRODUCT xác nhận CÙNG khái niệm với DIM_CLOS_PRODUCT.PRODUCT_LINE_CODE/SUB_PRODUCT_CODE (đã dùng nhất quán cho BC9 nhánh CLOS, xem 1.2.1.2) — không tạo cột text trùng lặp trên DIM_CLOS_APPLICATION, chỉ hợp nhất qua đúng 1 chiều sản phẩm này. Mặc định -1 nếu không khớp |
+| 7 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY — PHÁI SINH (review 2026-09-21, đóng gap tài liệu BC1/BC2.ZONE/BRANCH_CODE): lookup theo COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_LOS_COMPANY (Natural Key COMPANY_CODE, 1.1.1) — cùng bảng nguồn NG_SB_CLOS_CUST_INFO đã dùng cho EMPLOYEE_CODE trên DIM_CLOS_APPLICATION. Mặc định -1 nếu không khớp |
+| 8 | RI_USER | VARCHAR2 | N | 100 |  | User khởi tạo hồ sơ (bước RequestInitiate) |
+| 9 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất |
+| 10 | DDE_USER | VARCHAR2 | N | 100 |  | User xử lý bước DetailDataEntry, HOÀN TẤT gần nhất |
+| 11 | QC_USER | VARCHAR2 | N | 100 |  | User xử lý bước DataInputerChecker, HOÀN TẤT gần nhất |
+| 12 | UND_MAKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterMaker, HOÀN TẤT gần nhất |
+| 13 | UND_CHECKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterChecker, HOÀN TẤT gần nhất |
+| 14 | PHV_USER | VARCHAR2 | N | 100 |  | User xử lý bước PhoneVerification, HOÀN TẤT gần nhất |
+| 15 | FA_USER | VARCHAR2 | N | 100 |  | User Chuyên viên Thực địa — WORKSTEP='FieldAssessment' (đối chiếu SRS BC2, field FA_USER) |
+| 16 | APPROVER_USER | VARCHAR2 | N | 100 |  | User xử lý bước CreditApproval, HOÀN TẤT gần nhất |
+| 17 | COMMITTEE_USER | VARCHAR2 | N | 100 |  | User Hội đồng tín dụng |
+| 18 | HOS_USER | VARCHAR2 | N | 100 |  | User Hỗ trợ phê duyệt — WORKSTEP='HOSupport' (đối chiếu SRS BC2, field BI_HOS_USER) |
+| 19 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên: (1) MAX(EXITDATE) WHERE WORKSTEP IN ('CreditCommittee','CreditApproval') AND DECISION IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker'); (2) NVL(EXITDATE, ENTRYDATE) WHERE WORKSTEP='CancelRevoke'; (3) EXITDATE của sự kiện hoàn tất gần nhất. Đối chiếu nguyên văn SRS BC2 (review 2026-09-22) — nhánh (2) sửa lại đúng WORKSTEP='CancelRevoke' + NVL(EXITDATE,ENTRYDATE), bản trước đây ghi sai WORKSTEP='UnderwriterMaker' AND DECISION='Cancel' |
+| 20 | CREATION_DATE | DATE | N |  |  | TRUNC(MIN(ENTRYDATE)) theo WI_NAME |
+| 21 | LAST_APPROVAL_DATE | DATE | N |  |  | MAX(EXITDATE) tại bước phê duyệt — WORKSTEP IN ('CreditApproval','CreditCommittee'), không có điều kiện DECISION (đối chiếu nguyên văn SRS BC2 field LAST_APPROVAL_DATE, review 2026-09-22 — bản trước đây ghi thừa điều kiện DECISION "đã phê duyệt hợp lệ" không có căn cứ SRS) |
+| 22 | FIRST_APPROVED_DATE | DATE | N |  |  | Ngày phê duyệt (BC11.APPROVAL_DATE) — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-30, theo yêu cầu người dùng — chỉ có giá trị từ khi hồ sơ tới bước phê duyệt, không phải thuộc tính hồ sơ ổn định phù hợp DIM). PHÁI SINH: MAX(EXITDATE) trên NG_SB_CLOS_ENTRY_EXIT của hồ sơ thỏa USERNAME IS NOT NULL AND WORKSTEP IN ('CreditApproval','CreditCommittee') AND DECISION IN ('Submit','Send To HOSupport','Send To PostSanction'). Đúng nguyên văn công thức SRS BC11 — khác `LAST_APPROVAL_DATE` (cột 21, không lọc DECISION, phục vụ BC2): 2 metric độc lập, không trùng lặp dù cùng công thức MAX(EXITDATE) |
+| 23 | MIN_UWM | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại UnderwriterMaker |
+| 24 | MIN_APP | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại CreditApproval/CreditCommittee |
+| 25 | CANCEL_DATE | DATE | N |  |  | ENTRYDATE tại bước CancelRevoke. Input thô giữ nguyên ở SB_DWH — `FLAG_AUTO_CANCEL` (business rule CASE WHEN dựa trên cột này + DECISION_CODE của `LAST_WORKSTEP_DECISION_SK`) đã chuyển tính tại PDTD_DTM, xem "Chuyển business rule sang PDTD_DTM" bên dưới và Section 2 → 2.2.2.1 |
+| 26 | LAST_ENTRYDATE | TIMESTAMP | N |  |  | ENTRYDATE của sự kiện hoàn tất gần nhất |
+| 27 | LAST_EXITDATE | TIMESTAMP | N |  |  | EXITDATE của cùng sự kiện hoàn tất gần nhất |
+| 28 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước (LAG theo ENTRYDATE) |
+| 29 | LAST_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của sự kiện hoàn tất gần nhất |
+| 30 | PROPOSED_AMT | NUMBER | N | 20,2 |  | Số tiền đề xuất — nguồn NG_SB_CLOS_CREDITINFO_COMM.PRECREDITLIMIT |
+| 31 | CREDIT_LIMIT_APPROVAL | NUMBER | N | 20,2 |  | Hạn mức do chuyên gia phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_CD.CREDIT_LIMIT |
+| 32 | CREDIT_LIMIT_COMMITTEE | NUMBER | N | 20,2 |  | Hạn mức do hội đồng phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_LIMIT |
+| 33 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng (BC3.CREDIT_LIMIT) — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_LIMIT, map thẳng 1 nguồn (review 2026-09-22: đổi từ CASE chọn CREDIT_LIMIT_APPROVAL/CREDIT_LIMIT_COMMITTEE theo bước phê duyệt cuối — đối chiếu SRS BC3 xác nhận không có CASE chọn 2 nguồn, và đối xứng với bản RLOS FCT_RLOS_APPLICATION.APPROVED_AMT_FINAL cũng map thẳng 1 nguồn duy nhất) |
+| 34 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_TERM |
+| 35 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%), chỉ nhận khi nguồn là số |
+| 36 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền — nguồn NG_SB_CLOS_CREDITINFO_COMM.CURRENCY |
+| 37 | RETURN_CNT_DATAENTRY | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu nhập liệu |
+| 38 | RETURN_CNT_UNDERWRITING | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu thẩm định |
+| 39 | RETURN_CNT_APPROVAL | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu phê duyệt |
+| 40 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (KHÔNG lọc CREATEDBY, khác điều kiện join của WORKSTEP_FLAG — nay chỉ còn trên FCT_CLOS_WORKSTEP_EVENT, đã bỏ khỏi bảng này, xem 1.2.2.6). Dùng làm điều kiện lọc `IS NOT NULL` cho SLHS_CLOS/SLGN_CLOS (AGG_LOS_KPI_YTD_DAILY, 2.1.8) — CLOS-only, RLOS không có cột tương ứng vì SRS BC9 không nhắc WFINSTRUMENTTABLE ở nhánh KPI Khối (RLOS) |
+| 41 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | Input thô (review 2026-09-26, đổi tên từ UNDERWRITERMAKER_TAKERESPON — business rule COALESCE chuyển tính tại PDTD_DTM, xem Section 2 → 2.2.2.1): COALESCE(CASE WHEN m.WORK_STEP='UnderwriterMaker' THEN m.USER_MAKE END, i.UWMAKERUSER) với i=NG_SB_CLOS_EXTTABLE, m=NG_SB_CLOS_USER_MAKE_WORK_STEP (LEFT JOIN theo WI_NAME=m.WI_NAME AND WORKSTEP=m.WORK_STEP). Công thức giữ nguyên như cột cũ — chỉ đổi tên để phản ánh đúng bản chất input thô, KHÔNG còn business rule nào khác áp thêm ở tầng này. ✅ Bảng nguồn `NG_SB_CLOS_USER_MAKE_WORK_STEP` không có trong `DS_BANG_202608.xlsx` nhưng đã xác nhận tồn tại thật qua `input/CLOS - Metadata.xlsx` (review 2026-09-21, Section 3 dòng #20) |
+| 42 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | Input thô (review 2026-09-26, đổi tên từ UNDERWRITERCHECKER_TAKERESPON, cùng lý do trên): COALESCE(CASE WHEN m.WORK_STEP='UnderwriterChecker' THEN m.USER_MAKE END, i.UWCHKRUSER). Cùng nguồn `NG_SB_CLOS_USER_MAKE_WORK_STEP` đã xác nhận tồn tại thật (Section 3 dòng #20) |
+| 43 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | Input thô (review 2026-09-26, đổi tên từ APPROVAL_TAKERESPON, cùng lý do trên): COALESCE(m.USER_MAKE, CASE e.APP_GRP WHEN 'A1' THEN 'long.lq' WHEN 'CC' THEN 'UBTD' WHEN 'BOD' THEN 'HDQT' END) với e=NG_SB_CLOS_APPROVAL, m=NG_SB_CLOS_USER_MAKE_WORK_STEP. Có hằng số hardcode theo APP_GRP (khác hẳn công thức RLOS dùng CREDAPPRUSER/CCOMMITUSER, xem 1.3.2.1) — cùng nguồn đã xác nhận tồn tại thật, xem Section 3 dòng #20 |
+| 44 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (1.2.1.6, review 2026-09-17: bổ sung; ⚠️ review 2026-09-25: đổi cách join sau khi DIM_CLOS_CUSTOMER đổi grain sang 1 dòng/khách hàng, NK=ID_NUMBER) — nguồn: lấy NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN theo WI_NAME (của chính dòng đang nạp) + UPPER(OBJ_TYPE)='KHÁCH HÀNG', rồi lookup DIM_CLOS_CUSTOMER.DIMENSION_KEY theo ID_NUMBER (NK) + điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) để lấy đúng phiên bản hiệu lực tại DAYID. Quan hệ N:1 (nhiều hồ sơ/DAYID của cùng khách hàng có thể trỏ cùng 1 CUSTOMER_SK), không còn 1:1 như trước. Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK (chân T24) |
+| 45 | LG_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu bảo lãnh (Letter of Guarantee) phát sinh theo hồ sơ — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-30, theo yêu cầu người dùng, cùng lý do đã áp dụng cho 11 cờ tương ứng bên `FCT_RLOS_APPLICATION`) — nguồn NG_SB_CLOS_CUST_INFO.LG_REQ (boolean true/false), giữ nguyên công thức/nguồn, chỉ đổi bảng chứa. ⚠️ Metadata: cần BA xác nhận ý nghĩa và điều kiện phát sinh cụ thể |
+| 46 | FI_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu (tương tự LG_REQ) — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-30), cùng lý do cột 45 — nguồn NG_SB_CLOS_CUST_INFO.FI_REQ (boolean true/false). ⚠️ Metadata: cần BA xác nhận ý nghĩa và điều kiện phát sinh cụ thể |
+| 47 | PHONE_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu xác minh điện thoại (tương tự LG_REQ) — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-30), cùng lý do cột 45 — nguồn NG_SB_CLOS_CUST_INFO.PHONE_REQ (boolean true/false). ⚠️ Metadata: cần BA xác nhận ý nghĩa và điều kiện phát sinh cụ thể |
+
+**Cắt gọn cột dư thừa (review 2026-09-24):** rà soát toàn bộ 16 cột đã bị
+đánh "Thiết kế dư thừa" tại `hld/hld_review/HLD_FCT_SB_DWH_review.md`
+Section 1 và `hld/hld_review/HLD_FCT_PDTD_DTM_review.md` Section 3 — xác
+nhận không cột nào còn được bất kỳ báo cáo nào tiêu thụ (trực tiếp hoặc
+làm nguồn tính toán cho cột khác) — đã xóa khỏi bảng: `CURRENT_WORKSTEP_SK`,
+`LAST_USER_SK`, `FIRST_APPROVAL_DATE`, `CANCEL_USER_DATE`,
+`HAS_ACTION_IN_DAY`, `LAST_ACTION_DATE`, `INACTIVE_DAY_CNT`,
+`LAST_REMARK_DDE`, `LAST_CAN_REMARKS`, `HAS_REACHED_DDE`,
+`HAS_REACHED_QC`, `HAS_REACHED_UWM`, `HAS_REACHED_UWC`,
+`HAS_REACHED_APPROVAL`, `INTEREST_RATE_DESC`, `KPI_VOLUME`.
+
+**Cắt gọn thêm 2 cột dư thừa (review 2026-09-24, phát hiện tiếp theo):**
+`LAST_UWM_ENTRYDATE`/`PROCESSED_DATE_UWM` — bản review trước gán nhãn
+"Báo cáo BC4 — REPORT_DATE" cho `PROCESSED_DATE_UWM`, nhưng đối chiếu
+`lld/BC4.csv` (bản mapping đã chốt, review 2026-09-21) cho thấy
+BC4.REPORT_DATE đã đổi nguồn sang `FCT_CLOS_WORKSTEP_EVENT.PROCESSED_DATE`
+(cột phái sinh trực tiếp trên bảng event, không JOIN fan-out sang
+APPLICATION_DAILY) — nhãn cũ đã lỗi thời. Khớp với bản RLOS
+(`FCT_RLOS_APPLICATION`) đã tự đánh đúng "Thiết kế dư thừa" cho
+`PROCESSED_DATE_UWM` từ trước, nay đồng bộ lại cho nhánh CLOS. Còn lại 47
+cột (từ 65 cột trước đó, đã gồm `DATASOURCE`). Đánh số lại STT liên tục.
+
+**Đổi driving table + chuyển 5 cột business rule sang PDTD_DTM, xóa 3 cột
+`*_TAKERESPON` đổi thành 3 cột `*_USERMAKE` thô (review 2026-09-26, theo
+yêu cầu người dùng):** xem đánh giá kiến trúc đầy đủ tại Section 1 →
+1.2.2.1 ("Đổi driving table + chuyển business rule sang PDTD_DTM"). Tóm
+tắt thay đổi ở bảng cột trên: xóa hẳn `APPLICATION_STATUS`,
+`FLAG_AUTO_CANCEL` (business rule CASE WHEN dựa trên sự kiện hoàn tất gần
+nhất — tái tạo được ở PDTD_DTM từ `LAST_WORKSTEP_DECISION_SK`+`CANCEL_DATE`
+đã có sẵn, không cần input mới; **`AUTO_CANCEL_DATE` không tồn tại ở cả 2
+tầng** — rà soát lại xác nhận đây là field chỉ có ở SRS BC1/RLOS, không
+phải BC2/CLOS); đổi tên `UNDERWRITERMAKER_TAKERESPON`/
+`UNDERWRITERCHECKER_TAKERESPON`/`APPROVAL_TAKERESPON` thành
+`UNDERWRITERMAKER_USERMAKE`/`UNDERWRITERCHECKER_USERMAKE`/
+`APPROVAL_USERMAKE` (giữ nguyên công thức COALESCE hiện có làm input thô,
+PDTD_DTM sẽ không cần tính lại COALESCE — cột thô đã là kết quả cuối, đổi
+tên chỉ để phản ánh đúng vai trò input chứ không phải business rule tầng
+này). Còn lại 43 cột. Các cột aggregate quét toàn bộ lịch sử sự kiện
+(`RETURN_CNT_DATAENTRY`/`UNDERWRITING`/`APPROVAL`, `PROCESSED_DATE`) đã
+đánh giá và XÁC NHẬN GIỮ NGUYÊN ở đây — không thể tái tạo chỉ từ 1-2 mốc
+"sự kiện gần nhất", phải quét nhiều dòng nguồn (khác bản chất với 6 cột
+chuyển đi ở trên, vốn chỉ cần đúng 1 mốc).
+
+**Nhận thêm 4 cột từ `DIM_CLOS_APPLICATION` (review 2026-09-30, theo yêu
+cầu người dùng):** `FIRST_APPROVED_DATE` (cột 22, đặt cạnh
+`LAST_APPROVAL_DATE` — không phải thuộc tính hồ sơ ổn định, chỉ có giá
+trị từ khi hồ sơ tới bước phê duyệt, cùng bản chất grain-theo-sự-kiện
+với `LAST_APPROVAL_DATE`; 2 cột độc lập không trùng lặp dù cùng công
+thức MAX(EXITDATE) — khác điều kiện lọc DECISION) và `LG_REQ`/`FI_REQ`/
+`PHONE_REQ` (cột 45-47, cùng lý do đã áp dụng cho 11 cờ tương ứng bên
+`FCT_RLOS_APPLICATION`: nguồn `NG_SB_CLOS_CUST_INFO` tự thân phát sinh
+dòng mới khi hồ sơ bàn giao nhân viên khác xử lý, không phải thuộc tính
+hồ sơ ổn định phù hợp SCD2 của DIM). Không đổi công thức/nguồn — chỉ đổi
+bảng chứa. Xem giải trình đầy đủ tại Section 1 → 1.2.1.1. Bảng từ 43 cột
+lên **47 cột**.
 
 - Bảng FACT xương sống, lưu ảnh trạng thái cuối ngày của hồ sơ CLOS kèm chỉ tiêu lũy kế, phục vụ BC1, BC2, BC3, BC4, BC5, BC6, BC8, BC9, BC11.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME**.
@@ -4591,7 +5349,7 @@ IN`. Đây là ý nghĩa nghiệp vụ chưa rõ (tên cột generic của
 xác nhận rõ ràng — dùng làm điều kiện lọc thêm 1 lần nữa cho
 `SLHS_CLOS`/`SLGN_CLOS`. Chỉ CLOS có (nhóm "KPI Khối (RLOS)" của BC9
 không nhắc `WFINSTRUMENTTABLE`) — không thêm cột này cho
-`FCT_RLOS_APPLICATION_DAILY`. Giá trị dùng downstream tại `FCT_LOS_
+`FCT_RLOS_APPLICATION`. Giá trị dùng downstream tại `FCT_LOS_
 KPI_YTD_DAILY.SLHS_CLOS_DAY`/`SLGN_CLOS_DAY` (2.1.8) — xem ghi chú ở đó.
 
 **Đánh giá kiến trúc — vì sao bỏ `DEVIATION_CNT`/`COLLATERAL_CNT*` khỏi
@@ -4605,7 +5363,7 @@ bảng nguồn tài sản/ngoại lệ rồi đếm trực tiếp, hoàn toàn k
 `COLLATERAL_CNT`/`DEVIATION_CNT` — và `DEVIATION_G3` cũng đã được thiết
 kế độc lập ngay trên `DIM_RLOS_APPLICATION` (1.3.1.1), đọc thẳng
 `NG_SB_RLOS_MANUAL_DEVIATION`, không qua cột này. Giữ cột đếm trung gian
-này trên `FCT_CLOS_APPLICATION_DAILY` buộc ETL phải chạy `FCT_CLOS_
+này trên `FCT_CLOS_APPLICATION` buộc ETL phải chạy `FCT_CLOS_
 COLLATERAL`/`FCT_CLOS_DEVIATION` xong trước mới tính được — một phụ
 thuộc thứ tự ETL giữa 2 fact hoàn toàn có thể tránh, vì người dùng làm
 báo cáo bằng OAS (Oracle Analytics Server): OAS's BI Server hỗ trợ đúng
@@ -4620,34 +5378,21 @@ calculated item wrap quanh measure đó. BI Server tự sinh SQL nhiều lượt
 xử lý multi-fact chuẩn, không phải workaround. Chi phí duy nhất là model
 đúng quan hệ logical fact-to-fact 1 lần trong RPD, không phải chi phí lặp
 lại theo từng báo cáo. Kết quả: `FCT_CLOS_COLLATERAL`, `FCT_CLOS_
-DEVIATION`, `FCT_CLOS_APPLICATION_DAILY` trở thành 3 luồng ETL hoàn toàn
+DEVIATION`, `FCT_CLOS_APPLICATION` trở thành 3 luồng ETL hoàn toàn
 độc lập, không còn phụ thuộc thứ tự chạy trước/sau lẫn nhau. Cùng đánh
-giá và kết luận áp dụng cho `FCT_RLOS_APPLICATION_DAILY` (1.3.2.1).
+giá và kết luận áp dụng cho `FCT_RLOS_APPLICATION` (1.3.2.1).
 
-###### 1.2.2.2 FCT_CLOS_APPLICATION_PARTY — MỚI (factless-fact liên kết, tương tự FCT_RLOS_APPLICATION_PARTY)
+###### 1.2.2.2 FCT_CLOS_APPLICATION_PARTY — ĐÃ XÓA (review 2026-09-26, theo yêu cầu người dùng)
 
-**Bảng cũ (trước tách):** không có — bảng bị thiếu trong lần thiết kế trước, bổ sung để khớp pattern factless-fact đã áp dụng cho RLOS (`FCT_RLOS_APPLICATION_PARTY`, 1.3.2.2) sau khi tách `DIM_CLOS_CUSTOMER`/`DIM_CLOS_LEGAL_PARTY` ra khỏi FCT
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS |
-| 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION. Mặc định -1 |
-| 4 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER. Mặc định -1 |
-| 5 | LEGAL_PARTY_SK | NUMBER | Y | 18 | PK | Khóa tới DIM_CLOS_LEGAL_PARTY — join ĐỦ N dòng cho CẢ 5 vai trò (CUSTOMER, LEGAL_REPRESENTATIVE, COLLATERAL_OWNER, MAIN_CONTRIBUTING_MEMBERS, OTHER), đúng grain "1 dòng = 1 hồ sơ × 1 người liên quan pháp lý" đã nêu ở Section 1 (review 2026-09-17: làm rõ, tránh hiểu nhầm chỉ join riêng CUSTOMER). Mặc định -1 chỉ dùng cho trường hợp dữ liệu thiếu/không khớp được (Unknown) — CLOS luôn có đúng 1 dòng LEGAL_PARTY ứng với chính khách hàng (LEGAL_TYPE='CUSTOMER', xác nhận nghiệp vụ: không bao giờ nhiều dòng cùng vai trò này/hồ sơ, riêng cho vai trò CUSTOMER), khác quy ước "-1 = không có corepayer" bên RLOS |
-| 6 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
-
-- Bảng FACT quan hệ (factless fact), thể hiện quan hệ 1 hồ sơ × 1 khách hàng chính × N người liên quan pháp lý. Phục vụ BC2.
-- Khóa chính của bảng (PK): **DAYID, WI_NAME, LEGAL_PARTY_SK**.
-
-**Bảng bổ sung mới, không so sánh với thiết kế cũ:** đây là bảng còn thiếu
-sau khi `DIM_CLOS_CUSTOMER` (1.2.1.7) và `DIM_CLOS_LEGAL_PARTY` (1.2.1.8)
-được tách khỏi FCT gốc — cần 1 bảng factless-fact liên kết lại 3 khóa
-(`APPLICATION_SK`, `CUSTOMER_SK`, `LEGAL_PARTY_SK`), đúng cùng vai trò với
-`FCT_RLOS_APPLICATION_PARTY` (1.3.2.2) bên RLOS. Không gộp thuộc tính mô tả
-nào vào bảng này (toàn bộ đã nằm trên `DIM_CLOS_CUSTOMER`/`DIM_CLOS_LEGAL_
-PARTY`) — bảng chỉ giữ 3 khóa liên kết, cùng nguyên tắc "factless fact" đã
-áp dụng cho RLOS.
+**Đã xóa hẳn bảng này** — xem lý do đầy đủ tại Section 1 → 1.2.2.2. Bảng
+liên kết factless này chỉ mang 3 khóa (`APPLICATION_SK`/`CUSTOMER_SK`/
+`LEGAL_PARTY_SK`) để bắc cầu `DIM_CLOS_CUSTOMER` sang `FCT_CLOS_LEGAL_
+PARTY`. Nhưng `FCT_CLOS_LEGAL_PARTY` (1.2.2.7) tự nó đã mang sẵn
+`WI_NAME` (và cả `CUSTOMER_SK`/`APPLICATION_SK` từ review 2026-09-25) để
+join trực tiếp, không cần bảng cầu nối trung gian này nữa — cùng lý do
+đã áp dụng cho `FCT_RLOS_APPLICATION_PARTY` (1.3.2.2, đã xóa). Giữ lại
+số hiệu `1.2.2.2` như một mục rỗng trỏ chuyển tiếp, không xóa số để
+không làm lệch số các bảng FCT khác trong nhóm CLOS.
 
 ###### 1.2.2.3 FCT_CLOS_COLLATERAL
 
@@ -4660,13 +5405,12 @@ PARTY`) — bảng chỉ giữ 3 khóa liên kết, cùng nguyên tắc "factles
 | 3 | COLLATERAL_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng tài sản — PHÁI SINH: STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB của NG_SB_CLOS_COLL_CD (loại trừ COLL_MGMT_APP, DESCRIPTION), cộng DATASOURCE và tên bảng nguồn. Chuẩn hóa trước khi hash: TRIM chuỗi, NULL quy về '<NULL>', DATE/NUMBER dùng format cố định không phụ thuộc NLS |
 | 4 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
 | 5 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
-| 6 | COLLATERAL_TYPE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_COLLATERAL_TYPE, lookup theo COLLATERAL_TYPE_CODE. Mặc định -1 |
-| 7 | COLLATERAL_TYPE_CODE | VARCHAR2 | N | 100 |  | Mã loại tài sản bảo đảm — nguồn NG_SB_CLOS_COLL_CD.COLLTYPE |
-| 8 | DESCRIPTION | VARCHAR2 | N | 4000 |  | Diễn giải tài sản bảo đảm — nguồn NG_SB_CLOS_COLL_CD.DESCRIPTION (CLOB) |
-| 9 | OWNER_NAME | VARCHAR2 | N | 200 |  | Chủ sở hữu tài sản — nguồn NG_SB_CLOS_COLL_CD.COLL_OWNER |
-| 10 | COLL_MGMT_METHOD | VARCHAR2 | N | 4000 |  | Phương thức quản lý tài sản — nguồn NG_SB_CLOS_COLL_CD.COLL_MGMT_APP. Người dùng thường không nhập trường này trên live nên phần lớn sẽ rỗng, nhưng BC3 vẫn liệt kê nên phải nạp |
-| 11 | APPRAISED_VALUE | NUMBER | N | 20,2 |  | Giá trị định giá của tài sản — nguồn NG_SB_CLOS_COLL_CD.APPRAISED_VAL_FIG. Ép kiểu số từ text theo định dạng Việt Nam (dấu chấm ngăn nghìn, dấu phẩy ngăn thập phân), DEFAULT NULL ON CONVERSION ERROR |
-| 12 | LOAN_RATE_LTV | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị tài sản — nguồn NG_SB_CLOS_COLL_CD.LTV. Cùng quy tắc ép kiểu, đơn vị phần trăm |
+| 6 | COLLATERAL_TYPE_CODE | VARCHAR2 | N | 500 |  | Loại tài sản bảo đảm — DENORMALIZE TRỰC TIẾP, nguồn NG_SB_CLOS_COLL_CD.COLLTYPE (text tự do tiếng Việt không dấu). Bỏ DIM_CLOS_COLLATERAL_TYPE (review 2026-09-30, theo yêu cầu người dùng): SRS chỉ khai thác trực tiếp giá trị COLLTYPE, không cần bảng danh mục/SK riêng — xem Section 1 → 1.2.2.3 |
+| 7 | DESCRIPTION | VARCHAR2 | N | 4000 |  | Diễn giải tài sản bảo đảm — nguồn NG_SB_CLOS_COLL_CD.DESCRIPTION (CLOB) |
+| 8 | OWNER_NAME | VARCHAR2 | N | 200 |  | Chủ sở hữu tài sản — nguồn NG_SB_CLOS_COLL_CD.COLL_OWNER |
+| 9 | COLL_MGMT_METHOD | VARCHAR2 | N | 4000 |  | Phương thức quản lý tài sản — nguồn NG_SB_CLOS_COLL_CD.COLL_MGMT_APP. Người dùng thường không nhập trường này trên live nên phần lớn sẽ rỗng, nhưng BC3 vẫn liệt kê nên phải nạp |
+| 10 | APPRAISED_VALUE | NUMBER | N | 20,2 |  | Giá trị định giá của tài sản — nguồn NG_SB_CLOS_COLL_CD.APPRAISED_VAL_FIG. Ép kiểu số từ text theo định dạng Việt Nam (dấu chấm ngăn nghìn, dấu phẩy ngăn thập phân), DEFAULT NULL ON CONVERSION ERROR |
+| 11 | LOAN_RATE_LTV | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị tài sản — nguồn NG_SB_CLOS_COLL_CD.LTV. Cùng quy tắc ép kiểu, đơn vị phần trăm |
 
 - Bảng FACT chi tiết (nhân dòng), lưu ảnh số liệu thay đổi theo ngày của từng tài sản bảo đảm thuộc hồ sơ CLOS. Không có chiều tài sản riêng — toàn bộ thuộc tính lưu thẳng trên fact vì nguồn không khai khóa CDC. Phục vụ BC1, BC2, BC3, BC9.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, COLLATERAL_BK**.
@@ -4678,15 +5422,31 @@ tương ứng "số giấy chứng nhận" (khác RLOS có `NO_CERTI`/
 `NG_SB_RLOS_COLL_CERTIGRD`) — theo column-optimization rule, bỏ hẳn cột
 luôn NULL thay vì giữ lại, giảm từ 13 xuống 12 cột.
 
+**Bỏ `DIM_CLOS_COLLATERAL_TYPE`, quay lại denormalize `COLLATERAL_TYPE_CODE`
+trên fact (review 2026-09-30, theo yêu cầu người dùng):** đảo ngược quyết
+định review 2026-09-24 (khi đó đã chủ động BỎ cột denormalize này để quay
+về join qua `COLLATERAL_TYPE_SK` → `DIM_CLOS_COLLATERAL_TYPE`, với lý do
+`lld/BC2.csv`/`lld/BC3.csv` viết sai so với thiết kế gốc). Rà soát lại
+(2026-09-30) xác nhận: SRS (BC1, BC2, BC3, BC9) thực chất chỉ khai thác
+trực tiếp giá trị text `NG_SB_CLOS_COLL_CD.COLLTYPE` — không có công thức
+báo cáo nào thật sự cần một bảng danh mục riêng với `DIMENSION_KEY`/SCD2,
+nên việc tồn tại `DIM_CLOS_COLLATERAL_TYPE` chỉ thêm độ phức tạp không cần
+thiết. Xóa hẳn `DIM_CLOS_COLLATERAL_TYPE` khỏi thiết kế (xem Section 1 →
+1.2.2.3) — đúng tiền lệ đã áp dụng cho `FCT_RLOS_COLLATERAL` khi xóa
+`DIM_RLOS_COLLATERAL_TYPE` (review 2026-09-22, xem 1.3.2.3, cột
+`COLLATERAL_TYPE_CODE` đã có sẵn denormalize ở đó). Bỏ cột
+`COLLATERAL_TYPE_SK`, thêm lại cột `COLLATERAL_TYPE_CODE` (cột 6, nguồn
+trực tiếp `COLLTYPE`) — vẫn giữ 11 cột.
+
 **Đối chiếu SRS (BC1, BC2, BC3, BC9):** BC1 dùng các cột chi tiết trực
 tiếp (OWNER_NAME/OWNERSHIP, APPRAISED_VALUE, LOAN_RATE_LTV...). BC3 dùng
-`COLLATERAL_TYPE_CODE` trực tiếp (nguồn `COLLTYPE` gốc tiếng Việt) làm
-`TYPES_OF_COLLATERALS` — CLOS chỉ có 1 nguồn tài sản duy nhất nên không
-cần cột phái sinh tổng hợp như RLOS (xem 1.3.2.3). BC2 tự tính 9 cờ
-TSDB_*/TIN_CHAP_TQD bằng CASE so sánh trực tiếp `COLLATERAL_TYPE_CODE`
-của `DIM_CLOS_COLLATERAL_TYPE` (join qua `COLLATERAL_TYPE_SK`, không
-phải cột vật lý trên fact này). BC9 là báo cáo RLOS, không liên quan bảng
-này. Không phát hiện lệch tài liệu nào về công thức cột.
+`COLLATERAL_TYPE_CODE` (giá trị `COLLTYPE` gốc tiếng Việt, denormalize
+trực tiếp trên fact) làm `TYPES_OF_COLLATERALS` — CLOS chỉ có 1 nguồn tài
+sản duy nhất nên không cần cột phái sinh tổng hợp như RLOS (xem 1.3.2.3).
+BC2 tự tính 9 cờ TSDB_*/TIN_CHAP_TQD bằng CASE so sánh trực tiếp
+`COLLATERAL_TYPE_CODE` (cột vật lý trên chính fact này, không còn qua
+join DIM). BC9 là báo cáo RLOS, không liên quan bảng này. Không phát hiện
+lệch tài liệu nào về công thức cột.
 
 **So với thiết kế cũ (`FCT_LOS_COLLATERAL` gộp, 22 cột):** bỏ `DATASOURCE`
 (luôn cố định 'CLOS' sau khi tách vật lý). Bỏ 9 cột chỉ có nguồn RLOS theo
@@ -4696,8 +5456,9 @@ column-optimization rule: `REL_TO_CUSTOMER`, `USING_PURPOSE`,
 (`NG_SB_CLOS_COLL_CD`), không có 5 bảng grid theo loại tài sản vật lý như
 RLOS nên các thuộc tính đặc thù loại tài sản (bất động sản/phương tiện/giấy
 tờ có giá) không áp dụng được. Giữ `COLL_MGMT_METHOD` (chỉ có ở CLOS); sau
-đó thêm lại `DATASOURCE` làm cột kỹ thuật cố định 'CLOS' — tổng
-13 cột (giảm 9 so với bản gộp).
+đó thêm lại `DATASOURCE` làm cột kỹ thuật cố định 'CLOS'; đã bỏ tiếp
+`CERTIFICATE_NO` (review 2026-09-17) — tổng 11 cột (giảm 11 so với bản
+gộp).
 
 ###### 1.2.2.4 FCT_CLOS_EXCEPTION
 
@@ -4708,17 +5469,30 @@ tờ có giá) không áp dụng được. Giữ `COLL_MGMT_METHOD` (chỉ có �
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
 | 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS |
 | 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 |
-| 4 | EXCEPTION_REASON_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_EXCEPTION_REASON — PHÁI SINH 2 bước đúng SRS BC7 (không phải lookup 1 cột): (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME, có thể khớp nhiều dòng DIM cùng category+name khác ACTIVITYNAME/DECISION_CODE; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_CLOS_ENTRY_EXIT (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó) — chỉ giữ tổ hợp đã thực sự xảy ra trong lịch sử xử lý hồ sơ. Mặc định -1 nếu không còn dòng nào khớp. Xem giải thích đầy đủ tại Section 1 → 1.2.2.4 |
-| 5 | RAISED_BY_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu |
+| 4 | EXCEPTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_EXCEPTION — PHÁI SINH 2 bước đúng SRS BC7 (không phải lookup 1 cột): (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME, có thể khớp nhiều dòng DIM cùng category+name khác ACTIVITYNAME/DECISION_CODE; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_CLOS_ENTRY_EXIT (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó) — chỉ giữ tổ hợp đã thực sự xảy ra trong lịch sử xử lý hồ sơ. Mặc định -1 nếu không còn dòng nào khớp. Xem giải thích đầy đủ tại Section 1 → 1.2.2.4 |
+| 5 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu |
 | 6 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 | PK | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_CATEGORY |
 | 7 | EXCEPTION_NAME | VARCHAR2 | N | 500 |  | Tên nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_NAME |
 | 8 | EXCEPTION_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_REMARKS |
-| 9 | RAISED_BY | VARCHAR2 | N | 100 | PK | Người nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_BY. Cột RAISED_BY_USER_SK bên cạnh giữ khóa tới DIM |
+| 9 | RAISED_BY | VARCHAR2 | N | 100 | PK | Người nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_BY. Cột USER_SK bên cạnh giữ khóa tới DIM |
 | 10 | RAISED_DATE_TIME | TIMESTAMP | N |  | PK | Thời điểm nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_DATE_TIME |
 | 11 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
 | 12 | RCTYPE | VARCHAR2 | N | 20 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_CLOS_EXCEPTION.RCTYPE |
-| 13 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật đổi hẳn công thức): mặc định 'Not First Time Right'; là 'First Time Right' CHỈ KHI mọi dòng NG_SB_CLOS_EXCEPTION (a) của hồ sơ đều khớp 1 tổ hợp ngoại lệ miễn trừ theo (join NG_SB_CLOS_ENTRY_EXIT (h) qua h.WINAME=a.WI_NAME AND h.WORKSTEP=d.ACTIVITYNAME AND h.DECISION=d.DECISION, d=NG_SB_CLOS_MAS_EXCEPTION), phân theo NG_SB_CLOS_CUST_INFO.CUST_GROUP: nhóm KHDN (MSME/SME/USME) và nhóm KHDNL/ĐT&ĐCTC (FDI/SOC/JSC/NBFI/BANK/STR) — mỗi nhóm có 4 tổ hợp WORKSTEP+DECISION với danh sách EXCEPTION_CATEGORY miễn trừ riêng, xem đầy đủ literal tại SRS BC7 BR 1.2 |
-| 14 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật): WORKSTEP của bản ghi NG_SB_CLOS_ENTRY_EXIT tại MIN(EXITDATE) theo WI_NAME, với điều kiện EXITDATE IS NOT NULL AND ((WORKSTEP='DetailDataEntry' AND DECISION='Send_Back') OR (WORKSTEP IN ('DataInputerChecker','UnderwriterMaker','CreditApproval') AND DECISION='Additional_Doc_Required') OR (WORKSTEP='UnderwriterMaker' AND DECISION='Send_Back to BranchSupport')) — bổ sung nhánh thứ 3 (UnderwriterMaker+Send_Back to BranchSupport) so với công thức cũ |
+| 13 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (review 2026-09-26, bổ sung vật lý — trước đây chỉ là lookup tạm để tính CHECK_FTR, chưa denormalize thành cột): tra ID_NUMBER qua WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, rồi lookup DIM_CLOS_CUSTOMER theo ID_NUMBER (NK) + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
+
+**Chuyển `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` sang tính tại PDTD_DTM (review
+2026-09-26, theo yêu cầu người dùng):** 2 cột này là business rule CASE
+WHEN/whitelist theo SRS BC7 (không phải giá trị gốc từ STG_LOS) — vi phạm
+nguyên tắc "SB_DWH là ảnh chụp sạch của nguồn, không biến đổi giá trị;
+PDTD_DTM mới là tầng chuẩn hóa/tính business rule". Đã xác nhận: dữ liệu
+thô cả 2 công thức cần (lịch sử `WORKSTEP_CODE`/`EXITDATE`/`DECISION_CODE`
+theo `WI_NAME`) đã có sẵn đầy đủ trên `SB_DWH.FCT_CLOS_WORKSTEP_EVENT`
+(1.2.2.6) — không cần thêm cột thô mới nào trên bảng này ngoài
+`CUSTOMER_SK` (cột 13, để PDTD_DTM tra `CUST_GROUP` phân nhóm whitelist).
+Xem công thức đầy đủ tại `hld/hld_review/HLD_FCT_PDTD_DTM_review.md`
+mục 6 (khi có) hoặc Section 2 → 2.2.2.4. Bảng này (SB_DWH) từ 14 cột
+xuống còn **13 cột** (xóa `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`, thêm
+`CUSTOMER_SK`).
 
 - Bảng FACT chi tiết (nhân dòng), lưu mỗi lần một lý do được nêu ra trên hồ sơ CLOS, trong ảnh chụp của ngày DAYID. Phục vụ BC7, BC8.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME**.
@@ -4726,53 +5500,64 @@ tờ có giá) không áp dụng được. Giữ `COLL_MGMT_METHOD` (chỉ có �
 **So với thiết kế cũ (`FCT_LOS_EXCEPTION` gộp, 12 cột):** bỏ `DATASOURCE`
 (luôn cố định 'CLOS' sau khi tách vật lý, cũng loại khỏi PK theo ghi chú
 thiết kế khóa của split-proposal), 11 cột gốc giữ nguyên cấu trúc, vẫn đọc
-trực tiếp từ `NG_SB_CLOS_EXCEPTION` (LOẠI 1, khóa CDC khai đủ). Thêm mới
+trực tiếp từ `NG_SB_CLOS_EXCEPTION` (LOẠI 1, khóa CDC khai đủ). Từng thêm
 2 cột `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` — vốn nằm trên
-`FCT_LOS_APPLICATION_DAILY` (bản gộp cũ, dưới tên `FLAG_FTR`) nhưng đã
-đánh giá lại và dời sang đây (xem đánh giá kiến trúc bên dưới); sau đó
-thêm lại `DATASOURCE` làm cột kỹ thuật cố định 'CLOS' — tổng
-**14 cột**. `PHAN_LOAI_DDE` (cột thứ 3 từng dự kiến chuyển sang đây) đã
-được đánh giá lại (review 2026-09-22) và chuyển hẳn sang tính tại
+`FCT_LOS_APPLICATION_DAILY` (bản gộp cũ, dưới tên `FLAG_FTR`) — nhưng nay
+đã chuyển hẳn sang tính tại PDTD_DTM (review 2026-09-26, xem ghi chú
+ngay trên). `PHAN_LOAI_DDE` (cột thứ 3 từng dự kiến chuyển sang đây) cũng
+đã được đánh giá lại (review 2026-09-22) và chuyển hẳn sang tính tại
 `hld/HLD_FCT_PDTD_DTM.md` mục 2.2.2.4 — xem "⚠️ Đánh giá kiến trúc —
-`PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" ở Section 1 phía trên.
+`PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" ở Section 1 phía trên. Bảng
+này (SB_DWH) sau cùng thêm `CUSTOMER_SK` (review 2026-09-26) — tổng
+**13 cột**.
 
 **Đối chiếu SRS (BC7, BC8):** BC7 dùng trực tiếp `EXCEPTION_CATEGORY`,
 `EXCEPTION_NAME`, `EXCEPTION_REMARKS`, `RAISED_BY`, `RAISED_DATE_TIME`,
-`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE` (cột này tính ở
-PDTD_DTM, xem `hld/HLD_FCT_PDTD_DTM.md` mục 2.2.2.4). Đã đối chiếu công
-thức `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` trực tiếp với bảng field-list của
+`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE` — cả 3 cột phái
+sinh này nay đều tính tại PDTD_DTM (xem `hld/hld_review/HLD_FCT_PDTD_
+DTM_review.md` mục 6, review 2026-09-26). Đã đối chiếu công thức
+`CHECK_FTR`/`FIRST_WORKSTEP_RETURN` trực tiếp với bảng field-list của
 SRS BC7 bản cập nhật (review 2026-09-18, cả nhánh CLOS và RLOS) — xem
-công thức mới đầy đủ tại Section 1 → 1.2.2.4 và cột tương ứng ở trên.
+công thức đầy đủ tại `hld/hld_review/HLD_FCT_PDTD_DTM_review.md` mục 6.
 `RCTYPE` **không còn** là điều kiện lọc của `CHECK_FTR` theo SRS mới
 (khác bản trước, xem ghi chú cột `RCTYPE` phía trên) — vẫn giữ cột này vì
 BC7 hiển thị trực tiếp `RCTYPE` (Raise/Clear) làm trường riêng trên báo
 cáo.
 
-**Đánh giá kiến trúc — vì sao không gộp vào `FCT_CLOS_APPLICATION_DAILY`
+**Đánh giá kiến trúc — vì sao không gộp vào `FCT_CLOS_APPLICATION`
 (1.2.2.1):** xem ghi chú đầy đủ tại Section 1 → 1. SB_DWH → 1.2.2.4 —
 giữ bảng riêng vì khác grain (1 dòng/lần nêu lý do, không phải 1 dòng/hồ
 sơ/ngày), BC7 cần liệt kê chi tiết từng lần chứ không phải rollup. Cùng
 pattern detail-fact/aggregate-fact với `FCT_CLOS_COLLATERAL` (1.2.2.3).
 
-**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`
-chuyển về đây:** rà soát toàn bộ SRS BC1-BC11 xác nhận cả 3 cột gốc
-(`CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE`) chỉ phục vụ đúng
-`BC7` (đúng như "Trường đích trên báo cáo" của tài liệu gốc đã ghi
-`BC7.CHECK_FTR`/`BC7.FIRST_WORKSTEP_RETURN`/`BC7.PHAN_LOAI_DDE`, không
-báo cáo nào khác dùng) — nên thuộc về đúng grain của bảng này (1 dòng/lần
-nêu lý do), không phải grain hồ sơ/ngày của `FCT_CLOS_APPLICATION_DAILY`.
-Đã bỏ cả 3 cột khỏi `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY`
-(1.2.2.1/1.3.2.1) tương ứng — quyết định kiến trúc này (đọc thẳng
-`ENTRY_EXIT` tại đây thay vì gián tiếp qua `FCT_CLOS_APPLICATION_DAILY`)
-không đổi qua lần review 2026-09-18; chỉ bản thân công thức 3 cột đã đổi
-theo SRS BC7 cập nhật (xem Section 1 → 1.2.2.4 và cột tương ứng ở trên).
-Riêng `PHAN_LOAI_DDE`: dù cùng phục vụ BC7 và cùng lý do "khác grain
-FCT_CLOS_APPLICATION_DAILY", cột này KHÔNG dừng lại ở tầng SB_DWH mà
-tiếp tục chuyển sang tính hẳn tại PDTD_DTM (review 2026-09-22) — vì bảng
-danh mục nó lookup (`REF_PHAN_LOAI_DDE`) chỉ tồn tại vật lý ở PDTD_DTM,
-xem "⚠️ Đánh giá kiến trúc — `PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" ở
-Section 1 phía trên. Bảng này (SB_DWH) chỉ còn 2 cột `CHECK_FTR`/
-`FIRST_WORKSTEP_RETURN` trong nhóm 3 cột gốc.
+**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
+`PHAN_LOAI_DDE` đều chuyển hẳn sang tính tại PDTD_DTM (review 2026-09-26,
+cập nhật — trước đây 2 cột đầu từng đặt tại SB_DWH):** rà soát toàn bộ
+SRS BC1-BC11 xác nhận cả 3 cột chỉ phục vụ đúng `BC7` (đúng như "Trường
+đích trên báo cáo" của tài liệu gốc đã ghi `BC7.CHECK_FTR`/
+`BC7.FIRST_WORKSTEP_RETURN`/`BC7.PHAN_LOAI_DDE`, không báo cáo nào khác
+dùng) — nên thuộc về đúng grain của bảng này (1 dòng/lần nêu lý do),
+không phải grain hồ sơ/ngày của `FCT_CLOS_APPLICATION`. Đã bỏ cả 3
+cột khỏi `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION`
+(1.2.2.1/1.3.2.1) tương ứng — quyết định kiến trúc này (không tính gián
+tiếp qua `FCT_CLOS_APPLICATION`) không đổi. Điểm đổi ở review
+2026-09-26: `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` từng đặt tính TẠI SB_DWH
+(lý do cũ: JOIN liên-FCT `FCT_CLOS_EXCEPTION`↔`FCT_CLOS_WORKSTEP_EVENT`
+"phải" xảy ra ở SB_DWH) — nhưng rà soát lại xác nhận đây là 2 công thức
+CASE WHEN/whitelist theo business rule SRS BC7 (không phải giá trị gốc
+STG_LOS), nên vi phạm nguyên tắc phân tầng "SB_DWH ảnh chụp sạch nguồn,
+PDTD_DTM chuẩn hóa/tính business rule" — cùng bản chất với `PHAN_LOAI_DDE`
+đã chuyển trước đó (review 2026-09-22). Cơ chế chuyển: SB_DWH KHÔNG cần
+thêm cột thô mới nào ngoài `CUSTOMER_SK` (cột 13, để PDTD_DTM tra
+`CUST_GROUP`) — vì toàn bộ dữ liệu lịch sử `WORKSTEP_CODE`/`EXITDATE`/
+`DECISION_CODE` theo `WI_NAME` mà cả 2 công thức cần đã có sẵn, đầy đủ
+trên `SB_DWH.FCT_CLOS_WORKSTEP_EVENT` (1.2.2.6) — PDTD_DTM.FCT_CLOS_
+EXCEPTION JOIN sang bảng SB_DWH này (không phải STG_LOS) để tự tính lại
+2 công thức, đúng nguyên tắc "JOIN dựng cột ETL luôn xuất phát từ bảng
+SB_DWH, PDTD_DTM chỉ được đọc SB_DWH chứ không đọc STG_LOS trực tiếp".
+Xem công thức JOIN đầy đủ tại `hld/hld_review/HLD_FCT_PDTD_DTM_review.md`
+mục 6. Bảng này (SB_DWH) nay không còn cột phái sinh business-rule nào
+trong nhóm 3 cột gốc — chỉ giữ `CUSTOMER_SK` làm cột thô phục vụ PDTD_DTM.
 
 ###### 1.2.2.5 FCT_CLOS_DEVIATION
 
@@ -4788,7 +5573,7 @@ Section 1 phía trên. Bảng này (SB_DWH) chỉ còn 2 cột `CHECK_FTR`/
 | 6 | DEVIATION_TYPE_CODE | VARCHAR2 | N | 300 |  | Mã loại lệch chính sách — nguồn NG_SB_CLOS_CONDITON_CDGRID.DEVIATION_TYPE |
 | 7 | DEV_PROPOSAL | VARCHAR2 | N | 4000 |  | Đề xuất xử lý lệch chính sách — nguồn NG_SB_CLOS_CONDITON_CDGRID.DEV_PROPOSAL |
 | 8 | AS_REGULAR | VARCHAR2 | N | 4000 |  | Quy định chuẩn liên quan tới lệch chính sách — nguồn NG_SB_CLOS_CONDITON_CDGRID.AS_REGULAR. Không báo cáo nào hiển thị trực tiếp; BA từng đề xuất đưa vào khóa nghiệp vụ nhưng bị từ chối vì là trường nhập tùy biến (free-text, xem `CLOS - Metadata.xlsx`) — vẫn phải nạp vì là thuộc tính gốc của bảng nguồn (review 2026-09-17: sửa lại mô tả, bản cũ bị cắt cụt gây hiểu nhầm là đã đưa vào DEVIATION_BK, mâu thuẫn với công thức hash loại trừ chính cột này) |
-| 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — PHÁI SINH: tính độc lập từ NG_SB_CLOS_ENTRY_EXIT theo cùng công thức 3 mức ưu tiên (ngày phê duyệt cuối/ngày hủy/ngày thoát bước gần nhất) đã dùng cho FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE (1.2.2.1) — không JOIN sang FCT_CLOS_APPLICATION_DAILY để tránh tham chiếu chéo giữa 2 bảng (xem đánh giá kiến trúc bên dưới) |
+| 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — PHÁI SINH: tính độc lập từ NG_SB_CLOS_ENTRY_EXIT theo cùng công thức 3 mức ưu tiên (ngày phê duyệt cuối/ngày hủy/ngày thoát bước gần nhất) đã dùng cho FCT_CLOS_APPLICATION.PROCESSED_DATE (1.2.2.1) — không JOIN sang FCT_CLOS_APPLICATION để tránh tham chiếu chéo giữa 2 bảng (xem đánh giá kiến trúc bên dưới) |
 
 - Bảng FACT chi tiết (nhân dòng), lưu ảnh số liệu thay đổi theo ngày của từng ngoại lệ chính sách thuộc hồ sơ CLOS. Không có chiều riêng — toàn bộ thuộc tính lưu thẳng trên fact vì nguồn không khai khóa CDC. Phục vụ BC6 (chi tiết) — review 2026-09-17: đã xác nhận BC5 không hề dùng `NG_SB_CLOS_CONDITON_CDGRID`/bảng này, và BC9 chỉ có `DEVIATION_G2`/`DEVIATION_G3` cho nhánh RLOS (nguồn `NG_SB_RLOS_MANUAL_DEVIATION`, khác hẳn), không có tương đương cho nhánh CLOS — bỏ "BC5, BC9" khỏi mô tả bảng, chỉ còn phục vụ BC6, xem Section 3.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, DEVIATION_BK**.
@@ -4832,10 +5617,10 @@ soạn khối RLOS), giữ nguyên thiết kế cột theo cách 1:1 cùng tên,
 sửa theo SRS.
 
 **Đánh giá kiến trúc — vì sao `PROCESSED_DATE` tính độc lập tại đây thay
-vì JOIN `FCT_CLOS_APPLICATION_DAILY`:** để `FCT_CLOS_DEVIATION` và
-`FCT_CLOS_APPLICATION_DAILY` là 2 luồng ETL hoàn toàn độc lập (không còn
+vì JOIN `FCT_CLOS_APPLICATION`:** để `FCT_CLOS_DEVIATION` và
+`FCT_CLOS_APPLICATION` là 2 luồng ETL hoàn toàn độc lập (không còn
 cột đếm trung gian nào tham chiếu chéo giữa 2 bảng — `DEVIATION_CNT` cũng
-đã bỏ khỏi `FCT_CLOS_APPLICATION_DAILY`, xem đánh giá kiến trúc tại
+đã bỏ khỏi `FCT_CLOS_APPLICATION`, xem đánh giá kiến trúc tại
 1.2.2.1), `PROCESSED_DATE` tính độc lập ngay tại `FCT_CLOS_DEVIATION`
 (SB_DWH), đọc thẳng `NG_SB_CLOS_ENTRY_EXIT`. Xem đánh giá đầy đủ tại
 Section 1 → 1. SB_DWH → 1.2.2.5.
@@ -4860,27 +5645,47 @@ tách đầy đủ tại Section 1 → 1. SB_DWH → 1.2.2.6.
 | 3 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | PK | Mã bước xử lý trên workflow — nguồn ENTRY_EXIT.WORKSTEP (đổi tên thêm hậu tố CODE), đã cắt tiền tố hệ nguồn nếu có |
 | 4 | ENTRYDATE | TIMESTAMP | Y |  | PK | Thời điểm hồ sơ vào bước xử lý — nguồn ENTRY_EXIT.ENTRYDATE. Bắt buộc nằm trong khóa vì 1 hồ sơ có thể quay lại cùng 1 bước nhiều lần |
 | 5 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
-| 6 | WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP, lookup bằng WORKSTEP_CODE theo điều kiện thời gian (EFF_DATE/EXP_DATE). Mặc định -1 nếu không khớp |
-| 7 | DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_DECISION, lookup bằng DECISION_CODE theo điều kiện thời gian. DECISION null/không khớp dùng -1. KHÔNG nằm trong PK — chỉ để tra cứu thêm thuộc tính |
-| 8 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người xử lý của chính sự kiện này. ĐÚNG GRAIN của bảng — 1 lần vào bước có đúng 1 người xử lý. Mặc định -1. KHÔNG nằm trong PK |
-| 9 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 |
-| 10 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý — nguồn ENTRY_EXIT.EXITDATE. NULL nghĩa là hồ sơ đang nằm tại bước này |
-| 11 | DECISION_CODE | VARCHAR2 | N | 200 |  | Mã quyết định tại bước xử lý — nguồn ENTRY_EXIT.DECISION (đổi tên thêm hậu tố CODE) |
-| 12 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản người xử lý hồ sơ — nguồn ENTRY_EXIT.USERNAME. Giữ nguyên giá trị gốc để báo cáo hiển thị thẳng, không phải join qua DIM_LOS_USER |
-| 13 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — nguồn ENTRY_EXIT.REMARKS |
-| 14 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — nguồn ENTRY_EXIT.TAT. Giữ lại để đối soát với 3 cột TAT tính lại bên dưới. Đơn vị "giây" kế thừa từ extract gốc, CLOS - Metadata.xlsx ghi "cần DE xác nhận đơn vị" — chưa chốt chính thức, xem Section 3 |
-| 15 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ. NULL nếu chưa có EXITDATE |
-| 16 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật; giờ tính 8-12 và 13-17. NULL nếu chưa có EXITDATE |
-| 17 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30. NULL nếu chưa có EXITDATE |
-| 18 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN); chiều giảm dần (mới→cũ) khi cần có thể tự suy bằng COUNT(*) OVER (PARTITION BY WI_NAME) - EVENT_SEQ_ASC + 1, không cần cột riêng |
-| 19 | BI_FLAG_APPROVAL | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH: 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ), ngược lại 'From Second Approval'. Dùng cho BC5.BI_FLAG_APPROVAL |
-| 20 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước — PHÁI SINH: LAG(WORKSTEP_CODE) OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE). Dùng cho BC1.PRE_WORKSTEP, BC2.PRE_WORKSTEP |
-| 21 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21, KHÔNG copy/JOIN từ FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE cột 22, 2.2.2.1): MAX(EXITDATE) window theo WI_NAME WHERE WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') AND DECISION_CODE IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker'); nếu rỗng → EXITDATE tại WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Cancel'; nếu vẫn rỗng → ngày dữ liệu hệ thống (DAYID). Cùng công thức/kết quả với FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE cho cùng WI_NAME — lặp lại giống nhau trên mọi dòng event của hồ sơ vì công thức quét MAX/EXITDATE theo toàn bộ lịch sử WI_NAME, không phụ thuộc dòng đang xét. Phục vụ BC4.REPORT_DATE (xem lld/BC4.csv) mà không cần JOIN fan-out sang APPLICATION_DAILY |
-| 22 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21, KHÔNG copy/JOIN từ bảng APPLICATION_DAILY — cột WORKSTEP_FLAG tương ứng đã bị xóa khỏi FCT_CLOS_APPLICATION_DAILY, 2.2.2.1, không còn consumer nào khác): LEFT JOIN WFINSTRUMENTTABLE (c) theo WI_NAME=c.PROCESSINSTANCEID AND c.CREATEDBY NOT IN ('10000380','10000020','10000420','10000140','10000100'), sau đó 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE của TOÀN BỘ lịch sử WI_NAME (không phải chỉ dòng đang xét) kết hợp c.PROCESSNAME='CLOS'/c.ACTIVITYNAME — xem công thức đầy đủ ở dòng 4289+ (Đóng PENDING #6). Phục vụ BC4.FLAG mà không cần JOIN fan-out sang APPLICATION_DAILY |
-| 23 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (1.2.1.7) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21, theo yêu cầu người dùng: cho phép khai thác lookup DIM qua surrogate key thay vì qua WI_NAME natural key, nhất quán với WORKSTEP_SK/DECISION_SK/USER_SK/APPLICATION_SK đã có sẵn trên bảng): join theo WI_NAME + điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL), quan hệ 1:1 với hồ sơ — cùng điều kiện/kết quả với FCT_CLOS_APPLICATION_DAILY.CUSTOMER_SK (cột 66, 2.2.2.1) cho cùng WI_NAME+DAYID, không copy/JOIN từ đó. Mặc định -1 nếu không khớp |
+| 6 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_WORKSTEP_DECISION (review 2026-09-24, gộp từ WORKSTEP_SK+DECISION_SK), lookup theo cặp WORKSTEP_CODE (cột 3, chính dòng event) + DECISION_CODE điều kiện thời gian (EFF_DATE/EXP_DATE). Mặc định -1 nếu không khớp. KHÔNG nằm trong PK — chỉ để tra cứu thêm thuộc tính (kể cả DECISION_CODE, đã xóa denormalize khỏi fact) |
+| 7 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người xử lý của chính sự kiện này. ĐÚNG GRAIN của bảng — 1 lần vào bước có đúng 1 người xử lý. Mặc định -1. KHÔNG nằm trong PK |
+| 8 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 |
+| 9 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý — nguồn ENTRY_EXIT.EXITDATE. NULL nghĩa là hồ sơ đang nằm tại bước này |
+| 10 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản người xử lý hồ sơ — nguồn ENTRY_EXIT.USERNAME. Giữ nguyên giá trị gốc để báo cáo hiển thị thẳng, không phải join qua DIM_LOS_USER |
+| 11 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — nguồn ENTRY_EXIT.REMARKS |
+| 12 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — nguồn ENTRY_EXIT.TAT. Giữ lại để đối soát với 3 cột TAT tính lại bên dưới. Đơn vị "giây" kế thừa từ extract gốc, CLOS - Metadata.xlsx ghi "cần DE xác nhận đơn vị" — chưa chốt chính thức, xem Section 3 |
+| 13 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ. NULL nếu chưa có EXITDATE |
+| 14 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật; giờ tính 8-12 và 13-17. NULL nếu chưa có EXITDATE |
+| 15 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30. NULL nếu chưa có EXITDATE |
+| 16 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN); chiều giảm dần (mới→cũ) khi cần có thể tự suy bằng COUNT(*) OVER (PARTITION BY WI_NAME) - EVENT_SEQ_ASC + 1, không cần cột riêng |
+| 17 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước — PHÁI SINH: LAG(WORKSTEP_CODE) OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE). Dùng cho BC1.PRE_WORKSTEP, BC2.PRE_WORKSTEP |
+| 18 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21, KHÔNG copy/JOIN từ FCT_CLOS_APPLICATION.PROCESSED_DATE cột 19, 2.2.2.1): MAX(EXITDATE) window theo WI_NAME WHERE WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') AND DECISION_CODE IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker') — DECISION_CODE ở đây tra qua JOIN WORKSTEP_DECISION_SK sang DIM_CLOS_WORKSTEP_DECISION (review 2026-09-24, cột denormalize gốc đã xóa); nếu rỗng → EXITDATE tại WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Cancel' (cùng cách tra); nếu vẫn rỗng → ngày dữ liệu hệ thống (DAYID). Cùng công thức/kết quả với FCT_CLOS_APPLICATION.PROCESSED_DATE cho cùng WI_NAME — lặp lại giống nhau trên mọi dòng event của hồ sơ vì công thức quét MAX/EXITDATE theo toàn bộ lịch sử WI_NAME, không phụ thuộc dòng đang xét. Phục vụ BC4.REPORT_DATE (xem lld/BC4.csv) mà không cần JOIN fan-out sang APPLICATION_DAILY |
+| 19 | WF_PROCESSNAME | VARCHAR2 | N | 50 |  | Tên hệ thống workflow của instance đang đứng, đã lọc tài khoản test — cột thô (review 2026-09-26, thay cho WORKSTEP_FLAG đã tính sẵn): LEFT JOIN WFINSTRUMENTTABLE (c) theo WI_NAME=c.PROCESSINSTANCEID AND c.CREATEDBY NOT IN ('10000380','10000020','10000420','10000140','10000100'), lấy c.PROCESSNAME. Lặp lại giống nhau trên mọi dòng event cùng WI_NAME (hồ sơ-scope, không phải event-scope), cùng cơ chế PROCESSED_DATE/CUSTOMER_SK đang làm | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (tính tại PDTD_DTM, xem HLD_FCT_PDTD_DTM_review.md mục 8) | — |
+| 20 | WF_ACTIVITYNAME | VARCHAR2 | N | 200 |  | Bước hiện tại của instance workflow, đã lọc tài khoản test — cột thô (review 2026-09-26, cùng JOIN trên): lấy c.ACTIVITYNAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (tính tại PDTD_DTM) | — |
+| 21 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (1.2.1.6) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21, theo yêu cầu người dùng: cho phép khai thác lookup DIM qua surrogate key thay vì qua WI_NAME natural key, nhất quán với WORKSTEP_DECISION_SK/USER_SK/APPLICATION_SK đã có sẵn trên bảng): join theo WI_NAME + điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL), quan hệ 1:1 với hồ sơ — cùng điều kiện/kết quả với FCT_CLOS_APPLICATION.CUSTOMER_SK (cột 46, 2.2.2.1) cho cùng WI_NAME+DAYID, không copy/JOIN từ đó. Mặc định -1 nếu không khớp |
+
+**Chuyển `APPROVAL_FLAG` sang tính tại PDTD_DTM (review 2026-09-27,
+theo yêu cầu người dùng, tạm thời chỉ CLOS — RLOS vẫn giữ nguyên):** cột
+này là so sánh vị trí (window function `MIN(EXITDATE)` qua các sự kiện
+phê duyệt trong cùng hồ sơ, gán nhãn 'First Approval'/'From Second
+Approval') — không phải business rule whitelist, nhưng người dùng chọn
+chuyển sang PDTD_DTM để nhất quán kiến trúc. Không cần thêm cột thô nào
+— `EXITDATE`/`WORKSTEP_CODE`/`WORKSTEP_DECISION_SK` đã có sẵn ngay trên
+bảng này; PDTD_DTM tự tính lại `MIN(EXITDATE)` qua các dòng cùng
+`WI_NAME` trên chính bảng PDTD_DTM đã bê 1:1, không JOIN thẳng STG_LOS.
+Xem công thức tại `hld/hld_review/HLD_FCT_PDTD_DTM_review.md` mục 8.
 
 - Bảng FACT nhật ký workflow mức nguyên tử của hệ CLOS, giữ HẾT MỌI SỰ KIỆN (không bao giờ xóa, không chép lại nhật ký mỗi ngày). Grain: 1 dòng = 1 phiên bản của 1 logical event (hồ sơ × workstep × lần vào bước). Là nguồn duy nhất để tính mọi mốc thời gian, TAT, số lần trả về và người xử lý theo từng bước, nhánh CLOS. Phục vụ BC1, BC2, BC3, BC4, BC5, BC7, BC8, BC9, BC10, BC11.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, WORKSTEP_CODE, ENTRYDATE**.
+
+**Chuyển `WORKSTEP_FLAG` sang tính tại PDTD_DTM (review 2026-09-26, theo
+yêu cầu người dùng):** cột này là công thức 5 nhánh CASE-WHEN theo
+business rule SRS BC4 (không phải giá trị gốc STG_LOS) — vi phạm nguyên
+tắc "SB_DWH ảnh chụp sạch nguồn, PDTD_DTM chuẩn hóa/tính business rule",
+cùng bản chất với `CHECK_FTR`/`APPLICATION_STATUS` đã chuyển trước đó. SB_DWH
+nay chỉ giữ 2 cột thô `WF_PROCESSNAME`/`WF_ACTIVITYNAME` (cột 19-20, kết
+quả JOIN `WFINSTRUMENTTABLE` đã lọc `CREATEDBY`, không tính CASE WHEN)
+— `WORKSTEP_CODE`/`DECISION_CODE` của toàn bộ lịch sử `WI_NAME` mà công
+thức cần đã có sẵn ngay trên chính bảng này (không cần thêm cột). Xem
+công thức đầy đủ tại `hld/hld_review/HLD_FCT_PDTD_DTM_review.md` mục 8.
 
 **So với `FCT_LOS_WORKSTEP_EVENT` gộp (24 cột):** bỏ `DATASOURCE` (luôn cố
 định 'CLOS' sau khi tách vật lý — column-optimization rule đã áp dụng cho
@@ -4893,15 +5698,24 @@ làm cột kỹ thuật cố định 'CLOS'. Bỏ thêm `PRODUCT_SK` — rà so�
 SRS BC1-BC11 xác nhận không báo cáo nào join qua surrogate key này để lấy
 dữ liệu sản phẩm (mọi report đọc `PRODUCT_LINE`/`SUB_PRODUCT` mã thô trực
 tiếp từ nguồn khác — xem Section 3); quan hệ hồ sơ↔sản phẩm chính đã có
-sẵn qua `FCT_CLOS_APPLICATION_DAILY.PRODUCT_SK` (2.2.2.1), không cần lặp
+sẵn qua `FCT_CLOS_APPLICATION.PRODUCT_SK` (2.2.2.1), không cần lặp
 lại ở đây — tổng 21 cột (giảm 3 so với bản gộp), tăng lên 24 cột sau khi
 bổ sung `PROCESSED_DATE`/`WORKSTEP_FLAG`/`CUSTOMER_SK` (review
 2026-09-21 — BC4 đổi bảng nguồn chính sang đây, xem Section 1 → 1.2.2.6
 phần "Đính chính lld/BC4.csv" — cùng nguồn đã có sẵn 1:1 trên chính bảng
-này, tính độc lập, không copy/JOIN từ `FCT_CLOS_APPLICATION_DAILY`), rồi
-**nay 23 cột** sau khi bỏ `EVENT_SEQ_DESC` (review 2026-09-22 — cột dư
+này, tính độc lập, không copy/JOIN từ `FCT_CLOS_APPLICATION`), rồi
+23 cột sau khi bỏ `EVENT_SEQ_DESC` (review 2026-09-22 — cột dư
 thừa, không công thức nào trong toàn tài liệu tham chiếu tới, chiều
-giảm dần tự suy từ `EVENT_SEQ_ASC` khi cần, xem Section 3).
+giảm dần tự suy từ `EVENT_SEQ_ASC` khi cần, xem Section 3), 21
+cột sau khi gộp `WORKSTEP_SK`+`DECISION_SK` thành 1 `WORKSTEP_
+DECISION_SK` và xóa cột `DECISION_CODE` denormalize (review 2026-09-24,
+theo quyết định gộp `DIM_CLOS_WORKSTEP`+`DIM_CLOS_DECISION` — xem
+1.2.1.3), 22 cột sau khi đổi `WORKSTEP_FLAG` (đã tính sẵn) thành 2 cột
+thô `WF_PROCESSNAME`/`WF_ACTIVITYNAME` (review 2026-09-26 — công thức
+CASE WHEN chuyển sang PDTD_DTM), **nay 21 cột** sau khi chuyển tiếp
+`APPROVAL_FLAG` sang tính tại PDTD_DTM (review 2026-09-27, tạm thời
+chỉ nhánh CLOS). `WORKSTEP_CODE` KHÔNG đổi, vẫn giữ trên fact vì là 1
+phần PK vật lý của bảng.
 
 **Đối chiếu SRS (BC3, BC4, BC8, BC9):** đã đối chiếu chi tiết tại Section
 1 → 1.2.2.6 — khớp đúng công thức TAT/NHAN_SU/SL_RETURN đã ghi trong
@@ -4918,13 +5732,62 @@ giảm dần tự suy từ `EVENT_SEQ_ASC` bằng `COUNT(*) OVER (PARTITION BY
 WI_NAME) - EVENT_SEQ_ASC + 1` khi cần), đánh số lại STT các cột phía
 sau — bảng nay còn 23 cột.
 
+###### 1.2.2.7 FCT_CLOS_LEGAL_PARTY — ĐỔI PHÂN LOẠI DIM → FACT (review 2026-09-25, trước đây là DIM_CLOS_LEGAL_PARTY, 1.2.1.7)
 
+**Bảng cũ (trước đổi phân loại):** `DIM_CLOS_LEGAL_PARTY` (1.2.1.7) — vốn tách từ `FCT_LOS_APPLICATION_PARTY` + `FCT_LOS_PARTY_DOCUMENT` gộp (20 + 11 cột), nay đổi từ DIM sang FACT vì nguồn không có CDC key ổn định (xem lý do đầy đủ tại Section 1 → 1.2.2.7)
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ CLOS — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.WI_NAME. Quan hệ 1:N với hồ sơ, N không giới hạn (1 người có thể giữ nhiều vai trò, xác nhận qua CLOS Metadata) |
+| 2 | ID_NUMBER | VARCHAR2 | Y | 100 | PK | Số giấy tờ định danh — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER. Cùng WI_NAME tạo PK, theo đúng "Khóa nghiệp vụ" ghi trong CLOS - Metadata.xlsx sheet "2. Table Review" dòng NG_SB_CLOS_CUST_INFO_LEGAL |
+| 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS |
+| 4 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên/tên đối tượng — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE |
+| 5 | OBJ_TYPE | VARCHAR2 | N | 100 |  | Loại đối tượng của giấy tờ pháp lý — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.OBJ_TYPE (Khách hàng, Người đại diện theo pháp luật, Chủ sở hữu TSBĐ, Thành viên góp vốn chính, Khác). 1 người (cùng ID_NUMBER) có thể giữ nhiều vai trò khác nhau trên cùng hồ sơ (nhiều dòng, xác nhận BA) |
+| 6 | LEGAL_DOC | VARCHAR2 | N | 100 |  | Tên loại giấy tờ pháp lý — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.LEGAL_DOC |
+| 7 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — khách hàng CHÍNH của hồ sơ (MỌI dòng đều có, không chỉ dòng OBJ_TYPE='Khách hàng'). Cách lấy: tìm dòng khác cùng WI_NAME có UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, lấy ID_NUMBER của dòng đó, lookup DIM_CLOS_CUSTOMER.DIMENSION_KEY theo ID_NUMBER (NK, xem 1.2.1.6) — tái sử dụng đúng logic dựng DIM_CLOS_CUSTOMER. Mặc định -1 nếu không khớp |
+| 8 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION — join theo WI_NAME (1.2.1.1). Quan hệ N:1 (nhiều dòng vai trò pháp lý cùng WI_NAME trỏ về đúng 1 hồ sơ). Mặc định -1 nếu không khớp |
+
+- Bảng FACT lưu người/đối tượng liên quan vai trò pháp lý của hồ sơ CLOS (bao gồm cả giấy tờ), 1 dòng = 1 người × 1 vai trò × 1 hồ sơ (N dòng/hồ sơ, không giới hạn) — snapshot trung thực từ nguồn, không SCD2 (nguồn không có CDC key ổn định). Phục vụ BC2.
+- Khóa chính của bảng (PK): **WI_NAME, ID_NUMBER**.
+
+**Đổi phân loại DIM → FACT, bỏ SCD2 (review 2026-09-25):** trước đây bảng
+này là `DIM_CLOS_LEGAL_PARTY` với `DIMENSION_KEY` sequence + `EFF_DATE`/
+`EXP_DATE` (SCD2 "full-row-key" so khớp 5 cột, do nguồn `NG_SB_CLOS_
+CUST_INFO_LEGAL` có KEY CDC RỖNG trong `DS_BANG_202608.xlsx` — xem lý do
+đầy đủ, kể cả quyết định cũ 2026-09-17, tại Section 1 → 1.2.2.7 và
+Section 3 #36). Người dùng quyết định đổi hướng: bỏ hẳn `DIMENSION_KEY`/
+`EFF_DATE`/`EXP_DATE`, chuyển thành FACT snapshot trung thực — PK là
+composite `WI_NAME + ID_NUMBER` (đúng "Khóa nghiệp vụ" trong CLOS
+Metadata Table Review), không còn giả vờ có lịch sử SCD2 đáng tin cậy
+trên 1 nguồn không có định danh dòng độc lập với nội dung.
+
+**Bổ sung 2 chiều FK mới (yêu cầu người dùng, review 2026-09-25):**
+`CUSTOMER_SK` (cột 7, mọi dòng đều trỏ về khách hàng chính của hồ sơ,
+không phải chính dòng đang xét) và `APPLICATION_SK` (cột 8, trỏ hồ sơ
+chứa dòng này) — xem chi tiết công thức tại Section 1 → 1.2.2.7.
+
+**Vẫn giữ nguyên vẹn toàn bộ thuộc tính pháp lý cũ** (`OBJ_TYPE`, `FULL_
+NAME`←`NAMEE`, `LEGAL_DOC`, `ID_NUMBER`) và lý do gộp `FCT_LOS_PARTY_
+DOCUMENT`/không pivot thành cột cố định (giống `DIM_RLOS_COREPAYER`) —
+không đổi, xem đầy đủ tại Section 1 → 1.2.2.7. Bỏ `PARTY_TYPE`,
+`PARTY_ROLE_CODE` (thay bằng `OBJ_TYPE`/`LEGAL_TYPE` chuẩn hóa ở PDTD_
+DTM, xem Section 2 → 2.2.2.8), `GEO_SK` (không cần vì không phải khách
+hàng chính); giữ `DATASOURCE` làm cột kỹ thuật cố định 'CLOS'.
+
+**Ảnh hưởng lan truyền:** `FCT_CLOS_APPLICATION_PARTY.LEGAL_PARTY_SK`
+(1.2.2.2) đổi từ trỏ `DIMENSION_KEY` sang trỏ composite `WI_NAME+
+ID_NUMBER` của bảng này — xem 1.2.2.2 đã cập nhật ghi chú (⚠️ lưu ý:
+bảng `FCT_CLOS_APPLICATION_PARTY` này sau đó đã bị xóa hẳn, review
+2026-09-26 — ghi chú ở đây chỉ còn giá trị lịch sử). `DIM_CLOS_
+CUSTOMER.LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` (PDTD_DTM,
+2.2.1.6) đổi nguồn từ "LEFT JOIN DIM_CLOS_LEGAL_PARTY" thành "LEFT JOIN
+FCT_CLOS_LEGAL_PARTY" (cùng điều kiện join).
 
 #### 1.3 Bộ bảng RLOS
 
 ##### 1.3.1 DIM
 
-###### 1.3.1.1 DIM_RLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (đã bổ sung APP_GRP, DEVIATION_G3)
+###### 1.3.1.1 DIM_RLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (đã bổ sung APP_GRP, APPLICATION_DATE; lấy đầy đủ cột dư thừa EXTTABLE; DEVIATION_G3 chuyển report-time PDTD_DTM; CHANGE_REQUEST/CHANGE_TYPE/CUS_SEGMENT/APPROVED_AMT_FINAL/CURRENCY_CODE/APPROVED_TERM chuyển đi nơi khác). ⚠️ review 2026-09-30 (lượt 1): xóa 12 cột "username/routing tại 1 bước" — 73 cột. ⚠️ review 2026-09-30 (lượt 2, theo yêu cầu người dùng): xóa tiếp 10 cột username tại 1 bước khác (RR_USER/POSTDISBDEUSER/NORMBRUSER/REGBRUSER/BRASUPPORTSENDER/DISBURSEUSER/DISBCHECKERUSER/LASTAPPROVER/NORMSUPPORT_DCSN/REGSUPPORT_DCSN) và 2 cột APPROVAL_REJECT/APPROVAL_FLAG (cùng lý do SCD2 phình version); chuyển 11 cột cờ nhánh phụ/trạng thái (C_PHONE_CREATE_FLAG/C_PHONE_DELETE_FLAG/C_FI_CREATE_FLAG/C_FI_DELETE_FLAG/C_LEGAL_CREATE_FLAG/C_LEGAL_DELETE_FLAG/REINITIATE/NORMALBRHOLD/REGBRHOLD/STP_FLAG/ELIGIBLE) sang FCT_RLOS_APPLICATION (1.3.2.1) — 50 cột. ⚠️ review 2026-09-30 (lượt 3, theo yêu cầu người dùng): xóa `CURR_WSNAME`/`PREV_WSNAME`/`DECISION` (ảnh chụp state trùng `CURRENT_WORKSTEP_SK`/`PRE_WORKSTEP_CODE`/`LAST_WORKSTEP_DECISION_SK`→`DECISION_CODE` đã có trên FCT_RLOS_APPLICATION), `CHECKER3_CONDITION`/`DISBURSEMENT_TYPE`/`DISB_DECSION` (chấp nhận rủi ro chưa xác nhận WORKSTEP_CODE thay thế, cùng nguyên tắc lượt 2), `MAJOR_DEV`/`MINOR_DEV` (không tồn tại thông tin thay thế — FCT_RLOS_DEVIATION chỉ đếm tổng số dòng, không phân biệt mức độ lớn/nhỏ, xóa vì không dùng), `CANCEL_DATE` (trùng lặp ý nghĩa với FCT_RLOS_APPLICATION.CANCEL_DATE); chuyển `TOTALNONELIGIBLE` và `REASON` (đổi tên `CANCEL_REASON`) sang FCT_RLOS_APPLICATION — nay 39 cột
 
 **Bảng cũ (trước tách):** `DIM_LOS_APPLICATION` → tách phần thuộc tính RLOS thành `DIM_RLOS_APPLICATION`
 
@@ -4936,28 +5799,39 @@ sau — bảng nay còn 23 cột.
 | 4 | WI_NAME | VARCHAR2 | Y | 100 | NK | Mã hồ sơ tín dụng RLOS — nguồn NG_SB_RLOS_EXTTABLE.WI_NAME (review 2026-09-22: đổi driving table sang NG_SB_RLOS_EXTTABLE — bảng master 1:1 hồ sơ, nhất quán kiến trúc với DIM_CLOS_APPLICATION driving NG_SB_CLOS_EXTTABLE). UNIQUE (WI_NAME, EFF_DATE) |
 | 5 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.LOANCASEID, giữ nguyên văn không lọc |
 | 6 | STREAM | VARCHAR2 | N | 200 |  | Luồng nghiệp vụ của hồ sơ — nguồn NG_SB_RLOS_APPROVAL.STREAM |
-| 7 | CHANGE_REQUEST | VARCHAR2 | N | 200 |  | Yêu cầu điều chỉnh hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.REQ_TYPE |
-| 8 | CHANGE_TYPE | VARCHAR2 | N | 500 |  | Loại thay đổi điều kiện phê duyệt — nguồn NG_SB_RLOS_EXTTABLE.CHANGE_TYPE, giữ nguyên giá trị thô. Dùng làm khóa either/or với PRODUCT_LINE khi tra cam kết SLA ở PDTD_DTM (xem 2.3.1.1) |
-| 9 | POLICY | VARCHAR2 | N | 200 |  | Chính sách tín dụng áp dụng cho hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.POLICY |
-| 10 | CAMPAIGN | VARCHAR2 | N | 200 |  | Chương trình bán áp dụng cho hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.CAMPAIGN |
-| 11 | PROOF_OF_INCOME | VARCHAR2 | N | 200 |  | Hình thức chứng minh thu nhập — PHÁI SINH: CASE WHEN NG_SB_RLOS_APPLICANT_GENERAL.PROOF_OF_INCOME = 'proofincome01' THEN 'CHUNGTU_CHUNGMINH_THUNHAP' WHEN NG_SB_RLOS_APPLICANT_GENERAL.PROOF_OF_INCOME = 'proofincome02' THEN 'BANGKE_THUNHAP' END (review 2026-09-22: sửa lỗi thiếu tên cột ở vế WHEN thứ 2) |
-| 12 | CUS_SEGMENT | VARCHAR2 | N | 100 |  | Phân khúc khách hàng theo LOS (giá trị gốc, chưa chuẩn hóa) — nguồn NG_SB_RLOS_APPLICANT_DETAIL.CUS_SEGMENT |
-| 13 | BI_CUS_SEGMENT | VARCHAR2 | N | 50 |  | Phân khúc khách hàng chuẩn hóa để hiển thị trên báo cáo — PHÁI SINH: CASE WHEN UPPER(NG_SB_RLOS_APPLICANT_DETAIL.CUS_SEGMENT) LIKE '%XANH' THEN 'XANH' WHEN NG_SB_RLOS_APPLICANT_DETAIL.CUS_SEGMENT = 'CBNV' THEN 'CBNV' ELSE 'THUONG' END |
-| 14 | COLL_REQUIRE | VARCHAR2 | N | 10 |  | Sản phẩm có yêu cầu tài sản bảo đảm hay không — PHÁI SINH: CASE WHEN NG_SB_RLOS_APPLICANT_GENERAL.COLLREQUIRE = 'true' THEN 'YES' ELSE 'NO' END |
-| 15 | IS_SEC_PRODUCT | VARCHAR2 | N | 10 |  | Hồ sơ có sản phẩm phụ đi kèm hay không — nguồn NG_SB_RLOS_APPLICANT_GENERAL.IS_SEC_PRODUCT. Đối chiếu SRS BC5: đây chính là nguồn của SECONDARY_PRODUCTLINE khi tra cam kết SLA (map Có→YES, Không→NO), xem 2.3.1.1 |
-| 16 | DEVIATION_FLAG | VARCHAR2 | N | 10 |  | Hồ sơ có ngoại lệ chính sách hay không — nguồn NG_SB_RLOS_APPLICANT_GENERAL.DEVIATION_FLAG, đúng theo SRS BC1 chỉ đích danh (DQ-11, đã giải quyết — ưu tiên mapping BA/SRS hơn metadata, xem ghi chú bên dưới). Metadata Column Review (28 dòng) không liệt kê cột này — coi là thiếu sót/lỗi thời của tài liệu Metadata, cần DEV xác nhận tồn tại thật trên database trước khi sinh LLD |
-| 17 | EMPLOYEE_CODE | VARCHAR2 | N | 50 |  | Mã cán bộ quản lý hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.EMPLOYEE_CODE |
-| 18 | EMPLOYEE_NAME | VARCHAR2 | N | 200 |  | Tên cán bộ quản lý hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.EMPLOYEE_NAME |
-| 19 | CREATION_DATE | DATE | N | 10 |  | Ngày khởi tạo hồ sơ — PHÁI SINH: MIN(ENTRYDATE) theo WI_NAME trên NG_SB_RLOS_ENTRY_EXIT, TRUNC về ngày |
-| 20 | RESULT_MAIN_CARD_ID | VARCHAR2 | N | 100 |  | Mã thẻ chính do hệ thẻ (T24) trả về — nguồn NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID, lấy dòng mới nhất STATUS='OK'. Thuộc tính đến muộn: chỉ có giá trị sau khi hồ sơ được phê duyệt và đẩy sang T24; NULL ở các phiên bản trước đó là đúng, không phải lỗi |
-| 21 | APP_GRP | VARCHAR2 | N | 50 |  | Cấp thẩm quyền phê duyệt của hồ sơ — nguồn NG_SB_RLOS_APPROVAL.APP_GRP. BC1/BC2 hiển thị trực tiếp; BC9 dùng làm khóa tra điểm KPI; dùng làm khóa tra cam kết SLA ở PDTD_DTM (xem 2.3.1.1) |
-| 22 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ chính sách trở lên hay không (YES/NO) — PHÁI SINH: COUNT(*) theo WI_NAME trên NG_SB_RLOS_MANUAL_DEVIATION, >=3 → 'YES', còn lại → 'NO'. Dùng làm khóa tra cam kết SLA ở PDTD_DTM (xem 2.3.1.1) |
-| 23 | LAST_APPROVAL_DATE | DATE | N |  |  | Ngày phê duyệt gần nhất của hồ sơ — PHÁI SINH: MAX(EXITDATE) trên NG_SB_RLOS_ENTRY_EXIT tại WORKSTEP IN ('CreditApprovalReview','CreditApproval','CreditCommittee') AND DECISION IN ('Submit','Send To HOSupport','Send To PostSanction','Submit To DisbursementMaker'). Phục vụ BC10.APPROVAL_DATE (qua FCT_RLOS_LOAN_DISBURSEMENT, xem 2.3.2.8) |
-| 24 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng (BC3.CREDIT_LIMIT) — DƯ THỪA CÓ CHỦ ĐÍCH (review 2026-09-21, theo yêu cầu người dùng): cùng nguồn/giá trị với FCT_RLOS_APPLICATION_DAILY.APPROVED_AMT_FINAL (cột 51, 1.3.2.1, nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT — đơn giản hơn CLOS vì chỉ 1 nguồn duy nhất, không phải công thức CASE chọn 2 nguồn) — đặt thêm 1 bản trên DIM để BC3 lookup thẳng qua APPLICATION_SK (đã có sẵn trên FCT_RLOS_WORKSTEP_EVENT), không cần JOIN fan-out sang FCT_RLOS_APPLICATION_DAILY |
-| 25 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền (BC3.CURRENCY) — DƯ THỪA CÓ CHỦ ĐÍCH, cùng lý do cột 24 — cùng nguồn/giá trị với FCT_RLOS_APPLICATION_DAILY.CURRENCY_CODE (cột 56, nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_CURRENCY) |
-| 26 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt (BC3.CREDIT_TERM) — DƯ THỪA CÓ CHỦ ĐÍCH, cùng lý do cột 24 — cùng nguồn/giá trị với FCT_RLOS_APPLICATION_DAILY.APPROVED_TERM (cột 52, nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_TERM) |
-| 27 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
-| 28 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
+| 7 | POLICY | VARCHAR2 | N | 200 |  | Chính sách tín dụng áp dụng cho hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.POLICY |
+| 8 | CAMPAIGN | VARCHAR2 | N | 200 |  | Chương trình bán áp dụng cho hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.CAMPAIGN |
+| 9 | PROOF_OF_INCOME | VARCHAR2 | N | 200 |  | Hình thức chứng minh thu nhập — nguồn NG_SB_RLOS_APPLICANT_GENERAL.PROOF_OF_INCOME, giữ nguyên giá trị gốc (mã 'proofincome01'/'proofincome02'...). ⚠️ Review 2026-09-26: chuyển logic CASE WHEN map sang tên hiển thị ('CHUNGTU_CHUNGMINH_THUNHAP'/'BANGKE_THUNHAP') xuống PDTD_DTM (xem 2.3.1.1) — SB_DWH chỉ lưu ảnh chụp sạch của nguồn, không biến đổi giá trị |
+| 10 | COLL_REQUIRE | VARCHAR2 | N | 10 |  | Sản phẩm có yêu cầu tài sản bảo đảm hay không — nguồn NG_SB_RLOS_APPLICANT_GENERAL.COLLREQUIRE, giữ nguyên giá trị gốc ('true'/'false'). ⚠️ Review 2026-09-26: chuyển logic CASE WHEN chuẩn hóa YES/NO xuống PDTD_DTM (xem 2.3.1.1) — cùng lý do cột 9 |
+| 11 | IS_SEC_PRODUCT | VARCHAR2 | N | 10 |  | Hồ sơ có sản phẩm phụ đi kèm hay không — nguồn NG_SB_RLOS_APPLICANT_GENERAL.IS_SEC_PRODUCT. Đối chiếu SRS BC5: đây chính là nguồn của SECONDARY_PRODUCTLINE khi tra cam kết SLA (map Có→YES, Không→NO), xem 2.3.1.1 |
+| 12 | DEVIATION_FLAG | VARCHAR2 | N | 10 |  | Hồ sơ có ngoại lệ chính sách hay không — nguồn NG_SB_RLOS_APPLICANT_GENERAL.DEVIATION_FLAG, đúng theo SRS BC1 chỉ đích danh (DQ-11, đã giải quyết — ưu tiên mapping BA/SRS hơn metadata, xem ghi chú bên dưới). Metadata Column Review (28 dòng) không liệt kê cột này — coi là thiếu sót/lỗi thời của tài liệu Metadata, cần DEV xác nhận tồn tại thật trên database trước khi sinh LLD |
+| 13 | EMPLOYEE_CODE | VARCHAR2 | N | 50 |  | Mã cán bộ quản lý hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.EMPLOYEE_CODE |
+| 14 | EMPLOYEE_NAME | VARCHAR2 | N | 200 |  | Tên cán bộ quản lý hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.EMPLOYEE_NAME |
+| 15 | CREATION_DATE | DATE | N | 10 |  | Ngày khởi tạo hồ sơ — PHÁI SINH: MIN(ENTRYDATE) theo WI_NAME trên NG_SB_RLOS_ENTRY_EXIT, TRUNC về ngày |
+| 16 | APPLICATION_DATE | DATE | N |  |  | Ngày khởi tạo hồ sơ khai theo form — nguồn NG_SB_RLOS_APPLICANT_GENERAL.APPLICATION_DATE. Dư thừa song song với CREATION_DATE (cột 15, phái sinh MIN(ENTRYDATE) trên NG_SB_RLOS_ENTRY_EXIT) — cùng khái niệm nhưng khác nguồn, giữ cả 2 vì không chắc chắn 2 giá trị luôn khớp nhau |
+| 17 | RESULT_MAIN_CARD_ID | VARCHAR2 | N | 100 |  | Mã thẻ chính do hệ thẻ (T24) trả về — nguồn NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID, lấy dòng mới nhất STATUS='OK'. Thuộc tính đến muộn: chỉ có giá trị sau khi hồ sơ được phê duyệt và đẩy sang T24; NULL ở các phiên bản trước đó là đúng, không phải lỗi |
+| 18 | APP_GRP | VARCHAR2 | N | 50 |  | Cấp thẩm quyền phê duyệt của hồ sơ — nguồn NG_SB_RLOS_APPROVAL.APP_GRP. BC1/BC2 hiển thị trực tiếp; BC9 dùng làm khóa tra điểm KPI; dùng làm khóa tra cam kết SLA ở PDTD_DTM (xem 2.3.1.1) |
+| 19 | LAST_APPROVAL_DATE | DATE | N |  |  | Ngày phê duyệt gần nhất của hồ sơ — PHÁI SINH: MAX(EXITDATE) trên NG_SB_RLOS_ENTRY_EXIT tại WORKSTEP IN ('CreditApprovalReview','CreditApproval','CreditCommittee') AND DECISION IN ('Submit','Send To HOSupport','Send To PostSanction','Submit To DisbursementMaker'). Phục vụ BC10.APPROVAL_DATE (qua FCT_RLOS_LOAN_DISBURSEMENT, xem 2.3.2.8) |
+| 20 | CUSTOMER_NAME | VARCHAR2 | N | 150 |  | Tên khách hàng — nguồn NG_SB_RLOS_EXTTABLE.CUSTOMER_NAME. Thiết kế dư thừa |
+| 21 | PRODUCT_NAME | VARCHAR2 | N | 150 |  | Tên sản phẩm vay — nguồn NG_SB_RLOS_EXTTABLE.PRODUCT_NAME. Thiết kế dư thừa |
+| 22 | APPROVAL_CONDITION | VARCHAR2 | N | 50 |  | Nhóm/cấp phê duyệt áp dụng cho hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.APPROVAL_CONDITION, cùng bộ mã với APP_GRP (cột 18) nhưng ghi nhận trực tiếp trên EXTTABLE thay vì NG_SB_RLOS_APPROVAL. Thiết kế dư thừa |
+| 23 | APPROVER_TYPE | VARCHAR2 | N | 100 |  | Loại cấp phê duyệt xử lý hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.APPROVER_TYPE. Thiết kế dư thừa |
+| 24 | APP_STATUS | VARCHAR2 | N | 100 |  | Trạng thái hồ sơ (giá trị mẫu quan sát được là lý do từ chối theo câu hỏi Knock-out) — nguồn NG_SB_RLOS_EXTTABLE.APP_STATUS. Cần BA xác nhận đầy đủ tập giá trị hợp lệ. Thiết kế dư thừa |
+| 25 | RMEMAILID | VARCHAR2 | N | 250 |  | Email cán bộ quan hệ khách hàng (RM) phụ trách — nguồn NG_SB_RLOS_EXTTABLE.RMEMAILID. Thiết kế dư thừa |
+| 26 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú — nguồn NG_SB_RLOS_EXTTABLE.REMARKS, dữ liệu HTML thô, rất ít khi có dữ liệu. Thiết kế dư thừa |
+| 27 | ZONE | VARCHAR2 | N | 50 |  | Vùng miền quản lý tự khai theo hồ sơ (BC1/BC2.ZONE) — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26, xác nhận qua dữ liệu thực là thuộc tính hồ sơ, không phải khách hàng): nguồn NG_SB_RLOS_APPLICANT_GENERAL.ZONE |
+| 28 | SALE_TYPE | VARCHAR2 | N | 100 |  | Kênh bán hàng — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.SALE_TYPE. Thiết kế dư thừa |
+| 29 | BROKER_TYPE | VARCHAR2 | N | 100 |  | Loại đối tác giới thiệu (cộng tác viên, đại diện đối tác, đối tác liên kết) — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.BROKER_TYPE. Thiết kế dư thừa |
+| 30 | BROKER_ID | VARCHAR2 | N | 100 |  | Mã đối tác giới thiệu — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.BROKER_ID. Thiết kế dư thừa |
+| 31 | BROKER_NAME | VARCHAR2 | N | 200 |  | Tên đối tác giới thiệu — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.BROKER_NAME. Thiết kế dư thừa |
+| 32 | ACC_OFFICER | VARCHAR2 | N | 100 |  | Mã nhân viên quan hệ khách hàng (Account Officer) phụ trách hồ sơ — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.ACC_OFFICER. Thiết kế dư thừa |
+| 33 | ACCOUNT_OFFICER_NAME | VARCHAR2 | N | 200 |  | Tên Account Officer phụ trách hồ sơ — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.ACCOUNT_OFFICER_NAME. Thiết kế dư thừa |
+| 34 | EXISTING_CUSTOMER | VARCHAR2 | N | 10 |  | Cờ khách hàng hiện hữu tại thời điểm nộp hồ sơ — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.EXISTING_CUSTOMER. ⚠️ Metadata: không có dữ liệu trong tập mẫu khảo sát. Thiết kế dư thừa |
+| 35 | APPLICANT_CIF | VARCHAR2 | N | 50 |  | Mã CIF khách hàng (định danh ngân hàng lõi) tại thời điểm hồ sơ — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.APPLICANTCIF (đổi tên cho rõ nghĩa). ⚠️ Metadata: không có dữ liệu trong tập mẫu khảo sát, chỉ được gắn vào hồ sơ ở giai đoạn gần giải ngân. Khác `CIF` trên `FCT_RLOS_CUSTOMER` (nguồn IDGRID.CIF, gắn theo giấy tờ). Thiết kế dư thừa |
+| 36 | BUSINESS_MODEL | VARCHAR2 | N | 200 |  | Mô hình kinh doanh áp dụng cho kênh giới thiệu của hồ sơ — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.BUSINESS_MODEL. Thiết kế dư thừa |
+| 37 | KYC1 | VARCHAR2 | N | 50 |  | Đơn vị/khối đang xử lý hồ sơ tại thời điểm ghi nhận (giá trị quan sát: Khối VHCN, Khối PDTD, ĐVKD) — CHUYỂN TỪ `DIM_RLOS_APPLICANT` (review 2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.KYC1. ⚠️ Metadata đang ở trạng thái "Cần chỉnh sửa", đề xuất đổi tên "Luồng phê duyệt"/Approval Flow — cần BA xác nhận lại tên/ý nghĩa chuẩn trước khi sinh LLD. Thiết kế dư thừa |
+| 38 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
+| 39 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
 - Bảng DIM lưu danh mục hồ sơ tín dụng RLOS (bán lẻ/cá nhân), 1 dòng = 1 phiên bản thuộc tính của 1 hồ sơ theo thời gian (SCD Type 2).
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
@@ -4966,30 +5840,122 @@ sau — bảng nay còn 23 cột.
 populate từ CLOS (`FIRST_APPROVED_WI_NAME`,
 `FIRST_APPROVED_DATE`, `APPROVAL_TYPE`, `CREDIT_PROFILE`, `CUST_GROUP`,
 `INDUSTRY_LVL1/2/3_CODE` — 3 cột ngành tính là 1 nhóm); **thêm mới
-`APP_GRP`, `DEVIATION_G3`, `CHANGE_TYPE`, `LAST_APPROVAL_DATE`** (xem giải
-trình bên dưới); giữ lại `DATASOURCE` (nay cố định 'RLOS' làm cột kỹ thuật
-đánh dấu nguồn hệ sau khi tách vật lý CLOS/RLOS). Còn 25 cột, **nay 28
-cột (review 2026-09-21):** bổ sung dư thừa `APPROVED_AMT_FINAL`/
-`CURRENCY_CODE`/`APPROVED_TERM` (xem cột 24-26 ở trên) — cùng lý do đã
-áp dụng cho nhánh CLOS.
+`APP_GRP`, `CHANGE_TYPE`, `LAST_APPROVAL_DATE`** (xem giải trình bên
+dưới); giữ lại `DATASOURCE` (nay cố định 'RLOS' làm cột kỹ thuật đánh
+dấu nguồn hệ sau khi tách vật lý CLOS/RLOS). Còn 25 cột; **28 cột
+(review 2026-09-21):** bổ sung dư thừa `APPROVED_AMT_FINAL`/
+`CURRENCY_CODE`/`APPROVED_TERM` — cùng lý do đã áp dụng cho nhánh CLOS.
+**80 cột (review 2026-09-25, lượt 1):** rà soát lại toàn bộ 50 cột của
+driving table `NG_SB_RLOS_EXTTABLE` đối chiếu SRS BC1 — bổ sung 4 cột có
+report dùng thật (`UWMAKERUSER`/`UWCHKRUSER`/`CREDAPPRUSER`/
+`CCOMMITUSER`, fallback COALESCE) và 49 cột dư thừa, cùng nguyên tắc đã
+áp dụng cho `DIM_CLOS_APPLICATION` (1.2.1.1); đồng thời bỏ `DEVIATION_G3`
+khỏi DIM (chuyển tính report-time tại PDTD_DTM, xem ghi chú riêng bên
+dưới). **Nay 74 cột (review 2026-09-25, lượt 2):** xóa `CHANGE_REQUEST`/
+`CHANGE_TYPE` (chuyển sang `FCT_RLOS_APPLICATION`), xóa
+`CUS_SEGMENT`/`CUSTOMER_SEGMENT` (chuyển sang `DIM_RLOS_APPLICANT`), xóa
+`APPROVED_AMT_FINAL`/`CURRENCY_CODE`/`APPROVED_TERM` (chuyển sang
+`FCT_RLOS_WORKSTEP_EVENT`), thêm `APPLICATION_DATE` (xem giải trình bên
+dưới). **Nay 83 cột (review 2026-09-26):** `DIM_RLOS_APPLICANT` đổi
+thành `FCT_RLOS_CUSTOMER` (grain giấy tờ, xem 1.3.2.8) — 9 cột từng
+"làm giàu" vào đó ngày 2026-09-21 (`ZONE`, `SALE_TYPE`, `BROKER_TYPE`/
+`BROKER_ID`/`BROKER_NAME`, `ACC_OFFICER`, `ACCOUNT_OFFICER_NAME`,
+`EXISTING_CUSTOMER`, `APPLICANTCIF`→`APPLICANT_CIF`, `BUSINESS_MODEL`,
+`KYC1`) được xác nhận qua dữ liệu thực là thuộc tính HỒ SƠ, không phải
+khách hàng — chuyển VỀ đây (cột 73-83). **Nay 73 cột (review 2026-09-30,
+theo yêu cầu người dùng):** xóa 12 cột "username/routing tại 1 bước"
+(`UWMAKERUSER`/`UWCHKRUSER`/`CREDAPPRUSER`/`CCOMMITUSER`/`DATACHKUSER`/
+`HOSUPPORTUSER`/`POSTSANCUSER`/`PREDISBMAKUSER`/`PREDISBCHKUSER`/
+`DISBMAKUSER`/`DISBCHKUSER`/`CHECKER3_TARGET`) — cùng lý do đã áp dụng
+cho `DIM_CLOS_APPLICATION` (1.2.1.1): các cột này set-tại-chỗ trên
+`NG_SB_RLOS_EXTTABLE` (NULL→username khi hồ sơ qua từng bước) khiến DIM
+(SCD2) sinh thêm phiên bản mới không cần thiết mỗi lần hồ sơ hoàn tất 1
+bước; thông tin `USERNAME`/`WORKSTEP_CODE` tương đương đã có sẵn trên
+`FCT_RLOS_WORKSTEP_EVENT` (bảng nhật ký, không bị vấn đề phình version).
+4 cột fallback COALESCE (`UWMAKERUSER`/`UWCHKRUSER`/`CREDAPPRUSER`/
+`CCOMMITUSER`) không ảnh hưởng công thức `UNDERWRITERMAKER_USERMAKE`/
+`UNDERWRITERCHECKER_USERMAKE`/`APPROVAL_USERMAKE` tại `FCT_RLOS_
+APPLICATION` (1.3.2.1) vì công thức đó đọc thẳng `NG_SB_RLOS_EXTTABLE`
+(driving table đã join sẵn), không phụ thuộc cột trên DIM này.
+
+**Nay 50 cột (review 2026-09-30, lượt 2, theo yêu cầu người dùng):** rà
+soát tiếp 23 cột dư thừa còn lại trên `NG_SB_RLOS_EXTTABLE`, chia 3
+nhóm:
+- **Xóa hẳn (10 cột username tại 1 bước, cùng lý do 12 cột đã xóa ở lượt
+  1):** `RR_USER`, `POSTDISBDEUSER`, `NORMBRUSER`, `REGBRUSER`,
+  `BRASUPPORTSENDER`, `DISBURSEUSER`, `DISBCHECKERUSER`, `LASTAPPROVER`,
+  `NORMSUPPORT_DCSN`, `REGSUPPORT_DCSN` — chấp nhận rủi ro chưa xác nhận
+  được `WORKSTEP_CODE` tương ứng trên `FCT_RLOS_WORKSTEP_EVENT` (khác 12
+  cột lượt 1 vốn có `WORKSTEP_CODE` khớp thẳng công thức SRS đã kiểm
+  chứng — điều tra riêng cho thấy các bước "ký hợp đồng chi nhánh công
+  chứng/không công chứng", "Round-Robin re-appraisal", "giải ngân thực
+  tế", "PostDisbursementDataEntry" không khớp danh sách `WORKSTEP_CODE`
+  đã xác nhận thật trong SRS/HLD).
+- **Xóa hẳn (2 cột trạng thái phê duyệt):** `APPROVAL_REJECT`,
+  `APPROVAL_FLAG` — theo yêu cầu người dùng.
+- **Chuyển sang `FCT_RLOS_APPLICATION` (11 cột cờ nhánh phụ/trạng thái,
+  không đổi công thức/nguồn, chỉ đổi bảng chứa — xem 1.3.2.1):**
+  `C_PHONE_CREATE_FLAG`, `C_PHONE_DELETE_FLAG`, `C_FI_CREATE_FLAG`,
+  `C_FI_DELETE_FLAG`, `C_LEGAL_CREATE_FLAG`, `C_LEGAL_DELETE_FLAG`,
+  `REINITIATE`, `NORMALBRHOLD`, `REGBRHOLD`, `STP_FLAG`, `ELIGIBLE`.
+
+**Nay 39 cột (review 2026-09-30, lượt 3, theo yêu cầu người dùng):** rà
+soát tiếp các cột còn lại, chia 3 nhóm:
+- **Xóa hẳn (ảnh chụp state, có đường thay thế xác nhận rõ ràng):**
+  `CURR_WSNAME`/`PREV_WSNAME`/`DECISION` — trùng bản chất với
+  `CURRENT_WORKSTEP_SK`/`PRE_WORKSTEP_CODE` (đã có report dùng qua BC1/
+  BC2)/`LAST_WORKSTEP_DECISION_SK`→`DECISION_CODE` (đã có report dùng
+  qua BC1.LAST_DECISION) sẵn có trên `FCT_RLOS_APPLICATION`.
+- **Xóa hẳn (chấp nhận rủi ro, chưa xác nhận `WORKSTEP_CODE` thay thế —
+  cùng nguyên tắc lượt 2):** `CHECKER3_CONDITION`/`DISBURSEMENT_TYPE`/
+  `DISB_DECSION` — điều tra riêng xác nhận "BranchChecker3"/"bước giải
+  ngân thực tế" không khớp danh sách `WORKSTEP_CODE` đã xác nhận thật
+  trong SRS/HLD, theo yêu cầu người dùng chấp nhận xóa dù chưa có đường
+  tái tạo xác nhận.
+- **Xóa hẳn (không tồn tại thông tin thay thế):** `MAJOR_DEV`/
+  `MINOR_DEV` — xác nhận `FCT_RLOS_DEVIATION` (1.3.2.x) chỉ đếm TỔNG số
+  dòng deviation (COUNT(\*) GROUP BY WI_NAME cho DEVIATION_G3), không có
+  bất kỳ cột nào phân loại mức độ lớn/nhỏ — 2 cột này không dùng cho báo
+  cáo nào và không tồn tại đường tái tạo, xóa theo yêu cầu người dùng.
+  `CANCEL_DATE` — trùng lặp ý nghĩa với `FCT_RLOS_APPLICATION.CANCEL_
+  DATE` (ENTRYDATE tại CancelRevoke) đã có report dùng (BC1 hiển thị
+  trực tiếp).
+- **Chuyển sang `FCT_RLOS_APPLICATION` (không xóa):** `TOTALNONELIGIBLE`
+  (nguyên trạng) và `REASON` (đổi tên `CANCEL_REASON`, đặt cạnh
+  `CANCEL_DATE` — cùng ngữ cảnh nghiệp vụ hủy hồ sơ) — xem 1.3.2.1.
+
+**✅ Đã giải quyết — chuyển logic CASE WHEN của `PROOF_OF_INCOME`/
+`COLL_REQUIRE` xuống PDTD_DTM (review 2026-09-26):** 2 cột này (cột 9-10)
+trước đây tính sẵn giá trị map (`'proofincome01'`→`'CHUNGTU_CHUNGMINH_
+THUNHAP'`, `'true'`→`'YES'`...) ngay tại SB_DWH — không đúng nguyên tắc
+kiến trúc "SB_DWH là ảnh chụp sạch của nguồn, không biến đổi giá trị;
+PDTD_DTM mới là tầng chuẩn hóa/phục vụ báo cáo" đã áp dụng cho các cột
+khác (`BUSINESS_FLOW`, `DEVIATION_G3`...). Theo yêu cầu người dùng: SB_DWH nay
+lưu nguyên giá trị gốc từ `NG_SB_RLOS_APPLICANT_GENERAL.PROOF_OF_INCOME`/
+`.COLLREQUIRE`; công thức `CASE WHEN` map sang giá trị hiển thị chuyển
+xuống PDTD_DTM, áp dụng ngay khi bê 1:1 (xem 2.3.1.1) — đây là 2 ngoại lệ
+duy nhất trong số cột "kế thừa" bị biến đổi giá trị khi bê, không giữ
+nguyên văn như 72 cột kế thừa còn lại.
 
 **✅ Bổ sung `LAST_APPROVAL_DATE` (khi thiết kế `FCT_RLOS_LOAN_DISBURSEMENT`,
 2.3.2.8):** phát sinh khi đối chiếu SRS BC10 — trường `APPROVAL_DATE`
 (MAX(EXITDATE) tại bước phê duyệt) không có sẵn ở DIM/FCT nào phía RLOS
 dưới dạng có thể join trực tiếp cho `FCT_RLOS_LOAN_DISBURSEMENT` mà không tạo
 phụ thuộc fact-to-fact. Về khái niệm, đây trùng công thức với
-`LAST_APPROVAL_DATE` đã có sẵn trên `FCT_RLOS_APPLICATION_DAILY`
+`LAST_APPROVAL_DATE` đã có sẵn trên `FCT_RLOS_APPLICATION`
 (1.3.2.1) — nhưng đặt thêm 1 bản trên chính DIM này (tính độc lập, không
-JOIN sang FCT khác) để giữ đối xứng kiến trúc với CLOS:
-`DIM_CLOS_APPLICATION` đã có sẵn `FIRST_APPROVED_WI_NAME`/
-`FIRST_APPROVED_DATE` ngay trên DIM (không phải FCT) cho cùng mục đích
-(`BC11.APPROVAL_WINAME_LOS`/`APPROVAL_DATE`) — nên
-`FCT_CLOS_LOAN_DISBURSEMENT`/`FCT_RLOS_LOAN_DISBURSEMENT`
-join DIM theo cùng 1 pattern, không "khi thì DIM
-khi thì FCT". Đây là dữ liệu trùng lặp có chủ đích với
-`FCT_RLOS_APPLICATION_DAILY.LAST_APPROVAL_DATE` — chấp nhận trùng lặp để
-đổi lấy 2 luồng ETL độc lập (không bắt `FCT_RLOS_LOAN_DISBURSEMENT` phải chờ
-`FCT_RLOS_APPLICATION_DAILY` chạy xong), đã xác nhận với người dùng.
+JOIN sang FCT khác) để giữ đối xứng kiến trúc với CLOS tại thời điểm
+thiết kế (`DIM_CLOS_APPLICATION` khi đó có sẵn `FIRST_APPROVED_WI_NAME`/
+`FIRST_APPROVED_DATE` ngay trên DIM cho cùng mục đích
+`BC11.APPROVAL_WINAME_LOS`/`APPROVAL_DATE`). Đây là dữ liệu trùng lặp có
+chủ đích với `FCT_RLOS_APPLICATION.LAST_APPROVAL_DATE` — chấp nhận trùng
+lặp để đổi lấy 2 luồng ETL độc lập (không bắt `FCT_RLOS_LOAN_DISBURSEMENT`
+phải chờ `FCT_RLOS_APPLICATION` chạy xong), đã xác nhận với người dùng.
+⚠️ Review 2026-09-30: `FIRST_APPROVED_DATE` phía CLOS đã chuyển từ
+`DIM_CLOS_APPLICATION` sang `FCT_CLOS_APPLICATION` (đặt cạnh
+`LAST_APPROVAL_DATE`, xem 1.2.2.1) — điểm đối xứng ban đầu không còn,
+nhưng `LAST_APPROVAL_DATE` trên `DIM_RLOS_APPLICATION` vẫn giữ nguyên vị
+trí (chưa có yêu cầu đánh giá lại riêng cột này).
 
 **✅ Đã giải quyết (DQ-11, cùng nguyên tắc đã áp dụng cho `DIM_CLOS_APPLICATION`,
 Section 3 dòng #2):** cột `DEVIATION_FLAG` được SRS BC1 chỉ đích danh nguồn
@@ -5001,36 +5967,46 @@ không chuyển sang phương án thay thế `MAJOR_DEV`/`MINOR_DEV` trên
 `NG_SB_RLOS_EXTTABLE`. Vẫn cần DEV xác nhận cột tồn tại thật trên database
 trước khi sinh LLD (cùng mức độ xác nhận đã làm cho `DIM_CLOS_APPLICATION`).
 
-**✅ Đã giải quyết — loại bỏ `DIM_RLOS_APPROVAL_GROUP`, bổ sung `APP_GRP` +
-`DEVIATION_G3` thẳng lên đây:** RLOS Metadata gốc (sheet Table Review, bảng
+**✅ Đã giải quyết — loại bỏ `DIM_RLOS_APPROVAL_GROUP`, bổ sung `APP_GRP`
+thẳng lên đây:** RLOS Metadata gốc (sheet Table Review, bảng
 `NG_SB_RLOS_APPROVAL`) xác nhận trực tiếp **grain = 1 dòng = 1 hồ sơ RLOS**
 — cùng kết luận với CLOS (1.2.1.1). `APP_GRP` là thuộc tính ổn định của hồ
 sơ, đọc thẳng từ cùng bảng đã cấp `STREAM`. `DIM_RLOS_APPROVAL_GROUP` và
 `MAP_RLOS_APPROVAL_GROUP` đã bị loại bỏ hoàn toàn; cột `APPROVAL_GROUP_SK`
-cũng bị loại khỏi `FCT_RLOS_APPLICATION_DAILY`.
+cũng bị loại khỏi `FCT_RLOS_APPLICATION`.
 
 Đối chiếu SRS BC5 (công thức JOIN sang `RLOS_REF_SLA_TDKHCN`, alias
 `c=NG_SB_RLOS_APPROVAL`): *"1. Điều kiện cột APP_GRP: file1.APP_GRP tương
 ứng với các giá trị c.APP_GRP"* — xác nhận lookup thẳng theo `APP_GRP` thô,
-cùng cấu trúc với CLOS. `DEVIATION_G3` trích nguyên văn SRS BC5/BC9: *"Count
-số dòng (sl) của mỗi WI_NAME trong bảng NG_SB_RLOS_MANUAL_DEVIATION, sl>=3
-→ 'YES', sl<3 → 'NO'"*.
+cùng cấu trúc với CLOS.
 
 Bảng `NG_SB_RLOS_APPROVAL` còn có cặp cột `PRE_APPROVALGROUP`/`APP_GRP`
 (giá trị trước/sau 1 lần định tuyến lại, 2 cột trên cùng 1 dòng, không phải
 lịch sử SCD) — đã rà soát toàn bộ SRS, không có báo cáo nào dùng
 `PRE_APPROVALGROUP`, nên không đưa cột này vào thiết kế.
 
-**✅ Đã giải quyết — bổ sung `CHANGE_TYPE`:** đọc thẳng từ
-`NG_SB_RLOS_EXTTABLE.CHANGE_TYPE` — cùng bảng nguồn đã tin cậy dùng cho
-`LOANCASEID`/`CHANGE_REQUEST` ở DIM này. SRS BC5 xác nhận công thức JOIN
-sang `RLOS_REF_SLA_TDKHCN` là either/or với `PRODUCT_LINE` — trích nguyên
-văn: *"Nếu file1.'Product Line' = 'Trường Change Request': Xét file1.'Change
-Type' = d.CHANGE_TYPE. Nếu file1.'Product Line' <> 'Trường Change Request':
-Xét file1.'Product Line' = b.PRODUCT_LINE"* (d = `NG_SB_RLOS_EXTTABLE`, b =
-`NG_SB_RLOS_APPLICANT_GENERAL`). Khác với `CHANGE_TYPE_SK` trên FCT (trỏ
-`DIM_RLOS_CHANGE_TYPE` để lấy tên/chi tiết chuẩn hóa cho BC1) — đây là giá
-trị thô dùng riêng làm khóa tra SLA.
+**✅ Đã giải quyết — bỏ `DEVIATION_G3` khỏi DIM này, chuyển sang report-time
+PDTD_DTM (review 2026-09-25):** trước đây `DEVIATION_G3` được thiết kế
+ngay trên DIM này (SCD2, `COUNT(*)` theo `WI_NAME` trên
+`NG_SB_RLOS_MANUAL_DEVIATION`, trích nguyên văn SRS BC5/BC9: *"Count số
+dòng (sl) của mỗi WI_NAME trong bảng NG_SB_RLOS_MANUAL_DEVIATION, sl>=3
+→ 'YES', sl<3 → 'NO'"*), dùng làm khóa tra cam kết SLA cùng `APP_GRP`.
+Rà soát lại: `NG_SB_RLOS_MANUAL_DEVIATION` đã có đường đi SB_DWH riêng
+qua `FCT_RLOS_DEVIATION` (1.3.2.x, full-snapshot mỗi ngày) — đây cũng là
+nguồn của `AGG_LOS_KPI_APPLICATION.DEVIATION_G3` (2.1.9, PDTD_DTM,
+report-time, cùng công thức đếm). Theo yêu cầu người dùng: bỏ hẳn bản
+SCD2 trên DIM, chuyển khóa tra SLA sang dùng chung nguồn/công thức
+report-time này tại PDTD_DTM (2.3.1.1) — không đọc thẳng STG_LOS 2 lần
+cho cùng 1 khái niệm.
+
+**✅ Đã giải quyết — chuyển `CHANGE_REQUEST`/`CHANGE_TYPE` sang
+`FCT_RLOS_APPLICATION` (review 2026-09-25):** cùng lý do đã áp
+dụng cho `DIM_CLOS_APPLICATION` — bản chất "thay đổi thường xuyên" theo
+hồ sơ không phù hợp cột ổn định SCD2 của DIM. 2 cột này (nguồn
+`NG_SB_RLOS_EXTTABLE.REQ_TYPE`/`CHANGE_TYPE`) nay đặt thẳng trên
+`FCT_RLOS_APPLICATION` (1.3.2.1, cột 78-79) — xem công thức
+either/or với `PRODUCT_LINE` để tra `RLOS_REF_SLA_TDKHCN` tại ghi chú
+của bảng đó và tại 2.3.1.1 (PDTD_DTM).
 
 ###### 1.3.1.2 DIM_RLOS_PRODUCT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_PRODUCT_LINE/MAS_SUB_PRODUCT, review 2026-09-18)
 
@@ -5080,104 +6056,75 @@ xem Section 3 nếu cần làm rõ thêm với BA). BC5/BC9 dùng tương tự n
 kiểm ở `DIM_CLOS_PRODUCT`. Không phát hiện lệch tài liệu nào về công thức
 cột.
 
-###### 1.3.1.3 DIM_RLOS_WORKSTEP — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_DECISION, review 2026-09-18)
+###### 1.3.1.3 DIM_RLOS_WORKSTEP_DECISION — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_DECISION, review 2026-09-24, gộp từ DIM_RLOS_WORKSTEP + DIM_RLOS_DECISION)
 
-**Bảng cũ (trước tách):** `DIM_LOS_WORKSTEP` → tách phần thuộc tính RLOS thành `DIM_RLOS_WORKSTEP`
+**Bảng cũ (trước tách):** `DIM_LOS_WORKSTEP`/`DIM_LOS_DECISION` → tách phần thuộc tính RLOS, sau đó gộp lại (review 2026-09-24) thành `DIM_RLOS_WORKSTEP_DECISION`
 
 **Nguồn:** `NG_SB_RLOS_MAS_DECISION` (bảng danh mục thật, tầng STG_LOS, BA
-LOS xác nhận 16/09) — lấy `DISTINCT QUEUE_NAME` (review 2026-09-18, thay
-thế `MAP_RLOS_WORKSTEP`; cùng bảng nguồn với `DIM_RLOS_DECISION`, 1.3.1.4).
+LOS xác nhận 16/09, cấu trúc cột xác nhận thêm qua `input/DS Bảng danh
+mục.xlsx` — 3 cột QUEUE_NAME/DECISION/REQ_TYPE) — lấy 1:1 QUEUE_NAME+
+DECISION (review 2026-09-24, gộp từ 2 lần DISTINCT riêng lẻ trước đây).
 
-**`DIM_RLOS_WORKSTEP` (SB_DWH):**
+**`DIM_RLOS_WORKSTEP_DECISION` (SB_DWH):**
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_WORKSTEP, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_WORKSTEP_DECISION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
 | 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_WORKSTEP, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 4 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | NK | Mã bước xử lý trên workflow RLOS — nguồn DISTINCT NG_SB_RLOS_MAS_DECISION.QUEUE_NAME (review 2026-09-18: đổi nguồn — MAS_DECISION gộp WORKSTEP+DECISION dạng N-N, DIM này chỉ lấy phần WORKSTEP). UNIQUE (WORKSTEP_CODE, EFF_DATE) |
-| 5 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION (không có cột khai báo tay như MAP_RLOS_WORKSTEP trước đây) |
-| 6 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
+| 3 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_WORKSTEP_DECISION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
+| 4 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | NK | Mã bước xử lý trên workflow RLOS — nguồn NG_SB_RLOS_MAS_DECISION.QUEUE_NAME. Cùng với DECISION_CODE tạo thành khóa nghiệp vụ composite |
+| 5 | DECISION_CODE | VARCHAR2 | Y | 200 | NK | Mã quyết định phát sinh tại bước xử lý trên — nguồn NG_SB_RLOS_MAS_DECISION.DECISION. UNIQUE (WORKSTEP_CODE, DECISION_CODE, EFF_DATE) |
+| 6 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION |
+| 7 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
-- Bảng DIM lưu danh mục bước xử lý trong quy trình BPM của hồ sơ tín dụng RLOS, 1 dòng = 1 bước xử lý.
+- Bảng DIM lưu danh mục cặp (bước xử lý, quyết định) hợp lệ trong quy trình BPM của hồ sơ tín dụng RLOS, 1 dòng = 1 cặp (WORKSTEP_CODE, DECISION_CODE) hợp lệ.
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
 
-**Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #2):**
-giữ nguyên cấu trúc 6 cột, chỉ đổi **nguồn nạp**: trước đây đọc từ
-`MAP_RLOS_WORKSTEP` (tạm thay cho `NG_SB_RLOS_ENTRY_EXIT`); nay BA LOS xác
-nhận (16/09) dùng bảng danh mục thật `NG_SB_RLOS_MAS_DECISION` — cùng lý
-do giữ tách 2 DIM đã giải thích ở `DIM_CLOS_WORKSTEP` (1.2.1.3): bảng
-nguồn gộp WORKSTEP+DECISION dạng N-N, không có danh mục WORKSTEP độc lập.
+**Gộp 2 DIM thành 1 (review 2026-09-24, thay thế quyết định cũ
+2026-09-18):** cùng lý do đã áp dụng cho `DIM_CLOS_WORKSTEP_DECISION`
+(1.2.1.3) — `NG_SB_RLOS_MAS_DECISION` gộp chung WORKSTEP+DECISION, mỗi
+cặp (QUEUE_NAME, DECISION) là duy nhất trên bảng nguồn. Bỏ `DECISION_
+GROUP`-kiểu và cột `REQ_TYPE` (chưa xác nhận báo cáo nào cần) — giữ
+nguyên các kết luận cũ về những cột này, chỉ thay đổi cấu trúc DIM.
+
+⚠️ **Giả định cần BA xác nhận lại trước khi sinh LLD:** cùng lưu ý đã
+ghi ở `DIM_CLOS_WORKSTEP_DECISION` (1.2.1.3).
 
 **Đối chiếu SRS (BC1, BC2, BC3, BC4, BC5, BC7, BC8, BC9):** BC3, BC4, BC8
-dùng `WORKSTEP` cho mục đích hiển thị/lọc trên FCT
-(`NG_SB_RLOS_ENTRY_EXIT> WORKSTEP`, không đổi — vẫn là nguồn của FCT như
-trước).
+dùng `WORKSTEP`/`DECISION` cho mục đích hiển thị/lọc — nay đọc qua JOIN
+`WORKSTEP_DECISION_SK` sang DIM này thay vì cột denormalize trên
+`FCT_RLOS_WORKSTEP_EVENT` (xem 1.3.2.7, cột đã xóa). `APPLICATION_STATUS` (4
+giá trị Approved/Rejected/Cancelled/Processing) vẫn là công thức
+CASE-WHEN riêng của từng báo cáo, tính thẳng trên `DECISION`/`WORKSTEP`
+của `NG_SB_*_ENTRY_EXIT`, không lookup DIM này — không đổi.
 
 `WFINSTRUMENTTABLE` vẫn không thuộc phạm vi bảng này — **✅ đã giải quyết
-(PENDING #6):** thông tin đó nay đã nạp vào `FCT_RLOS_APPLICATION_DAILY`
+(PENDING #6):** thông tin đó nay đã nạp vào `FCT_RLOS_APPLICATION`
 (1.3.2.1) để tính `WORKSTEP_FLAG`, xem ghi chú đầy đủ ở `DIM_CLOS_
-WORKSTEP` (1.2.1.3).
+WORKSTEP_DECISION` (1.2.1.3).
 
-###### 1.3.1.4 DIM_RLOS_DECISION — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_DECISION, review 2026-09-18)
+###### 1.3.1.5 DIM_RLOS_EXCEPTION
 
-**Bảng cũ (trước tách):** `DIM_LOS_DECISION` → tách phần thuộc tính RLOS thành `DIM_RLOS_DECISION`
-
-**Nguồn:** `NG_SB_RLOS_MAS_DECISION` (bảng danh mục thật, tầng STG_LOS, BA
-LOS xác nhận 16/09) — lấy `DISTINCT DECISION` (review 2026-09-18, thay
-thế `MAP_RLOS_DECISION`; cùng bảng nguồn với `DIM_RLOS_WORKSTEP`, 1.3.1.3).
-
-**`DIM_RLOS_DECISION` (SB_DWH):**
+**Bảng cũ (trước tách):** `DIM_LOS_EXCEPTION_REASON` → tách phần thuộc tính RLOS thành `DIM_RLOS_EXCEPTION`
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_DECISION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_EXCEPTION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
 | 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_DECISION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 4 | DECISION_CODE | VARCHAR2 | Y | 200 | NK | Mã quyết định tại bước xử lý trên workflow RLOS — nguồn DISTINCT NG_SB_RLOS_MAS_DECISION.DECISION (review 2026-09-18: đổi nguồn — MAS_DECISION gộp WORKSTEP+DECISION dạng N-N, DIM này chỉ lấy phần DECISION). UNIQUE (DECISION_CODE, EFF_DATE) |
-| 5 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION (không có cột khai báo tay như MAP_RLOS_DECISION trước đây) |
-| 6 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
-
-- Bảng DIM lưu danh mục quyết định có thể phát sinh tại một bước xử lý của hồ sơ tín dụng RLOS, 1 dòng = 1 quyết định.
-- Khóa chính của bảng (PK): **DIMENSION_KEY**.
-
-**Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #2):**
-giữ nguyên cấu trúc 6 cột, chỉ đổi **nguồn nạp**: trước đây đọc từ
-`MAP_RLOS_DECISION` (tạm thay cho `NG_SB_RLOS_ENTRY_EXIT`, event log); nay
-BA LOS xác nhận (16/09) dùng cùng bảng danh mục thật
-`NG_SB_RLOS_MAS_DECISION` đã dùng cho `DIM_RLOS_WORKSTEP` (1.3.1.3). Bỏ
-`DECISION_GROUP` — rà soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào
-lookup trực tiếp cột này (xem Đối chiếu SRS bên dưới và Section 3).
-`MAS_DECISION` còn có cột `REQ_TYPE` (loại yêu cầu thay đổi) chưa xác nhận
-báo cáo nào cần — xem Section 3.
-
-**Đối chiếu SRS (BC1, BC2, BC3, BC4, BC7, BC8, BC9):** BC3, BC8 dùng
-`DECISION` trực tiếp từ `NG_SB_RLOS_ENTRY_EXIT.DECISION` cho mục đích hiển
-thị (không đổi — ENTRY_EXIT vẫn là nguồn của FCT như trước). BC1/BC2/BC5/
-BC9 dùng khái niệm phân loại duyệt/từ chối/hủy/trả về gần giống
-`DECISION_GROUP` cũ, nhưng **không lookup trực tiếp cột này** — `BI_APPSTATUS`
-(4 giá trị Approved/Rejected/Cancelled/Processing) là công thức CASE-WHEN
-riêng của từng báo cáo, tính thẳng trên `DECISION`/`WORKSTEP` của
-`NG_SB_*_ENTRY_EXIT` (ví dụ "Cancelled" dựa theo `WORKSTEP`, không dựa
-theo `DECISION_CODE`) — xác nhận không báo cáo nào cần cột `DECISION_GROUP`
-nên đã loại theo column-optimization rule.
-
-###### 1.3.1.5 DIM_RLOS_EXCEPTION_REASON
-
-**Bảng cũ (trước tách):** `DIM_LOS_EXCEPTION_REASON` → tách phần thuộc tính RLOS thành `DIM_RLOS_EXCEPTION_REASON`
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_EXCEPTION_REASON, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
-| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | EXCEPTION_REASON_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_EXCEPTION_REASON, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 4 | ACTIVITYNAME | VARCHAR2 | N | 200 | NK | Tên bước phát sinh nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.ACTIVITYNAME |
-| 5 | DECISION_CODE | VARCHAR2 | N | 200 | NK | Mã quyết định tại bước xử lý — nguồn NG_SB_RLOS_MAS_EXCEPTION.DECISION (đổi tên thêm hậu tố CODE cho thống nhất với DIM_RLOS_DECISION) |
-| 6 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 | NK | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY |
-| 7 | EXCEPTION_NAME | VARCHAR2 | N | 500 | NK | Tên nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_NAME |
-| 8 | EXCEPTION_CODE | VARCHAR2 | N | 50 |  | Mã nội dung cần làm rõ — PHÁI SINH: CASE WHEN INSTR(EXCEPTION_CATEGORY, ':') > 0 THEN REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END (review 2026-09-22: viết lại đúng cú pháp CASE WHEN, trước đây mô tả văn xuôi không parse được) |
-| 9 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
-| 10 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
+| 3 | EXCEPTION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_EXCEPTION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
+| 4 | EXCEPTION_BK | VARCHAR2 | Y | 64 |  | Khóa nghiệp vụ hash của tổ hợp (bước, quyết định, nhóm lý do, tên lý do) — PHÁI SINH: STANDARD_HASH(ACTIVITYNAME \|\| '~' \|\| DECISION_CODE \|\| '~' \|\| EXCEPTION_CATEGORY \|\| '~' \|\| EXCEPTION_NAME, 'SHA256') (bổ sung review 2026-09-24, theo yêu cầu người dùng, cùng công thức đã áp dụng cho DIM_CLOS_EXCEPTION) |
+| 5 | ACTIVITYNAME | VARCHAR2 | N | 200 | NK | Tên bước phát sinh nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.ACTIVITYNAME |
+| 6 | DECISION_CODE | VARCHAR2 | N | 200 | NK | Mã quyết định tại bước xử lý — nguồn NG_SB_RLOS_MAS_EXCEPTION.DECISION (đổi tên thêm hậu tố CODE cho thống nhất với DIM_RLOS_WORKSTEP_DECISION.DECISION_CODE) |
+| 7 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 | NK | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY |
+| 8 | EXCEPTION_NAME | VARCHAR2 | N | 500 | NK | Tên nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_NAME |
+| 9 | EXCEPTION_CODE | VARCHAR2 | N | 50 |  | Mã nội dung cần làm rõ — PHÁI SINH: CASE WHEN INSTR(EXCEPTION_CATEGORY, ':') > 0 THEN REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END (review 2026-09-22: viết lại đúng cú pháp CASE WHEN, trước đây mô tả văn xuôi không parse được) |
+| 10 | RAISE_FLAG | VARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Raise (nêu lý do) tại tổ hợp bước/quyết định này hay không — nguồn NG_SB_RLOS_MAS_EXCEPTION.RAISE (đổi tên thêm hậu tố FLAG, tránh trùng từ khóa RAISE). Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn |
+| 11 | CLEAR_FLAG | VARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Clear (trả lời làm rõ) tại tổ hợp bước/quyết định này hay không — nguồn NG_SB_RLOS_MAS_EXCEPTION.CLEAR (đổi tên thêm hậu tố FLAG cho nhất quán với RAISE_FLAG). Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn |
+| 12 | ID_SOURCE | NUMBER | N | 18 |  | Số định danh nội bộ của bản ghi danh mục trên bảng nguồn — nguồn NG_SB_RLOS_MAS_EXCEPTION.ID (đổi tên thêm hậu tố SOURCE, tránh trùng khái niệm với DIMENSION_KEY/ID kỹ thuật của DIM, đồng nhất với CODE_SOURCE). Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn |
+| 13 | CODE_SOURCE | VARCHAR2 | N | 255 |  | Mã viết tắt của tổ hợp ngoại lệ — nguồn NG_SB_RLOS_MAS_EXCEPTION.CODE (đổi tên thêm hậu tố SOURCE, tránh trùng khái niệm với EXCEPTION_CODE phái sinh ở cột 9, đồng nhất với ID_SOURCE). Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn |
+| 14 | STATUS | VARCHAR2 | N | 50 |  | Trạng thái bản ghi danh mục trên bảng nguồn (còn hiệu lực/đã ngừng áp dụng...) — nguồn NG_SB_RLOS_MAS_EXCEPTION.STATUS, giữ nguyên tên nguồn. Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn, đồng bộ với bản CLOS |
+| 15 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
+| 16 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
 - Bảng DIM lưu danh mục lý do ngoại lệ được cấu hình cho từng tổ hợp bước xử lý + quyết định trên workflow RLOS, 1 dòng = 1 tổ hợp bước + quyết định + nhóm lý do + tên lý do.
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
@@ -5188,17 +6135,27 @@ khi tách vật lý CLOS/RLOS). Còn 10 cột, cấu trúc không đổi — ngu
 nạp không đổi, vẫn đọc trực tiếp từ `NG_SB_RLOS_MAS_EXCEPTION`.
 
 **Đối chiếu SRS (BC7, BC8):** cùng cách dùng như đã kiểm ở
-`DIM_CLOS_EXCEPTION_REASON` (1.2.1.6). Không phát hiện lệch tài liệu nào
+`DIM_CLOS_EXCEPTION` (1.2.1.6). Không phát hiện lệch tài liệu nào
 về công thức cột.
 
-**Rà soát thêm (review 2026-09-17):** cùng lưu ý như `DIM_CLOS_EXCEPTION_
-REASON` (1.2.1.5) — `EXCEPTION_CODE` dư thừa trên DIM (SRS chỉ định
+**Rà soát thêm (review 2026-09-17):** cùng lưu ý như `DIM_CLOS_EXCEPTION`
+(1.2.1.5) — `EXCEPTION_CODE` dư thừa trên DIM (SRS chỉ định
 nghĩa công thức này cho FCT), người dùng xác nhận chấp nhận giữ nguyên.
-Không bổ sung 4 cột `CODE`/`RAISE`/`CLEAR`/`ID` từ `NG_SB_RLOS_MAS_
-EXCEPTION` — không báo cáo nào cần.
+
+**Bổ sung 5 cột dư thừa cho thông tin nguồn + khóa hash EXCEPTION_BK
+(review 2026-09-24, theo yêu cầu người dùng — đảo lại quyết định cũ
+2026-09-17 "không báo cáo nào cần"):** bảng nguồn `NG_SB_RLOS_MAS_
+EXCEPTION` có cấu trúc tương đồng bản CLOS, cả 2 nguồn đều đủ 5 cột chưa
+từng đưa vào DIM (`RAISE`, `CLEAR`, `ID`, `CODE`, `STATUS`). Đã bổ sung
+`RAISE_FLAG`, `CLEAR_FLAG`, `ID_SOURCE`, `CODE_SOURCE`,
+`STATUS` (giữ nguyên tên nguồn — trừ `RAISE`/`CLEAR`/`ID`/`CODE` phải
+đổi hậu tố/tiền tố để tránh trùng khái niệm với cột phái sinh/kỹ thuật
+đã có sẵn), cùng `EXCEPTION_BK` (đặt ngay sau `EXCEPTION_SK`,
+cột 4 — khóa hash SHA256 nối 4 cột NK hiện tại) — đồng bộ hoàn toàn với
+`DIM_CLOS_EXCEPTION` (1.2.1.5).
 
 **Không rơi vào pattern "application-scoped source":** cùng bản chất với
-`DIM_CLOS_EXCEPTION_REASON` (1.2.1.6) — `NG_SB_RLOS_MAS_EXCEPTION` là bảng
+`DIM_CLOS_EXCEPTION` (1.2.1.6) — `NG_SB_RLOS_MAS_EXCEPTION` là bảng
 LOẠI 1 (danh mục cấu hình gốc), không phải bảng sự kiện theo hồ sơ. Giữ
 nguyên nguồn trực tiếp, không cần bảng `MAP_` seed.
 
@@ -5259,67 +6216,7 @@ cần bảng `MAP_` seed. SRS không xác nhận nhu cầu theo dõi lịch sử
 tên loại (không có yêu cầu "as-of" cho field này), nhưng giữ chuẩn SCD
 Type 2 để đồng bộ với các DIM danh mục khác trong kiến trúc.
 
-###### 1.3.1.7 DIM_RLOS_GEO
-
-**Bảng cũ (trước tách):** `DIM_LOS_GEO` (không đổi tên gốc, chỉ thêm tiền tố RLOS để nhất quán với các DIM khác — bảng vốn đã RLOS-only, không có phần CLOS tương ứng)
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_GEO, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới |
-| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | GEO_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_GEO, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 4 | CITY_CODE | VARCHAR2 | Y | 50 | NK | Mã tỉnh thành — nguồn H_NG_SB_RLOS_MAS_CITY.CITY_CODE. Nối với NG_SB_RLOS_APPLICANT_DETAIL.CITY_CURR_RES |
-| 5 | CITY_NAME | VARCHAR2 | N | 200 |  | Tên tỉnh thành — nguồn H_NG_SB_RLOS_MAS_CITY.CITY_NAME |
-| 6 | CITY_NAME_VN | VARCHAR2 | N | 200 |  | Tên tỉnh thành tiếng Việt có dấu — nguồn H_NG_SB_RLOS_MAS_CITY.CITY_NAME_VN |
-| 7 | DISTRICT_CODE | VARCHAR2 | N | 50 | NK | Mã quận huyện — nguồn H_NG_SB_RLOS_MAS_DISTRICT.DISTRICT_CODE. Nối với NG_SB_RLOS_APPLICANT_DETAIL.DISTRICT_CURR_RES |
-| 8 | DISTRICT_NAME | VARCHAR2 | N | 200 |  | Tên quận huyện — nguồn H_NG_SB_RLOS_MAS_DISTRICT.DISTRICT_NAME |
-| 9 | DISTRICT_NAME_VN | VARCHAR2 | N | 200 |  | Tên quận huyện tiếng Việt có dấu — PHÁI SINH: lấy H_NG_SB_RLOS_MAS_DISTRICT.DISTRICT_NAME_VN nhưng gán NULL với giá trị lỗi '#NA'/'#REF!' còn sót từ khâu import Excel |
-| 10 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
-| 11 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
-
-- Bảng DIM lưu danh mục địa giới hành chính tỉnh/thành và quận/huyện, 1 dòng = 1 quận/huyện thuộc 1 tỉnh/thành.
-- Khóa chính của bảng (PK): **DIMENSION_KEY**.
-
-**So với thiết kế cũ:** bảng gốc RLOS-only, 10 cột, chưa từng có cột
-`DATASOURCE`. Nay bổ sung thêm `DATASOURCE` (cố định 'RLOS') làm cột kỹ
-thuật đánh dấu nguồn hệ, đồng bộ với mọi DIM/FCT RLOS khác sau khi tách
-vật lý CLOS/RLOS — tổng **11 cột**. Ngoài ra chỉ đổi tên bảng để nhất quán
-với quy ước `DIM_RLOS_*` của các DIM khác.
-
-**Đối chiếu SRS (BC1):** `CITY_NAME` dùng cho `CURRENT_RESIDENTIAL_CITY`,
-`DISTRICT_NAME` cho `CURRENT_RESIDENTIAL_DISTRICT`, `CITY_NAME_VN`/
-`DISTRICT_NAME_VN` là thành phần ghép của `CURRENT_RESIDENTIAL_ADDRESS`.
-Không phát hiện lệch tài liệu nào về công thức cột.
-
-**Không rơi vào pattern "application-scoped source":**
-`H_NG_SB_RLOS_MAS_CITY`/`H_NG_SB_RLOS_MAS_DISTRICT` mang tiền tố `MAS_`,
-là danh mục địa giới hành chính gốc, không phải bảng sự kiện theo hồ sơ.
-Giữ nguyên nguồn trực tiếp, không cần bảng `MAP_` seed.
-
-**Rà soát REGION_CODE/REGION_NAME (review 2026-09-17):** cả
-`H_NG_SB_RLOS_MAS_CITY` (có `REGION_CODE`) và `H_NG_SB_RLOS_MAS_DISTRICT`
-(có `REGION_ID`/`REGION_NAME`/`REGION_NAME_VN`) đều có sẵn cột vùng miền
-theo địa chỉ khách hàng, nhưng đã rà soát đủ 11/11 SRS (BC1-BC11): không
-có báo cáo nào dùng vùng miền theo địa chỉ khách hàng — BC10/BC11 chỉ
-dùng vùng miền theo đơn vị kinh doanh (`TMP_REF_COMPANY_REGION`, khác
-khái niệm, khác nguồn). Xác nhận đúng theo column-optimization rule:
-**không thêm** `REGION_CODE`/`REGION_NAME` vào bảng này.
-
-**Rà soát DISTRICT_CODE nullable trong NK (review 2026-09-17 — CẦN DEV
-XÁC NHẬN BẰNG DỮ LIỆU THẬT trước LLD):** `DISTRICT_CODE` (NK, cột 7) có
-`Bắt buộc = N` — về lý thuyết, NK composite (`CITY_CODE`+`DISTRICT_CODE`)
-có thành phần NULL gây rủi ro so khớp SCD2/UNIQUE không nhất quán (nhiều
-hồ sơ cùng tỉnh/thành nhưng đều NULL quận/huyện có bị coi là trùng NK hay
-không tùy engine). Đã tra `input/RLOS - Metadata.xlsx` và
-`input/DS_BANG_202608.xlsx` nhưng cả 2 đều không có sample data cấp dòng
-để xác nhận dứt điểm có hồ sơ nào NULL `DISTRICT_CURR_RES` thật hay
-không — giữ nguyên thiết kế hiện tại (nullable, không đổi sang sentinel)
-vì chưa có bằng chứng ngược lại, nhưng đây là điểm **cần DEV xác nhận
-bằng dữ liệu thật** trước khi chốt LLD: nếu xác nhận có NULL thật, cân
-nhắc đổi sang giá trị sentinel cố định (ví dụ 'UNKNOWN') để NK luôn có
-đủ giá trị so khớp.
-
-###### 1.3.1.8 DIM_RLOS_CARD_PROMOTION
+###### 1.3.1.7 DIM_RLOS_CARD_PROMOTION
 
 **Bảng cũ (trước tách):** `DIM_LOS_CARD_PROMOTION` (không đổi tên gốc, chỉ thêm tiền tố RLOS để nhất quán với các DIM khác — bảng vốn đã RLOS-only, không có phần CLOS tương ứng)
 
@@ -5352,122 +6249,9 @@ thức cột.
 gốc thật, không phải bảng sự kiện theo hồ sơ. Giữ nguyên nguồn trực tiếp,
 không cần bảng `MAP_` seed.
 
-###### 1.3.1.9 DIM_RLOS_APPLICANT
-
-**Bảng cũ (trước tách):** `FCT_LOS_APPLICATION_PARTY` (20 cột, gộp CLOS+RLOS) — tách thuộc tính applicant chính phía RLOS thành DIM riêng, không còn là FCT
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_APPLICANT, sinh bằng Oracle sequence tại SB_DWH |
-| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | APPLICANT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_APPLICANT, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 |
-| 4 | WI_NAME | VARCHAR2 | Y | 100 | NK | Mã hồ sơ RLOS — nguồn NG_SB_RLOS_APPLICANT_GENERAL.WI_NAME. Quan hệ 1:1 với hồ sơ |
-| 5 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên đầy đủ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.FULL_NAME |
-| 6 | DATE_OF_BIRTH | DATE | N |  |  | Ngày sinh — nguồn NG_SB_RLOS_APPLICANT_GENERAL.DOB |
-| 7 | GENDER | VARCHAR2 | N | 20 |  | Giới tính — nguồn NG_SB_RLOS_APPLICANT_GENERAL.GENDER |
-| 8 | MARRIAGE_STATUS | VARCHAR2 | N | 100 |  | Tình trạng hôn nhân — nguồn NG_SB_RLOS_APPLICANT_DETAIL.MARR_STATUS |
-| 9 | EDUCATION_LEVEL | VARCHAR2 | N | 100 |  | Trình độ học vấn — nguồn NG_SB_RLOS_APPLICANT_DETAIL.EDU_LEVEL |
-| 10 | VEHICLE | VARCHAR2 | N | 100 |  | Phương tiện đi lại — nguồn NG_SB_RLOS_APPLICANT_DETAIL.VEHICLE |
-| 11 | PERM_ADDRESS | VARCHAR2 | N | 500 |  | Địa chỉ thường trú — nguồn NG_SB_RLOS_APPLICANT_DETAIL.PERM_ADD |
-| 12 | CURR_HOUSE_NO | VARCHAR2 | N | 200 |  | Số nhà thuộc địa chỉ hiện tại — nguồn NG_SB_RLOS_APPLICANT_DETAIL.HOUSNO_CURR_RES |
-| 13 | CURR_WARD | VARCHAR2 | N | 100 |  | Phường xã thuộc địa chỉ hiện tại — nguồn NG_SB_RLOS_APPLICANT_DETAIL.WARD_CURR_RES |
-| 14 | GEO_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_GEO, lookup theo CITY_CURR_RES + DISTRICT_CURR_RES của NG_SB_RLOS_APPLICANT_DETAIL. Mặc định -1 |
-| 15 | ADD_ID | VARCHAR2 | N | 500 |  | PHÁI SINH: pivot NG_SB_RLOS_APPLICANT_IDGRID.ID_NUMBER, lọc ID_TYPE IN ('TCC','CC'), nối chuỗi ";" nếu nhiều |
-| 16 | ADD_ID_OTHER | VARCHAR2 | N | 1000 |  | PHÁI SINH: pivot NG_SB_RLOS_APPLICANT_IDGRID.ID_NUMBER, lọc ID_TYPE NOT IN ('TCC','CC'), nối chuỗi ";" nếu nhiều |
-| 17 | ZONE | VARCHAR2 | N | 50 |  | Vùng miền quản lý tự khai theo hồ sơ (BC1/BC2.ZONE) — LÀM GIÀU (review 2026-09-21, đóng gap tài liệu BC1/BC2): nguồn NG_SB_RLOS_APPLICANT_GENERAL.ZONE. Khác bản chất với DIM_LOS_ORG_UNIT.ZONE (mã nội bộ chuẩn hóa từ MAS_COMPANY, dùng làm khóa join đơn vị kinh doanh) — cột này là giá trị tự khai gắn với hồ sơ/khách hàng, không dùng để join |
-| 18 | NATIONALITY | VARCHAR2 | N | 100 |  | Quốc tịch (mã) — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.NATIONALITY |
-| 19 | TITLE | VARCHAR2 | N | 50 |  | Danh xưng — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.TITLE |
-| 20 | HOME_PHONE | VARCHAR2 | N | 50 |  | Số điện thoại nhà riêng — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.HOME_PHONE |
-| 21 | PHONE_1 | VARCHAR2 | N | 50 |  | Số điện thoại di động chính — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.PHONE_1 |
-| 22 | PHONE_2 | VARCHAR2 | N | 50 |  | Số điện thoại phụ — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.PHONE2 (đổi tên PHONE2→PHONE_2 cho nhất quán với PHONE_1) |
-| 23 | SALE_TYPE | VARCHAR2 | N | 100 |  | Kênh bán hàng — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.SALE_TYPE |
-| 24 | BROKER_TYPE | VARCHAR2 | N | 100 |  | Loại đối tác giới thiệu (cộng tác viên, đại diện đối tác, đối tác liên kết) — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.BROKER_TYPE |
-| 25 | BROKER_ID | VARCHAR2 | N | 100 |  | Mã đối tác giới thiệu — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.BROKER_ID |
-| 26 | BROKER_NAME | VARCHAR2 | N | 200 |  | Tên đối tác giới thiệu — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.BROKER_NAME |
-| 27 | ACC_OFFICER | VARCHAR2 | N | 100 |  | Mã nhân viên quan hệ khách hàng (Account Officer) phụ trách — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.ACC_OFFICER |
-| 28 | ACCOUNT_OFFICER_NAME | VARCHAR2 | N | 200 |  | Tên Account Officer phụ trách — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.ACCOUNT_OFFICER_NAME |
-| 29 | EXISTING_CUSTOMER | VARCHAR2 | N | 10 |  | Cờ khách hàng hiện hữu — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.EXISTING_CUSTOMER. ⚠️ Metadata: không có dữ liệu trong tập mẫu khảo sát |
-| 30 | APPLICANT_CIF | VARCHAR2 | N | 50 |  | Mã CIF khách hàng (định danh ngân hàng lõi) — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.APPLICANTCIF (đổi tên cho rõ nghĩa). ⚠️ Metadata: không có dữ liệu trong tập mẫu khảo sát, chỉ được gắn vào hồ sơ ở giai đoạn gần giải ngân |
-| 31 | BUSINESS_MODEL | VARCHAR2 | N | 200 |  | Mô hình kinh doanh áp dụng cho kênh giới thiệu — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.BUSINESS_MODEL |
-| 32 | KYC1 | VARCHAR2 | N | 50 |  | Đơn vị/khối đang xử lý hồ sơ tại thời điểm ghi nhận (giá trị quan sát: Khối VHCN, Khối PDTD, ĐVKD) — LÀM GIÀU — nguồn NG_SB_RLOS_APPLICANT_GENERAL.KYC1. ⚠️ Metadata đang ở trạng thái "Cần chỉnh sửa", đề xuất đổi tên "Luồng phê duyệt"/Approval Flow — cần BA xác nhận lại tên/ý nghĩa chuẩn trước khi sinh LLD |
-| 33 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
-| 34 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
-
-- Bảng DIM lưu thuộc tính người đề nghị vay chính (applicant) của hồ sơ RLOS, 1 dòng = 1 phiên bản của 1 hồ sơ (quan hệ 1:1 với DIM_RLOS_APPLICATION). Phục vụ BC1, BC2.
-- Khóa chính của bảng (PK): **DIMENSION_KEY**.
-
-**So với thiết kế cũ (tách từ `FCT_LOS_APPLICATION_PARTY` gộp):** đây là
-thay đổi kiến trúc — không còn là FCT mà trở thành DIM. Bỏ `PARTY_TYPE`,
-`PARTY_ROLE_CODE` (luôn cố định 'APPLICANT', không còn giá
-trị phân biệt vì bảng chỉ chứa applicant), `ORG_LEGAL_ID`, `OBJ_TYPE`,
-`REL_TO_APPLICANT` (các cột chỉ có nguồn CLOS hoặc corepayer theo
-column-optimization rule); giữ lại `DATASOURCE` (nay cố định 'RLOS' làm
-cột kỹ thuật đánh dấu nguồn hệ sau khi tách vật lý CLOS/RLOS). Thêm mới
-`ADD_ID`/`ADD_ID_OTHER` (pivot từ
-`FCT_LOS_PARTY_DOCUMENT` cũ, xem ghi chú Section 1 → 1.3.1.9). **Nay 34
-cột (review 2026-09-21):** làm giàu thêm 15 cột mô tả từ NG_SB_RLOS_
-APPLICANT_GENERAL (ZONE, NATIONALITY, TITLE, HOME_PHONE, PHONE_1,
-PHONE_2, SALE_TYPE, BROKER_TYPE/ID/NAME, ACC_OFFICER, ACCOUNT_OFFICER_
-NAME, EXISTING_CUSTOMER, APPLICANT_CIF, BUSINESS_MODEL, KYC1) — xem lý
-do đầy đủ tại Section 1 → 1.3.1.9.
-
-###### 1.3.1.10 DIM_RLOS_COREPAYER
-
-**Bảng cũ (trước tách):** `FCT_LOS_APPLICATION_PARTY` (20 cột, gộp CLOS+RLOS) — tách thuộc tính corepayer phía RLOS thành DIM riêng, không còn là FCT
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_COREPAYER, sinh bằng Oracle sequence tại SB_DWH |
-| 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
-| 3 | COREPAYER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_COREPAYER, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 |
-| 4 | WI_NAME | VARCHAR2 | Y | 100 | NK | Mã hồ sơ RLOS — nguồn NG_SB_RLOS_COREPAYER_GENERAL.WI_NAME. Quan hệ 1:N với hồ sơ (0..4 corepayer) |
-| 5 | ID_NO_CO | VARCHAR2 | Y | 100 | NK | Nhãn thứ tự người đồng trả nợ (PIN: Corep1-4) — nguồn NG_SB_RLOS_COREPAYER_GENERAL.ID_NO_CO. Business key cùng WI_NAME + REL_TO_APPLICANT; dùng để join NG_SB_RLOS_COREP_IDGRID.PIN lấy giấy tờ |
-| 6 | REL_TO_APPLICANT | VARCHAR2 | N | 200 | NK | Quan hệ với người đề nghị vay chính — nguồn NG_SB_RLOS_COREPAYER_GENERAL.REL_TO_APPLICANT. Đưa vào khóa tự nhiên theo đúng KEY CDC khai trên DS_BANG_202608.xlsx (WI_NAME+REL_TO_APPLICANT+ID_NO_CO) — ID_NO_CO đơn thuần (placeholder Corep1-4) chưa đủ căn cứ đảm bảo không lặp trong cùng hồ sơ |
-| 7 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên đầy đủ — nguồn NG_SB_RLOS_COREPAYER_GENERAL.FULL_NAME |
-| 8 | DATE_OF_BIRTH | DATE | N |  |  | Ngày sinh — nguồn NG_SB_RLOS_COREPAYER_GENERAL.DOB_CO |
-| 9 | NATIONALITY | VARCHAR2 | N | 100 |  | Quốc tịch — nguồn NG_SB_RLOS_COREPAYER_GENERAL.NATIONALITY_CO |
-| 10 | TITLE | VARCHAR2 | N | 30 |  | Danh xưng — LÀM GIÀU (review 2026-09-21, đối xứng với DIM_RLOS_APPLICANT.TITLE, 1.3.1.9) — nguồn NG_SB_RLOS_COREPAYER_GENERAL.TITLE_CO |
-| 11 | HOUSEHOLD | VARCHAR2 | N | 100 |  | Số sổ hộ khẩu — LÀM GIÀU — nguồn NG_SB_RLOS_COREPAYER_GENERAL.HOUSEHOLD |
-| 12 | PHONE_1 | VARCHAR2 | N | 50 |  | Số điện thoại di động chính — LÀM GIÀU (đổi tên PHONE1→PHONE_1 cho nhất quán với DIM_RLOS_APPLICANT) — nguồn NG_SB_RLOS_COREPAYER_GENERAL.PHONE1 |
-| 13 | PHONE_2 | VARCHAR2 | N | 50 |  | Số điện thoại phụ — LÀM GIÀU (đổi tên PHONE2→PHONE_2) — nguồn NG_SB_RLOS_COREPAYER_GENERAL.PHONE2 |
-| 14 | HOME_PHONE | VARCHAR2 | N | 50 |  | Số điện thoại cố định — LÀM GIÀU (đổi tên HOMEPHONE→HOME_PHONE cho nhất quán với DIM_RLOS_APPLICANT) — nguồn NG_SB_RLOS_COREPAYER_GENERAL.HOMEPHONE |
-| 15 | ADD_ID_COREPAYER | VARCHAR2 | N | 500 |  | PHÁI SINH: pivot NG_SB_RLOS_COREP_IDGRID.ID_NUMBER (nối WI_NAME + PIN=ID_NO_CO), lọc ID_TYPE IN ('TCC','CC'), nối chuỗi ";" nếu nhiều |
-| 16 | ADD_ID_OTHER_COREPAYER | VARCHAR2 | N | 1000 |  | PHÁI SINH: pivot NG_SB_RLOS_COREP_IDGRID.ID_NUMBER (nối WI_NAME + PIN=ID_NO_CO), lọc ID_TYPE NOT IN ('TCC','CC'), nối chuỗi ";" nếu nhiều |
-| 17 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
-| 18 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
-
-- Bảng DIM lưu thuộc tính người đồng trả nợ (corepayer) của hồ sơ RLOS, 1 dòng = 1 corepayer của 1 hồ sơ (0..4 dòng/hồ sơ). Phục vụ BC1.
-- Khóa chính của bảng (PK): **DIMENSION_KEY**.
-
-**Làm giàu thêm 5 cột (review 2026-09-21, theo yêu cầu người dùng):**
-`NG_SB_RLOS_COREPAYER_GENERAL` giữ grain ổn định 1 dòng/corepayer (đã
-xác nhận ở trên, business key `WI_NAME+REL_TO_APPLICANT+ID_NO_CO`) — mọi
-cột mô tả còn lại (không phải khóa join/FK, không phải cột không có dữ
-liệu thật) đưa thẳng lên đây an toàn, đối xứng với nhóm liên hệ đã làm
-giàu ở `DIM_RLOS_APPLICANT` (1.3.1.9): `TITLE`, `HOUSEHOLD`, `PHONE_1`,
-`PHONE_2`, `HOME_PHONE`. Không đưa `IS_COREPAYER`/giấy tờ hộ chiếu-visa
-chi tiết (`ISSUE_DATE_ID_CO`...)/`KYC1-9`/`ACCNO`-nhóm (metadata ghi rõ
-"không có dữ liệu trong tập mẫu khảo sát" — không đáng đưa lên), và
-không đưa `AGE` (phái sinh được từ `DATE_OF_BIRTH` đã có, tránh trùng
-lặp 2 nguồn cho cùng 1 sự thật).
-
-**So với thiết kế cũ (tách từ `FCT_LOS_APPLICATION_PARTY` gộp):** thay đổi
-kiến trúc tương tự `DIM_RLOS_APPLICANT` (1.3.1.9). Không gộp chung 1
-`DIM_RLOS_PARTY` với applicant — đã rà soát cấu trúc cột qua RLOS Metadata
-"3. Column Review": `NG_SB_RLOS_COREPAYER_GENERAL` không có nhóm địa
-chỉ/hôn nhân/học vấn mà applicant có, gộp sẽ sinh nhiều cột NULL không
-nhất quán. Grain thực tế (nhiều dòng/hồ sơ) khác ghi chú "1 dòng = 1 hồ
-sơ" trên RLOS Metadata Table Review — xác nhận trực tiếp từ người dùng/BA
-(xem ghi chú Section 1 → 1.3.1.10). Bỏ `PARTY_TYPE` (luôn
-cố định 'COREPAYER'); giữ lại `DATASOURCE` (nay cố định 'RLOS' làm cột kỹ
-thuật đánh dấu nguồn hệ sau khi tách vật lý CLOS/RLOS). Thêm mới `ADD_ID_COREPAYER`/`ADD_ID_OTHER_COREPAYER`
-(pivot từ `FCT_LOS_PARTY_DOCUMENT` cũ, nguồn `NG_SB_RLOS_COREP_IDGRID`
-thay vì `ID_NO_CO` đơn lẻ — xác nhận trực tiếp từ người dùng vì dữ liệu
-`ID_NO_CO` chỉ là placeholder theo Table Review).
-
 ##### 1.3.2 FCT
 
-###### 1.3.2.1 FCT_RLOS_APPLICATION_DAILY
+###### 1.3.2.1 FCT_RLOS_APPLICATION
 
 **Bảng cũ (trước tách):** `FCT_LOS_APPLICATION_DAILY` (93 cột, gộp CLOS+RLOS)
 
@@ -5477,80 +6261,74 @@ thay vì `ID_NO_CO` đơn lẻ — xác nhận trực tiếp từ người dùng
 | 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS |
 | 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
 | 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION. Mặc định -1 nếu không khớp |
-| 5 | CURRENT_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP, bước hồ sơ đang đứng tại ngày DAYID. Mặc định -1 |
-| 6 | LAST_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP của sự kiện hoàn tất gần nhất. Mặc định -1 |
-| 7 | LAST_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_DECISION của sự kiện hoàn tất gần nhất. Mặc định -1 |
-| 8 | LAST_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER của người xử lý sự kiện hoàn tất gần nhất. Mặc định -1 |
-| 9 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_PRODUCT — PHÁI SINH (review 2026-09-21, bổ sung công thức còn thiếu, đối xứng với PRODUCT_SK CLOS cột 9 mục 1.2.2.1): lookup theo PRODUCT_LINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_RLOS_PRODUCT. NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE/SUB_PRODUCT xác nhận tồn tại thật (input/RLOS - Metadata.xlsx, sheet "3. Column Review") — cùng bảng nguồn đã dùng cho POLICY/EMPLOYEE_CODE/COMPANY_CODE trên DIM_RLOS_APPLICATION/ORG_UNIT_SK. Mặc định -1 nếu không khớp |
-| 10 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_ORG_UNIT — PHÁI SINH (review 2026-09-21, cùng lý do nhánh CLOS): lookup theo COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_LOS_ORG_UNIT (Natural Key COMPANY_CODE, 1.1.1) — cùng bảng nguồn NG_SB_RLOS_APPLICANT_GENERAL đã dùng cho POLICY/EMPLOYEE_CODE trên DIM_RLOS_APPLICATION. Mặc định -1 nếu không khớp |
-| 11 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CHANGE_TYPE. Chỉ có giá trị với hồ sơ thay đổi điều kiện phê duyệt, còn lại Unknown -1. Nguồn: NG_SB_RLOS_EXTTABLE.CHANGE_TYPE |
-| 12 | CARD_PROMOTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CARD_PROMOTION. Lookup NG_SB_RLOS_CBS.PROMOTION_ID; hồ sơ không phải thẻ dùng -1 |
-| 13 | RI_USER | VARCHAR2 | N | 100 |  | User khởi tạo hồ sơ (bước RequestInitiate) |
-| 14 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất |
-| 15 | DDE_USER | VARCHAR2 | N | 100 |  | User xử lý bước DetailDataEntry, HOÀN TẤT gần nhất |
-| 16 | QC_USER | VARCHAR2 | N | 100 |  | User xử lý bước DataInputerChecker, HOÀN TẤT gần nhất |
-| 17 | UND_MAKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterMaker, HOÀN TẤT gần nhất |
-| 18 | UND_CHECKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterChecker, HOÀN TẤT gần nhất |
-| 19 | PHV_USER | VARCHAR2 | N | 100 |  | User xử lý bước PhoneVerification, HOÀN TẤT gần nhất |
-| 20 | FA_USER | VARCHAR2 | N | 100 |  | User Chuyên viên Thực địa |
-| 21 | APPROVER_USER | VARCHAR2 | N | 100 |  | User xử lý bước CreditApproval, HOÀN TẤT gần nhất |
-| 22 | COMMITTEE_USER | VARCHAR2 | N | 100 |  | User Hội đồng tín dụng |
-| 23 | HOS_USER | VARCHAR2 | N | 100 |  | User Hỗ trợ phê duyệt |
-| 24 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên |
-| 25 | LAST_UWM_ENTRYDATE | TIMESTAMP | N |  |  | MAX(ENTRYDATE) tại UnderwriterMaker <= DAYID — mốc mở chu kỳ thẩm định hiện hành |
-| 26 | PROCESSED_DATE_UWM | DATE | N |  |  | Ngày chốt chu kỳ thẩm định hiện hành, tính tương đối theo LAST_UWM_ENTRYDATE |
-| 27 | CREATION_DATE | DATE | N |  |  | TRUNC(MIN(ENTRYDATE)) theo WI_NAME |
-| 28 | FIRST_APPROVAL_DATE | DATE | N |  |  | MIN(EXITDATE) tại bước phê duyệt hợp lệ |
-| 29 | LAST_APPROVAL_DATE | DATE | N |  |  | MAX(EXITDATE) tại bước phê duyệt (nhóm quyết định đã định nghĩa) |
-| 30 | MIN_UWM | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại UnderwriterMaker |
-| 31 | MIN_APP | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại CreditApproval/CreditCommittee |
-| 32 | AUTO_CANCEL_DATE | DATE | N |  |  | Ngày hồ sơ bị hệ thống tự động chuyển sang CancelRevoke (do quá 5 ngày làm việc ở bước ĐVKD không bổ sung) — PHÁI SINH theo nguyên văn SRS BC1 (field AUTO_CAN_DATE, review 2026-09-22): MIN(ENTRYDATE) tại WORKSTEP='CancelRevoke' thỏa 1 trong 3 điều kiện OR — (1) dòng CancelRevoke rỗng (USERNAME/EXITDATE/DECISION NULL); (2) từng treo BranchSupport >= 2400 phút làm việc (hàm get_business_minute, loại ngày nghỉ/ngoài giờ hành chính); (3) không có bước hủy thủ công (DECISION='Cancel') trước/cùng lúc vào CancelRevoke. Xác nhận CÓ report dùng trực tiếp (BC1, xem lld/BC1.csv dòng 76) — không phải cột dư thừa |
-| 33 | CANCEL_USER_DATE | DATE | N |  |  | EXITDATE tại bản ghi DECISION='Cancel' và USERNAME khác NULL |
-| 34 | BI_CAN_DATE | DATE | N |  |  | ENTRYDATE tại bước CancelRevoke |
-| 35 | LAST_ENTRYDATE | TIMESTAMP | N |  |  | ENTRYDATE của sự kiện hoàn tất gần nhất |
-| 36 | LAST_EXITDATE | TIMESTAMP | N |  |  | EXITDATE của cùng sự kiện hoàn tất gần nhất |
-| 37 | BI_APPSTATUS | VARCHAR2 | N | 50 |  | Trạng thái hồ sơ chuẩn hóa (Approved/Rejected/Cancelled/Processing) |
-| 38 | HAS_ACTION_IN_DAY | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có phát sinh xử lý trong ngày DAYID |
-| 39 | LAST_ACTION_DATE | DATE | Y |  |  | Ngày business action gần nhất tính đến cuối DAYID |
-| 40 | INACTIVE_DAY_CNT | NUMBER | Y | 5 |  | TRUNC(DAYID) - TRUNC(LAST_ACTION_DATE) |
-| 41 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước (LAG theo ENTRYDATE) |
-| 42 | FLAG_AUTO_CANCEL | VARCHAR2 | N | 10 |  | 'YES'/'NO' theo nguyên văn SRS BC1 field FLAG_AUTO_CAN (review 2026-09-22): AUTO_CAN_DATE IS NOT NULL → 'YES', else 'NO' |
-| 43 | LAST_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của sự kiện hoàn tất gần nhất |
-| 44 | LAST_REMARK_DDE | VARCHAR2 | N | 4000 |  | Ghi chú tại bước DetailDataEntry |
-| 45 | LAST_CAN_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại lần hủy hồ sơ |
-| 46 | HAS_REACHED_DDE | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước DetailDataEntry hay chưa |
-| 47 | HAS_REACHED_QC | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước DataInputerChecker hay chưa |
-| 48 | HAS_REACHED_UWM | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước UnderwriterMaker hay chưa |
-| 49 | HAS_REACHED_UWC | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước UnderwriterChecker hay chưa |
-| 50 | HAS_REACHED_APPROVAL | VARCHAR2 | N | 1 |  | Hồ sơ đã tới bước CreditApproval/CreditCommittee hay chưa |
-| 51 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT |
-| 52 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_TERM |
-| 53 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%) — ép kiểu từ NG_SB_RLOS_CREDIT_PROPOSAL.CURRENT_RATE |
-| 54 | LOAN_TO_VALUE | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị TSBĐ — nguồn NG_SB_RLOS_CREDIT_PROPOSAL(_APP).LOAN_TO_VALUE |
-| 55 | LOAN_OBJECTIVE | VARCHAR2 | N | 200 |  | Mục đích vay — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_OBJECTIVE (hồ sơ thẻ tín dụng: mang nghĩa loại thẻ) |
-| 56 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_CURRENCY |
-| 57 | TOTAL_INCOME | NUMBER | N | 20,2 |  | Tổng thu nhập khách hàng — nguồn NG_SB_RLOS_REPAY_CALC.TOT_INC_CALC |
-| 58 | RETURN_CNT_DATAENTRY | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu nhập liệu (BC8.SL_RETURN_NHAPLIEU) — PHÁI SINH: SUM(CASE WHEN WORKSTEP='DetailDataEntry' AND DECISION='Send_Back' THEN 1 WHEN WORKSTEP='DataInputerChecker' AND DECISION='Additional_Doc_Required' THEN 1 ELSE 0 END) trên NG_SB_RLOS_ENTRY_EXIT, GROUP BY WI_NAME |
-| 59 | RETURN_CNT_UNDERWRITING | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu thẩm định (BC8.SL_RETURN_THAMDINH) — PHÁI SINH: tổng 2 nhánh, mỗi nhánh = SUM(CASE WORKSTEP+DECISION='Additional_Doc_Required' THEN 1 ELSE 0) trên NG_SB_RLOS_ENTRY_EXIT (a) TRỪ COUNT(DISTINCT a.WI_NAME‖RAISED_DATE_TIME) theo điều kiện exception cụ thể trên NG_SB_RLOS_EXCEPTION (b, LEFT JOIN theo WI_NAME — SRS BC8 ghi nhầm NG_SB_CLOS_EXCEPTION cho nhánh RLOS, đã sửa theo đúng hệ): UnderwriterMaker (WORKSTEP='UnderwriterMaker') trừ COUNT DISTINCT khi b.EXCEPTION_NAME='UW-BR-FTR: Gửi dự thảo phê duyệt TD'; UnderwriterChecker (WORKSTEP='UnderwriterChecker') trừ COUNT DISTINCT khi b.EXCEPTION_CATEGORY='CK-BR: Gửi dự thảo về ĐVKD'. GROUP BY WI_NAME |
-| 60 | RETURN_CNT_APPROVAL | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu phê duyệt (BC8.SL_RETURN_PHEDUYET) — PHÁI SINH: SUM(CASE WHEN WORKSTEP IN ('CreditApproval','CreditCommittee') AND DECISION='Additional_Doc_Required' THEN 1 ELSE 0 END) trên NG_SB_RLOS_ENTRY_EXIT, GROUP BY WI_NAME |
-| 61 | SALARYFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lương hay không — nguồn NG_SB_RLOS_REPAYFLAGS.SALARYFLAG |
-| 62 | CARFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê phương tiện hay không — NG_SB_RLOS_REPAYFLAGS.CARFLAG |
-| 63 | HOUSEFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê nhà hay không — NG_SB_RLOS_REPAYFLAGS.HOUSEFLAG |
-| 64 | ENTERPRISSEFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lợi nhuận doanh nghiệp hay không — NG_SB_RLOS_REPAYFLAGS.ENTERPRISSEFLAG (giữ nguyên tên sai chính tả nguồn) |
-| 65 | DIVINGFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cổ tức hay không — NG_SB_RLOS_REPAYFLAGS.DIVINGFLAG (giữ nguyên tên sai chính tả nguồn) |
-| 66 | FAIMILYFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ kinh doanh hộ gia đình hay không — NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG (giữ nguyên tên sai chính tả nguồn) |
-| 67 | NONLICFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ kinh doanh không đăng ký hay không — NG_SB_RLOS_REPAYFLAGS.NONLICFLAG |
-| 68 | WAGESFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ tiền công hay không — NG_SB_RLOS_REPAYFLAGS.WAGESFLAG |
-| 69 | PENSIONFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lương hưu/phụ cấp hay không — NG_SB_RLOS_REPAYFLAGS.PENSIONFLAG |
-| 70 | OTHERFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu khác hay không — NG_SB_RLOS_REPAYFLAGS.OTHERFLAG |
-| 71 | INCOME_SOURCE_CNT | NUMBER | N | 5 |  | Số nguồn thu nhập của hồ sơ — đếm số cờ 'Yes' trong 10 cột trên |
-| 72 | REPAYMENT_SOURCE | VARCHAR2 | N | 500 |  | Danh sách nguồn trả nợ, nối tên tiếng Việt các nguồn thu đang bật |
-| 73 | FLAG_BUSINESS_INCOME | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh hay không (không áp dụng SeAPro/SeALand) — PHÁI SINH đúng nguyên văn SRS BC9 (`BUSINESS_INCOM`): 'YES' nếu (`UPPER(NG_SB_RLOS_EXTTABLE.PRODUCT_NAME) NOT LIKE '%SEAPRO%' AND NOT LIKE '%SEALAND%'`) AND (`NVL(NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG,'No')='Yes' OR NVL(.ENTERPRISSEFLAG,'No')='Yes' OR NVL(.NONLICFLAG,'No')='Yes'`); còn lại 'NO' |
-| 74 | KPI_VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH: theo DECISION nếu đã phê duyệt/từ chối = 1.0; nếu đã CancelRevoke/CancelPermanent thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại NULL. Cùng công thức đã chốt ở AGG_LOS_KPI_APPLICATION.VOLUME (2.1.9), tính từ toàn bộ lịch sử hồ sơ trên FCT_RLOS_WORKSTEP_EVENT |
-| 75 | UNDERWRITERMAKER_TAKERESPON | VARCHAR2 | N | 100 |  | CV Thẩm định chịu trách nhiệm (BC1) — PHÁI SINH theo nguyên văn SRS: COALESCE(CASE WHEN ak.WORK_STEP='UnderwriterMaker' THEN ak.USER_MAKE END, g.UWMAKERUSER) với g=NG_SB_RLOS_EXTTABLE, ak=NG_SB_RLOS_USER_MAKE_WORK_STEP (LEFT JOIN theo WI_NAME=ak.WI_NAME AND WORKSTEP=ak.WORK_STEP). ✅ Bảng nguồn `NG_SB_RLOS_USER_MAKE_WORK_STEP` không có trong `DS_BANG_202608.xlsx` nhưng đã xác nhận tồn tại thật qua `input/RLOS - Metadata.xlsx` (review 2026-09-21, Section 3 dòng #20, dùng chung với nhánh CLOS) |
-| 76 | UNDERWRITERCHECKER_TAKERESPON | VARCHAR2 | N | 100 |  | Kiểm soát thẩm định chịu trách nhiệm (BC1) — PHÁI SINH: cùng cơ chế trên, COALESCE(CASE WHEN ak.WORK_STEP='UnderwriterChecker' THEN ak.USER_MAKE END, g.UWCHKRUSER). Cùng nguồn `NG_SB_RLOS_USER_MAKE_WORK_STEP` đã xác nhận tồn tại thật (Section 3 dòng #20) |
-| 77 | APPROVAL_TAKERESPON | VARCHAR2 | N | 100 |  | Chuyên gia phê duyệt chịu trách nhiệm (BC1) — PHÁI SINH theo nguyên văn SRS: COALESCE(CASE WHEN ak.WORK_STEP IN ('CreditCommittee','CreditApproval') THEN ak.USER_MAKE END, g.CREDAPPRUSER, g.CCOMMITUSER) — khác hẳn công thức CLOS (không hardcode theo APP_GRP, dùng 2 cột fallback CREDAPPRUSER/CCOMMITUSER trên chính NG_SB_RLOS_EXTTABLE thay vì hằng số, xem 1.2.2.1). Cùng nguồn đã xác nhận tồn tại thật, xem Section 3 dòng #20 |
-| 78 | APPLICANT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICANT (1.3.1.9, review 2026-09-17: bổ sung — quan hệ 1:1 với hồ sơ qua WI_NAME, join theo WI_NAME + điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) để lấy đúng phiên bản hiệu lực tại DAYID, không phải business key tĩnh). Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS/applicant — khác T24_CUSTOMER_SK (chân T24) |
+| 5 | CURRENT_WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP_DECISION (review 2026-09-24, đổi DIM đích sau khi gộp DIM — chưa rà soát riêng việc cột này có dư thừa hay không), bước hồ sơ đang đứng tại ngày DAYID. Mặc định -1 |
+| 6 | LAST_WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP_DECISION (review 2026-09-24, gộp từ LAST_WORKSTEP_SK+LAST_DECISION_SK) của sự kiện hoàn tất gần nhất, lookup theo cặp WORKSTEP_CODE+DECISION_CODE của sự kiện đó. Mặc định -1 |
+| 7 | LAST_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER của người xử lý sự kiện hoàn tất gần nhất. Mặc định -1 |
+| 8 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_PRODUCT — PHÁI SINH (review 2026-09-21, bổ sung công thức còn thiếu, đối xứng với PRODUCT_SK CLOS cột 7 mục 1.2.2.1): lookup theo PRODUCT_LINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_RLOS_PRODUCT. NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE/SUB_PRODUCT xác nhận tồn tại thật (input/RLOS - Metadata.xlsx, sheet "3. Column Review") — cùng bảng nguồn đã dùng cho POLICY/EMPLOYEE_CODE/COMPANY_CODE trên DIM_RLOS_APPLICATION/COMPANY_SK. Mặc định -1 nếu không khớp |
+| 9 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY — PHÁI SINH (review 2026-09-21, cùng lý do nhánh CLOS): lookup theo COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_LOS_COMPANY (Natural Key COMPANY_CODE, 1.1.1) — cùng bảng nguồn NG_SB_RLOS_APPLICANT_GENERAL đã dùng cho POLICY/EMPLOYEE_CODE trên DIM_RLOS_APPLICATION. Mặc định -1 nếu không khớp |
+| 10 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CHANGE_TYPE. Chỉ có giá trị với hồ sơ thay đổi điều kiện phê duyệt, còn lại Unknown -1. Nguồn: NG_SB_RLOS_EXTTABLE.CHANGE_TYPE |
+| 11 | CARD_PROMOTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CARD_PROMOTION. Lookup NG_SB_RLOS_CBS.PROMOTION_ID; hồ sơ không phải thẻ dùng -1 |
+| 12 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất |
+| 13 | DDE_USER | VARCHAR2 | N | 100 |  | User xử lý bước DetailDataEntry, HOÀN TẤT gần nhất |
+| 14 | QC_USER | VARCHAR2 | N | 100 |  | User xử lý bước DataInputerChecker, HOÀN TẤT gần nhất |
+| 15 | UND_MAKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterMaker, HOÀN TẤT gần nhất |
+| 16 | UND_CHECKER_USER | VARCHAR2 | N | 100 |  | User xử lý bước UnderwriterChecker, HOÀN TẤT gần nhất |
+| 17 | PHV_USER | VARCHAR2 | N | 100 |  | User xử lý bước PhoneVerification, HOÀN TẤT gần nhất |
+| 18 | APPROVER_USER | VARCHAR2 | N | 100 |  | User xử lý bước CreditApproval, HOÀN TẤT gần nhất |
+| 19 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên |
+| 20 | CREATION_DATE | DATE | N |  |  | TRUNC(MIN(ENTRYDATE)) theo WI_NAME |
+| 21 | LAST_APPROVAL_DATE | DATE | N |  |  | MAX(EXITDATE) tại bước phê duyệt (nhóm quyết định đã định nghĩa) |
+| 22 | MIN_UWM | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại UnderwriterMaker |
+| 23 | MIN_APP | TIMESTAMP | N |  |  | MIN(ENTRYDATE) tại CreditApproval/CreditCommittee |
+| 24 | CANCEL_USER_DATE | DATE | N |  |  | EXITDATE tại bản ghi DECISION='Cancel' và USERNAME khác NULL |
+| 25 | CANCEL_DATE | DATE | N |  |  | ENTRYDATE tại bước CancelRevoke. Input thô giữ nguyên ở SB_DWH — `AUTO_CANCEL_DATE`/`FLAG_AUTO_CANCEL` (business rule dựa trên lịch sử FCT_RLOS_WORKSTEP_EVENT) đã chuyển tính tại PDTD_DTM (review 2026-09-27), xem Section 2 → 2.3.2.1 |
+| 26 | LAST_ENTRYDATE | TIMESTAMP | N |  |  | ENTRYDATE của sự kiện hoàn tất gần nhất |
+| 27 | LAST_EXITDATE | TIMESTAMP | N |  |  | EXITDATE của cùng sự kiện hoàn tất gần nhất |
+| 28 | HAS_ACTION_IN_DAY | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có phát sinh xử lý trong ngày DAYID |
+| 29 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước (LAG theo ENTRYDATE) |
+| 30 | LAST_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của sự kiện hoàn tất gần nhất |
+| 31 | LAST_REMARK_DDE | VARCHAR2 | N | 4000 |  | Ghi chú tại bước DetailDataEntry |
+| 32 | LAST_CAN_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại lần hủy hồ sơ |
+| 33 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT |
+| 34 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_TERM |
+| 35 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%) — ép kiểu từ NG_SB_RLOS_CREDIT_PROPOSAL.CURRENT_RATE |
+| 36 | LOAN_TO_VALUE | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị TSBĐ — nguồn NG_SB_RLOS_CREDIT_PROPOSAL(_APP).LOAN_TO_VALUE |
+| 37 | LOAN_OBJECTIVE | VARCHAR2 | N | 200 |  | Mục đích vay — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_OBJECTIVE (hồ sơ thẻ tín dụng: mang nghĩa loại thẻ) |
+| 38 | TOTAL_INCOME | NUMBER | N | 20,2 |  | Tổng thu nhập khách hàng — nguồn NG_SB_RLOS_REPAY_CALC.TOT_INC_CALC |
+| 39 | RETURN_CNT_DATAENTRY | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu nhập liệu (BC8.SL_RETURN_NHAPLIEU) — PHÁI SINH: SUM(CASE WHEN WORKSTEP='DetailDataEntry' AND DECISION='Send_Back' THEN 1 WHEN WORKSTEP='DataInputerChecker' AND DECISION='Additional_Doc_Required' THEN 1 ELSE 0 END) trên NG_SB_RLOS_ENTRY_EXIT, GROUP BY WI_NAME |
+| 40 | RETURN_CNT_UNDERWRITING | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu thẩm định (BC8.SL_RETURN_THAMDINH) — PHÁI SINH: tổng 2 nhánh, mỗi nhánh = SUM(CASE WORKSTEP+DECISION='Additional_Doc_Required' THEN 1 ELSE 0) trên NG_SB_RLOS_ENTRY_EXIT (a) TRỪ COUNT(DISTINCT a.WI_NAME‖RAISED_DATE_TIME) theo điều kiện exception cụ thể trên NG_SB_RLOS_EXCEPTION (b, LEFT JOIN theo WI_NAME — SRS BC8 ghi nhầm NG_SB_CLOS_EXCEPTION cho nhánh RLOS, đã sửa theo đúng hệ): UnderwriterMaker (WORKSTEP='UnderwriterMaker') trừ COUNT DISTINCT khi b.EXCEPTION_NAME='UW-BR-FTR: Gửi dự thảo phê duyệt TD'; UnderwriterChecker (WORKSTEP='UnderwriterChecker') trừ COUNT DISTINCT khi b.EXCEPTION_CATEGORY='CK-BR: Gửi dự thảo về ĐVKD'. GROUP BY WI_NAME |
+| 41 | RETURN_CNT_APPROVAL | NUMBER | N | 5 |  | Số lần hồ sơ bị trả về ở khâu phê duyệt (BC8.SL_RETURN_PHEDUYET) — PHÁI SINH: SUM(CASE WHEN WORKSTEP IN ('CreditApproval','CreditCommittee') AND DECISION='Additional_Doc_Required' THEN 1 ELSE 0 END) trên NG_SB_RLOS_ENTRY_EXIT, GROUP BY WI_NAME |
+| 42 | SALARYFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lương hay không — nguồn NG_SB_RLOS_REPAYFLAGS.SALARYFLAG |
+| 43 | CARFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê phương tiện hay không — NG_SB_RLOS_REPAYFLAGS.CARFLAG |
+| 44 | HOUSEFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê nhà hay không — NG_SB_RLOS_REPAYFLAGS.HOUSEFLAG |
+| 45 | ENTERPRISSEFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lợi nhuận doanh nghiệp hay không — NG_SB_RLOS_REPAYFLAGS.ENTERPRISSEFLAG (giữ nguyên tên sai chính tả nguồn) |
+| 46 | DIVINGFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cổ tức hay không — NG_SB_RLOS_REPAYFLAGS.DIVINGFLAG (giữ nguyên tên sai chính tả nguồn) |
+| 47 | FAIMILYFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ kinh doanh hộ gia đình hay không — NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG (giữ nguyên tên sai chính tả nguồn) |
+| 48 | NONLICFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ kinh doanh không đăng ký hay không — NG_SB_RLOS_REPAYFLAGS.NONLICFLAG |
+| 49 | WAGESFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ tiền công hay không — NG_SB_RLOS_REPAYFLAGS.WAGESFLAG |
+| 50 | PENSIONFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lương hưu/phụ cấp hay không — NG_SB_RLOS_REPAYFLAGS.PENSIONFLAG |
+| 51 | OTHERFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu khác hay không — NG_SB_RLOS_REPAYFLAGS.OTHERFLAG |
+| 52 | INCOME_SOURCE_CNT | NUMBER | N | 5 |  | Số nguồn thu nhập của hồ sơ — đếm số cờ 'Yes' trong 10 cột trên |
+| 53 | REPAYMENT_SOURCE | VARCHAR2 | N | 500 |  | Danh sách nguồn trả nợ, nối tên tiếng Việt các nguồn thu đang bật |
+| 54 | FLAG_BUSINESS_INCOME | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh hay không (không áp dụng SeAPro/SeALand) — PHÁI SINH đúng nguyên văn SRS BC9 (`BUSINESS_INCOM`): 'YES' nếu (`UPPER(NG_SB_RLOS_EXTTABLE.PRODUCT_NAME) NOT LIKE '%SEAPRO%' AND NOT LIKE '%SEALAND%'`) AND (`NVL(NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG,'No')='Yes' OR NVL(.ENTERPRISSEFLAG,'No')='Yes' OR NVL(.NONLICFLAG,'No')='Yes'`); còn lại 'NO' |
+| 55 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | Input thô (review 2026-09-27, đổi tên từ UNDERWRITERMAKER_TAKERESPON — business rule COALESCE chuyển tính tại PDTD_DTM, cùng cơ chế đã áp dụng cho CLOS): COALESCE(CASE WHEN ak.WORK_STEP='UnderwriterMaker' THEN ak.USER_MAKE END, g.UWMAKERUSER) với g=NG_SB_RLOS_EXTTABLE, ak=NG_SB_RLOS_USER_MAKE_WORK_STEP (LEFT JOIN theo WI_NAME=ak.WI_NAME AND WORKSTEP=ak.WORK_STEP). ✅ Bảng nguồn `NG_SB_RLOS_USER_MAKE_WORK_STEP` không có trong `DS_BANG_202608.xlsx` nhưng đã xác nhận tồn tại thật qua `input/RLOS - Metadata.xlsx` (review 2026-09-21, Section 3 dòng #20, dùng chung với nhánh CLOS) |
+| 56 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | Input thô (review 2026-09-27, đổi tên từ UNDERWRITERCHECKER_TAKERESPON, cùng lý do trên): COALESCE(CASE WHEN ak.WORK_STEP='UnderwriterChecker' THEN ak.USER_MAKE END, g.UWCHKRUSER). Cùng nguồn `NG_SB_RLOS_USER_MAKE_WORK_STEP` đã xác nhận tồn tại thật (Section 3 dòng #20) |
+| 57 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | Input thô (review 2026-09-27, đổi tên từ APPROVAL_TAKERESPON, cùng lý do trên): COALESCE(CASE WHEN ak.WORK_STEP IN ('CreditCommittee','CreditApproval') THEN ak.USER_MAKE END, g.CREDAPPRUSER, g.CCOMMITUSER) — khác hẳn công thức CLOS (không hardcode theo APP_GRP, dùng 2 cột fallback CREDAPPRUSER/CCOMMITUSER trên chính NG_SB_RLOS_EXTTABLE thay vì hằng số, xem 1.2.2.1). Cùng nguồn đã xác nhận tồn tại thật, xem Section 3 dòng #20 |
+| 58 | CHANGE_REQUEST | VARCHAR2 | N | 200 |  | Yêu cầu điều chỉnh hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.REQ_TYPE. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-25) — bản chất "thay đổi thường xuyên" theo hồ sơ, không phù hợp cột ổn định SCD2 của DIM |
+| 59 | CHANGE_TYPE | VARCHAR2 | N | 500 |  | Loại thay đổi điều kiện phê duyệt — nguồn NG_SB_RLOS_EXTTABLE.CHANGE_TYPE, giữ nguyên giá trị thô. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-25), cùng lý do cột 58. Dùng làm khóa either/or với PRODUCT_LINE khi tra cam kết SLA ở PDTD_DTM (xem 2.3.1.1) — khác CHANGE_TYPE_SK (cột 10, trỏ DIM_RLOS_CHANGE_TYPE để lấy tên/chi tiết chuẩn hóa cho BC1) |
+| 60 | C_PHONE_CREATE_FLAG | VARCHAR2 | N | 20 |  | Cờ đánh dấu hồ sơ có phát sinh nhánh phụ Xác minh điện thoại — nguồn NG_SB_RLOS_EXTTABLE.C_PHONE_CREATE_FLAG. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30, theo yêu cầu người dùng) — cùng lý do CHANGE_REQUEST/CHANGE_TYPE (cột 58-59): cờ set-tại-chỗ theo sự kiện, không phù hợp cột ổn định SCD2 của DIM. Thiết kế dư thừa |
+| 61 | C_PHONE_DELETE_FLAG | VARCHAR2 | N | 10 |  | Cờ đánh dấu nhánh phụ Xác minh điện thoại đã được xóa/hủy — nguồn NG_SB_RLOS_EXTTABLE.C_PHONE_DELETE_FLAG. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 62 | C_FI_CREATE_FLAG | VARCHAR2 | N | 20 |  | Cờ đánh dấu hồ sơ có phát sinh nhánh phụ Thẩm định thực địa — nguồn NG_SB_RLOS_EXTTABLE.C_FI_CREATE_FLAG. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 63 | C_FI_DELETE_FLAG | VARCHAR2 | N | 10 |  | Cờ đánh dấu nhánh phụ Thẩm định thực địa đã được xóa/hủy — nguồn NG_SB_RLOS_EXTTABLE.C_FI_DELETE_FLAG. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 64 | C_LEGAL_CREATE_FLAG | VARCHAR2 | N | 20 |  | Cờ đánh dấu hồ sơ có phát sinh nhánh phụ Thẩm định pháp chế — nguồn NG_SB_RLOS_EXTTABLE.C_LEGAL_CREATE_FLAG. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 65 | C_LEGAL_DELETE_FLAG | VARCHAR2 | N | 10 |  | Cờ đánh dấu nhánh phụ Thẩm định pháp chế đã được xóa/hủy — nguồn NG_SB_RLOS_EXTTABLE.C_LEGAL_DELETE_FLAG. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 66 | REINITIATE | VARCHAR2 | N | 5 |  | Cờ đánh dấu hồ sơ đang ở luồng khởi tạo lại (ReInitiate) sau khi bị từ chối — nguồn NG_SB_RLOS_EXTTABLE.REINITIATE. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 67 | NORMALBRHOLD | VARCHAR2 | N | 10 |  | Cờ tạm giữ (hold) hồ sơ tại bước ký hợp đồng, hồ sơ không công chứng — nguồn NG_SB_RLOS_EXTTABLE.NORMALBRHOLD. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 68 | REGBRHOLD | VARCHAR2 | N | 10 |  | Cờ tạm giữ (hold) hồ sơ tại bước ký hợp đồng, hồ sơ có công chứng — nguồn NG_SB_RLOS_EXTTABLE.REGBRHOLD. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 69 | STP_FLAG | VARCHAR2 | N | 50 |  | Cờ xử lý tự động (Straight-Through Processing) — nguồn NG_SB_RLOS_EXTTABLE.STP_FLAG. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 70 | ELIGIBLE | VARCHAR2 | N | 100 |  | Cờ đủ điều kiện — nguồn NG_SB_RLOS_EXTTABLE.ELIGIBLE. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30), cùng lý do cột 60. Thiết kế dư thừa |
+| 71 | TOTALNONELIGIBLE | VARCHAR2 | N | 5 |  | Số lượng điều kiện không đủ tiêu chuẩn ghi nhận trên hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.TOTALNONELIGIBLE. Chuyển từ DIM_RLOS_APPLICATION (review 2026-09-30, theo yêu cầu người dùng) — cùng lý do các cột dư thừa khác đã chuyển: set-tại-chỗ trên EXTTABLE, phù hợp grain ngày hơn SCD2 của DIM. Thiết kế dư thừa |
+| 72 | CANCEL_REASON | VARCHAR2 | N | 500 |  | Lý do hủy hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.REASON (đổi tên REASON→CANCEL_REASON cho rõ nghĩa, review 2026-09-30, theo yêu cầu người dùng), rất ít khi có dữ liệu. Chuyển từ DIM_RLOS_APPLICATION, đặt cạnh CANCEL_DATE (cột 25) — cùng ngữ cảnh nghiệp vụ hủy hồ sơ. Thiết kế dư thừa |
 
 - Bảng FACT xương sống, lưu ảnh trạng thái cuối ngày của hồ sơ RLOS kèm chỉ tiêu lũy kế, phục vụ BC1, BC3, BC4, BC5, BC6, BC8, BC9, BC10.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME**.
@@ -5563,25 +6341,110 @@ column-optimization rule: `PROPOSED_AMT`, `CREDIT_LIMIT_APPROVAL`,
 (do loại bỏ `DIM_RLOS_APPROVAL_GROUP`, `APP_GRP` nay đọc qua JOIN
 `APPLICATION_SK` sang `DIM_RLOS_APPLICATION`, xem 1.3.1.1); thêm bỏ
 `FLAG_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE` (cùng lý do đã đánh
-giá ở `FCT_CLOS_APPLICATION_DAILY`, 1.2.2.1 — chỉ phục vụ `BC7`, đúng grain
+giá ở `FCT_CLOS_APPLICATION`, 1.2.2.1 — chỉ phục vụ `BC7`, đúng grain
 của `FCT_RLOS_EXCEPTION` chứ không phải grain hồ sơ/ngày của bảng này, dời
 sang tính trực tiếp tại `FCT_RLOS_EXCEPTION` khi thiết kế bảng đó); thêm bỏ
 `DEVIATION_CNT`, `COLLATERAL_CNT` + 9 cột `COLLATERAL_CNT_*` (cùng lý do
-đã đánh giá ở `FCT_CLOS_APPLICATION_DAILY`, 1.2.2.1 — chỉ là cột kỹ thuật
+đã đánh giá ở `FCT_CLOS_APPLICATION`, 1.2.2.1 — chỉ là cột kỹ thuật
 trung gian, không báo cáo nào dùng trực tiếp tên cột; các cờ/chỉ tiêu
 tiêu thụ tính trực tiếp từ `FCT_RLOS_COLLATERAL`/`FCT_RLOS_DEVIATION` ở
 tầng report/OAS); thêm mới `WORKSTEP_FLAG` (đóng PENDING #6) và
 `UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/
 `APPROVAL_TAKERESPON` (review 2026-09-15, theo đúng nguyên văn SRS BC1,
 xem ghi chú công thức tại 1.2.2.1) — tổng 79 cột (giảm 15 so với bản
-gộp, cộng thêm `APPLICANT_SK` bổ sung review 2026-09-17), **nay 78 cột
-(review 2026-09-21):** đã bỏ `WORKSTEP_FLAG` khỏi bảng này — cùng lý do
+gộp, cộng thêm `APPLICANT_SK` bổ sung review 2026-09-17), rồi 78 cột
+(review 2026-09-21): đã bỏ `WORKSTEP_FLAG` khỏi bảng này — cùng lý do
 đã áp dụng cho nhánh CLOS (1.2.2.1), chỉ phục vụ BC4 và BC4 đã đổi sang
 đọc bản trên `FCT_RLOS_WORKSTEP_EVENT` (1.3.2.7). Giữ trọn `CHANGE_
 TYPE_SK` (trỏ `DIM_RLOS_CHANGE_TYPE` thật sự tồn tại) và mọi cột đặc
 thù cá nhân (`CARD_PROMOTION_SK`, 10 cột `*FLAG`, `REPAYMENT_SOURCE`,
-`LOAN_TO_VALUE`...) mà không cần luôn NULL cho phía CLOS — đã đánh số
-lại STT liên tục 1-78 cho các cột còn lại.
+`LOAN_TO_VALUE`...) mà không cần luôn NULL cho phía CLOS, 77 cột
+sau khi gộp `LAST_WORKSTEP_SK`+`LAST_DECISION_SK` thành 1
+`LAST_WORKSTEP_DECISION_SK` (review 2026-09-24, theo quyết định gộp
+`DIM_RLOS_WORKSTEP`+`DIM_RLOS_DECISION` — xem 1.3.1.3; `CURRENT_
+WORKSTEP_SK` giữ nguyên, chỉ đổi DIM đích) — đã đánh số lại STT liên
+tục 1-77 cho các cột còn lại. **79 cột (review 2026-09-25):** bổ
+sung `CHANGE_REQUEST`/`CHANGE_TYPE` (giá trị thô — chuyển từ
+`DIM_RLOS_APPLICATION`, xem 1.3.1.1) — bản chất "thay đổi thường xuyên"
+theo hồ sơ phù hợp grain ngày của bảng này hơn là SCD2 của DIM. **Nay 78
+cột (review 2026-09-26):** bỏ `APPLICANT_SK` — `DIM_RLOS_APPLICANT` đã
+đổi thành `FCT_RLOS_CUSTOMER` (grain giấy tờ, 1.3.2.8), không còn 1:1
+hồ sơ↔applicant để giữ 1 FK duy nhất ở đây (xem ghi chú Section 1 →
+1.3.2.1). `CHANGE_REQUEST`/`CHANGE_TYPE` đánh số lại thành cột 77-78 lúc
+đó (nay là cột 74-75 sau khi bỏ tiếp 3 cột business rule, xem ghi chú
+ngay dưới).
+
+**Chuyển 6 cột business rule sang PDTD_DTM, đổi 3 cột `*_TAKERESPON`
+thành `*_USERMAKE` thô (review 2026-09-27, theo yêu cầu người dùng —
+đồng bộ RLOS theo đúng pattern đã áp dụng cho CLOS 1.2.2.1):** rà soát
+toàn bộ cột phát hiện `AUTO_CANCEL_DATE`/`APPLICATION_STATUS`/
+`FLAG_AUTO_CANCEL`/`UNDERWRITERMAKER_TAKERESPON`/
+`UNDERWRITERCHECKER_TAKERESPON`/`APPROVAL_TAKERESPON` đều là công thức
+CASE WHEN/COALESCE theo business rule SRS BC1, vi phạm nguyên tắc
+"SB_DWH ảnh chụp sạch nguồn, PDTD_DTM chuẩn hóa/tính business rule" —
+trước đây RLOS chưa được đồng bộ theo quyết định đã áp dụng cho CLOS
+(review 2026-09-26). Đã chuyển hẳn cả 3 công thức sang tính tại PDTD_DTM
+(xem Section 2 → 2.3.2.1) — dữ liệu thô cần thiết (`CANCEL_DATE`,
+`LAST_WORKSTEP_DECISION_SK`+`DIM_RLOS_WORKSTEP_DECISION`, lịch sử
+`ENTRYDATE`/`EXITDATE`/`WORKSTEP_CODE`/`DECISION_CODE` trên
+`FCT_RLOS_WORKSTEP_EVENT`) đã có sẵn, không cần thêm cột thô mới nào
+ngoài việc đổi tên 3 cột `*_TAKERESPON` (giữ nguyên công thức COALESCE
+hiện có làm input thô) thành `*_USERMAKE`. `AUTO_CAN_DATE` (BC1) — xác
+nhận CÓ report dùng trực tiếp (`lld/BC1.csv` dòng 76), nên
+`AUTO_CANCEL_DATE` chuyển nguyên công thức 3 nhánh OR sang PDTD_DTM
+cùng `FLAG_AUTO_CANCEL` (phụ thuộc nó), không chỉ xóa. **Còn lại 75
+cột** (giảm 3 so với 78 cột trước: xóa `AUTO_CANCEL_DATE`/
+`APPLICATION_STATUS`/`FLAG_AUTO_CANCEL`, đổi tên 3 cột `*_TAKERESPON` giữ
+nguyên số lượng).
+
+**Nay 86 cột (review 2026-09-30, theo yêu cầu người dùng):** nhận thêm
+11 cột cờ nhánh phụ/trạng thái từ `DIM_RLOS_APPLICATION` (cột 76-86:
+`C_PHONE_CREATE_FLAG`/`C_PHONE_DELETE_FLAG`/`C_FI_CREATE_FLAG`/
+`C_FI_DELETE_FLAG`/`C_LEGAL_CREATE_FLAG`/`C_LEGAL_DELETE_FLAG`/
+`REINITIATE`/`NORMALBRHOLD`/`REGBRHOLD`/`STP_FLAG`/`ELIGIBLE`) — cùng
+lý do đã áp dụng cho `CHANGE_REQUEST`/`CHANGE_TYPE` (cột 74-75): cờ
+set-tại-chỗ theo sự kiện, không phù hợp cột ổn định SCD2 của DIM, phù
+hợp grain ngày của bảng này hơn. Không đổi công thức/nguồn (vẫn đọc
+trực tiếp `NG_SB_RLOS_EXTTABLE`), chỉ đổi bảng chứa. Xem giải trình đầy
+đủ tại Section 1 → 1.3.1.1.
+
+**Nay 72 cột (review 2026-09-30, lượt tiếp theo, theo yêu cầu người
+dùng):** rà soát toàn bộ cột "Thiết kế dư thừa" còn lại, xác nhận qua
+đối chiếu chéo SRS gốc (BC1/BC3/BC4/BC9 — đọc trực tiếp docx, không chỉ
+qua HLD tóm tắt) — xóa 16 cột dư thừa thật:
+- `RI_USER`/`FA_USER`/`COMMITTEE_USER`/`HOS_USER` — SRS BC1 (RLOS)
+  không định nghĩa field tương ứng (7 field User thật của BC1 đã giữ đủ:
+  BRANCH_USER/DDE_USER/QC_USER/UND_MAKER_USER/UND_CHECKER_USER/
+  PHV_USER/APPROVER_USER); người dùng ban đầu nhớ nhầm sang bản CLOS
+  (BC2 dùng RI_USER/FA_USER/HOS_USER trên `FCT_CLOS_APPLICATION`, khác
+  bảng) — riêng COMMITTEE_USER có field tương đương ở BC3 (BI_COMMITTEE)
+  nhưng lấy từ `FCT_RLOS_WORKSTEP_EVENT.USERNAME`, không qua cột này.
+- `LAST_UWM_ENTRYDATE`/`PROCESSED_DATE_UWM` — ghi chú lịch sử review
+  2026-09-24 xác nhận nhãn cũ "phục vụ BC4.REPORT_DATE" đã lỗi thời, BC4
+  thực đổi nguồn sang `FCT_RLOS_WORKSTEP_EVENT.PROCESSED_DATE`.
+- `FIRST_APPROVAL_DATE` — SRS chỉ có `LAST_APPROVAL_DATE` (giữ đúng),
+  không có field "phê duyệt lần đầu".
+- `LAST_ACTION_DATE`/`INACTIVE_DAY_CNT` — không tìm thấy field liên
+  quan ở bất kỳ SRS BC1-BC11 nào.
+- `CURRENCY_CODE` — SRS BC3 có field CURRENCY nhưng đã tính độc lập tại
+  `FCT_RLOS_WORKSTEP_EVENT.CURRENCY_CODE` (cột riêng, không JOIN qua
+  bảng này).
+- `HAS_REACHED_DDE`/`HAS_REACHED_QC`/`HAS_REACHED_UWM`/`HAS_REACHED_UWC`/
+  `HAS_REACHED_APPROVAL` — từng là điều kiện lọc chính thức của BC4 và
+  input công thức KPI_VOLUME gốc (thiết kế `FCT_LOS_APPLICATION_DAILY`
+  cũ), nhưng thiết kế RLOS hiện tại đã refactor thay bằng EXISTS/JOIN
+  trực tiếp trên `FCT_RLOS_WORKSTEP_EVENT` — dư thừa sau refactor, không
+  phải "chưa từng dùng".
+- `KPI_VOLUME` — SRS BC9 có công thức VOLUME đầy đủ (đúng nguyên văn),
+  nhưng đã chuyển hẳn sang `AGG_LOS_KPI_APPLICATION.VOLUME` (tính độc
+  lập từ UNION `FCT_CLOS/RLOS_WORKSTEP_EVENT`, không JOIN đọc lại cột
+  này).
+
+Giữ lại `CURRENT_WORKSTEP_SK`(cột 5)/`LAST_USER_SK`(cột 7) theo yêu cầu
+người dùng dù cũng đánh dấu dư thừa. Đồng thời nhận thêm 2 cột từ
+`DIM_RLOS_APPLICATION` (cột 71-72): `TOTALNONELIGIBLE` (nguyên trạng) và
+`REASON`→`CANCEL_REASON` (đổi tên, đặt cạnh `CANCEL_DATE` cột 25) — xem
+1.3.1.1.
 
 **Đóng PENDING #6 — công thức `WORKSTEP_FLAG` (nhánh RLOS, lịch sử thiết
 kế, nay cột này đã bỏ khỏi bảng — xem ghi chú "Nay 78 cột" ở trên; công
@@ -5598,33 +6461,16 @@ c.CREATEDBY NOT IN ('10000380','10000020','10000420','10000140',
 5. `a.WORKSTEP='UnderwriterMaker' AND a.DECISION IN ('Legal_Assessment','Additional_Doc_Required','Send_Back','Send_Back to DDE','Send Back DataInputerChecker','Send To Legal or FI or Phone Verification')` → 'Hồ sơ CVTĐ đã xử lý nhưng chuyển/trả lại các bộ phận để bổ sung/làm rõ'.
 Không khớp nhánh nào → NULL.
 
-###### 1.3.2.2 FCT_RLOS_APPLICATION_PARTY
+###### 1.3.2.2 FCT_RLOS_APPLICATION_PARTY — ĐÃ XÓA (review 2026-09-26, theo yêu cầu người dùng)
 
-**Bảng cũ (trước tách):** `FCT_LOS_APPLICATION_PARTY` (20 cột, gộp CLOS+RLOS) — thay đổi kiến trúc, không còn giữ thuộc tính mô tả (đã chuyển sang DIM_RLOS_APPLICANT/DIM_RLOS_COREPAYER), chỉ còn là factless-fact liên kết
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS |
-| 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
-| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION. Mặc định -1 |
-| 5 | APPLICANT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICANT. Mặc định -1 |
-| 6 | COREPAYER_SK | NUMBER | Y | 18 | PK | Khóa tới DIM_RLOS_COREPAYER. Mặc định -1 (Unknown) nếu hồ sơ không có corepayer nào |
-
-- Bảng FACT quan hệ (factless fact), thể hiện quan hệ 1 hồ sơ × 1 applicant × N corepayer. Phục vụ BC1.
-- Khóa chính của bảng (PK): **DAYID, WI_NAME, COREPAYER_SK**.
-
-**So với thiết kế cũ (`FCT_LOS_APPLICATION_PARTY` gộp, 20 cột):** thay đổi
-kiến trúc hoàn toàn — bỏ toàn bộ cột thuộc tính mô tả (`FULL_NAME`,
-`DATE_OF_BIRTH`, `GENDER`, `MARRIAGE_STATUS`, `EDUCATION_LEVEL`,
-`VEHICLE`, `PERM_ADDRESS`, `CURR_HOUSE_NO`, `CURR_WARD`, `GEO_SK`,
-`REL_TO_APPLICANT`, `PARTY_TYPE`, `PARTY_ROLE_CODE`,
-`ORG_LEGAL_ID`, `OBJ_TYPE` — đã chuyển hết sang `DIM_RLOS_APPLICANT`/
-`DIM_RLOS_COREPAYER`, xem 1.3.1.9, 1.3.1.10); giữ lại `DATASOURCE` (nay
-cố định 'RLOS' làm cột kỹ thuật đánh dấu nguồn hệ sau khi tách vật lý
-CLOS/RLOS). Thêm mới `APPLICANT_SK`,
-`COREPAYER_SK` — tổng 6 cột (giảm 14 so với bản gộp), grain đổi từ "1
-người liên quan/hồ sơ" thành "1 corepayer/hồ sơ" (factless liên kết).
+**Đã xóa hẳn bảng này** — xem lý do đầy đủ tại Section 1 → 1.3.2.2:
+sau khi `DIM_RLOS_APPLICANT`/`DIM_RLOS_COREPAYER` đều đổi thành FACT
+(`FCT_RLOS_CUSTOMER`/`FCT_RLOS_COREPAYER`), bảng liên kết này mất cả
+`APPLICANT_SK` lẫn `COREPAYER_SK`, chỉ còn `DAYID+WI_NAME+DATASOURCE+
+APPLICATION_SK` — trùng lặp hoàn toàn với `FCT_RLOS_APPLICATION`
+(1.3.2.1), không còn lý do tồn tại. Giữ lại số hiệu `1.3.2.2` như một
+mục rỗng trỏ chuyển tiếp, không xóa số để không làm lệch số các bảng FCT
+khác trong nhóm RLOS.
 
 ###### 1.3.2.3 FCT_RLOS_COLLATERAL
 
@@ -5678,49 +6524,53 @@ Giữ nguyên toàn bộ 9 cột đặc thù RLOS, bổ sung mới `TYPES_OF_COL
 — đã loại bỏ hẳn DIM này, xem Section 3; `COLLATERAL_TYPE_CODE` đã có sẵn
 trực tiếp trên fact này) — tổng 21 cột.
 
-###### 1.3.2.4 FCT_RLOS_SUB_PRODUCT
+###### 1.3.2.4 FCT_RLOS_SUB_PRODUCT — ⚠️ review 2026-09-27: sửa lại cơ chế nạp cho khớp SRS BC1 BR 1.2 (xem Section 1 → 1.3.2.4)
 
 **Bảng cũ (trước tách):** `FCT_LOS_SUB_PRODUCT` (11 cột, đã là RLOS-only — cột `DATASOURCE` gốc luôn ghi 'RLOS')
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
-| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS — nguồn NG_SB_RLOS_SUB_PRODUCT.WI_NAME và WI_NAME của 5 bảng sản phẩm phụ |
-| 3 | SUB_PRODUCT_TYPE_CODE | VARCHAR2 | Y | 30 | PK | Mã LOẠI sản phẩm phụ do DWH chuẩn hóa — PHÁI SINH: gán theo bảng nguồn mà dòng đến từ đó, đúng điều kiện lọc SRS BC1 (BR 1.2): `NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE` = 'SeACivil'→CIVIL, 'SeATeacher'→TEACHER, 'SeAWoman'→WOMAN, 'SeABuy'→SEABUY, 'Thẻ tín dụng'→CREDIT_CARD (giá trị cụ thể theo từng nhóm, không chỉ đơn thuần "dòng có mặt ở bảng nào"). Đổi tên từ SUB_PRODUCT_CODE gốc để tránh trùng nghĩa với DIM_RLOS_PRODUCT.SUB_PRODUCT_CODE (sản phẩm nhánh của sản phẩm chính) |
-| 4 | SUB_PRODUCT_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của 1 lần đăng ký sản phẩm phụ — PHÁI SINH: với NG_SB_RLOS_SEABUY_APP/TEACHER_APP/WOMAN_APP (khai khóa CDC=WI_NAME) dùng thẳng khóa nguồn; với NG_SB_RLOS_SUB_PRODUCT/CREDIT_CARD_APP/CIVIL_APP/SENT_CBS_LOG (không khai khóa CDC) dùng STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB (loại trừ COMMENT_CO, REQUEST), cộng DATASOURCE và tên bảng nguồn |
-| 5 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
-| 6 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
-| 7 | SUB_PRODUCT_LINE | VARCHAR2 | N | 200 |  | Dòng của sản phẩm phụ — nguồn NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE. Trường SAN_PHAM_PHU của BC1 |
-| 8 | SPP_AMOUNT | NUMBER | N | 20,2 |  | Hạn mức của sản phẩm phụ — UNION LIMIT_NO của 5 bảng (CREDIT_CARD_APP/SEABUY_APP/CIVIL_APP/TEACHER_APP/WOMAN_APP). Ép kiểu số từ text định dạng Việt Nam, DEFAULT NULL ON CONVERSION ERROR. Trường SPP_Amount của BC1 |
-| 9 | SPP_TERM | NUMBER | N | 5 |  | Thời hạn của sản phẩm phụ, đơn vị tháng — CREDIT_CARD_APP.TERM; SEABUY_APP/CIVIL_APP/TEACHER_APP/WOMAN_APP.TIME_VALID. Trường SPP_Term của BC1 |
-| 10 | CARD_TYPE_CODE | VARCHAR2 | N | 100 |  | Loại thẻ đăng ký lúc đề xuất sản phẩm phụ là thẻ tín dụng — nguồn NG_SB_RLOS_CREDIT_CARD_APP.CARD_TYPE. Chỉ có ở dòng SUB_PRODUCT_TYPE_CODE='CREDIT_CARD'. Là khái niệm khác BC1.K_TYPE (loại thẻ thật sau giải ngân, nguồn STG_DIM_CARD.K_TYPE, join qua NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID = STG_DIM_CARD.MAIN_ID, không đi qua bảng này) — không dùng để tra BC1.K_TYPE |
+| 2 | SUB_PRODUCT_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của 1 lần đăng ký sản phẩm phụ — PHÁI SINH (review 2026-09-27, sửa lại): `NG_SB_RLOS_SUB_PRODUCT` không khai KEY CDC (`input/DS_BANG_202608.xlsx` rỗng), vẫn phải hash: STANDARD_HASH(WI_NAME \|\| '~' \|\| SUB_PRODUCT_LINE \|\| '~' \|\| NVL(TO_CHAR(SPP_AMOUNT),'<NULL>') \|\| '~' \|\| NVL(TO_CHAR(SPP_TERM),'<NULL>') \|\| '~' \|\| DATASOURCE, 'SHA256') — hash cặp khóa driving table (WI_NAME+SUB_PRODUCT_LINE) cộng 2 giá trị đã JOIN bổ sung (SPP_AMOUNT/SPP_TERM) để phân biệt nhiều dòng thẻ phụ nhân ra khi LEFT JOIN CREDIT_CARD_APP khớp nhiều thẻ/hồ sơ. Không hash CARD_TYPE_CODE (luôn NULL với 4 nhóm không phải thẻ, không đủ phân biệt 2 thẻ cùng loại) và không hash toàn bộ cột của 5 bảng grid như bản gốc ban đầu (chúng chỉ là JOIN bổ sung, không phải thành phần định danh dòng). Rủi ro đụng độ (2 thẻ phụ cùng hồ sơ trùng cả SPP_AMOUNT lẫn SPP_TERM) — CHẤP NHẬN theo quyết định người dùng. Tự thân đủ đảm bảo duy nhất — PK chỉ cần DAYID + SUB_PRODUCT_BK, không cần thêm WI_NAME/SUB_PRODUCT_LINE làm thành phần PK riêng (review 2026-09-27, theo yêu cầu người dùng) |
+| 3 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng RLOS — nguồn NG_SB_RLOS_SUB_PRODUCT.WI_NAME (driving table, review 2026-09-27) |
+| 4 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
+| 5 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
+| 6 | SUB_PRODUCT_LINE | VARCHAR2 | N | 200 |  | Dòng của sản phẩm phụ — nguồn NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE (driving table). Trường SAN_PHAM_PHU của BC1 — 5 giá trị khả dĩ ('SeABuy'/'SeACivil'/'SeATeacher'/'SeAWoman'/'Thẻ tín dụng') tự phân biệt loại sản phẩm phụ, đủ dùng làm điều kiện JOIN sang 5 bảng grid, không cần cột chuẩn hóa riêng (`SUB_PRODUCT_TYPE_CODE` đã xóa hẳn khỏi thiết kế, review 2026-09-27, theo yêu cầu người dùng — chỉ là ánh xạ 1-1 dư thừa của cột này) |
+| 7 | SPP_AMOUNT | NUMBER | N | 20,2 |  | Hạn mức của sản phẩm phụ — PHÁI SINH (review 2026-09-27, sửa lại theo SRS BC1 BR 1.2): LEFT JOIN đúng 1 trong 5 bảng grid theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='<giá trị tương ứng>' (không phải UNION 5 nguồn độc lập), lấy LIMIT_NO. Ép kiểu số từ text định dạng Việt Nam, DEFAULT NULL ON CONVERSION ERROR. Trường SPP_Amount của BC1 |
+| 8 | SPP_TERM | NUMBER | N | 5 |  | Thời hạn của sản phẩm phụ, đơn vị tháng — PHÁI SINH (review 2026-09-27, cùng cơ chế JOIN cột 7): CREDIT_CARD_APP.TERM hoặc SEABUY_APP/CIVIL_APP/TEACHER_APP/WOMAN_APP.TIME_VALID của đúng bảng đã khớp điều kiện JOIN. Trường SPP_Term của BC1 |
+| 9 | CARD_TYPE_CODE | VARCHAR2 | N | 100 |  | Loại thẻ đăng ký lúc đề xuất sản phẩm phụ là thẻ tín dụng — nguồn NG_SB_RLOS_CREDIT_CARD_APP.CARD_TYPE (LEFT JOIN theo cơ chế cột 7, review 2026-09-27). Chỉ có ở dòng SUB_PRODUCT_LINE='Thẻ tín dụng'. Là khái niệm khác BC1.K_TYPE (loại thẻ thật sau giải ngân, nguồn STG_DIM_CARD.K_TYPE, join qua NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID = STG_DIM_CARD.MAIN_ID — thuộc FCT_RLOS_APPLICATION, không đi qua bảng này) — không dùng để tra BC1.K_TYPE |
 
-- Bảng FACT chi tiết (nhân dòng), lưu từng lần đăng ký sản phẩm phụ kèm hồ sơ RLOS (hạn mức, thời hạn, thuộc tính thẻ phụ). Bốn nhóm SeABuy/Civil/Teacher/Woman tối đa 1 dòng/loại/hồ sơ; thẻ tín dụng phụ có thể nhiều dòng/hồ sơ. Phục vụ BC1.
-- Khóa chính của bảng (PK): **DAYID, WI_NAME, SUB_PRODUCT_TYPE_CODE, SUB_PRODUCT_BK**.
+- Bảng FACT chi tiết (nhân dòng), driving table = `NG_SB_RLOS_SUB_PRODUCT` (1 dòng = 1 hồ sơ x 1 lần đăng ký sản phẩm phụ), LEFT JOIN bổ sung chi tiết từ đúng 1 trong 5 bảng grid theo `SUB_PRODUCT_LINE`. Bốn nhóm SeABuy/Civil/Teacher/Woman thường 1 dòng/loại/hồ sơ (vì bảng grid tương ứng cũng chỉ 1 dòng/hồ sơ); thẻ tín dụng phụ có thể nhiều dòng/hồ sơ (LEFT JOIN tự nhân dòng nếu `CREDIT_CARD_APP` khớp nhiều thẻ). Phục vụ BC1.
+- Khóa chính của bảng (PK): **DAYID, SUB_PRODUCT_BK** (review 2026-09-27, theo yêu cầu người dùng — rút gọn từ `DAYID, WI_NAME, SUB_PRODUCT_TYPE_CODE, SUB_PRODUCT_BK`, xóa hẳn `SUB_PRODUCT_TYPE_CODE`).
 
 **So với thiết kế cũ (`FCT_LOS_SUB_PRODUCT`, 11 cột):** không đổi cột gốc —
 bảng gốc đã ghi rõ "hiện các bảng sản phẩm phụ trong phạm vi là RLOS" nên
 `DATASOURCE` chỉ có giá trị 'RLOS', không phải cột cần cắt theo
 column-optimization rule (không có nội dung CLOS nào để loại trừ). Giữ lại
 cột `DATASOURCE` trong thiết kế làm cột kỹ thuật đánh dấu nguồn hệ, đồng
-bộ với mọi DIM/FCT RLOS khác sau khi tách vật lý CLOS/RLOS — tổng **10
-cột** (review 2026-09-22: loại bỏ `PRODUCT_SK` — rà soát toàn bộ 11 SRS
-BC1-BC11 xác nhận không báo cáo nào dùng cột này, và không có căn cứ SRS
-nào cho JOIN key sang `DIM_RLOS_PRODUCT`; chiều sản phẩm chính/nhánh của
-hồ sơ đã có đủ trên `DIM_RLOS_APPLICATION` qua `NG_SB_RLOS_APPLICANT_
-GENERAL.PRODUCT_LINE`/`SUB_PRODUCT` — sản phẩm phụ (`SUB_PRODUCT_LINE` ở
-đây) là thuộc tính bổ sung độc lập, không phải 1 sản phẩm cần tra trong
-`DIM_RLOS_PRODUCT`, nên không cần lặp lại chiều sản phẩm ở FCT này). Nếu
-CLOS phát sinh sản phẩm phụ trong tương lai, tạo mới
+bộ với mọi DIM/FCT RLOS khác sau khi tách vật lý CLOS/RLOS. Loại bỏ
+`PRODUCT_SK` (review 2026-09-22 — rà soát toàn bộ 11 SRS BC1-BC11 xác
+nhận không báo cáo nào dùng cột này, và không có căn cứ SRS nào cho JOIN
+key sang `DIM_RLOS_PRODUCT`; chiều sản phẩm chính/nhánh của hồ sơ đã có
+đủ trên `DIM_RLOS_APPLICATION` qua `NG_SB_RLOS_APPLICANT_GENERAL.
+PRODUCT_LINE`/`SUB_PRODUCT` — sản phẩm phụ (`SUB_PRODUCT_LINE` ở đây) là
+thuộc tính bổ sung độc lập, không phải 1 sản phẩm cần tra trong `DIM_
+RLOS_PRODUCT`, nên không cần lặp lại chiều sản phẩm ở FCT này) — 11→10
+cột. Xóa tiếp `SUB_PRODUCT_TYPE_CODE` (review 2026-09-27, theo yêu cầu
+người dùng — chỉ là ánh xạ 1-1 dư thừa của `SUB_PRODUCT_LINE`, xem cột 6)
+— 10→**9 cột**. Nếu CLOS phát sinh sản phẩm phụ trong tương lai, tạo mới
 `FCT_CLOS_SUB_PRODUCT` khi đó thay vì gộp lại (đúng theo "Nguyên nhân"
 tách bảng đã ghi trong `output/Table_Split_Proposal_CLOS_RLOS.md`).
 
-**Đối chiếu SRS (BC1):** `SAN_PHAM_PHU` ← `NG_SB_RLOS_SUB_PRODUCT.SUB_
-PRODUCT_LINE`; `SPP_AMOUNT`/`SPP_TERM` ← UNION đúng 5 bảng, đúng tên cột
-nguồn (`LIMIT_NO`; `TERM`/`TIME_VALID`) đã thiết kế; `K_TYPE` xác nhận lấy
-từ `STG_DIM_CARD.K_TYPE` (bảng thẻ T24 ngoài phạm vi datamart này, không
-phải REF_/DIM cần thiết kế) — khớp hoàn toàn với ghi chú "khóa tra BC1.
-K_TYPE qua bảng thẻ T24 ở DTM" của lineage doc gốc, không phát hiện lệch.
+**Đối chiếu SRS (BC1, BR 1.2 — xác nhận lại đầy đủ review 2026-09-27):**
+`SAN_PHAM_PHU` ← `NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE` (driving
+table, alias `f`); `SPP_AMOUNT`/`SPP_TERM` ← LEFT JOIN đúng 1 trong 5
+bảng theo `f.WI_NAME=<bảng>.WI_NAME AND f.SUB_PRODUCT_LINE='<giá trị>'`
+(nguyên văn BR 1.2, không phải UNION độc lập), đúng tên cột nguồn
+(`LIMIT_NO`; `TERM`/`TIME_VALID`); `K_TYPE` xác nhận lấy từ
+`STG_DIM_CARD.K_TYPE` qua `NG_SB_RLOS_SENT_CBS_LOG` (bảng này join
+thẳng vào `NG_SB_RLOS_ENTRY_EXIT`, không join vào `f` — thuộc
+`FCT_RLOS_APPLICATION`, không phải bảng này).
 
 ###### 1.3.2.5 FCT_RLOS_EXCEPTION
 
@@ -5731,17 +6581,31 @@ K_TYPE qua bảng thẻ T24 ở DTM" của lineage doc gốc, không phát hiệ
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
 | 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS |
 | 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 |
-| 4 | EXCEPTION_REASON_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_EXCEPTION_REASON — PHÁI SINH 2 bước đúng SRS BC7 (không phải lookup 1 cột): (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME, có thể khớp nhiều dòng DIM cùng category+name khác ACTIVITYNAME/DECISION_CODE; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_RLOS_ENTRY_EXIT (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó) — chỉ giữ tổ hợp đã thực sự xảy ra trong lịch sử xử lý hồ sơ. Mặc định -1 nếu không còn dòng nào khớp. Xem giải thích đầy đủ tại Section 1 → 1.3.2.5 |
-| 5 | RAISED_BY_USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu |
+| 4 | EXCEPTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_EXCEPTION — PHÁI SINH 2 bước đúng SRS BC7 (không phải lookup 1 cột): (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME, có thể khớp nhiều dòng DIM cùng category+name khác ACTIVITYNAME/DECISION_CODE; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_RLOS_ENTRY_EXIT (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó) — chỉ giữ tổ hợp đã thực sự xảy ra trong lịch sử xử lý hồ sơ. Mặc định -1 nếu không còn dòng nào khớp. Xem giải thích đầy đủ tại Section 1 → 1.3.2.5 |
+| 5 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu |
 | 6 | EXCEPTION_CATEGORY | VARCHAR2 | N | 500 | PK | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_CATEGORY |
 | 7 | EXCEPTION_NAME | VARCHAR2 | N | 500 |  | Tên nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_NAME |
 | 8 | EXCEPTION_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_REMARKS |
-| 9 | RAISED_BY | VARCHAR2 | N | 100 | PK | Người nêu nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.RAISED_BY. Cột RAISED_BY_USER_SK bên cạnh giữ khóa tới DIM |
+| 9 | RAISED_BY | VARCHAR2 | N | 100 | PK | Người nêu nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.RAISED_BY. Cột USER_SK bên cạnh giữ khóa tới DIM |
 | 10 | RAISED_DATE_TIME | TIMESTAMP | N |  | PK | Thời điểm nêu nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.RAISED_DATE_TIME |
 | 11 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
 | 12 | RCTYPE | VARCHAR2 | N | 20 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_RLOS_EXCEPTION.RCTYPE. Review 2026-09-18: SRS BC7 cập nhật KHÔNG còn dùng cột này làm điều kiện lọc CHECK_FTR (khác bản SRS trước) — vẫn giữ cột vì BC7 hiển thị trực tiếp làm trường riêng trên báo cáo |
-| 13 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật đổi hẳn công thức): **công thức RIÊNG của RLOS, không dùng chung với CLOS** — mặc định 'Not First Time Right'; là 'First Time Right' CHỈ KHI mọi dòng NG_SB_RLOS_EXCEPTION (a) có EXCEPTION_CATEGORY LIKE '%BR%' đều khớp 1 trong 5 điều kiện miễn trừ theo EXCEPTION_NAME (một số điều kiện phụ theo BI_SUB_PRODUCT — PHÁI SINH: CASE WHEN NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT LIKE '%Phát hành%' OR LIKE '%TTD%' THEN 'Credit Card' ELSE SUB_PRODUCT END), xem đầy đủ literal tại SRS BC7 BR 1.2 |
-| 14 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH (review 2026-09-18, SRS BC7 cập nhật): WORKSTEP của bản ghi NG_SB_RLOS_ENTRY_EXIT tại MIN(EXITDATE) theo WI_NAME, với điều kiện EXITDATE IS NOT NULL AND ((WORKSTEP='DetailDataEntry' AND DECISION='Send_Back') OR (WORKSTEP IN ('DataInputerChecker','UnderwriterMaker','CreditApproval') AND DECISION='Additional_Doc_Required') OR (WORKSTEP='UnderwriterMaker' AND DECISION='Send_Back to BranchSupport')) — bổ sung nhánh thứ 3 so với công thức cũ, giống CLOS |
+| 13 | SUB_PRODUCT | VARCHAR2 | N | 255 |  | Sản phẩm vay chi tiết tự khai theo hồ sơ — cột thô (review 2026-09-27, bổ sung — theo yêu cầu người dùng, cùng cơ chế đã áp dụng cho CLOS 1.2.2.4): LEFT JOIN NG_SB_RLOS_APPLICANT_GENERAL theo WI_NAME, lấy SUB_PRODUCT. Không tính BI_SUB_PRODUCT ở đây — chỉ giữ giá trị gốc, PDTD_DTM tự CASE WHEN phân loại 'Credit Card' khi tính CHECK_FTR |
+
+**Chuyển `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` sang tính tại PDTD_DTM (review
+2026-09-27, theo yêu cầu người dùng, cùng cơ chế đã áp dụng cho CLOS
+1.2.2.4):** 2 cột này là business rule CASE WHEN/whitelist theo SRS BC7
+(không phải giá trị gốc từ STG_LOS) — vi phạm nguyên tắc "SB_DWH là ảnh
+chụp sạch của nguồn, không biến đổi giá trị; PDTD_DTM mới là tầng chuẩn
+hóa/tính business rule". Đã xác nhận: dữ liệu thô `CHECK_FTR` cần
+(`EXCEPTION_CATEGORY`/`EXCEPTION_NAME` đã có sẵn trên chính bảng này,
+`SUB_PRODUCT` bổ sung mới ở cột 13) đã đủ — không cần join thêm bảng SB_DWH
+nào khác. Dữ liệu thô `FIRST_WORKSTEP_RETURN` cần (lịch sử `WORKSTEP_CODE`/
+`EXITDATE`/`DECISION_CODE` theo `WI_NAME`) đã có sẵn đầy đủ trên
+`SB_DWH.FCT_RLOS_WORKSTEP_EVENT` (1.3.2.7). Xem công thức đầy đủ tại
+`hld/hld_review/HLD_FCT_PDTD_DTM_review.md` mục 16 (RLOS). Bảng này
+(SB_DWH) từ 14 cột xuống còn **13 cột** (xóa `CHECK_FTR`/
+`FIRST_WORKSTEP_RETURN`, thêm `SUB_PRODUCT`).
 
 - Bảng FACT chi tiết (nhân dòng), lưu mỗi lần một lý do được nêu ra trên hồ sơ RLOS, trong ảnh chụp của ngày DAYID. Phục vụ BC7, BC8.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME**.
@@ -5751,41 +6615,51 @@ K_TYPE qua bảng thẻ T24 ở DTM" của lineage doc gốc, không phát hiệ
 khi tách vật lý, loại khỏi PK theo ghi chú
 thiết kế khóa của split-proposal), 11 cột gốc giữ nguyên cấu trúc, vẫn đọc
 trực tiếp từ `NG_SB_RLOS_EXCEPTION` (LOẠI 1, khóa CDC khai đủ, cùng tổ
-hợp khóa với `NG_SB_CLOS_EXCEPTION`). Thêm mới 2 cột `CHECK_FTR`/
+hợp khóa với `NG_SB_CLOS_EXCEPTION`). Từng thêm 2 cột `CHECK_FTR`/
 `FIRST_WORKSTEP_RETURN` — vốn nằm trên `FCT_LOS_APPLICATION_DAILY` (bản
-gộp cũ) nhưng đã đánh giá lại và dời sang đây (xem đánh giá kiến trúc bên
-dưới) — tổng **14 cột**. `PHAN_LOAI_DDE` (cột thứ 3 từng dự kiến chuyển
-sang đây) đã được đánh giá lại (review 2026-09-22) và chuyển hẳn sang
-tính tại `hld/HLD_FCT_PDTD_DTM.md` mục 2.3.2.5 — xem "⚠️ Đánh giá kiến
-trúc — `PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" ở Section 1 phía trên.
+gộp cũ) — nhưng nay đã chuyển hẳn sang tính tại PDTD_DTM (review
+2026-09-27, xem ghi chú ngay trên). `PHAN_LOAI_DDE` (cột thứ 3 từng dự
+kiến chuyển sang đây) cũng đã được đánh giá lại (review 2026-09-22) và
+chuyển hẳn sang tính tại `hld/HLD_FCT_PDTD_DTM.md` mục 2.3.2.5 — xem "⚠️
+Đánh giá kiến trúc — `PHAN_LOAI_DDE` chuyển hẳn sang PDTD_DTM" ở Section 1
+phía trên. Bảng này (SB_DWH) sau cùng thêm `SUB_PRODUCT` (review
+2026-09-27) — tổng **13 cột**.
 
 **Đối chiếu SRS (BC7, BC8):** BC7 dùng trực tiếp `EXCEPTION_CATEGORY`,
 `EXCEPTION_NAME`, `EXCEPTION_REMARKS`, `RAISED_BY`, `RAISED_DATE_TIME`,
-`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE` (cột này tính ở
-PDTD_DTM, xem `hld/HLD_FCT_PDTD_DTM.md` mục 2.3.2.5). Đã đối chiếu công
-thức trực tiếp với bảng field-list của SRS BC7 bản cập nhật (review
-2026-09-18), nhánh "Nguồn RLOS" — xem công thức mới đầy đủ tại Section 1
-→ 1.3.2.5 và cột tương ứng ở trên. Vẫn giữ điểm khác biệt quan trọng:
-**`CHECK_FTR` phía RLOS dùng công thức riêng biệt với CLOS** (whitelist
-theo `BI_SUB_PRODUCT` thay vì `CUST_GROUP`) — 2 định nghĩa tách biệt cho
-2 hệ vẫn đúng, chỉ thay đổi nội dung whitelist so với bản SRS trước.
+`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE` — cả 3 cột phái
+sinh này nay đều tính tại PDTD_DTM (xem `hld/hld_review/HLD_FCT_PDTD_
+DTM_review.md` mục 16, review 2026-09-27). Đã đối chiếu công thức
+`CHECK_FTR`/`FIRST_WORKSTEP_RETURN` trực tiếp với bảng field-list của SRS
+BC7 bản cập nhật (review 2026-09-18, nhánh RLOS) — xem công thức đầy đủ
+tại `hld/hld_review/HLD_FCT_PDTD_DTM_review.md` mục 16. Vẫn giữ điểm khác
+biệt quan trọng: **`CHECK_FTR` phía RLOS dùng công thức riêng biệt với
+CLOS** (whitelist theo `BI_SUB_PRODUCT` thay vì `CUST_GROUP`) — 2 định
+nghĩa tách biệt cho 2 hệ vẫn đúng, chỉ thay đổi nội dung whitelist so với
+bản SRS trước.
 
-**Đánh giá kiến trúc — vì sao không gộp vào `FCT_RLOS_APPLICATION_DAILY`
+**Đánh giá kiến trúc — vì sao không gộp vào `FCT_RLOS_APPLICATION`
 (1.3.2.1):** cùng lý do khác grain đã áp dụng cho `FCT_CLOS_EXCEPTION`
 (1.2.2.4) — không gộp vào grain 1 dòng/hồ sơ/ngày.
 
-**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` chuyển
-về đây:** rà soát SRS BC1-BC11 xác nhận cả 3 cột gốc (`CHECK_FTR`/
-`FIRST_WORKSTEP_RETURN`/`PHAN_LOAI_DDE`) chỉ phục vụ BC7, đúng grain của
-bảng này — cùng lý do đã áp dụng cho `FCT_CLOS_EXCEPTION` (1.2.2.4).
-Riêng `CHECK_FTR`, công thức đọc thẳng `NG_SB_RLOS_EXCEPTION` (chính là
-nguồn của FCT này) nên không cần join thêm bảng nào khác — đơn giản hơn
-cả CLOS (vốn phải đọc `ENTRY_EXIT`). Riêng `PHAN_LOAI_DDE`: dù cùng lý do
-"khác grain" và cùng phục vụ BC7, cột này KHÔNG dừng ở tầng SB_DWH mà
-chuyển tiếp sang tính hẳn tại PDTD_DTM (review 2026-09-22, cùng lý do đã
-áp dụng cho CLOS) — vì bảng danh mục nó lookup (`REF_PHAN_LOAI_DDE`) chỉ
-tồn tại vật lý ở PDTD_DTM. Bảng này (SB_DWH) chỉ còn 2 cột `CHECK_FTR`/
-`FIRST_WORKSTEP_RETURN` trong nhóm 3 cột gốc.
+**Đánh giá kiến trúc — vì sao `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
+`PHAN_LOAI_DDE` đều chuyển hẳn sang tính tại PDTD_DTM (review 2026-09-27,
+cập nhật — trước đây 2 cột đầu từng đặt tại SB_DWH):** rà soát SRS BC1-BC11
+xác nhận cả 3 cột chỉ phục vụ đúng BC7, đúng grain của bảng này — cùng lý
+do đã áp dụng cho `FCT_CLOS_EXCEPTION` (1.2.2.4). Khác CLOS (vốn cần thêm
+`CUSTOMER_SK` để tra `CUST_GROUP`), whitelist RLOS phân nhóm theo
+`BI_SUB_PRODUCT` — chỉ cần bổ sung 1 cột thô `SUB_PRODUCT` (cột 13, LEFT
+JOIN `NG_SB_RLOS_APPLICANT_GENERAL` theo `WI_NAME`) vì giá trị này chưa
+tồn tại sẵn ở đâu khác tại SB_DWH (`DIM_RLOS_APPLICATION`/`DIM_RLOS_
+PRODUCT` chỉ có mã/tên chuẩn hóa, không có text tự khai gốc). PDTD_DTM tự
+CASE WHEN phân loại `BI_SUB_PRODUCT` từ cột thô này khi tính `CHECK_FTR`.
+`FIRST_WORKSTEP_RETURN` đọc lịch sử `WORKSTEP_CODE`/`EXITDATE`/
+`DECISION_CODE` đã có sẵn trên `SB_DWH.FCT_RLOS_WORKSTEP_EVENT` (1.3.2.7),
+không cần thêm cột thô nào. `PHAN_LOAI_DDE` vẫn chuyển hẳn sang PDTD_DTM
+như trước (review 2026-09-22) vì bảng danh mục nó lookup (`REF_PHAN_
+LOAI_DDE`) chỉ tồn tại vật lý ở PDTD_DTM. Bảng này (SB_DWH) không còn cột
+nào trong nhóm 3 cột gốc `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`/
+`PHAN_LOAI_DDE`.
 
 ###### 1.3.2.6 FCT_RLOS_DEVIATION
 
@@ -5801,7 +6675,7 @@ tồn tại vật lý ở PDTD_DTM. Bảng này (SB_DWH) chỉ còn 2 cột `CHE
 | 6 | CHECKING_CONDITION | VARCHAR2 | N | 500 |  | Điều kiện kiểm tra chính sách — nguồn NG_SB_RLOS_MANUAL_DEVIATION.CHECKING_CONDITION |
 | 7 | CHECKING_RESULT | VARCHAR2 | N | 200 |  | Kết quả kiểm tra chính sách — nguồn NG_SB_RLOS_MANUAL_DEVIATION.CHECKING_RESULT |
 | 8 | DEVIATION_REASON | VARCHAR2 | N | 4000 |  | Lý do lệch chính sách — nguồn NG_SB_RLOS_MANUAL_DEVIATION.REASON (đổi tên cho rõ nghĩa vì tên gốc quá chung) |
-| 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — PHÁI SINH: tính độc lập từ NG_SB_RLOS_ENTRY_EXIT theo cùng công thức 3 mức ưu tiên (ngày phê duyệt cuối/ngày hủy/ngày thoát bước gần nhất) đã dùng cho FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE (1.3.2.1) — không JOIN sang FCT_RLOS_APPLICATION_DAILY để tránh tham chiếu chéo giữa 2 bảng (xem đánh giá kiến trúc bên dưới) |
+| 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — PHÁI SINH: tính độc lập từ NG_SB_RLOS_ENTRY_EXIT theo cùng công thức 3 mức ưu tiên (ngày phê duyệt cuối/ngày hủy/ngày thoát bước gần nhất) đã dùng cho FCT_RLOS_APPLICATION.PROCESSED_DATE (1.3.2.1) — không JOIN sang FCT_RLOS_APPLICATION để tránh tham chiếu chéo giữa 2 bảng (xem đánh giá kiến trúc bên dưới) |
 
 - Bảng FACT chi tiết (nhân dòng), lưu ảnh số liệu thay đổi theo ngày của từng ngoại lệ chính sách thuộc hồ sơ RLOS. Không có chiều riêng — toàn bộ thuộc tính lưu thẳng trên fact vì nguồn không khai khóa CDC. Phục vụ BC6 (chi tiết); đồng thời là nguồn trực tiếp cho `AGG_LOS_KPI_APPLICATION.DEVIATION_G2`/`DEVIATION_G3` (2.1.9, phục vụ BC9 — review 2026-09-17: sửa lại cho đúng, bản cũ ghi nhầm "tính trực tiếp ở tầng report/OAS" không có căn cứ SRS và bỏ sót liên kết thật này). Riêng `DIM_RLOS_APPLICATION.DEVIATION_G3` (1.3.1.1) là 1 thiết kế song song khác, đọc thẳng `NG_SB_RLOS_MANUAL_DEVIATION` không qua bảng này — xem đối chiếu công thức tại "Đối chiếu SRS" bên dưới.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, DEVIATION_BK**.
@@ -5861,10 +6735,10 @@ khối RLOS), giữ nguyên thiết kế cột theo cách 1:1 cùng tên, không
 theo SRS — cùng quyết định đã chốt cho `FCT_CLOS_DEVIATION`.
 
 **Đánh giá kiến trúc — vì sao `PROCESSED_DATE` tính độc lập tại đây thay
-vì JOIN `FCT_RLOS_APPLICATION_DAILY`:** để `FCT_RLOS_DEVIATION` và
-`FCT_RLOS_APPLICATION_DAILY` là 2 luồng ETL hoàn toàn độc lập (không còn
+vì JOIN `FCT_RLOS_APPLICATION`:** để `FCT_RLOS_DEVIATION` và
+`FCT_RLOS_APPLICATION` là 2 luồng ETL hoàn toàn độc lập (không còn
 cột đếm trung gian nào tham chiếu chéo giữa 2 bảng — `DEVIATION_CNT`
-cũng đã bỏ khỏi `FCT_RLOS_APPLICATION_DAILY`, xem đánh giá kiến trúc tại
+cũng đã bỏ khỏi `FCT_RLOS_APPLICATION`, xem đánh giá kiến trúc tại
 1.3.2.1), `PROCESSED_DATE` tính độc lập ngay tại `FCT_RLOS_DEVIATION`
 (SB_DWH), đọc thẳng `NG_SB_RLOS_ENTRY_EXIT`. Xem đánh giá đầy đủ tại
 Section 1 → 1. SB_DWH → 1.3.2.6.
@@ -5889,29 +6763,43 @@ tách đầy đủ tại Section 1 → 1. SB_DWH → 1.3.2.7.
 | 3 | WORKSTEP_CODE | VARCHAR2 | Y | 200 | PK | Mã bước xử lý trên workflow — nguồn ENTRY_EXIT.WORKSTEP (đổi tên thêm hậu tố CODE), đã cắt tiền tố hệ nguồn nếu có |
 | 4 | ENTRYDATE | TIMESTAMP | Y |  | PK | Thời điểm hồ sơ vào bước xử lý — nguồn ENTRY_EXIT.ENTRYDATE. Bắt buộc nằm trong khóa vì 1 hồ sơ có thể quay lại cùng 1 bước nhiều lần |
 | 5 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
-| 6 | WORKSTEP_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP, lookup bằng WORKSTEP_CODE theo điều kiện thời gian (EFF_DATE/EXP_DATE). Mặc định -1 nếu không khớp |
-| 7 | DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_DECISION, lookup bằng DECISION_CODE theo điều kiện thời gian. DECISION null/không khớp dùng -1. KHÔNG nằm trong PK — chỉ để tra cứu thêm thuộc tính |
-| 8 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người xử lý của chính sự kiện này. ĐÚNG GRAIN của bảng — 1 lần vào bước có đúng 1 người xử lý. Mặc định -1. KHÔNG nằm trong PK |
-| 9 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 |
-| 10 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý — nguồn ENTRY_EXIT.EXITDATE. NULL nghĩa là hồ sơ đang nằm tại bước này |
-| 11 | DECISION_CODE | VARCHAR2 | N | 200 |  | Mã quyết định tại bước xử lý — nguồn ENTRY_EXIT.DECISION (đổi tên thêm hậu tố CODE) |
-| 12 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản người xử lý hồ sơ — nguồn ENTRY_EXIT.USERNAME. Giữ nguyên giá trị gốc để báo cáo hiển thị thẳng, không phải join qua DIM_LOS_USER |
-| 13 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — nguồn ENTRY_EXIT.REMARKS |
-| 14 | REASON_CODE | VARCHAR2 | N | 50 |  | Mã lý do hủy hồ sơ — nguồn NG_SB_RLOS_ENTRY_EXIT.REASON_CODE (chỉ RLOS có cột này) |
-| 15 | REASON_DESC | VARCHAR2 | N | 500 |  | Diễn giải lý do hủy hồ sơ — nguồn NG_SB_RLOS_ENTRY_EXIT.REASON_DESC (chỉ RLOS có cột này) |
-| 16 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — nguồn ENTRY_EXIT.TAT. Giữ lại để đối soát với 3 cột TAT tính lại bên dưới. Đơn vị "giây" kế thừa từ extract gốc, cần DE xác nhận chính thức, xem Section 3 |
-| 17 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ. NULL nếu chưa có EXITDATE |
-| 18 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật; giờ tính 8-12 và 13-17. NULL nếu chưa có EXITDATE |
-| 19 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30. NULL nếu chưa có EXITDATE |
-| 20 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN); chiều giảm dần (mới→cũ) khi cần có thể tự suy bằng COUNT(*) OVER (PARTITION BY WI_NAME) - EVENT_SEQ_ASC + 1, không cần cột riêng |
-| 21 | BI_FLAG_APPROVAL | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH: 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ), ngược lại 'From Second Approval'. Dùng cho BC5.BI_FLAG_APPROVAL |
-| 22 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước — PHÁI SINH: LAG(WORKSTEP_CODE) OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE). Dùng cho BC1.PRE_WORKSTEP, BC2.PRE_WORKSTEP |
-| 23 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21, KHÔNG copy/JOIN từ FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE cột 24, 2.3.2.1): MAX(EXITDATE) window theo WI_NAME WHERE WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') AND DECISION_CODE IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker'); nếu rỗng → EXITDATE tại WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Cancel'; nếu vẫn rỗng → ngày dữ liệu hệ thống (DAYID). Cùng công thức/kết quả với FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE cho cùng WI_NAME — lặp lại giống nhau trên mọi dòng event của hồ sơ. Phục vụ BC4.REPORT_DATE (xem lld/BC4.csv) mà không cần JOIN fan-out sang APPLICATION_DAILY |
-| 24 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4, nhánh RLOS) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21, KHÔNG copy/JOIN từ bảng APPLICATION_DAILY — cột WORKSTEP_FLAG tương ứng đã bị xóa khỏi FCT_RLOS_APPLICATION_DAILY, 2.3.2.1, không còn consumer nào khác): LEFT JOIN WFINSTRUMENTTABLE (c) theo WI_NAME=c.PROCESSINSTANCEID AND c.CREATEDBY NOT IN ('10000380','10000020','10000420','10000140','10000100'), sau đó 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE của TOÀN BỘ lịch sử WI_NAME kết hợp c.PROCESSNAME='RLOS'/c.ACTIVITYNAME (nhánh 2/4/5 khác CLOS — nhánh 4 có thêm OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send to UWChecker')) — xem công thức đầy đủ ở dòng 5297+ (Đóng PENDING #6, nhánh RLOS). Phục vụ BC4.FLAG mà không cần JOIN fan-out sang APPLICATION_DAILY |
-| 25 | APPLICANT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICANT (1.3.1.9) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21, cùng lý do đã áp dụng cho CUSTOMER_SK nhánh CLOS 1.2.2.6): join theo WI_NAME + điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL), quan hệ 1:1 với hồ sơ — cùng điều kiện/kết quả với FCT_RLOS_APPLICATION_DAILY.APPLICANT_SK (cột 79, 2.3.2.1) cho cùng WI_NAME+DAYID, không copy/JOIN từ đó. Mặc định -1 nếu không khớp |
+| 6 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP_DECISION (review 2026-09-24, gộp từ WORKSTEP_SK+DECISION_SK), lookup theo cặp WORKSTEP_CODE (cột 3, chính dòng event) + DECISION_CODE điều kiện thời gian (EFF_DATE/EXP_DATE). Mặc định -1 nếu không khớp. KHÔNG nằm trong PK — chỉ để tra cứu thêm thuộc tính (kể cả DECISION_CODE, đã xóa denormalize khỏi fact) |
+| 7 | USER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_USER, người xử lý của chính sự kiện này. ĐÚNG GRAIN của bảng — 1 lần vào bước có đúng 1 người xử lý. Mặc định -1. KHÔNG nằm trong PK |
+| 8 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 |
+| 9 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý — nguồn ENTRY_EXIT.EXITDATE. NULL nghĩa là hồ sơ đang nằm tại bước này |
+| 10 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản người xử lý hồ sơ — nguồn ENTRY_EXIT.USERNAME. Giữ nguyên giá trị gốc để báo cáo hiển thị thẳng, không phải join qua DIM_LOS_USER |
+| 11 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — nguồn ENTRY_EXIT.REMARKS |
+| 12 | REASON_CODE | VARCHAR2 | N | 50 |  | Mã lý do hủy hồ sơ — nguồn NG_SB_RLOS_ENTRY_EXIT.REASON_CODE (chỉ RLOS có cột này) |
+| 13 | REASON_DESC | VARCHAR2 | N | 500 |  | Diễn giải lý do hủy hồ sơ — nguồn NG_SB_RLOS_ENTRY_EXIT.REASON_DESC (chỉ RLOS có cột này) |
+| 14 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — nguồn ENTRY_EXIT.TAT. Giữ lại để đối soát với 3 cột TAT tính lại bên dưới. Đơn vị "giây" kế thừa từ extract gốc, cần DE xác nhận chính thức, xem Section 3 |
+| 15 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ. NULL nếu chưa có EXITDATE |
+| 16 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật; giờ tính 8-12 và 13-17. NULL nếu chưa có EXITDATE |
+| 17 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30. NULL nếu chưa có EXITDATE |
+| 18 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN); chiều giảm dần (mới→cũ) khi cần có thể tự suy bằng COUNT(*) OVER (PARTITION BY WI_NAME) - EVENT_SEQ_ASC + 1, không cần cột riêng |
+| 19 | PRE_WORKSTEP_CODE | VARCHAR2 | N | 200 |  | Bước xử lý liền trước — PHÁI SINH: LAG(WORKSTEP_CODE) OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE). Dùng cho BC1.PRE_WORKSTEP, BC2.PRE_WORKSTEP |
+| 20 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-21, KHÔNG copy/JOIN từ FCT_RLOS_APPLICATION.PROCESSED_DATE cột 23, 2.3.2.1): MAX(EXITDATE) window theo WI_NAME WHERE WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') AND DECISION_CODE IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker') — DECISION_CODE ở đây tra qua JOIN WORKSTEP_DECISION_SK sang DIM_RLOS_WORKSTEP_DECISION (review 2026-09-24, cột denormalize gốc đã xóa); nếu rỗng → EXITDATE tại WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Cancel' (cùng cách tra); nếu vẫn rỗng → ngày dữ liệu hệ thống (DAYID). Cùng công thức/kết quả với FCT_RLOS_APPLICATION.PROCESSED_DATE cho cùng WI_NAME — lặp lại giống nhau trên mọi dòng event của hồ sơ. Phục vụ BC4.REPORT_DATE (xem lld/BC4.csv) mà không cần JOIN fan-out sang APPLICATION_DAILY |
+| 21 | WF_PROCESSNAME | VARCHAR2 | N | 50 |  | Tên hệ thống workflow của instance đang đứng, đã lọc tài khoản test — cột thô (review 2026-09-27, thay cho WORKSTEP_FLAG đã tính sẵn, cùng cơ chế đã áp dụng cho CLOS 1.2.2.6): LEFT JOIN WFINSTRUMENTTABLE (c) theo WI_NAME=c.PROCESSINSTANCEID AND c.CREATEDBY NOT IN ('10000380','10000020','10000420','10000140','10000100'), lấy c.PROCESSNAME. Lặp lại giống nhau trên mọi dòng event cùng WI_NAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (tính tại PDTD_DTM, xem 2.3.2.7) | — |
+| 22 | WF_ACTIVITYNAME | VARCHAR2 | N | 200 |  | Bước hiện tại của instance workflow, đã lọc tài khoản test — cột thô (review 2026-09-27, cùng JOIN trên): lấy c.ACTIVITYNAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (tính tại PDTD_DTM) | — |
+| 23 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng (BC3.CREDIT_LIMIT) — PHÁI SINH TRỰC TIẾP trên bảng này (review 2026-09-25, chuyển từ DIM_RLOS_APPLICATION): nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT, cùng công thức/kết quả với FCT_RLOS_APPLICATION.APPROVED_AMT_FINAL (1.3.2.1) cho cùng WI_NAME, không copy/JOIN từ đó — phục vụ BC3 lookup thẳng qua APPLICATION_SK, không cần JOIN fan-out sang FCT_RLOS_APPLICATION |
+| 24 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền (BC3.CURRENCY) — PHÁI SINH TRỰC TIẾP, cùng lý do cột 23: nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_CURRENCY |
+| 25 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt (BC3.CREDIT_TERM) — PHÁI SINH TRỰC TIẾP, cùng lý do cột 23: nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_TERM |
 
 - Bảng FACT nhật ký workflow mức nguyên tử của hệ RLOS, giữ HẾT MỌI SỰ KIỆN (không bao giờ xóa, không chép lại nhật ký mỗi ngày). Grain: 1 dòng = 1 phiên bản của 1 logical event (hồ sơ × workstep × lần vào bước). Là nguồn duy nhất để tính mọi mốc thời gian, TAT, số lần trả về và người xử lý theo từng bước, nhánh RLOS. Phục vụ BC1, BC2, BC3, BC4, BC5, BC7, BC8, BC9, BC10, BC11.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, WORKSTEP_CODE, ENTRYDATE**.
+
+**Chuyển `APPROVAL_FLAG`/`WORKSTEP_FLAG` sang tính tại PDTD_DTM
+(review 2026-09-27, theo yêu cầu người dùng, cùng cơ chế đã áp dụng cho
+CLOS 1.2.2.6):** `WORKSTEP_FLAG` là công thức 5 nhánh CASE-WHEN theo
+business rule SRS BC4 (không phải giá trị gốc STG_LOS) — vi phạm nguyên
+tắc "SB_DWH ảnh chụp sạch nguồn, PDTD_DTM chuẩn hóa/tính business rule".
+`APPROVAL_FLAG` (window function `MIN(EXITDATE)` so sánh vị trí)
+không phải business-rule whitelist nhưng chuyển theo để nhất quán kiến
+trúc. SB_DWH nay chỉ giữ 2 cột thô `WF_PROCESSNAME`/`WF_ACTIVITYNAME`
+(cột 21-22, kết quả JOIN `WFINSTRUMENTTABLE` đã lọc `CREATEDBY`) —
+không cần thêm cột nào khác vì `WORKSTEP_CODE`/`DECISION_CODE`/
+`EXITDATE` của toàn bộ lịch sử `WI_NAME` đã có sẵn ngay trên bảng này.
+Xem công thức đầy đủ tại `hld/hld_review/HLD_FCT_PDTD_DTM_review.md`
+mục 16.
 
 **So với `FCT_LOS_WORKSTEP_EVENT` gộp (24 cột):** giữ lại `DATASOURCE`
 (nay cố định 'RLOS' làm cột kỹ thuật đánh dấu nguồn hệ sau khi tách vật
@@ -5923,21 +6811,35 @@ chứng cột-mức bổ sung cho việc tách hợp lý). Cập nhật mô tả
 `DIM_CLOS_*`, không còn cần CASE theo `DATASOURCE`). Bỏ thêm `PRODUCT_SK`
 — rà soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào join qua
 surrogate key này để lấy dữ liệu sản phẩm (xem Section 3), quan hệ hồ
-sơ↔sản phẩm chính đã có sẵn qua `FCT_RLOS_APPLICATION_DAILY.PRODUCT_SK`
+sơ↔sản phẩm chính đã có sẵn qua `FCT_RLOS_APPLICATION.PRODUCT_SK`
 (2.3.2.1) — tổng 23 cột (giảm 1 so với bản gộp), tăng lên 26 cột sau khi
 bổ sung `PROCESSED_DATE`/`WORKSTEP_FLAG`/`APPLICANT_SK` (review
 2026-09-21, cùng lý do đã áp dụng cho nhánh CLOS 1.2.2.6 — xem Section 1
-→ 1.3.2.7 phần "Đính chính lld/BC4.csv"), rồi **nay 25 cột** sau khi bỏ
+→ 1.3.2.7 phần "Đính chính lld/BC4.csv"), rồi 25 cột sau khi bỏ
 `EVENT_SEQ_DESC` (review 2026-09-22 — cột dư thừa, không công thức nào
 trong toàn tài liệu tham chiếu tới, chiều giảm dần tự suy từ
-`EVENT_SEQ_ASC` khi cần, xem Section 3).
+`EVENT_SEQ_ASC` khi cần, xem Section 3), 23 cột sau khi gộp
+`WORKSTEP_SK`+`DECISION_SK` thành 1 `WORKSTEP_DECISION_SK` và xóa cột
+`DECISION_CODE` denormalize (review 2026-09-24, theo quyết định gộp
+`DIM_RLOS_WORKSTEP`+`DIM_RLOS_DECISION` — xem 1.3.1.3). `WORKSTEP_CODE`
+KHÔNG đổi, vẫn giữ trên fact vì là 1 phần PK vật lý của bảng. **26 cột
+(review 2026-09-25):** bổ sung `APPROVED_AMT_FINAL`/`CURRENCY_CODE`/
+`APPROVED_TERM` (chuyển từ `DIM_RLOS_APPLICATION`, tính độc
+lập trực tiếp trên bảng này). 25 cột (review 2026-09-26): bỏ
+`APPLICANT_SK` — `DIM_RLOS_APPLICANT` đã đổi thành `FCT_RLOS_CUSTOMER`
+(grain giấy tờ, 1.3.2.8), không còn 1:1 hồ sơ↔applicant để giữ 1 FK duy
+nhất ở đây (xem ghi chú Section 1 → 1.3.2.7). **Nay vẫn 25 cột (review
+2026-09-27):** đổi `WORKSTEP_FLAG`+`APPROVAL_FLAG` (2 cột đã tính
+sẵn) thành 2 cột thô `WF_PROCESSNAME`/`WF_ACTIVITYNAME`, công thức CASE
+WHEN/window function chuyển sang PDTD_DTM (cùng cơ chế đã áp dụng cho
+CLOS, xem đánh giá kiến trúc phía trên). `APPROVED_AMT_FINAL`/
+`CURRENCY_CODE`/`APPROVED_TERM` đánh số lại thành cột 23-25.
 
 **Đối chiếu SRS (BC3, BC4, BC8, BC9):** đã đối chiếu chi tiết tại Section
 1 → 1.3.2.7 — khớp đúng công thức TAT/NHAN_SU/SL_RETURN đã ghi trong
 lineage doc gốc, nhánh RLOS. Không phát hiện lệch tài liệu, không phát
 sinh PENDING mới. **Cập nhật (review 2026-09-21):**
-đã bổ sung `PROCESSED_DATE`/`WORKSTEP_FLAG`/`APPLICANT_SK` (nay cột
-23-25 sau khi đánh số lại — xem cập nhật 2026-09-22 dưới đây)
+đã bổ sung `PROCESSED_DATE`/`WORKSTEP_FLAG`/`APPLICANT_SK`
 — xem chi tiết
 căn cứ tại Section 1 → 1.3.2.7, phần "Đính chính lld/BC4.csv".
 **Cập nhật (review 2026-09-22):** đã bỏ cột `EVENT_SEQ_DESC` (cột dư
@@ -5945,18 +6847,122 @@ thừa — không có công thức nào trong toàn tài liệu tham chiếu t�
 `FIRST_WORKSTEP_RETURN` lẫn nhóm `LAST_*` đều tự tính độc lập; chiều
 giảm dần tự suy từ `EVENT_SEQ_ASC` bằng `COUNT(*) OVER (PARTITION BY
 WI_NAME) - EVENT_SEQ_ASC + 1` khi cần), đánh số lại STT các cột phía
-sau — bảng nay còn 25 cột.
+sau — bảng nay còn 25 cột. **Cập nhật (review 2026-09-26):** đã bỏ tiếp
+`APPLICANT_SK` — nay còn 25 cột (23-25 là `APPROVED_AMT_FINAL`/
+`CURRENCY_CODE`/`APPROVED_TERM`, xem ghi chú "Nay 25 cột" ở trên).
+
+###### 1.3.2.8 FCT_RLOS_CUSTOMER — MỚI (đổi từ DIM_RLOS_APPLICANT, review 2026-09-26, theo yêu cầu người dùng)
+
+**Bảng cũ (trước đổi):** `DIM_RLOS_APPLICANT` (1.3.1.8 cũ, 41 cột, grain 1 dòng/hồ sơ) — đổi thành FACT, đổi grain sang 1 dòng/giấy tờ định danh, xem lý do đầy đủ tại Section 1 → 1.3.2.8
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
+| 2 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION (1.3.1.1), join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
+| 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
+| 4 | CUSTOMER_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ hash của tổ hợp (hồ sơ, loại giấy tờ, số giấy tờ) — PHÁI SINH: STANDARD_HASH(WI_NAME \|\| '~' \|\| ID_TYPE \|\| '~' \|\| ID_NUMBER, 'SHA256'). Cùng công thức/mục đích với EXCEPTION_BK (DIM_CLOS_EXCEPTION/DIM_RLOS_EXCEPTION, 1.2.1.5/1.3.1.5) |
+| 5 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ RLOS — nguồn NG_SB_RLOS_APPLICANT_IDGRID.WI_NAME (driving table). Quan hệ 1:N với giấy tờ (1 hồ sơ có thể có nhiều giấy tờ) |
+| 6 | ID_TYPE | VARCHAR2 | N | 50 |  | Loại giấy tờ định danh — nguồn NG_SB_RLOS_APPLICANT_IDGRID.ID_TYPE. 14 giá trị quan sát được (BLX, CMND, CMNDQD, DKKD...); SRS BC1 dùng nhóm TCC/CC làm khóa lọc ADD_ID (xem ghi chú Section 1) |
+| 7 | ID_NUMBER | VARCHAR2 | N | 100 |  | Số giấy tờ định danh — nguồn NG_SB_RLOS_APPLICANT_IDGRID.ID_NUMBER |
+| 8 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24) — CHUYỂN TỪ FCT_RLOS_APPLICATION (review 2026-09-26): join trực tiếp theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME (đúng nguyên văn SRS BC1 BR 1.2: LEFT JOIN STG_DTM.STG_DIM_CUSTOMER (ac) ON u.ID_NUMBER=ac.LEGAL_ID AND u.ID_TYPE=ac.LEGAL_DOC_NAME, u=NG_SB_RLOS_APPLICANT_IDGRID). Mặc định -1 nếu không khớp. Đây là chân khách hàng T24 — khác chân khách hàng LOS/applicant thể hiện bằng chính WI_NAME/ID_TYPE/ID_NUMBER trên bảng này |
+| 9 | ISSUE_DATE | DATE | N |  |  | Ngày cấp giấy tờ — nguồn NG_SB_RLOS_APPLICANT_IDGRID.ISSUE_DATE. Thiết kế dư thừa |
+| 10 | EXPIRY_DATE | DATE | N |  |  | Ngày hết hạn giấy tờ — nguồn NG_SB_RLOS_APPLICANT_IDGRID.EXPIRY_DATE. Thiết kế dư thừa |
+| 11 | ISSUE_PLACE | VARCHAR2 | N | 200 |  | Nơi cấp giấy tờ — nguồn NG_SB_RLOS_APPLICANT_IDGRID.ISSUE_PLACE. Thiết kế dư thừa |
+| 12 | ISSUE_DATE_VISA | DATE | N |  |  | Ngày cấp visa (khách hàng nước ngoài) — nguồn NG_SB_RLOS_APPLICANT_IDGRID.ISSUE_DATE_VISA. Thiết kế dư thừa |
+| 13 | EXPIRY_DATE_VISA | DATE | N |  |  | Ngày hết hạn visa (khách hàng nước ngoài) — nguồn NG_SB_RLOS_APPLICANT_IDGRID.EXPIRY_DATE_VISA. Thiết kế dư thừa |
+| 14 | CUST_CLASS | VARCHAR2 | N | 200 |  | Phân loại khách hàng theo giấy tờ (CLASS.IND.UNDEFINED/CLASS.MASS/CLASS.SB.STAFF/CLASS.VIPS) — nguồn NG_SB_RLOS_APPLICANT_IDGRID.CUST_CLASS. Thiết kế dư thừa |
+| 15 | IS_FETCH | VARCHAR2 | N | 200 |  | Cờ giấy tờ có được tự động lấy từ hệ định danh hay không — nguồn NG_SB_RLOS_APPLICANT_IDGRID.IS_FETCH. Thiết kế dư thừa |
+| 16 | CIF | VARCHAR2 | N | 50 |  | Mã CIF khách hàng, nếu đã định danh — nguồn NG_SB_RLOS_APPLICANT_IDGRID.CIF. Hiện chưa có report nào dùng trực tiếp (SRS BC1 dùng T24_CUSTOMER_SK làm chân T24 chính thức), giữ dạng dư thừa vì có ý nghĩa nghiệp vụ thật |
+| 17 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên đầy đủ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.FULL_NAME, LEFT JOIN theo WI_NAME của chính dòng IDGRID đang xét |
+| 18 | DATE_OF_BIRTH | DATE | N |  |  | Ngày sinh — nguồn NG_SB_RLOS_APPLICANT_GENERAL.DOB |
+| 19 | GENDER | VARCHAR2 | N | 20 |  | Giới tính — nguồn NG_SB_RLOS_APPLICANT_GENERAL.GENDER |
+| 20 | NATIONALITY | VARCHAR2 | N | 100 |  | Quốc tịch (mã) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.NATIONALITY |
+| 21 | TITLE | VARCHAR2 | N | 50 |  | Danh xưng — nguồn NG_SB_RLOS_APPLICANT_GENERAL.TITLE |
+| 22 | HOME_PHONE | VARCHAR2 | N | 50 |  | Số điện thoại nhà riêng — nguồn NG_SB_RLOS_APPLICANT_GENERAL.HOME_PHONE |
+| 23 | PHONE_1 | VARCHAR2 | N | 50 |  | Số điện thoại di động chính — nguồn NG_SB_RLOS_APPLICANT_GENERAL.PHONE_1 |
+| 24 | PHONE_2 | VARCHAR2 | N | 50 |  | Số điện thoại phụ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.PHONE2 (đổi tên PHONE2→PHONE_2 cho nhất quán với PHONE_1) |
+| 25 | MARRIAGE_STATUS | VARCHAR2 | N | 100 |  | Tình trạng hôn nhân — nguồn NG_SB_RLOS_APPLICANT_DETAIL.MARR_STATUS, LEFT JOIN theo WI_NAME của chính dòng IDGRID đang xét |
+| 26 | EDUCATION_LEVEL | VARCHAR2 | N | 100 |  | Trình độ học vấn — nguồn NG_SB_RLOS_APPLICANT_DETAIL.EDU_LEVEL |
+| 27 | VEHICLE | VARCHAR2 | N | 100 |  | Phương tiện đi lại — nguồn NG_SB_RLOS_APPLICANT_DETAIL.VEHICLE |
+| 28 | PERM_ADDRESS | VARCHAR2 | N | 500 |  | Địa chỉ thường trú — nguồn NG_SB_RLOS_APPLICANT_DETAIL.PERM_ADD |
+| 29 | CURR_HOUSE_NO | VARCHAR2 | N | 200 |  | Số nhà thuộc địa chỉ hiện tại — nguồn NG_SB_RLOS_APPLICANT_DETAIL.HOUSNO_CURR_RES |
+| 30 | CURR_WARD | VARCHAR2 | N | 100 |  | Phường xã thuộc địa chỉ hiện tại — nguồn NG_SB_RLOS_APPLICANT_DETAIL.WARD_CURR_RES |
+| 31 | CITY_CODE | VARCHAR2 | N | 50 |  | Mã tỉnh/thành phố thuộc địa chỉ hiện tại — nguồn NG_SB_RLOS_MAS_CITY.CITY_CODE, LEFT JOIN theo NG_SB_RLOS_APPLICANT_DETAIL.CITY_CURR_RES |
+| 32 | CITY_NAME | VARCHAR2 | N | 200 |  | Tên tỉnh/thành phố — nguồn NG_SB_RLOS_MAS_CITY.CITY_NAME |
+| 33 | CITY_NAME_VN | VARCHAR2 | N | 200 |  | Tên tỉnh/thành phố tiếng Việt có dấu — nguồn NG_SB_RLOS_MAS_CITY.CITY_NAME_VN |
+| 34 | DISTRICT_CODE | VARCHAR2 | N | 50 |  | Mã quận/huyện thuộc địa chỉ hiện tại — nguồn NG_SB_RLOS_MAS_DISTRICT.DISTRICT_CODE, LEFT JOIN theo NG_SB_RLOS_APPLICANT_DETAIL.DISTRICT_CURR_RES |
+| 35 | DISTRICT_NAME | VARCHAR2 | N | 200 |  | Tên quận/huyện — nguồn NG_SB_RLOS_MAS_DISTRICT.DISTRICT_NAME |
+| 36 | DISTRICT_NAME_VN | VARCHAR2 | N | 200 |  | Tên quận/huyện tiếng Việt có dấu — PHÁI SINH: lấy NG_SB_RLOS_MAS_DISTRICT.DISTRICT_NAME_VN nhưng gán NULL với giá trị lỗi '#NA'/'#REF!' còn sót từ khâu import Excel |
+| 37 | CUS_SEGMENT | VARCHAR2 | N | 100 |  | Phân khúc khách hàng theo LOS (giá trị gốc, chưa chuẩn hóa) — nguồn NG_SB_RLOS_APPLICANT_DETAIL.CUS_SEGMENT. `CUSTOMER_SEGMENT` (chuẩn hóa CASE WHEN) chuyển hẳn sang tính tại PDTD_DTM (2.3.2.x), không có ở SB_DWH |
+
+- Bảng FACT snapshot hàng ngày, giữ chi tiết tới từng giấy tờ định danh của người vay chính RLOS. Grain: 1 dòng = 1 ngày × 1 giấy tờ của 1 hồ sơ. Không SCD2 (không có EFF_DATE/EXP_DATE) — mỗi ngày lặp lại toàn bộ giấy tờ của mọi hồ sơ đang active, giống pattern FCT_RLOS_APPLICATION. Phục vụ BC1, BC2, BC3, BC4.
+- Khóa chính của bảng (PK): **DAYID, CUSTOMER_BK**.
+
+**So với thiết kế cũ (`DIM_RLOS_APPLICANT`, 41 cột):** xem đầy đủ lý do
+đổi kiến trúc DIM→FACT, đổi grain, đổi driving table (GENERAL→IDGRID),
+bỏ `ADD_ID`/`ADD_ID_OTHER`, bổ sung `CUSTOMER_BK`/`T24_CUSTOMER_SK`/
+`CIF`/7 cột dư thừa IDGRID, chuyển 9 cột hồ sơ-scoped về `DIM_RLOS_
+APPLICATION`, chuyển `CUSTOMER_SEGMENT` sang PDTD_DTM — tại Section 1 →
+1.3.2.8. 37 cột (giảm 4 so với 41 cột cũ: bỏ `ADD_ID`/`ADD_ID_OTHER` (2
+cột pivot không còn cần), bỏ 9 cột hồ sơ-scoped, cộng thêm `APPLICANT_
+BK`/`T24_CUSTOMER_SK`/`CIF`/7 cột dư thừa IDGRID (10 cột mới) và `ID_
+TYPE`/`ID_NUMBER` denormalize từ NK (2 cột) — 41 - 2 - 9 + 10 + 2 = 42,
+trừ `EFF_DATE`/`EXP_DATE` không còn (bỏ SCD2, -2), cộng `DAYID` (+1) =
+37 cột).
+
+###### 1.3.2.9 FCT_RLOS_COREPAYER — MỚI (đổi từ DIM_RLOS_COREPAYER, review 2026-09-26, theo yêu cầu người dùng)
+
+**Bảng cũ (trước đổi):** `DIM_RLOS_COREPAYER` (1.3.1.8 cũ, 18 cột, grain 1 dòng/corepayer, SCD2) — đổi thành FACT, đổi grain sang 1 dòng/giấy tờ của corepayer, xem lý do đầy đủ tại Section 1 → 1.3.2.9
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
+| 2 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION (1.3.1.1), join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
+| 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS |
+| 4 | COREPAYER_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ hash của tổ hợp (hồ sơ, quan hệ với người vay chính, nhãn thứ tự corepayer, loại giấy tờ, số giấy tờ) — PHÁI SINH: STANDARD_HASH(WI_NAME \|\| '~' \|\| REL_TO_APPLICANT \|\| '~' \|\| ID_NO_CO \|\| '~' \|\| ID_TYPE \|\| '~' \|\| ID_NUMBER, 'SHA256'). Cùng công thức/mục đích với CUSTOMER_BK (FCT_RLOS_CUSTOMER, 1.3.2.8), EXCEPTION_BK (DIM_CLOS/RLOS_EXCEPTION) |
+| 5 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ RLOS — nguồn NG_SB_RLOS_COREP_IDGRID.WI_NAME (driving table). Quan hệ 1:N với giấy tờ (1 corepayer có thể có nhiều giấy tờ, 1 hồ sơ có thể có 0..4 corepayer) |
+| 6 | REL_TO_APPLICANT | VARCHAR2 | N | 200 |  | Quan hệ với người đề nghị vay chính — nguồn NG_SB_RLOS_COREPAYER_GENERAL.REL_TO_APPLICANT, LEFT JOIN theo WI_NAME + PIN=ID_NO_CO của chính dòng IDGRID đang xét. Cùng KEY CDC gốc của COREPAYER_GENERAL (WI_NAME+REL_TO_APPLICANT+ID_NO_CO), giữ lại để phân biệt các corepayer khác nhau khi ID_NO_CO chỉ là nhãn thứ tự |
+| 7 | ID_NO_CO | VARCHAR2 | N | 100 |  | Nhãn thứ tự người đồng trả nợ (PIN: Corep1-4) — nguồn NG_SB_RLOS_COREP_IDGRID.PIN (=ID_NO_CO trên COREPAYER_GENERAL, xác nhận nghiệp vụ) |
+| 8 | ID_TYPE | VARCHAR2 | N | 50 |  | Loại giấy tờ định danh — nguồn NG_SB_RLOS_COREP_IDGRID.ID_TYPE |
+| 9 | ID_NUMBER | VARCHAR2 | N | 100 |  | Số giấy tờ định danh — nguồn NG_SB_RLOS_COREP_IDGRID.ID_NUMBER |
+| 10 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên đầy đủ — nguồn NG_SB_RLOS_COREPAYER_GENERAL.FULL_NAME, LEFT JOIN theo WI_NAME + PIN=ID_NO_CO của chính dòng IDGRID đang xét |
+| 11 | DATE_OF_BIRTH | DATE | N |  |  | Ngày sinh — nguồn NG_SB_RLOS_COREPAYER_GENERAL.DOB_CO |
+| 12 | NATIONALITY | VARCHAR2 | N | 100 |  | Quốc tịch — nguồn NG_SB_RLOS_COREPAYER_GENERAL.NATIONALITY_CO |
+| 13 | TITLE | VARCHAR2 | N | 30 |  | Danh xưng — nguồn NG_SB_RLOS_COREPAYER_GENERAL.TITLE_CO |
+| 14 | HOUSEHOLD | VARCHAR2 | N | 100 |  | Số sổ hộ khẩu — nguồn NG_SB_RLOS_COREPAYER_GENERAL.HOUSEHOLD |
+| 15 | PHONE_1 | VARCHAR2 | N | 50 |  | Số điện thoại di động chính — nguồn NG_SB_RLOS_COREPAYER_GENERAL.PHONE1 |
+| 16 | PHONE_2 | VARCHAR2 | N | 50 |  | Số điện thoại phụ — nguồn NG_SB_RLOS_COREPAYER_GENERAL.PHONE2 |
+| 17 | HOME_PHONE | VARCHAR2 | N | 50 |  | Số điện thoại cố định — nguồn NG_SB_RLOS_COREPAYER_GENERAL.HOMEPHONE |
+
+- Bảng FACT snapshot hàng ngày, giữ chi tiết tới từng giấy tờ định danh của người đồng trả nợ (corepayer) RLOS. Grain: 1 dòng = 1 ngày × 1 giấy tờ của 1 corepayer trên 1 hồ sơ. Không SCD2 (không có EFF_DATE/EXP_DATE) — mỗi ngày lặp lại toàn bộ giấy tờ của mọi corepayer đang active, giống pattern FCT_RLOS_CUSTOMER/FCT_RLOS_APPLICATION. Phục vụ BC1.
+- Khóa chính của bảng (PK): **DAYID, COREPAYER_BK**.
+
+**So với thiết kế cũ (`DIM_RLOS_COREPAYER`, 18 cột):** đổi kiến trúc
+DIM→FACT, đổi grain từ 1 dòng/corepayer sang 1 dòng/giấy tờ của
+corepayer, đổi driving table (COREPAYER_GENERAL→COREP_IDGRID), bỏ pivot
+`ADD_ID_COREPAYER`/`ADD_ID_OTHER_COREPAYER` (2 cột), bổ sung
+`COREPAYER_BK`/`ID_TYPE`/`ID_NUMBER` denormalize từ NK (3 cột) — xem lý
+do đầy đủ tại Section 1 → 1.3.2.9. 17 cột (giảm 1 so với 18 cột cũ: bỏ
+`DIMENSION_KEY`/`COREPAYER_SK`/`EFF_DATE`/`EXP_DATE`/`ADD_ID_COREPAYER`/
+`ADD_ID_OTHER_COREPAYER` (6 cột), cộng `DAYID`/`COREPAYER_BK`/`ID_TYPE`/
+`ID_NUMBER` (4 cột), giữ nguyên `REL_TO_APPLICANT`/`ID_NO_CO` (đổi từ
+NK sang cột thường) và `APPLICATION_SK` mới — 18 - 6 + 4 + 1 = 17).
+Không có `T24_CUSTOMER_SK` — theo quyết định người dùng, chỉ khách hàng
+chính và người liên quan pháp lý mới cần chân T24, corepayer thì không.
+
+**Ripple — `FCT_RLOS_APPLICATION_PARTY` xóa hẳn (review 2026-09-26):** xem
+Section 1 → 1.3.2.9 và 1.3.2.2 (bảng đã xóa).
 
 
 ### 2. PDTD_DTM
 
 #### 2.1 Bộ bảng CHUNG
 
-##### 2.1.1 DIM_LOS_ORG_UNIT — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_RLOS_MAS_COMPANY/MAS_BRANCH/MAS_REGION từ SB_DWH, review 2026-09-18)
+##### 2.1.1 DIM_LOS_COMPANY — ✅ ĐÃ GIẢI QUYẾT (kế thừa nguồn NG_SB_RLOS_MAS_COMPANY/MAS_BRANCH/MAS_REGION từ SB_DWH, review 2026-09-18)
 
-**Bảng cũ (trước tách):** `DIM_PDTD_ORG_UNIT` → đổi tên thành `DIM_LOS_ORG_UNIT` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
+**Bảng cũ (trước tách):** `DIM_PDTD_ORG_UNIT` → đổi tên thành `DIM_LOS_COMPANY` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
-Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → SB_DWH → Bộ bảng CHUNG → DIM_LOS_ORG_UNIT trong `HLD_DIM_SB_DWH.md`) — không thêm/bớt cột nào ở layer này. **16 cột** (review 2026-09-18, tăng từ 10 cột do đổi nguồn sang bảng danh mục thật, xem Section 1 → 2.1.1).
+Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → SB_DWH → Bộ bảng CHUNG → DIM_LOS_COMPANY trong `HLD_DIM_SB_DWH.md`) — không thêm/bớt cột nào ở layer này. **16 cột** (review 2026-09-18, tăng từ 10 cột do đổi nguồn sang bảng danh mục thật, xem Section 1 → 2.1.1).
 
 - Bảng DIM lưu danh mục đơn vị kinh doanh, bê nguyên 1:1 từ SB_DWH, dùng chung cho cả hai hệ CLOS và RLOS.
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
@@ -5981,7 +6987,7 @@ Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → SB_
 | 3 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_T24_CUSTOMER, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 nếu không có giá trị phù hợp |
 | 4 | CUSTOMER_ID | VARCHAR2 | Y | 50 | NK | Mã khách hàng CIF — nguồn STG_DIM_CUSTOMER.CUSTOMER (1:1 từ SB_DWH.DIM_CUSTOMER.CUSTOMER) |
 | 5 | SHORT_NAME | VARCHAR2 | N | 200 |  | Tên khách hàng theo T24 — nguồn STG_DIM_CUSTOMER_VW.SHORT_NAME (1:1 từ SB_DWH.DIM_CUSTOMER_VW.SHORT_NAME) |
-| 6 | LEGAL_ID | VARCHAR2 | N | 100 |  | Số giấy tờ định danh đã chuẩn hóa — nguồn STG_DIM_CUSTOMER.LEGAL_ID. Đây là cột nối về LOS (khớp DIM_CLOS_CUSTOMER.ORG_LEGAL_ID / DIM_RLOS_APPLICANT.ADD_ID, ADD_ID_OTHER) |
+| 6 | LEGAL_ID | VARCHAR2 | N | 100 |  | Số giấy tờ định danh đã chuẩn hóa — nguồn STG_DIM_CUSTOMER.LEGAL_ID. Đây là cột nối về LOS (khớp DIM_CLOS_CUSTOMER.ID_NUMBER — ⚠️ review 2026-09-25: đổi từ ORG_LEGAL_ID sau khi cột đó bị xóa do trùng lặp với NK mới, xem 2.2.1.6 / khớp FCT_RLOS_CUSTOMER.ID_NUMBER+ID_TYPE, xem 1.3.2.8 — review 2026-09-26: đổi từ ADD_ID/ADD_ID_OTHER sau khi bảng đó đổi grain sang giấy tờ) |
 | 7 | LEGAL_DOC_NAME | VARCHAR2 | N | 100 |  | Loại giấy tờ định danh — nguồn STG_DIM_CUSTOMER.LEGAL_DOC_NAME. Phải khớp cùng lúc với LEGAL_ID khi tra |
 | 8 | DATE_OF_BIRTH | DATE | N |  |  | Ngày sinh — nguồn STG_DIM_CUSTOMER.DATE_OF_BIRTH |
 | 9 | GENDER | VARCHAR2 | N | 20 |  | Giới tính — nguồn STG_DIM_CUSTOMER.GENDER |
@@ -6004,9 +7010,13 @@ của các bảng CHUNG khác.
 toàn. BC2 dùng `CUSTOMER_ID` nhưng qua đường lookup khác:
 `STG_DIM_CUSTOMER` LEFT JOIN `REF_CLOS_LEGAL`, lấy giá trị `CUSTOMER` với
 điều kiện `TRIM(LEGAL_TYPE) = 'CUSTOMER'` — đây chính là join key
-`ORG_LEGAL_ID` trên `DIM_CLOS_CUSTOMER` (đã tra sẵn `LEGAL_TYPE='CUSTOMER'`
-từ `DIM_CLOS_LEGAL_PARTY`, xem 2.2.1.7/2.2.1.8), khớp với thiết kế
-`T24_CUSTOMER_SK` đã có trên `FCT_CLOS_APPLICATION_DAILY`. BC10/BC11 dùng
+`ID_NUMBER` trên `DIM_CLOS_CUSTOMER` (⚠️ review 2026-09-25: đổi từ
+`ORG_LEGAL_ID` sau khi cột đó bị xóa do trùng lặp với NK mới `ID_NUMBER`
+— nay là NK trực tiếp của bảng, không còn cần tra qua `FCT_CLOS_LEGAL_
+PARTY` với điều kiện `LEGAL_TYPE='CUSTOMER'` nữa vì `DIM_CLOS_CUSTOMER`
+tự thân đã dùng đúng `ID_NUMBER` của khách hàng chính, xem 2.2.1.6),
+khớp với thiết kế `T24_CUSTOMER_SK` đã có trên `FCT_CLOS_APPLICATION_
+DAILY`. BC10/BC11 dùng
 `SHORT_NAME` (← `STG_DIM_CUSTOMER_VW.SHORT_NAME`, khớp) nhưng lấy
 `CUSTOMER_ID` từ `STG_FCT_LOAN.CUSTOMER_CODE` — một bảng khoản vay T24
 khác, ngoài phạm vi `DIM_T24_CUSTOMER`/datamart này (thuộc
@@ -6021,14 +7031,14 @@ tài liệu nào ở phạm vi cột của bảng này; không phát sinh PENDIN
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_T24_COMPANY — giữ nguyên DIMENSION_KEY của bảng chiều tương ứng bên SB_DWH (qua vùng chìa STG_DTM), không sinh sequence mới |
 | 2 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'T24' — bảng nguồn T24 core banking, không thuộc STG_LOS (CLOS/RLOS) |
-| 3 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_T24_COMPANY, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 nếu không có giá trị phù hợp |
-| 4 | COMPANY_CODE | VARCHAR2 | Y | 20 | NK | Mã đơn vị kinh doanh theo T24 — nguồn STG_DIM_COMPANY.COMPANY_CODE (1:1 từ SB_DWH.DIM_COMPANY.COMPANY_CODE). Cùng business key với DIM_LOS_ORG_UNIT.COMPANY_CODE (nguồn LOS) và TMP_REF_COMPANY_REGION_*.COMPANY_CODE, nhưng đây là bảng khác, nguồn T24 |
+| 3 | T24_COMPANY_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_T24_COMPANY, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 nếu không có giá trị phù hợp |
+| 4 | COMPANY_CODE | VARCHAR2 | Y | 20 | NK | Mã đơn vị kinh doanh theo T24 — nguồn STG_DIM_COMPANY.COMPANY_CODE (1:1 từ SB_DWH.DIM_COMPANY.COMPANY_CODE). Cùng business key với DIM_LOS_COMPANY.COMPANY_CODE (nguồn LOS) và TMP_REF_COMPANY_REGION_*.COMPANY_CODE, nhưng đây là bảng khác, nguồn T24 |
 | 5 | BRANCH_NAME | VARCHAR2 | N | 200 |  | Tên chi nhánh theo T24 — nguồn STG_DIM_COMPANY.BRANCH_NAME. Trường BRANCH_NAME của BC10, BC11 |
 | 6 | COMPANY_NAME_VN | VARCHAR2 | N | 200 |  | Tên phòng giao dịch theo T24 — nguồn STG_DIM_COMPANY.COMPANY_NAME_VN. Trường COMPANY_NAME của BC10, BC11 |
 | 7 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi — do SB_DWH quản lý, bê nguyên qua vùng chìa, không tính lại ở DTM |
 | 8 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành — do SB_DWH quản lý, bê nguyên qua vùng chìa |
 
-- Bảng DIM lưu chiều đơn vị kinh doanh (chi nhánh/phòng giao dịch) lõi T24, chỉ dùng làm FK cho `FCT_CLOS_LOAN_DISBURSEMENT`/`FCT_RLOS_LOAN_DISBURSEMENT`. Grain: 1 dòng = 1 đơn vị kinh doanh T24. Phục vụ BC10, BC11 (qua FK COMPANY_SK trên fact).
+- Bảng DIM lưu chiều đơn vị kinh doanh (chi nhánh/phòng giao dịch) lõi T24, chỉ dùng làm FK cho `FCT_CLOS_LOAN_DISBURSEMENT`/`FCT_RLOS_LOAN_DISBURSEMENT`. Grain: 1 dòng = 1 đơn vị kinh doanh T24. Phục vụ BC10, BC11 (qua FK T24_COMPANY_SK trên fact).
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH qua vùng chìa STG_DTM).
 
 **Bảng mới, không so sánh với thiết kế cũ:** đây là bảng bổ sung phát sinh
@@ -6038,7 +7048,7 @@ trong quá trình thiết kế `FCT_CLOS_LOAN_DISBURSEMENT`/
 là cột vật lý trên fact, cũng không có DIM company riêng trong 24 bảng
 của split-proposal. Việc tách DIM riêng (thay vì lưu `BRANCH_NAME`/
 `COMPANY_NAME` trực tiếp trên fact, hoặc coi là join-time qua
-`DIM_LOS_ORG_UNIT`) là quyết định kiến trúc theo yêu cầu người dùng, để
+`DIM_LOS_COMPANY`) là quyết định kiến trúc theo yêu cầu người dùng, để
 2 bảng LOAN_DISBURSEMENT có FK vật lý rõ ràng cho mọi chiều dữ liệu chúng
 tham chiếu — không có cột nào chỉ mô tả bằng lời "JOIN qua X" mà không có
 khóa tương ứng trên fact.
@@ -6106,9 +7116,9 @@ liệu nào xác nhận business key gốc của sản phẩm T24 (chỉ có sur
 không thiết kế cột NK nào ngoài `SEAB_PRODUCTS_DE_NAME`. Không phát sinh
 PENDING mới.
 
-##### 2.1.7 REF_LOS_KPI_USER_YEAR — ĐỔI KIẾN TRÚC (đổi từ FCT_LOS_KPI_USER_YEAR sang bảng danh mục REF_, bỏ DAYID khỏi khóa)
+##### 2.1.7 AGG_LOS_KPI_USER_YEAR — ĐỔI TÊN TỪ REF_LOS_KPI_USER_YEAR (review 2026-09-27, theo yêu cầu người dùng)
 
-**Bảng cũ (trước tách):** `FCT_PDTD_KPI_USER_YEAR` (PK `DAYID + KPI_YEAR + USERNAME`) — đổi kiến trúc theo yêu cầu người dùng: bỏ `DAYID` khỏi khóa (bảng không có metric biến đổi theo ngày, chỉ là danh sách user/năm), đổi tiền tố `FCT_` → `REF_` cho đồng bộ nhóm bảng danh mục tại PDTD_DTM — riêng bảng này vẫn giữ cơ chế ETL tự động (INSERT-if-not-exists), khác 9 bảng `REF_` gốc (khởi tạo/cập nhật thủ công bởi BA, xem 2.4)
+**Bảng cũ:** `FCT_PDTD_KPI_USER_YEAR` (PK `DAYID + KPI_YEAR + USERNAME`) → đổi kiến trúc bỏ `DAYID` khỏi khóa (bảng không có metric biến đổi theo ngày, chỉ là danh sách user/năm), gọi là `REF_LOS_KPI_USER_YEAR` một thời gian → **đổi tên lần 2 (review 2026-09-27) thành `AGG_LOS_KPI_USER_YEAR`** để đúng quy ước: `REF_` chỉ dành cho danh mục tĩnh khởi tạo/cập nhật thủ công bởi BA (9 bảng gốc, xem 2.4); bảng này lưu kết quả tính toán qua ETL tự động (INSERT-if-not-exists), đúng bản chất `AGG_`. Xem đánh giá đầy đủ tại Section 1 → 2.1.7 và `hld/hld_review/HLD_FCT_PDTD_DTM_review.md`.
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -6144,32 +7154,32 @@ xử lý").
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
-| 2 | SLHS_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS được phê duyệt, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', thỏa điều kiện DECISION đã phê duyệt, VÀ (join DIM_RLOS_APPLICATION qua APPLICATION_SK) BI_FLOW IN ('BL','KHCN_HO'), VÀ (join DIM_LOS_ORG_UNIT qua ORG_UNIT_SK) COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (theo đúng công thức SLHS_RLOS của SRS BC9 — SLHS(Nhóm 1)+SLHS(Nhóm 2), 2 nhóm bù trừ hoàn toàn theo SUB_PRODUCT/PRODUCT_NAME nên tổng bằng COUNT trên toàn bộ điều kiện lọc chung, không cần tách nhóm khi tính) |
+| 2 | SLHS_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS được phê duyệt, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date (đọc đúng snapshot ngày đang chạy — bảng nguồn nay có DAYID riêng, review 2026-09-27, xem lưu ý bắt buộc tại Section 1 → 2.1.9) VÀ PROCESSED_DATE = v_batch_date (điều kiện nghiệp vụ "phát sinh trong ngày" — 2 điều kiện độc lập, không đối chiếu DAYID nguồn/đích), IS_TEST_ACCOUNT != 'Y', thỏa điều kiện DECISION đã phê duyệt, VÀ (join DIM_RLOS_APPLICATION qua APPLICATION_SK) BUSINESS_FLOW IN ('BL','KHCN_HO'), VÀ (join DIM_LOS_COMPANY qua COMPANY_SK) COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (theo đúng công thức SLHS_RLOS của SRS BC9 — SLHS(Nhóm 1)+SLHS(Nhóm 2), 2 nhóm bù trừ hoàn toàn theo SUB_PRODUCT/PRODUCT_NAME nên tổng bằng COUNT trên toàn bộ điều kiện lọc chung, không cần tách nhóm khi tính) |
 | 3 | SLHS_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_RLOS(D) = SLHS_RLOS(D-1) + SLHS_RLOS_DAY(D), reset vào 1/1. Trường SLHS_RLOS của BC9 |
-| 4 | SLGN_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS đã giải ngân (tồn tại hợp đồng trên STG_FCT_LOAN), phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', BI_FLOW IN ('BL','KHCN_HO'), COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (cùng 2 join như SLHS_RLOS_DAY), VÀ EXISTS hợp đồng STG_FCT_LOAN theo SEAB_LOS_ID |
+| 4 | SLGN_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS đã giải ngân (tồn tại hợp đồng trên STG_FCT_LOAN), phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, cùng cơ chế cột SLHS_RLOS_DAY), IS_TEST_ACCOUNT != 'Y', BUSINESS_FLOW IN ('BL','KHCN_HO'), COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (cùng 2 join như SLHS_RLOS_DAY), VÀ EXISTS hợp đồng STG_FCT_LOAN theo SEAB_LOS_ID |
 | 5 | SLGN_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_RLOS(D) = SLGN_RLOS(D-1) + SLGN_RLOS_DAY(D), reset vào 1/1. Trường SLGN_RLOS của BC9 |
-| 6 | SLHS_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS được phê duyệt, phát sinh trong ngày — cùng cách SLHS_RLOS_DAY, DATASOURCE='CLOS', IS_TEST_ACCOUNT != 'Y' VÀ VAR_STR12 IS NOT NULL, VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — điều kiện tương đương BI_FLOW của RLOS, SRS BC9 dùng STREAM trên NG_SB_CLOS_APPROVAL riêng cho CLOS), theo công thức SLHS_CLOS của SRS BC9 |
+| 6 | SLHS_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS được phê duyệt, phát sinh trong ngày — cùng cách SLHS_RLOS_DAY (bao gồm AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, 2 điều kiện độc lập), DATASOURCE='CLOS', IS_TEST_ACCOUNT != 'Y' VÀ VAR_STR12 IS NOT NULL, VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — điều kiện tương đương BUSINESS_FLOW của RLOS, SRS BC9 dùng STREAM trên NG_SB_CLOS_APPROVAL riêng cho CLOS), theo công thức SLHS_CLOS của SRS BC9 |
 | 7 | SLHS_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_CLOS(D) = SLHS_CLOS(D-1) + SLHS_CLOS_DAY(D), reset vào 1/1. Trường SLHS_CLOS của BC9 |
-| 8 | SLGN_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS đã giải ngân, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='CLOS') có PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', VAR_STR12 IS NOT NULL, VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17, cùng lý do SLHS_CLOS_DAY), VÀ EXISTS hợp đồng trên STG_FCT_LOAN (nhánh LD, review 2026-09-18/2026-09-21: LISTAGG(CONTRACT) nhóm theo WFINSTRUMENTTABLE.VAR_STR12, khóa JOIN vào STG_FCT_LOAN vẫn là SEAB_LOS_ID+CUSTOMER_CODE — xem đã giải quyết Section 1 → 2.1.8) HOẶC STG_DTM.STG_FCT_MD (nhánh MD, bảo lãnh) theo SEAB_LOS_ID+CUSTOMER — đúng công thức SLGN_CLOS của SRS BC9. Xem Section 3 dòng #18/#47 (đã giải quyết) |
+| 8 | SLGN_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS đã giải ngân, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='CLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, cùng cơ chế cột SLHS_CLOS_DAY), IS_TEST_ACCOUNT != 'Y', VAR_STR12 IS NOT NULL, VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17, cùng lý do SLHS_CLOS_DAY), VÀ EXISTS hợp đồng trên STG_FCT_LOAN (nhánh LD, review 2026-09-18/2026-09-21: LISTAGG(CONTRACT) nhóm theo WFINSTRUMENTTABLE.VAR_STR12, khóa JOIN vào STG_FCT_LOAN vẫn là SEAB_LOS_ID+CUSTOMER_CODE — xem đã giải quyết Section 1 → 2.1.8) HOẶC STG_DTM.STG_FCT_MD (nhánh MD, bảo lãnh) theo SEAB_LOS_ID+CUSTOMER — đúng công thức SLGN_CLOS của SRS BC9. Xem Section 3 dòng #18/#47 (đã giải quyết) |
 | 9 | SLGN_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_CLOS(D) = SLGN_CLOS(D-1) + SLGN_CLOS_DAY(D), reset vào 1/1. Trường SLGN_CLOS của BC9 |
-| 10 | TAT_RLOS_SEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS CÓ tài sản bảo đảm, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR theo PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', lọc SEC theo COLLREQUIRE |
+| 10 | TAT_RLOS_SEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS CÓ tài sản bảo đảm, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, review 2026-09-27), IS_TEST_ACCOUNT != 'Y', lọc SEC theo COLLREQUIRE |
 | 11 | TAT_RLOS_SEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS có tài sản bảo đảm, phát sinh trong ngày — mẫu số của TAT_RLOS_SEC, cùng điều kiện lọc trên |
 | 12 | TAT_RLOS_SEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_SUM_HOUR_DAY(D), reset vào 1/1 |
 | 13 | TAT_RLOS_SEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_CASE_CNT_DAY(D), reset vào 1/1 |
-| 14 | TAT_RLOS_UNSEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS KHÔNG có tài sản bảo đảm, phát sinh trong ngày — cùng cách trên (IS_TEST_ACCOUNT != 'Y'), lọc UNSEC |
+| 14 | TAT_RLOS_UNSEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS KHÔNG có tài sản bảo đảm, phát sinh trong ngày — cùng cách trên (AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, IS_TEST_ACCOUNT != 'Y'), lọc UNSEC |
 | 15 | TAT_RLOS_UNSEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS không có tài sản bảo đảm, phát sinh trong ngày |
 | 16 | TAT_RLOS_UNSEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 |
 | 17 | TAT_RLOS_UNSEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 |
-| 18 | TAT_CLOS_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ CLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (DATASOURCE='CLOS') theo PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y' (không lọc VAR_STR12 — SRS không nhắc điều kiện này cho TAT_CLOS), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — SRS BC9 có điều kiện này riêng cho TAT_CLOS) |
+| 18 | TAT_CLOS_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ CLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (DATASOURCE='CLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, review 2026-09-27), IS_TEST_ACCOUNT != 'Y' (không lọc VAR_STR12 — SRS không nhắc điều kiện này cho TAT_CLOS), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — SRS BC9 có điều kiện này riêng cho TAT_CLOS) |
 | 19 | TAT_CLOS_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS, phát sinh trong ngày — mẫu số của TAT_CLOS, cùng điều kiện lọc trên (bao gồm STREAM) |
 | 20 | TAT_CLOS_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 |
 | 21 | TAT_CLOS_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 |
-| 22 | QUY_DOI_RLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ RLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.QUY_DOI (DATASOURCE='RLOS') theo PROCESSED_DATE=DAYID, IS_TEST_ACCOUNT != 'Y', KHÔNG tính lại công thức POINT*8/VOLUME ở đây |
+| 22 | QUY_DOI_RLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ RLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.QUY_DOI (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, review 2026-09-27), IS_TEST_ACCOUNT != 'Y', KHÔNG tính lại công thức POINT*8/VOLUME ở đây |
 | 23 | QUY_DOI_RLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_RLOS(D) = QUY_DOI_RLOS(D-1) + QUY_DOI_RLOS_DAY(D), reset vào 1/1. Trường QUY_DOI_RLOS của BC9 |
-| 24 | QUY_DOI_CLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ CLOS, phát sinh trong ngày — cùng cách trên (IS_TEST_ACCOUNT != 'Y'), DATASOURCE='CLOS' |
+| 24 | QUY_DOI_CLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ CLOS, phát sinh trong ngày — cùng cách trên (AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, IS_TEST_ACCOUNT != 'Y'), DATASOURCE='CLOS' |
 | 25 | QUY_DOI_CLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_CLOS(D) = QUY_DOI_CLOS(D-1) + QUY_DOI_CLOS_DAY(D), reset vào 1/1. Trường QUY_DOI_CLOS của BC9 |
-| 26 | NEW_USER_CNT_DAY | NUMBER | N | 8 |  | Số USERNAME mới đủ điều kiện tính nhân sự trong ngày — PHÁI SINH: COUNT trên REF_LOS_KPI_USER_YEAR (2.1.7) có KPI_YEAR = năm(DAYID) VÀ TRUNC(FIRST_ELIGIBLE_TS) = DAYID (2 tài khoản test đã bị loại tại nguồn REF_LOS_KPI_USER_YEAR, không cần lọc lại ở đây) |
-| 27 | NHAN_SU | NUMBER | N | 8 |  | Lũy kế từ 1/1: NHAN_SU(D) = NHAN_SU(D-1) + NEW_USER_CNT_DAY(D), reset vào 1/1 — tương đương COUNT DISTINCT USERNAME lũy kế, không đếm trùng vì REF_LOS_KPI_USER_YEAR chỉ INSERT 1 lần/user/năm. Trường NHAN_SU của BC9 |
+| 26 | NEW_USER_CNT_DAY | NUMBER | N | 8 |  | Số USERNAME mới đủ điều kiện tính nhân sự trong ngày — PHÁI SINH: COUNT trên AGG_LOS_KPI_USER_YEAR (2.1.7) có KPI_YEAR = năm(DAYID) VÀ TRUNC(FIRST_ELIGIBLE_TS) = DAYID (2 tài khoản test đã bị loại tại nguồn AGG_LOS_KPI_USER_YEAR, không cần lọc lại ở đây) |
+| 27 | NHAN_SU | NUMBER | N | 8 |  | Lũy kế từ 1/1: NHAN_SU(D) = NHAN_SU(D-1) + NEW_USER_CNT_DAY(D), reset vào 1/1 — tương đương COUNT DISTINCT USERNAME lũy kế, không đếm trùng vì AGG_LOS_KPI_USER_YEAR chỉ INSERT 1 lần/user/năm. Trường NHAN_SU của BC9 |
 
 - Bảng FACT lũy kế theo ngày, lưu chỉ số KPI toàn khối PDTD phục vụ phần "KPI Khối" của BC9. Grain: 1 dòng = 1 ngày dữ liệu, cho toàn khối (RLOS và CLOS là các nhóm cột song song trên cùng 1 dòng, không tách bảng).
 - Khóa chính của bảng (PK): **DAYID**.
@@ -6186,6 +7196,35 @@ SLHS_CLOS`; `NSLD = (QUY_DOI_RLOS+QUY_DOI_CLOS)/NHAN_SU`), tính tại
 tầng report (OAS) thay vì lưu vật lý — tránh trùng dữ liệu suy ra được.
 Giữ nguyên 27 cột còn lại (14 `_DAY` + 13 lũy kế, gộp `NHAN_SU`/
 `NEW_USER_CNT_DAY` không tách SEC/UNSEC).
+
+**Xác nhận giữ nguyên công thức `TAT_RLOS = (AVG_SEC+AVG_UNSEC)/2`
+(review 2026-09-27, đối chiếu lại SRS):** SRS BC9 nguyên văn ghi công
+thức là "AVG_TAT_UNSEC + AVG_TAT_SEC/2" (khác `(AVG_SEC+AVG_UNSEC)/2`
+về mặt toán học). Theo xác nhận của người dùng: coi đây là lỗi soạn
+thảo SRS (ý định thật là trung bình cộng 2 nhóm SEC/UNSEC) — **giữ
+nguyên** công thức `(AVG_SEC+AVG_UNSEC)/2` như đã thiết kế, không sửa
+theo literal SRS.
+
+**Bổ sung điều kiện `AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date` vào
+12 cột `_DAY` đọc từ `AGG_LOS_KPI_APPLICATION` (review 2026-09-27, sau
+khi bảng đó đổi grain thêm DAYID — xem Section 1 → 2.1.9):** trước đây
+các cột `_DAY` chỉ ghi điều kiện `PROCESSED_DATE=DAYID`, đủ đúng khi
+`AGG_LOS_KPI_APPLICATION` còn grain 1 dòng/hồ sơ (không có DAYID). Sau
+khi bảng đó đổi thành N dòng/hồ sơ (1 dòng/DAYID), nếu ETL chỉ lọc
+`PROCESSED_DATE = v_batch_date` mà bỏ qua `DAYID` nguồn sẽ vẫn đúng về
+mặt kết quả (vì mỗi hồ sơ chỉ có đúng 1 dòng có `PROCESSED_DATE` khớp
+`v_batch_date`, do `PROCESSED_DATE` là thuộc tính cố định không đổi
+theo `DAYID` snapshot) — nhưng để tránh rủi ro đọc nhầm/quét thừa dữ
+liệu khi viết SQL thực tế (và làm rõ ý định thiết kế cho người viết LLD/
+ETL), đã bổ sung tường minh **cả 2 điều kiện độc lập**
+(`AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date` VÀ `PROCESSED_DATE =
+v_batch_date`) vào mô tả của: `SLHS_RLOS_DAY`, `SLGN_RLOS_DAY`,
+`SLHS_CLOS_DAY`, `SLGN_CLOS_DAY`, `TAT_RLOS_SEC_SUM_HOUR_DAY`,
+`TAT_RLOS_UNSEC_SUM_HOUR_DAY`, `TAT_CLOS_SUM_HOUR_DAY`,
+`QUY_DOI_RLOS_DAY`, `QUY_DOI_CLOS_DAY` (9 cột ghi trực tiếp; 3 cột
+`*_CASE_CNT_DAY` kế thừa qua "cùng điều kiện lọc trên"). `NEW_USER_
+CNT_DAY` KHÔNG áp dụng (nguồn là `AGG_LOS_KPI_USER_YEAR`, không phải
+`AGG_LOS_KPI_APPLICATION`, không có khái niệm DAYID snapshot này).
 
 **Đánh giá — thay thế `FCT_LOS_APPLICATION_MILESTONE` đã loại bỏ (đóng
 mục "chưa thiết kế" cũ của 2.1.9):** tài liệu lineage gốc dùng
@@ -6242,65 +7281,74 @@ chính thức đổi `SLGN_CLOS_DAY` sang `LISTAGG(CONTRACT)` nhóm theo
 `VAR_STR12` (thay vì tạm giữ `SEAB_LOS_ID+CUSTOMER_CODE`), khớp đúng
 Section 2 → 2.1.8 cột 8.
 
-##### 2.1.9 AGG_LOS_KPI_APPLICATION — ĐỔI TIỀN TỐ FCT_ → AGG_ (review 2026-09-22, xem lý do ở Section 1)
+##### 2.1.9 AGG_LOS_KPI_APPLICATION — ĐỔI SANG SNAPSHOT HÀNG NGÀY, THÊM DAYID VÀO PK (review 2026-09-27, xem lý do đầy đủ ở Section 1)
 
-**Bảng cũ (trước tách):** `FCT_PDTD_KPI_APPLICATION` (16 cột) — giữ nguyên phạm vi, xác nhận lại vai trò: input duy nhất theo grain hồ sơ cho `AGG_LOS_KPI_YTD_DAILY` (2.1.8) SUM/COUNT lên grain ngày, không tự mình pre-aggregate SLHS/SLGN/TAT
+**Bảng cũ (trước review 2026-09-27):** `AGG_LOS_KPI_APPLICATION` PK
+`WI_NAME, DATASOURCE`, chỉ nhận hồ sơ đã kết thúc, giữ đúng phạm vi cột
+của `FCT_PDTD_KPI_APPLICATION` gốc (16 cột) — nay đổi grain, thêm `DAYID`
+vào PK, bỏ điều kiện lọc "hồ sơ đã kết thúc" (theo yêu cầu người dùng,
+không xuất phát từ SRS — xem Section 1 → 2.1.9).
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS hoặc RLOS — nguồn FCT_CLOS_APPLICATION_DAILY.WI_NAME/FCT_RLOS_APPLICATION_DAILY.WI_NAME |
-| 2 | DATASOURCE | VARCHAR2 | Y | 10 | PK | RLOS hoặc CLOS — quyết định công thức TAT/POINT/nhóm phân loại áp dụng |
-| 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION hoặc DIM_RLOS_APPLICATION tùy DATASOURCE. Mặc định -1 |
-| 4 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT hoặc DIM_RLOS_PRODUCT tùy DATASOURCE. Mặc định -1 |
-| 5 | ORG_UNIT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_ORG_UNIT. Mặc định -1 |
-| 6 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — nguồn FCT_CLOS_APPLICATION_DAILY.PROCESSED_DATE/FCT_RLOS_APPLICATION_DAILY.PROCESSED_DATE. Là mốc để AGG_LOS_KPI_YTD_DAILY (2.1.8) xếp hồ sơ vào đúng DAYID khi SUM/COUNT lên grain ngày |
-| 7 | VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH: theo DECISION nếu đã phê duyệt/từ chối = 1.0; nếu đã CancelRevoke/CancelPermanent thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại NULL. Tính từ UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT toàn bộ lịch sử hồ sơ |
-| 8 | POINT | NUMBER | N | 12,4 |  | Điểm KPI — RLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCT_LINE_NAME qua DIM_RLOS_PRODUCT + SYSTEM_CODE='RLOS', review 2026-09-21: không còn đọc từ DIM_RLOS_APPLICATION) + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER (từ RLOS_REF_SLA_TDKHCN, vẫn đọc qua DIM_RLOS_APPLICATION như cũ); CLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCT_LINE_NAME+PRODUCT_NAME qua DIM_CLOS_PRODUCT+CHANGE_REQUEST qua DIM_CLOS_APPLICATION + SYSTEM_CODE='CLOS', review 2026-09-21: đóng gap CLOS chưa từng có thiết kế) + NVL(SLA_CREDIT_OFFICER theo CLOS_REF_SLA_TDKHDN/TDKHDNL) + NVL(SLA_CREDIT_APPROVER...), riêng APP_GRP='C1' cộng thêm hằng số 4 giờ (xem 2.4.7) |
-| 9 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi — PHÁI SINH: POINT*8/VOLUME (sửa lại đúng chiều phép tính theo nguyên văn SRS BC9, review 2026-09-17 — bản cũ ghi nhầm POINT/8*VOLUME, sai lệch tới 64 lần), NULL nếu VOLUME NULL. Là đầu vào duy nhất của QUY_DOI_RLOS_DAY/QUY_DOI_CLOS_DAY ở AGG_LOS_KPI_YTD_DAILY (2.1.8) |
-| 10 | TAT_APPLICATION_HOUR | NUMBER | N | 18,6 |  | Tổng thời gian xử lý của hồ sơ, đơn vị giờ — RLOS = DDE+QC+UWM+UWC+APPROVER; CLOS = như RLOS cộng thêm COMMITTEE. Loại trừ ngày nghỉ/giờ ngoài hành chính (get_business_minute). CHỈ tính các sự kiện có `BI_FLAG_APPROVAL = 'First Approval'` trên `FCT_CLOS/RLOS_WORKSTEP_EVENT` (review 2026-09-17 — đúng công thức "chỉ lấy hồ sơ được phê duyệt lần đầu" của SRS BC9, khớp 100% điều kiện WORKSTEP/DECISION đã dùng để tính `BI_FLAG_APPROVAL` cho BC5, xem 1.2.2.6/1.3.2.7 cột 20/22) — loại trừ thời gian của vòng làm lại (rework) sau lần EXIT đầu tiên khỏi CreditApproval/CreditCommittee |
-| 11 | TSBD_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 2 tài sản bảo đảm trở lên (RLOS-only — SRS BC9 chỉ định nghĩa field này trong khối "Nguồn RLOS", không có bản sao ở khối "Nguồn CLOS" (5 field cơ bản, không gồm TSBD_G2) và không có báo cáo nào khác trong BC1-BC11 cần TSBD_G2 cho CLOS — để NULL nhánh CLOS, review 2026-09-17: bản cũ tính cả CLOS là thiết kế thừa, không phục vụ báo cáo nào, đã bỏ, nhất quán với INCOM_3/BUSINESS_INCOM) — PHÁI SINH đúng nguyên văn SRS: UNION 4 bảng NG_SB_RLOS_COL_OTHER/COL_REALESTATE/COL_TRANSPORT/COL_VALPAPER (qua FCT_RLOS_COLLATERAL), CHỈ lấy DAYID = MAX(DAYID) của từng WI_NAME (ảnh chụp gần nhất — nguồn là full-snapshot-mỗi-ngày theo PK DAYID+WI_NAME+COLLATERAL_BK, review 2026-09-17: không lọc DAYID sẽ đếm nhân theo số ngày tài sản còn tồn tại), rồi COUNT(*) theo WI_NAME trên các dòng đã lọc (review 2026-09-17: sửa từ COUNT DISTINCT COLLATERAL_BK — SRS chỉ nói "đếm số lượng dòng", không có khái niệm loại trùng theo nội dung/hash), >= 2 thì 'YES' (review 2026-09-17: SRS Ý nghĩa field ghi "từ 02 trở lên" nhưng Cách lấy dữ liệu ghi literal "=2" — áp dụng >=2 theo đúng ý nghĩa nghiệp vụ, nhiều khả năng "=2" là lỗi soạn thảo SRS) |
-| 12 | INCOM_3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 nguồn thu trở lên (RLOS-only — SRS không định nghĩa cho CLOS, để NULL nhánh CLOS) — đếm cờ REPAYFLAGS >= 3 thì 'YES' |
-| 13 | BUSINESS_INCOM | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh, không áp dụng SeAPro/SeALand (RLOS-only — để NULL nhánh CLOS) — PHÁI SINH đúng nguyên văn SRS BC9: 'YES' nếu (`UPPER(NG_SB_RLOS_EXTTABLE.PRODUCT_NAME) NOT LIKE '%SEAPRO%' AND NOT LIKE '%SEALAND%'`) AND (`NVL(NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG,'No')='Yes' OR NVL(.ENTERPRISSEFLAG,'No')='Yes' OR NVL(.NONLICFLAG,'No')='Yes'`); còn lại 'NO'. Cùng công thức với FCT_RLOS_APPLICATION_DAILY.FLAG_BUSINESS_INCOME (1.3.2.1) |
-| 14 | DEVIATION_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có đúng 2 ngoại lệ — PHÁI SINH: đếm dòng trên bảng ngoại lệ tương ứng (FCT_CLOS_DEVIATION/FCT_RLOS_DEVIATION), CHỈ lấy DAYID = MAX(DAYID) của từng WI_NAME (ảnh chụp gần nhất — 2 bảng nguồn là full-snapshot-mỗi-ngày theo PK DAYID+WI_NAME+DEVIATION_BK, review 2026-09-17: không lọc DAYID sẽ đếm nhân theo số ngày ngoại lệ còn tồn tại), rồi COUNT(*) theo WI_NAME trên các dòng đã lọc (review 2026-09-17: sửa từ COUNT DISTINCT DEVIATION_BK — nguyên văn SRS BC9 dùng "Đếm số lượng dòng (sl_condition) theo WI_NAME", không có khái niệm loại trùng theo nội dung/hash; DEVIATION_BK loại trừ cột REASON khỏi hash nên 2 ngoại lệ thật khác nhau chỉ khác REASON sẽ bị đếm hụt nếu dùng COUNT DISTINCT), = 2 thì 'YES' |
-| 15 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ trở lên — cùng cách lọc DAYID mới nhất + COUNT(*) theo WI_NAME trên các dòng đã lọc (review 2026-09-17: sửa từ COUNT DISTINCT DEVIATION_BK, cùng lý do cột DEVIATION_G2 — khớp nguyên văn SRS BC9/BC5 "Count số dòng"), >= 3 thì 'YES' |
-| 16 | IS_TEST_ACCOUNT | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có tồn tại (bất kỳ dòng lịch sử nào) USERNAME thuộc 2 tài khoản test/kỹ thuật ('hanh.nh2','hai.bt2') — EXISTS trên UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT, toàn bộ lịch sử hồ sơ. AGG_LOS_KPI_YTD_DAILY (2.1.8) loại các hồ sơ IS_TEST_ACCOUNT='Y' khỏi MỌI phép COUNT/SUM _DAY (SLHS/SLGN/TAT/QUY_DOI) |
-| 17 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE (CLOS-only, RLOS luôn NULL) — nguồn FCT_CLOS_APPLICATION_DAILY.VAR_STR12 (1.2.2.1, cột 61). Dùng làm điều kiện lọc IS NOT NULL riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY tại AGG_LOS_KPI_YTD_DAILY — KHÔNG áp dụng cho TAT_CLOS_DAY/QUY_DOI_CLOS_DAY |
+| 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — gán = v_batch_date của lần chạy ETL (KHÔNG suy ra từ đối chiếu DAYID khác trên chính bảng này hay AGG_LOS_KPI_YTD_DAILY). Kế thừa trực tiếp DAYID=v_batch_date đã lọc sẵn trên driving table FCT_CLOS_APPLICATION/FCT_RLOS_APPLICATION |
+| 2 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS hoặc RLOS — nguồn FCT_CLOS_APPLICATION.WI_NAME/FCT_RLOS_APPLICATION.WI_NAME (đã lọc DAYID=v_batch_date) |
+| 3 | DATASOURCE | VARCHAR2 | Y | 10 | PK | RLOS hoặc CLOS — quyết định công thức TAT/POINT/nhóm phân loại áp dụng |
+| 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION hoặc DIM_RLOS_APPLICATION tùy DATASOURCE. Mặc định -1 |
+| 5 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT hoặc DIM_RLOS_PRODUCT tùy DATASOURCE. Mặc định -1 |
+| 6 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY. Mặc định -1 |
+| 7 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — nguồn FCT_CLOS_APPLICATION.PROCESSED_DATE/FCT_RLOS_APPLICATION.PROCESSED_DATE (cùng DAYID=v_batch_date đã lọc). Là THUỘC TÍNH CỐ ĐỊNH của hồ sơ (ngày hồ sơ thực sự chốt/hủy, KHÁC DAYID — không đổi ngược theo thời gian một khi hồ sơ đã chốt), là mốc để AGG_LOS_KPI_YTD_DAILY (2.1.8) xếp hồ sơ vào đúng ngày phát sinh khi SUM/COUNT lên grain ngày |
+| 8 | VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH POINT-IN-TIME (review 2026-09-27, đổi từ "toàn bộ lịch sử" sang tính đến v_batch_date): theo DECISION nếu đã phê duyệt/từ chối (EXITDATE<=v_batch_date) = 1.0; nếu đã CancelRevoke/CancelPermanent (EXITDATE<=v_batch_date) thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại (hồ sơ chưa kết thúc tính đến v_batch_date) NULL — đúng nguyên văn nhánh else SRS. Tính từ UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT, lọc ENTRYDATE/EXITDATE<=v_batch_date |
+| 9 | POINT | NUMBER | N | 12,4 |  | Điểm KPI — RLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCT_LINE_NAME qua DIM_RLOS_PRODUCT + SYSTEM_CODE='RLOS') + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER (từ RLOS_REF_SLA_TDKHCN, qua DIM_RLOS_APPLICATION); CLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCT_LINE_NAME+PRODUCT_NAME qua DIM_CLOS_PRODUCT+CHANGE_REQUEST qua DIM_CLOS_APPLICATION + SYSTEM_CODE='CLOS') + NVL(SLA_CREDIT_OFFICER theo CLOS_REF_SLA_TDKHDN/TDKHDNL) + NVL(SLA_CREDIT_APPROVER...), riêng APP_GRP='C1' cộng thêm hằng số 4 giờ (xem 2.4.7). Không phụ thuộc DAYID — khóa tra (PRODUCT_LINE_NAME/APP_GRP) ổn định theo hồ sơ, không đổi theo point-in-time |
+| 10 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi — PHÁI SINH: POINT*8/VOLUME, NULL nếu VOLUME NULL (hồ sơ chưa kết thúc tính đến v_batch_date). Là đầu vào duy nhất của QUY_DOI_RLOS_DAY/QUY_DOI_CLOS_DAY ở AGG_LOS_KPI_YTD_DAILY (2.1.8) |
+| 11 | TAT_APPLICATION_HOUR | NUMBER | N | 18,6 |  | Tổng thời gian xử lý của hồ sơ, đơn vị giờ, POINT-IN-TIME tính đến v_batch_date (review 2026-09-27) — RLOS = DDE+QC+UWM+UWC+APPROVER; CLOS = như RLOS cộng thêm COMMITTEE. Loại trừ ngày nghỉ/giờ ngoài hành chính (get_business_minute). CHỈ tính các sự kiện có `APPROVAL_FLAG = 'First Approval'` VÀ `EXITDATE <= v_batch_date` trên `FCT_CLOS/RLOS_WORKSTEP_EVENT` (đúng công thức "chỉ lấy hồ sơ được phê duyệt lần đầu" của SRS BC9) — NULL nếu hồ sơ chưa có sự kiện nào thỏa điều kiện tính đến v_batch_date |
+| 12 | TSBD_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 2 tài sản bảo đảm trở lên (RLOS-only — SRS BC9 chỉ định nghĩa field này trong khối "Nguồn RLOS", không có bản sao ở khối "Nguồn CLOS", để NULL nhánh CLOS) — PHÁI SINH POINT-IN-TIME (review 2026-09-27, đổi cơ chế lọc DAYID): đọc trực tiếp FCT_RLOS_COLLATERAL lọc `DAYID = v_batch_date` (đúng DAYID đang nạp — KHÔNG còn MAX(DAYID) toàn lịch sử như thiết kế cũ, vì bảng nguồn đã là full-snapshot-mỗi-ngày, chỉ cần lọc đúng ngày là đủ có ảnh chụp tại đúng thời điểm), COUNT(*) theo WI_NAME, >= 2 thì 'YES' |
+| 13 | INCOM_3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 nguồn thu trở lên (RLOS-only — SRS không định nghĩa cho CLOS, để NULL nhánh CLOS) — đếm cờ REPAYFLAGS (nguồn FCT_RLOS_APPLICATION đã lọc DAYID=v_batch_date) >= 3 thì 'YES' |
+| 14 | BUSINESS_INCOM | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh, không áp dụng SeAPro/SeALand (RLOS-only — để NULL nhánh CLOS) — PHÁI SINH đúng nguyên văn SRS BC9: 'YES' nếu (`UPPER(NG_SB_RLOS_EXTTABLE.PRODUCT_NAME) NOT LIKE '%SEAPRO%' AND NOT LIKE '%SEALAND%'`) AND (`NVL(NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG,'No')='Yes' OR NVL(.ENTERPRISSEFLAG,'No')='Yes' OR NVL(.NONLICFLAG,'No')='Yes'`); còn lại 'NO'. Cùng công thức với FCT_RLOS_APPLICATION.FLAG_BUSINESS_INCOME (1.3.2.1) |
+| 15 | DEVIATION_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có đúng 2 ngoại lệ — PHÁI SINH POINT-IN-TIME (review 2026-09-27, đổi cơ chế lọc DAYID): đếm dòng trên bảng ngoại lệ tương ứng (FCT_CLOS_DEVIATION/FCT_RLOS_DEVIATION) lọc `DAYID = v_batch_date` (đúng DAYID đang nạp, không còn MAX(DAYID) toàn lịch sử), COUNT(*) theo WI_NAME, = 2 thì 'YES' |
+| 16 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ trở lên — cùng cách lọc `DAYID = v_batch_date` + COUNT(*) theo WI_NAME, >= 3 thì 'YES' |
+| 17 | IS_TEST_ACCOUNT | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có tồn tại (bất kỳ dòng lịch sử nào TÍNH ĐẾN v_batch_date) USERNAME thuộc 2 tài khoản test/kỹ thuật ('hanh.nh2','hai.bt2') — EXISTS trên UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT, lọc ENTRYDATE<=v_batch_date (point-in-time, review 2026-09-27). AGG_LOS_KPI_YTD_DAILY (2.1.8) loại các hồ sơ IS_TEST_ACCOUNT='Y' khỏi MỌI phép COUNT/SUM _DAY (SLHS/SLGN/TAT/QUY_DOI) |
+| 18 | VAR_STR12 | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE (CLOS-only, RLOS luôn NULL) — nguồn FCT_CLOS_APPLICATION.VAR_STR12 (1.2.2.1, cột 61), đã lọc DAYID=v_batch_date. Dùng làm điều kiện lọc IS NOT NULL riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY tại AGG_LOS_KPI_YTD_DAILY — KHÔNG áp dụng cho TAT_CLOS_DAY/QUY_DOI_CLOS_DAY |
 
-- Bảng FACT chấm điểm KPI, lưu điểm KPI của từng hồ sơ, phục vụ BC9 (là input pre-aggregate duy nhất cho `AGG_LOS_KPI_YTD_DAILY`, 2.1.8, không tự thân hiển thị lũy kế). Grain: 1 dòng = 1 hồ sơ (WI_NAME) × 1 hệ nguồn (DATASOURCE).
-- Khóa chính của bảng (PK): **WI_NAME, DATASOURCE**.
+- Bảng FACT chấm điểm KPI theo ngày, lưu điểm KPI point-in-time của từng hồ sơ tại mỗi DAYID, phục vụ BC9 (là input pre-aggregate duy nhất cho `AGG_LOS_KPI_YTD_DAILY`, 2.1.8, không tự thân hiển thị lũy kế). Grain: 1 dòng = 1 hồ sơ (WI_NAME) × 1 hệ nguồn (DATASOURCE) × 1 ngày (DAYID).
+- Khóa chính của bảng (PK): **DAYID, WI_NAME, DATASOURCE**.
 
-**So với thiết kế cũ (`FCT_PDTD_KPI_APPLICATION`, 16 cột):** bỏ `DAYID`
-khỏi khóa chính — bảng cũ có PK `DAYID + WI_NAME` (snapshot theo ngày),
-nhưng các cột (`VOLUME`/`POINT`/`QUY_DOI`/`TSBD_G2`...) đều là thuộc
-tính ổn định của hồ sơ sau khi hồ sơ đạt trạng thái cuối, không phải
-snapshot biến đổi mỗi ngày — giữ 1 dòng/hồ sơ, dùng `PROCESSED_DATE` để
-xếp vào đúng ngày khi tổng hợp ở 2.1.8, thay vì lặp lại dòng theo
-`DAYID`. Giữ nguyên 14 cột nghiệp vụ còn lại, thêm mới `IS_TEST_ACCOUNT`/
-`VAR_STR12` (rà soát lại toàn bộ điều kiện lọc SRS BC9 chưa đưa vào thiết
-kế trước đó, xem ghi chú tại Section 1 → 2.1.9).
+**Đổi grain (review 2026-09-27, theo yêu cầu người dùng, không xuất
+phát từ SRS):** thêm `DAYID` vào PK, đổi driving table sang full
+snapshot `FCT_CLOS/RLOS_APPLICATION_DAILY` lọc `DAYID=v_batch_date`
+(nhận TOÀN BỘ hồ sơ, kể cả chưa kết thúc — bỏ điều kiện INNER JOIN lọc
+`DECISION`/`WORKSTEP` đã kết thúc từng áp dụng trước đây), mọi công
+thức lịch sử (`VOLUME`, `TAT_APPLICATION_HOUR`, `IS_TEST_ACCOUNT`,
+`TSBD_G2`, `DEVIATION_G2`/`G3`) chuyển sang **point-in-time** (chỉ dựa
+trên sự kiện/dữ liệu đã xảy ra tính đến `v_batch_date`, không đọc lại
+`DAYID` của chính bảng này hay của `AGG_LOS_KPI_YTD_DAILY` để tránh vòng
+lặp tự tham chiếu). Xem đánh giá đầy đủ (bao gồm đối chiếu SRS xác nhận
+SRS không có khái niệm point-in-time snapshot cho các chỉ tiêu này,
+nhưng người dùng vẫn quyết định theo hướng này vì lý do kỹ thuật/vận
+hành ETL) tại Section 1 → 2.1.9. Còn **18 cột** (17 cột cũ + `DAYID`).
 
 **Đối chiếu SRS (BC9):** đã đối chiếu chi tiết công thức
 `VOLUME`/`POINT`/`QUY_DOI`/`TSBD_G2`/`INCOM_3`/`BUSINESS_INCOM`/
 `DEVIATION_G2`/`DEVIATION_G3`/`TAT_APPLICATION_HOUR` tại BR 1.2 (bảng
 field-list, STT 4-11, 20-21) của cả 2 nhánh RLOS/CLOS — xem Section 1 →
-2.1.9.
+2.1.9. Toàn bộ công thức nghiệp vụ giữ nguyên đúng SRS, chỉ đổi cách
+lọc mốc thời gian (point-in-time thay vì toàn bộ lịch sử/MAX(DAYID)).
 
-**Bổ sung điều kiện "phê duyệt lần đầu" cho `TAT_APPLICATION_HOUR`
-(review 2026-09-17):** đối chiếu lại nguyên văn SRS BC9 (`TAT_RLOS`/
-`TAT_CLOS`) phát hiện điều kiện lọc "Chỉ lấy các hồ sơ được phê duyệt
-lần đầu" (`EXITDATE <= NVL(MIN(CASE WHEN WORKSTEP IN ('CreditApproval',
-'CreditCommittee') AND DECISION IN ('Submit','Send To HOSupport','Send
-To PostSanction','Reject','Submit To DisbursementMaker') THEN EXITDATE
-END) OVER (PARTITION BY WINAME), SYSDATE)`) mà thiết kế trước đó chưa
-áp dụng — `TAT_APPLICATION_HOUR` đang SUM toàn bộ lịch sử hồ sơ, kể cả
-các vòng làm lại (rework) sau lần EXIT đầu tiên khỏi CreditApproval/
-CreditCommittee. Đối chiếu chéo với SRS BC5 xác nhận công thức này
-khớp 100% với công thức đã dùng để tính `BI_FLAG_APPROVAL` (cột có sẵn
-trên `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT`, 1.2.2.6/
-1.3.2.7) — cùng WORKSTEP, cùng DECISION, cùng công thức MIN/PARTITION
-BY, chỉ khác cách dùng (BC5 gán nhãn flag, BC9 dùng làm điều kiện lọc).
-Tái sử dụng thẳng `BI_FLAG_APPROVAL = 'First Approval'` làm điều kiện
-lọc khi tính `TAT_APPLICATION_HOUR`, không tạo cột/điều kiện riêng.
+**Điều kiện "phê duyệt lần đầu" cho `TAT_APPLICATION_HOUR` (review
+2026-09-17, vẫn giữ nguyên sau khi đổi sang point-in-time):** đối chiếu
+lại nguyên văn SRS BC9 (`TAT_RLOS`/`TAT_CLOS`) xác nhận điều kiện lọc
+"Chỉ lấy các hồ sơ được phê duyệt lần đầu" (`EXITDATE <= NVL(MIN(CASE
+WHEN WORKSTEP IN ('CreditApproval','CreditCommittee') AND DECISION IN
+('Submit','Send To HOSupport','Send To PostSanction','Reject','Submit
+To DisbursementMaker') THEN EXITDATE END) OVER (PARTITION BY WINAME),
+SYSDATE)`) khớp 100% với công thức đã dùng để tính `APPROVAL_FLAG`
+(cột có sẵn trên `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT`,
+1.2.2.6/1.3.2.7) — cùng WORKSTEP, cùng DECISION, cùng công thức
+MIN/PARTITION BY, chỉ khác cách dùng (BC5 gán nhãn flag, BC9 dùng làm
+điều kiện lọc). Tái sử dụng thẳng `APPROVAL_FLAG = 'First Approval'`
+làm điều kiện lọc khi tính `TAT_APPLICATION_HOUR`, cộng thêm điều kiện
+`EXITDATE <= v_batch_date` (point-in-time, review 2026-09-27) để loại
+sự kiện tương lai so với DAYID đang nạp.
 
 
 ##### 2.1.10 DIM_DATE
@@ -6313,7 +7361,7 @@ lọc khi tính `TAT_APPLICATION_HOUR`, không tạo cột/điều kiện riêng
 | 2 | IS_WORKING_DAY | VARCHAR2 | Y | 1 |  | 'Y' nếu là ngày làm việc — đầu vào của hàm tính TAT theo giờ làm việc (get_business_minute). Nguồn SB_DWH.DIM_DATE.IS_WORKING_DAY |
 | 3 | REPORT_WEEK | VARCHAR2 | Y | 17 |  | Tuần báo cáo — khoảng ngày đầu tuần-cuối tuần (Thứ 2 đến Chủ nhật), dạng YYYYMMDD-YYYYMMDD (review 2026-09-17: sửa lại đúng định dạng SRS BC4, bản cũ ghi nhầm "YYYY-WW" số tuần ISO). Trường REPORT_WEEK của BC4. Nguồn SB_DWH.DIM_DATE.REPORT_WEEK |
 | 4 | YEAR_MONTH | VARCHAR2 | Y | 6 |  | Cột kỹ thuật group-theo-tháng của ngày (dạng YYYY-MM), phái sinh từ DAYID — dùng chuẩn cho các bảng chiều ngày. Nguồn SB_DWH.DIM_DATE.YEAR_MONTH (review 2026-09-17: bỏ tham chiếu "Trường YEAR_MONTH của BC9" — đối chiếu SRS xác nhận field YEAR_MONTH của BC9 thực chất là ngày đại diện cho tham số lọc "Năm báo cáo" do người dùng chọn, khác hẳn khái niệm cột tháng YYYY-MM này, không phải căn cứ nghiệp vụ hợp lệ cho cột) |
-| 5 | YEAR_ID | NUMBER | Y | 4 |  | Năm của ngày này — mốc reset các phép lũy kế YTD (khớp `KPI_YEAR` trên `REF_LOS_KPI_USER_YEAR`/`AGG_LOS_KPI_YTD_DAILY`, 2.1.7/2.1.8). Nguồn SB_DWH.DIM_DATE.YEAR_ID |
+| 5 | YEAR_ID | NUMBER | Y | 4 |  | Năm của ngày này — mốc reset các phép lũy kế YTD (khớp `KPI_YEAR` trên `AGG_LOS_KPI_USER_YEAR`/`AGG_LOS_KPI_YTD_DAILY`, 2.1.7/2.1.8). Nguồn SB_DWH.DIM_DATE.YEAR_ID |
 
 - Bảng DIM chiều ngày dùng chung toàn ngân hàng, bê nguyên 1:1 từ `SB_DWH.DIM_DATE` — không tính lại `IS_WORKING_DAY` hay bất kỳ cột nào ở tầng PDTD_DTM. Phục vụ BC4, BC9, và mọi báo cáo lọc theo khoảng ngày.
 - Khóa chính của bảng (PK): **DAYID**.
@@ -6328,7 +7376,7 @@ không có công thức nghiệp vụ nào tính lại ở tầng PDTD_DTM.
 
 ##### 2.1.11 DIM_T24_CARD — MỚI (review 2026-09-21, đóng gap BC1.K_TYPE)
 
-**Bảng cũ (trước tách):** không có — bảng mới, tách ra khỏi cách join trực tiếp STG_DIM_CARD vào fact, theo yêu cầu người dùng: kéo `DIM_CARD` (T24) 1:1 lên PDTD_DTM, đặt FK vật lý trên `FCT_RLOS_APPLICATION_DAILY` thay vì denormalize giá trị
+**Bảng cũ (trước tách):** không có — bảng mới, tách ra khỏi cách join trực tiếp STG_DIM_CARD vào fact, theo yêu cầu người dùng: kéo `DIM_CARD` (T24) 1:1 lên PDTD_DTM, đặt FK vật lý trên `FCT_RLOS_APPLICATION` thay vì denormalize giá trị
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -6340,14 +7388,14 @@ không có công thức nghiệp vụ nào tính lại ở tầng PDTD_DTM.
 | 6 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi — do SB_DWH quản lý, bê nguyên qua vùng chìa, không tính lại ở DTM |
 | 7 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành — do SB_DWH quản lý, bê nguyên qua vùng chìa |
 
-- Bảng DIM lưu chiều thẻ tín dụng lõi T24, chỉ dùng làm FK cho `FCT_RLOS_APPLICATION_DAILY`. Grain: 1 dòng = 1 thẻ T24 (theo phiên bản SCD2). Phục vụ BC1 (qua FK T24_CARD_SK trên fact).
+- Bảng DIM lưu chiều thẻ tín dụng lõi T24, chỉ dùng làm FK cho `FCT_RLOS_APPLICATION`. Grain: 1 dòng = 1 thẻ T24 (theo phiên bản SCD2). Phục vụ BC1 (qua FK T24_CARD_SK trên fact).
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH qua vùng chìa STG_DTM).
 
 **Bảng mới, không so sánh với thiết kế cũ:** phát sinh khi đóng gap
 `BC1.K_TYPE` — SRS BC1 (BR 1.2, nested table) xác nhận nguồn `STG_DTM.
 STG_DIM_CARD`, join qua `RESULT_MAIN_CARD_ID` (có sẵn trên `DIM_RLOS_
 APPLICATION`) = `MAIN_ID`. Theo yêu cầu người dùng: tách DIM riêng, đặt
-FK vật lý `T24_CARD_SK` trên `FCT_RLOS_APPLICATION_DAILY` (2.3.2.1) —
+FK vật lý `T24_CARD_SK` trên `FCT_RLOS_APPLICATION` (2.3.2.1) —
 cùng pattern `DIM_T24_CUSTOMER`/`DIM_T24_COMPANY`/`DIM_T24_LOAN`/
 `DIM_T24_SEAB_PRODUCTS_DE` (chỉ tồn tại ở PDTD_DTM, bê 1:1 qua vùng
 chìa `STG_DTM.STG_DIM_CARD`, không đi qua CDC của LOS).
@@ -6360,7 +7408,7 @@ cáo khác cần thêm thuộc tính của thẻ, bổ sung cột khi đó.
 
 ##### 2.1.12 DIM_T24_SEAB_MAIN_CARD — MỚI (review 2026-09-21, đóng gap BC1.HOME_ADDRESS)
 
-**Bảng cũ (trước tách):** không có — bảng mới, tách ra khỏi cách join trực tiếp STG_DIM_SEAB_MAIN_CARD vào fact, theo yêu cầu người dùng: kéo `DIM_SEAB_MAIN_CARD` (T24) 1:1 lên PDTD_DTM, đặt FK vật lý trên `FCT_RLOS_APPLICATION_DAILY` thay vì denormalize giá trị
+**Bảng cũ (trước tách):** không có — bảng mới, tách ra khỏi cách join trực tiếp STG_DIM_SEAB_MAIN_CARD vào fact, theo yêu cầu người dùng: kéo `DIM_SEAB_MAIN_CARD` (T24) 1:1 lên PDTD_DTM, đặt FK vật lý trên `FCT_RLOS_APPLICATION` thay vì denormalize giá trị
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -6372,7 +7420,7 @@ cáo khác cần thêm thuộc tính của thẻ, bổ sung cột khi đó.
 | 6 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi — do SB_DWH quản lý, bê nguyên qua vùng chìa, không tính lại ở DTM |
 | 7 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành — do SB_DWH quản lý, bê nguyên qua vùng chìa |
 
-- Bảng DIM lưu chiều thẻ chính SeAB lõi T24, chỉ dùng làm FK cho `FCT_RLOS_APPLICATION_DAILY`. Grain: 1 dòng = 1 thẻ chính T24 (theo phiên bản SCD2). Phục vụ BC1 (qua FK T24_SEAB_MAIN_CARD_SK trên fact).
+- Bảng DIM lưu chiều thẻ chính SeAB lõi T24, chỉ dùng làm FK cho `FCT_RLOS_APPLICATION`. Grain: 1 dòng = 1 thẻ chính T24 (theo phiên bản SCD2). Phục vụ BC1 (qua FK T24_SEAB_MAIN_CARD_SK trên fact).
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH qua vùng chìa STG_DTM).
 
 **Bảng mới, không so sánh với thiết kế cũ:** cùng lý do đã áp dụng cho
@@ -6391,47 +7439,62 @@ SRS (`RECID`, `HOME_ADDRESS`), không cần thể hiện đầy đủ cấu trú
 
 ##### 2.2.1 DIM
 
-###### 2.2.1.1 DIM_CLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (xem DQ-11 ở SB_DWH; đã bổ sung REF_PRODUCT, SLA_*)
+###### 2.2.1.1 DIM_CLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (xem DQ-11 ở SB_DWH). ⚠️ review 2026-09-26 (theo yêu cầu người dùng): chuyển hẳn BUSINESS_FLOW/REF_PRODUCT/SLA_* (và CUSTOMER_SK — cột chỉ phục vụ 4 cột đó) sang FCT_CLOS_APPLICATION, bảng này quay lại bê nguyên 1:1 từ SB_DWH. ⚠️ review 2026-09-30 (theo yêu cầu người dùng): chuyển FIRST_APPROVED_DATE/LG_REQ/FI_REQ/PHONE_REQ sang FCT_CLOS_APPLICATION, xóa APPROVAL_TYPE/DECISION/CURR_WSNAME/PREV_WSNAME — nay 26 cột
 
 **Bảng cũ (trước tách):** `DIM_PDTD_APPLICATION` → tách phần thuộc tính CLOS thành `DIM_CLOS_APPLICATION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
-Cấu trúc cột **kế thừa toàn bộ** từ SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH
-→ 1.2 Bộ bảng CLOS → 1.2.1.1 DIM_CLOS_APPLICATION — nay 26 cột (đã gồm
-`DATASOURCE`, đã bổ sung `CHANGE_TYPE`/`APP_GRP`/`HAVE_ANY_DEVIATION`,
-DQ-11 đã giải quyết; review 2026-09-21: thêm dư thừa `CREDIT_LIMIT_
-COMMITTEE`/`CURRENCY_CODE`/`APPROVED_TERM` phục vụ BC3), **cộng thêm 6
-cột mới** sinh tại PDTD_DTM:
+Cấu trúc cột **kế thừa toàn bộ, bê nguyên 1:1** từ SB_DWH (xem Section 2 →
+1. SB_DWH → 1.2 Bộ bảng CLOS → 1.2.1.1 DIM_CLOS_APPLICATION — nay 26
+cột: driving table `NG_SB_CLOS_EXTTABLE`, đã gồm `DATASOURCE`/`APP_GRP`/
+`HAVE_ANY_DEVIATION`, DQ-11 đã giải quyết (chỉ còn `CREDIT_PROFILE`, đã
+xóa `INDUSTRY_LVL1/2/3_CODE` vì trùng `DIM_CLOS_CUSTOMER`), các cột hồ
+sơ-grain nhận lại từ `DIM_CLOS_CUSTOMER`, `PRODUCT_LINE`/`SUB_PRODUCT`/
+`ID_NUMBER`, và 3 cột dư thừa lưu vết nguồn EXTTABLE còn lại
+(`PRODUCT_NAME`/`CHANNEL`/`CUSTOMER_NAME`; `EMPLOYEE_CODE`/
+`EMPLOYEE_NAME` cũng đổi nguồn sang EXTTABLE) — KHÔNG còn `CUST_GROUP`
+(đã chuyển hẳn về `DIM_CLOS_CUSTOMER`), `CHANGE_REQUEST`/`CHANGE_TYPE`
+(đã chuyển hẳn sang `FCT_CLOS_APPLICATION`, xem Section 1 → 1.2.1.1),
+`CREDIT_LIMIT_COMMITTEE`/`CURRENCY_CODE`/`APPROVED_TERM`, 12 cột
+"username/routing tại 1 bước" (`DATACHKUSER`/`UWMAKERUSER`/`UWCHKRUSER`/
+`CREDAPPRUSER`/`CCOMMITUSER`/`HOSUPPORTUSER`/`POSTSANCUSER`/
+`PREDISBMAKUSER`/`PREDISBCHKUSER`/`DISBCHKUSER`/`DISBMAKUSER`/
+`CHECKER3_TARGET`, xóa review 2026-09-30 theo yêu cầu người dùng — xem
+lý do đầy đủ tại Section 1 → 1.2.1.1), hay `FIRST_APPROVED_DATE`/
+`LG_REQ`/`FI_REQ`/`PHONE_REQ` (chuyển sang `FCT_CLOS_APPLICATION`,
+review 2026-09-30, lượt tiếp theo) và `APPROVAL_TYPE`/`DECISION`/
+`CURR_WSNAME`/`PREV_WSNAME` (xóa hẳn, cùng lượt review) — xem lý do đầy
+đủ tại Section 1 → 1.2.1.1. **Không còn cột nào bổ
+sung riêng tại PDTD_DTM** (review 2026-09-26, theo yêu cầu người dùng):
+`CUSTOMER_SK`/`BUSINESS_FLOW`/`REF_PRODUCT`/`SLA_CREDIT_OFFICER`/`SLA_MARKER`/
+`SLA_CHECKER`/`SLA_CREDIT_APPROVER` (7 cột từng bổ sung ở đây, review
+2026-09-25) nay chuyển hẳn sang `FCT_CLOS_APPLICATION` (xem Section
+2 → 2.2.2.1 và Section 1 → 2.2.1.1/2.2.2.1); cùng cách áp dụng cho
+`APPROVAL_TYPE` (review 2026-09-30, xem Section 2 → 2.2.2.1 — chuyển
+tính CASE lọc STREAM tại `FCT_CLOS_APPLICATION` tầng này, không đặt lại
+trên DIM).
 
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| ... | *(26 cột kế thừa từ SB_DWH, gồm cả DATASOURCE — xem 1.2.1.1)* |  |  |  |  |  |
-| 27 | BI_FLOW | VARCHAR2 | N | 50 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo — PHÁI SINH tại PDTD_DTM: `CASE WHEN CUST_GROUP IN ('MSME','SME','USME') THEN 'PDTD_KHDN' WHEN CUST_GROUP IN ('NBFI','JSC','FDI','BANK','STR','SOC') THEN 'PDTD_KHDNL' ELSE NULL END` (nguyên văn SRS BC2, không qua bảng REF_ nào, khác cách RLOS lookup REF_RLOS_FLOW) |
-| 28 | REF_PRODUCT | NVARCHAR2 | N | 200 |  | Nhóm sản phẩm dùng để tra cam kết SLA (BC5) — PHÁI SINH: LEFT JOIN `CLOS_REF_SLA_TDKHDNL`/`CLOS_REF_SLA_TDKHDN` (chọn theo `CUST_GROUP`) theo `PRODUCT_LINE`+`SUB_PRODUCT`+`HAVE_ANY_DEVIATION`+`FLAG_APP_GRP` (quy đổi từ `APP_GRP`). Điều kiện `SUB_PRODUCT` (review 2026-09-18, theo SRS BC5 cập nhật): luôn so khớp `SUB_PRODUCT` trực tiếp — SRS mới đã bỏ điều kiện loại trừ theo `CHANGE_REQUEST` (bản trước chỉ so khớp khi hồ sơ không phải "Change Request") |
-| 29 | SLA_CREDIT_OFFICER | NUMBER | N | 10,2 |  | Cam kết giờ cho chuyên viên tín dụng — cùng LEFT JOIN trên. Hồ sơ `APP_GRP='C1'`: hằng số cứng 4 giờ, không lookup |
-| 30 | SLA_MARKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước lập hồ sơ thẩm định — cùng LEFT JOIN trên. Hồ sơ `APP_GRP='C1'`: hằng số cứng 4 giờ |
-| 31 | SLA_CHECKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát thẩm định — cùng LEFT JOIN trên. Hồ sơ `APP_GRP='C1'`: hằng số cứng 4 giờ |
-| 32 | SLA_CREDIT_APPROVER | NUMBER | N | 10,2 |  | Cam kết giờ cho cấp phê duyệt — cùng LEFT JOIN trên. Hồ sơ `APP_GRP='C1'`: hằng số cứng 4 giờ |
-
-- Bảng DIM lưu danh mục hồ sơ tín dụng CLOS, bê nguyên 1:1 từ SB_DWH và bổ sung 6 cột chuẩn hóa/tra cứu cho báo cáo (BI_FLOW, cam kết SLA).
+- Bảng DIM lưu danh mục hồ sơ tín dụng CLOS, bê nguyên 1:1 từ SB_DWH, không còn cột phái sinh nào ở tầng PDTD_DTM.
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
 
 **✅ ĐÃ ĐÁNH GIÁ — không bổ sung cột SLA nhập liệu tập trung
 (`SLA_DE_RESULT`/`SLA_QC_RESULT`/`SLA_DE_TOTAL_RESULT`/`QD_DDE`/
-`QD_QC`) vào bảng này (review 2026-09-21):** SRS BC5/BC9 yêu cầu CLOS
-cũng đọc `REF_SLA_NLTT` (`SYSTEM_CODE='CLOS'`) nhưng quyết định người
-dùng là chuyển hẳn sang report-time lookup cho cả CLOS/RLOS, không
-denormalize vào DIM — xem chi tiết tại Section 1 → 2.2.1.1 và ghi chú
-`POINT` của BC9 (2.1.9).
+`QD_QC`) vào bảng này (review 2026-09-21, vẫn giữ nguyên sau review
+2026-09-26):** SRS BC5/BC9 yêu cầu CLOS cũng đọc `REF_SLA_NLTT`
+(`SYSTEM_CODE='CLOS'`) nhưng quyết định người dùng là chuyển hẳn sang
+report-time lookup cho cả CLOS/RLOS, không denormalize vào DIM — xem
+chi tiết tại Section 1 → 2.2.1.1 và ghi chú `POINT` của BC9 (2.1.9).
 
 **Công thức quy đổi `APP_GRP` → `FLAG_APP_GRP` (review 2026-09-18, cập
-nhật theo SRS BC5 mới — thay thế công thức tạm thời trước đây):** SRS BC5
-(BR 1.2, cả `CLOS_REF_SLA_TDKHDN`/file2 và `CLOS_REF_SLA_TDKHDNL`/file3)
-nay định nghĩa chính thức 2 nhóm: `APP_GRP IN ('A1','A2','B1','B2')` →
-`FLAG_APP_GRP = 'CGPD'`; `APP_GRP IN ('BOD','CC','SCC','RCC')` →
-`FLAG_APP_GRP = 'HDTD'` (đổi nhãn từ `'BOD/CC'` cũ, đồng thời mở rộng tập
-giá trị từ `('BOD','CC')` thành `('BOD','CC','SCC','RCC')`). SRS không
-liệt kê `C1` vào 1 trong 2 nhóm trên — `C1` đã có xử lý riêng bằng hằng
-số cứng 4 giờ (không qua bảng REF_ này, xem Section 3 dòng #13).
+nhật theo SRS BC5 mới — nay dùng tại `FCT_CLOS_APPLICATION`, xem
+Section 2 → 2.2.2.1, sau khi `REF_PRODUCT`/`SLA_*` chuyển khỏi bảng
+này):** SRS BC5 (BR 1.2, cả `CLOS_REF_SLA_TDKHDN`/file2 và `CLOS_REF_
+SLA_TDKHDNL`/file3) định nghĩa chính thức 2 nhóm: `APP_GRP IN
+('A1','A2','B1','B2')` → `FLAG_APP_GRP = 'CGPD'`; `APP_GRP IN
+('BOD','CC','SCC','RCC')` → `FLAG_APP_GRP = 'HDTD'` (đổi nhãn từ
+`'BOD/CC'` cũ, đồng thời mở rộng tập giá trị từ `('BOD','CC')` thành
+`('BOD','CC','SCC','RCC')`). SRS không liệt kê `C1` vào 1 trong 2 nhóm
+trên — `C1` đã có xử lý riêng bằng hằng số cứng 4 giờ (không qua bảng
+REF_ này, xem Section 3 dòng #13).
 
 ###### 2.2.1.2 DIM_CLOS_PRODUCT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_CLOS_MAS_PRO_LINE/MAS_SUB_PROD, review 2026-09-18; không có IS_CREDIT_CARD/IS_FAST_PRODUCT)
 
@@ -6489,7 +7552,7 @@ chốt (`NG_SB_CLOS_MAS_DECISION`, xem Section 2 → 1.2.1.3), thay thế
 cột phái sinh `IS_PDTD_STEP` tại đây (LEFT JOIN `Q_RLOS_REF_WORKSTEP_
 2SYSTEMS` theo `WORKSTEP_CODE = WORKSTEP`), với lý do "dùng làm đầu vào
 lọc nhân sự cho BC9 (`NHAN_SU`, `NSLD`)". Đối chiếu lại công thức thật
-của `NHAN_SU`/`NSLD` (`REF_LOS_KPI_USER_YEAR`, 2.1.7) xác nhận công thức
+của `NHAN_SU`/`NSLD` (`AGG_LOS_KPI_USER_YEAR`, 2.1.7) xác nhận công thức
 đó lọc bằng danh sách 8 `WORKSTEP` literal hardcode trực tiếp trên UNION
 `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT` — **không hề JOIN
 qua `IS_PDTD_STEP`**. Cột này không được dùng ở bất kỳ đâu trong toàn bộ
@@ -6516,104 +7579,152 @@ bản SB_DWH nay đọc từ `NG_SB_CLOS_MAS_DECISION` (xem Section 2 → 1.2.1.
 thay thế `MAP_CLOS_DECISION`, không còn PENDING về bản chất nguồn. Bản
 PDTD_DTM bê 1:1 nên kế thừa nguồn đã chốt.
 
-###### 2.2.1.5 DIM_CLOS_EXCEPTION_REASON
+###### 2.2.1.5 DIM_CLOS_EXCEPTION
 
-**Bảng cũ (trước tách):** `DIM_PDTD_EXCEPTION_REASON` → tách phần thuộc tính CLOS thành `DIM_CLOS_EXCEPTION_REASON` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
+**Bảng cũ (trước tách):** `DIM_PDTD_EXCEPTION_REASON` → tách phần thuộc tính CLOS thành `DIM_CLOS_EXCEPTION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.2 Bộ bảng CLOS → 1.2.1.6 DIM_CLOS_EXCEPTION_REASON — 10 cột, đã gồm
+1.2 Bộ bảng CLOS → 1.2.1.6 DIM_CLOS_EXCEPTION — 10 cột, đã gồm
 `DATASOURCE`) — không thêm/bớt cột nào ở layer này, không có REF_ nào
 join thêm.
 
 - Bảng DIM lưu danh mục lý do ngoại lệ CLOS, bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này.
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
 
-###### 2.2.1.6 DIM_CLOS_COLLATERAL_TYPE
+###### 2.2.1.6 DIM_CLOS_CUSTOMER — ⚠️ review 2026-09-26 (theo yêu cầu người dùng): chuyển hẳn LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE sang FCT_CLOS_APPLICATION
 
-**Bảng cũ (trước tách):** `DIM_PDTD_COLLATERAL_TYPE` → tách phần thuộc tính CLOS thành `DIM_CLOS_COLLATERAL_TYPE` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
+**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_PARTY` → tách phần khách hàng chính CLOS thành DIM riêng (bỏ tiền tố PDTD, đổi tên `DIM_CLOS_CUSTOMER`). **Đổi grain (review 2026-09-25):** xem 2.2.1.6 Section 1 và 1.2.1.6 Section 2 (SB_DWH) — nay 1 dòng/khách hàng (NK=ID_NUMBER), không còn 1 dòng/hồ sơ.
 
-Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.2 Bộ bảng CLOS → 1.2.1.6 DIM_CLOS_COLLATERAL_TYPE — 7 cột, đã gồm `DATASOURCE`) — không
-thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
+Cấu trúc cột **giống hệt** bản SB_DWH (bê nguyên 1:1, xem Section 2 → 1.
+SB_DWH → 1.2 Bộ bảng CLOS → 1.2.1.6 DIM_CLOS_CUSTOMER — nay 13 cột sau
+khi đổi grain, review 2026-09-25, đã gồm `DATASOURCE`). **Không còn cột
+nào bổ sung riêng tại PDTD_DTM** (review 2026-09-26, theo yêu cầu người
+dùng): `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` (2 cột từng bổ
+sung ở đây) nay chuyển hẳn sang `FCT_CLOS_APPLICATION` (xem
+Section 2 → 2.2.2.1 và Section 1 → 2.2.1.6/2.2.2.1).
 
-- Bảng DIM lưu danh mục loại tài sản bảo đảm CLOS, bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này.
+- Bảng DIM lưu thông tin doanh nghiệp khách hàng chính CLOS, bê nguyên 1:1 từ SB_DWH, không còn cột phái sinh nào ở tầng PDTD_DTM.
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
 
-###### 2.2.1.7 DIM_CLOS_CUSTOMER
+**Xóa `ORG_LEGAL_ID` (review 2026-09-25):** cột này trước đây (LEFT JOIN
+`DIM_CLOS_LEGAL_PARTY` theo `WI_NAME`+`LEGAL_TYPE='CUSTOMER'` lấy
+`ID_NUMBER` của khách hàng chính) nay **trùng lặp hoàn toàn** với NK mới
+`ID_NUMBER` của chính `DIM_CLOS_CUSTOMER` (SB_DWH, 1.2.1.6) — xóa khỏi
+danh sách cột, báo cáo tra trực tiếp NK của dòng thay vì cột phái sinh
+riêng. Xem Section 3. (`ORG_LEGAL_ID` vẫn tồn tại độc lập ở
+`FCT_CLOS_APPLICATION`, xem 2.2.2.1 — cột đó không trùng NK, vì
+`FCT_CLOS_APPLICATION` có grain hồ sơ × ngày, không có NK
+`ID_NUMBER` riêng như DIM này.)
 
-**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_PARTY` → tách phần khách hàng chính CLOS thành DIM riêng (bỏ tiền tố PDTD, đổi tên `DIM_CLOS_CUSTOMER`)
+**Chuyển `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` sang
+`FCT_CLOS_APPLICATION` (review 2026-09-26, theo yêu cầu người
+dùng):** 2 cột PHÁI SINH bằng LEFT JOIN `FCT_CLOS_LEGAL_PARTY`
+(2.2.2.8, trước đây `DIM_CLOS_LEGAL_PARTY`, xem 2.2.1.7) theo `WI_NAME`+
+`LEGAL_TYPE='LEGAL_REPRESENTATIVE'`+`DAYID=DAYID`, nối chuỗi `FULL_NAME`/`ID_NUMBER`
+bằng ";" nếu nhiều đại diện — nay đặt tại `FCT_CLOS_APPLICATION`
+(xem Section 2 → 2.2.2.1) thay vì DIM này, cùng lý do đã áp dụng cho
+`BUSINESS_FLOW`/`REF_PRODUCT`/`SLA_*` ở `DIM_CLOS_APPLICATION` (2.2.1.1): DIM
+không còn được phép JOIN sang FCT khác để giữ đúng nguyên tắc "DIM
+PDTD_DTM giống hệt DIM SB_DWH". Bảng này từ 15 cột xuống còn 13 cột.
 
-Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.2 Bộ bảng CLOS → 1.2.1.7 DIM_CLOS_CUSTOMER — nay 17 cột sau khi làm
-giàu thêm ZONE/APP_DATE/LOAN_PURPOSE/CUST_CATEGORY/PRECUSTGROUP/LG_REQ/
-FI_REQ/PHONE_REQ/EMAIL/DISTANCE_BRANCH_CUSTOMER, review 2026-09-21, đã
-gồm `DATASOURCE`), bổ sung:
+###### 2.2.1.7 DIM_CLOS_LEGAL_PARTY — xem `FCT_CLOS_LEGAL_PARTY` (2.2.2.8)
 
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 18 | ORG_LEGAL_ID | VARCHAR2 | N | 100 |  | PHÁI SINH: LEFT JOIN DIM_CLOS_LEGAL_PARTY (2.2.1.8) theo WI_NAME + LEGAL_TYPE='CUSTOMER' — lưu dư thừa số giấy tờ pháp lý của chính khách hàng vay để tiện tra cứu (đã xác nhận với người dùng: chấp nhận trùng lặp dữ liệu giữa 2 DIM). Join an toàn không fan-out — người dùng xác nhận nghiệp vụ: `OBJ_TYPE='Khách hàng'` (LEGAL_TYPE='CUSTOMER') luôn đúng 1 dòng/hồ sơ trên NG_SB_CLOS_CUST_INFO_LEGAL, khác với các vai trò khác (đại diện/thành viên góp vốn...) có thể nhiều dòng |
-| 19 | LEGAL_REPRESENTATIVE | VARCHAR2 | N | 1000 |  | Người đại diện theo pháp luật (BC2) — PHÁI SINH: LEFT JOIN DIM_CLOS_LEGAL_PARTY (2.2.1.8) theo WI_NAME + LEGAL_TYPE='LEGAL_REPRESENTATIVE', nối chuỗi FULL_NAME của mọi dòng khớp bằng dấu ";" nếu nhiều đại diện (vai trò này không giới hạn số người, xem 1.2.1.8) — cùng cách RLOS nối ADD_ID/ADD_ID_OTHER (1.3.1.9) khi nhiều giấy tờ. Đúng nguồn SRS BC2 (NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE, lọc OBJ_TYPE='Người đại diện theo pháp luật'); cách nối chuỗi khi nhiều dòng đã được BA xác nhận chính thức, xem Section 3 #19 |
-| 20 | ADD_ID_REPRESENTATIVE | VARCHAR2 | N | 1000 |  | Số giấy tờ tùy thân của người đại diện theo pháp luật (BC2) — PHÁI SINH: cùng LEFT JOIN trên, nối chuỗi ID_NUMBER bằng ";" nếu nhiều đại diện. Nguồn SRS BC2 (NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, cùng điều kiện lọc); cách nối chuỗi đã được BA xác nhận chính thức, xem Section 3 #19 |
-
-- Bảng DIM lưu thông tin doanh nghiệp vay chính CLOS, bê nguyên 1:1 từ SB_DWH, bổ sung ORG_LEGAL_ID/LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE tra qua DIM_CLOS_LEGAL_PARTY.
-- Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
-
-###### 2.2.1.8 DIM_CLOS_LEGAL_PARTY
-
-**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_PARTY` + `FCT_PDTD_PARTY_DOCUMENT` → gộp thành 1 DIM duy nhất cho các vai trò pháp lý liên quan CLOS (bỏ tiền tố PDTD, đổi tên `DIM_CLOS_LEGAL_PARTY`)
-
-Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.2 Bộ bảng CLOS → 1.2.1.8 DIM_CLOS_LEGAL_PARTY — 10 cột, đã gồm `DATASOURCE`), bổ sung:
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 11 | LEGAL_TYPE | VARCHAR2 | N | 50 |  | PHÁI SINH: LEFT JOIN REF_CLOS_LEGAL (2.4.2) theo OBJ_TYPE — chuẩn hóa vai trò pháp lý sang mã tiếng Anh (LEGAL_REPRESENTATIVE, CUSTOMER, COLLATERAL_OWNER, MAIN_CONTRIBUTING_MEMBERS, OTHER); BC2 lọc LEGAL_TYPE='CUSTOMER' khi tra CIF |
-
-- Bảng DIM lưu người/đối tượng liên quan vai trò pháp lý của hồ sơ CLOS, bê nguyên 1:1 từ SB_DWH, bổ sung LEGAL_TYPE chuẩn hóa.
-- Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
-
-**Cơ chế nạp SCD2 "full-row-key" (review 2026-09-17):** bê nguyên cơ chế
-đã mô tả tại 1.2.1.8 — SCD2 so khớp bằng toàn bộ 5 cột nghiệp vụ
-(`WI_NAME`, `ID_NUMBER`, `FULL_NAME`, `OBJ_TYPE`, `LEGAL_DOC`), không
-dùng CDC nguồn (rỗng) để phân biệt update/insert — không tính lại ở
-tầng PDTD_DTM, chỉ bê nguyên phiên bản đã tạo tại SB_DWH.
+**Đổi phân loại DIM → FACT (review 2026-09-25):** bảng này đã đổi tên
+thành `FCT_CLOS_LEGAL_PARTY` và chuyển sang nhóm FCT — xem 2.2.2.8 để
+tránh trùng lặp nội dung (cột, cơ chế nạp). Giữ lại số hiệu `2.2.1.7`
+như một mục rỗng trỏ chuyển tiếp, không xóa số để không làm lệch số các
+bảng DIM khác trong nhóm CLOS.
 
 ##### 2.2.2 FCT
 
-###### 2.2.2.1 FCT_CLOS_APPLICATION_DAILY
+###### 2.2.2.1 FCT_CLOS_APPLICATION — ⚠️ review 2026-09-26 (theo yêu cầu người dùng): nhận thêm 6 cột BUSINESS_FLOW/REF_PRODUCT/SLA_* từ DIM_CLOS_APPLICATION + 2 cột LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE từ DIM_CLOS_CUSTOMER (không nhận ORG_LEGAL_ID — xóa khỏi ETL, xem ghi chú bên dưới) + 5 cột business rule chuyển từ SB_DWH (đổi driving table sang EXTTABLE, full snapshot). ⚠️ review 2026-09-30 (theo yêu cầu người dùng): kế thừa FIRST_APPROVED_DATE/LG_REQ/FI_REQ/PHONE_REQ từ SB_DWH (47 cột), bổ sung thêm APPROVAL_TYPE tính tại tầng này
 
-**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_DAILY` → tách phần CLOS thành `FCT_CLOS_APPLICATION_DAILY` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
+**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_DAILY` → tách phần CLOS thành `FCT_CLOS_APPLICATION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.2 Bộ bảng CLOS → 1.2.2.1 FCT_CLOS_APPLICATION_DAILY — 64 cột (đã gồm
-`DATASOURCE`, `UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_
-TAKERESPON`/`APPROVAL_TAKERESPON`, `CUSTOMER_SK`; đã bỏ `WORKSTEP_FLAG`,
-xem PENDING #6 đóng), bổ sung:
+1.2 Bộ bảng CLOS → 1.2.2.1 FCT_CLOS_APPLICATION — 47 cột, review
+2026-09-30: đã gồm `DATASOURCE`, `UNDERWRITERMAKER_USERMAKE`/
+`UNDERWRITERCHECKER_USERMAKE`/`APPROVAL_USERMAKE` (đổi tên từ
+`*_TAKERESPON`, nay là input thô), `CUSTOMER_SK`; đã bỏ `WORKSTEP_FLAG`,
+xem PENDING #6 đóng; đã bỏ `APPLICATION_STATUS`/`FLAG_AUTO_CANCEL` (chuyển
+tính tại đây, xem bên dưới); đã cắt 16+2 cột dư thừa, review 2026-09-24;
+driving table đổi sang `NG_SB_CLOS_EXTTABLE`, full snapshot, review
+2026-09-26; nhận thêm `FIRST_APPROVED_DATE` (cột 22)/`LG_REQ`/`FI_REQ`/
+`PHONE_REQ` (cột 45-47) từ `DIM_CLOS_APPLICATION`, review 2026-09-30),
+bổ sung:
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 65 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), tra qua ORG_LEGAL_ID trên DIM_CLOS_CUSTOMER. Mặc định -1 (review 2026-09-17: đổi tên từ CUSTOMER_SK để phân biệt rõ với khách hàng LOS — DIM_CLOS_CUSTOMER là chân khách hàng LOS, đây là chân khách hàng T24 riêng, link qua FCT theo đúng nguyên tắc không link DIM sang DIM) |
-| 66 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước hoàn tất gần nhất, chuẩn hóa dùng chung 2 hệ — LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS theo bước/quyết định của sự kiện hoàn tất gần nhất |
+| 48 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), tra qua ID_NUMBER trên DIM_CLOS_CUSTOMER (⚠️ review 2026-09-25: đổi từ ORG_LEGAL_ID sau khi cột đó bị xóa do trùng lặp với NK mới ID_NUMBER, xem 2.2.1.6). Mặc định -1 (review 2026-09-17: đổi tên từ CUSTOMER_SK để phân biệt rõ với khách hàng LOS — DIM_CLOS_CUSTOMER là chân khách hàng LOS, đây là chân khách hàng T24 riêng, link qua FCT theo đúng nguyên tắc không link DIM sang DIM) |
+| 49 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước hoàn tất gần nhất, chuẩn hóa dùng chung 2 hệ — LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS theo bước/quyết định của sự kiện hoàn tất gần nhất |
+| 50 | BUSINESS_FLOW | VARCHAR2 | N | 50 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-26, theo yêu cầu người dùng, xem lý do tại Section 1 → 2.2.1.1/2.2.2.1). PHÁI SINH: `CASE WHEN CUST_GROUP IN ('MSME','SME','USME') THEN 'PDTD_KHDN' WHEN CUST_GROUP IN ('NBFI','JSC','FDI','BANK','STR','SOC') THEN 'PDTD_KHDNL' ELSE NULL END` (nguyên văn SRS BC2, không qua bảng REF_ nào, khác cách RLOS lookup REF_RLOS_FLOW). `CUST_GROUP` lấy qua JOIN `CUSTOMER_SK` (cột 44, cột có sẵn từ SB_DWH — không cần thêm cột mới) → `DIM_CLOS_CUSTOMER` |
+| 51 | REF_PRODUCT | NVARCHAR2 | N | 200 |  | Nhóm sản phẩm dùng để tra cam kết SLA (BC5) — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-26, theo yêu cầu người dùng). PHÁI SINH: LEFT JOIN `CLOS_REF_SLA_TDKHDNL`/`CLOS_REF_SLA_TDKHDN` (chọn theo `CUST_GROUP`, lấy qua `CUSTOMER_SK` cột 44 → `DIM_CLOS_CUSTOMER`) theo `PRODUCT_LINE_NAME`+`SUB_PRODUCT_NAME` (lấy qua `PRODUCT_SK` cột 6, cột có sẵn trên chính bảng này → `DIM_CLOS_PRODUCT`)+`HAVE_ANY_DEVIATION`+`FLAG_APP_GRP` (quy đổi từ `APP_GRP`, cả 2 tra qua `APPLICATION_SK` cột 4 → `DIM_CLOS_APPLICATION`). Điều kiện `SUB_PRODUCT` (review 2026-09-18, theo SRS BC5 cập nhật): luôn so khớp `SUB_PRODUCT` trực tiếp — SRS mới đã bỏ điều kiện loại trừ theo `CHANGE_REQUEST`. Khóa tra dùng `PRODUCT_LINE_NAME`/`PRODUCT_NAME` (tên hiển thị) chuẩn hóa từ `DIM_CLOS_PRODUCT`, không phải `PRODUCT_LINE_CODE`/`SUB_PRODUCT_CODE` (mã) — xem ghi chú "Lưu ý về PRODUCT_LINE/SUB_PRODUCT dùng làm khóa tra" ở Section 1 → 2.2.1.1 |
+| 52 | SLA_CREDIT_OFFICER | NUMBER | N | 10,2 |  | Cam kết giờ cho chuyên viên tín dụng — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-26). Cùng LEFT JOIN trên. Hồ sơ `APP_GRP='C1'`: hằng số cứng 4 giờ, không lookup |
+| 53 | SLA_MARKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước lập hồ sơ thẩm định — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-26). Cùng LEFT JOIN trên. Hồ sơ `APP_GRP='C1'`: hằng số cứng 4 giờ |
+| 54 | SLA_CHECKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát thẩm định — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-26). Cùng LEFT JOIN trên. Hồ sơ `APP_GRP='C1'`: hằng số cứng 4 giờ |
+| 55 | SLA_CREDIT_APPROVER | NUMBER | N | 10,2 |  | Cam kết giờ cho cấp phê duyệt — CHUYỂN TỪ `DIM_CLOS_APPLICATION` (review 2026-09-26). Cùng LEFT JOIN trên. Hồ sơ `APP_GRP='C1'`: hằng số cứng 4 giờ |
+| 56 | LEGAL_REPRESENTATIVE | VARCHAR2 | N | 1000 |  | Người đại diện theo pháp luật (BC2) — CHUYỂN TỪ `DIM_CLOS_CUSTOMER` (review 2026-09-26). PHÁI SINH TẠI SB_DWH (rà soát lại review 2026-09-26, cùng ngày): `APPLICATION_SK` (cột 4, cột có sẵn) → `SB_DWH.DIM_CLOS_APPLICATION` lấy `WI_NAME` → LEFT JOIN `SB_DWH.FCT_CLOS_LEGAL_PARTY` (Section 1 → 1.2.2.7, KHÔNG phải bản PDTD_DTM 2.2.2.8) theo `WI_NAME`+`OBJ_TYPE`='Người đại diện theo pháp luật', nối chuỗi `NAMEE` (nguồn gốc của `FULL_NAME`) của mọi dòng khớp bằng dấu ";" nếu nhiều đại diện (vai trò này không giới hạn số người, xem 1.2.2.7) — cùng cách RLOS nối `ADD_ID`/`ADD_ID_OTHER` (1.3.1.8) khi nhiều giấy tờ. Đúng nguồn SRS BC2 (`NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE`, lọc `OBJ_TYPE`='Người đại diện theo pháp luật'); cách nối chuỗi khi nhiều dòng đã được BA xác nhận chính thức, xem Section 3 #19 |
+| 57 | ADD_ID_REPRESENTATIVE | VARCHAR2 | N | 1000 |  | Số giấy tờ tùy thân của người đại diện theo pháp luật (BC2) — CHUYỂN TỪ `DIM_CLOS_CUSTOMER` (review 2026-09-26). PHÁI SINH TẠI SB_DWH, cùng đường JOIN trên (cột 56: `APPLICATION_SK` → `SB_DWH.DIM_CLOS_APPLICATION.WI_NAME` → `SB_DWH.FCT_CLOS_LEGAL_PARTY`), nối chuỗi `ID_NUMBER` bằng ";" nếu nhiều đại diện. Nguồn SRS BC2 (`NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER`, cùng điều kiện lọc); cách nối chuỗi đã được BA xác nhận chính thức, xem Section 3 #19 |
+| 58 | APPLICATION_STATUS | VARCHAR2 | N | 50 |  | Trạng thái hồ sơ chuẩn hóa (BC2) — CHUYỂN TỪ SB_DWH, business rule (review 2026-09-26, theo yêu cầu người dùng, xem lý do tại Section 1 → 2.2.2.1). PHÁI SINH: tra `WORKSTEP_CODE`/`DECISION_CODE` qua `LAST_WORKSTEP_DECISION_SK` (cột có sẵn cột 5 → `DIM_CLOS_WORKSTEP_DECISION`), áp `CASE WHEN DECISION_CODE IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport') THEN 'Approved' WHEN DECISION_CODE='Reject' THEN 'Rejected' WHEN WORKSTEP_CODE IN ('CancelRevoke','CancelPermanent') THEN 'Cancelled' ELSE 'Processing' END` — nguyên văn công thức SRS BC2, không đổi so với bản SB_DWH cũ, chỉ đổi nguồn tra WORKSTEP/DECISION sang qua FK có sẵn thay vì đọc lại ENTRY_EXIT |
+| 59 | FLAG_AUTO_CANCEL | VARCHAR2 | N | 10 |  | 'YES'/'NO' theo nguyên văn SRS BC2 field FLAG_AUTO_CAN (BC2) — CHUYỂN TỪ SB_DWH, business rule (review 2026-09-26). PHÁI SINH: `CASE WHEN CANCEL_DATE (cột 25) IS NOT NULL AND DECISION_CODE (qua LAST_WORKSTEP_DECISION_SK, cột 5) = 'Auto-Cancel' THEN 'YES' ELSE 'NO' END`. **Không có cột `AUTO_CANCEL_DATE`** (rà soát lại review 2026-09-26, cùng ngày, sau khi đối chiếu SRS BC1 gốc do người dùng cung cấp) — field `AUTO_CAN_DATE` chỉ tồn tại trong SRS BC1 (RLOS, công thức hoàn toàn khác); SRS BC2 (CLOS) không định nghĩa field này, chỉ định nghĩa trực tiếp `FLAG_AUTO_CAN`; không báo cáo nào tiêu thụ `AUTO_CANCEL_DATE` cho nhánh CLOS — cột dư thừa, loại khỏi thiết kế |
+| 60 | APPROVAL_TYPE | VARCHAR2 | N | 200 |  | Loại luồng phê duyệt (BC2) — BỔ SUNG TẠI PDTD_DTM (review 2026-09-30, theo yêu cầu người dùng — chuyển từ `DIM_CLOS_APPLICATION`, xem lý do tại Section 1 → 2.2.1.1): PHÁI SINH `CASE WHEN STREAM IN ('Phê duyệt tín dụng','Sent To Disbursement Request') THEN STREAM ELSE NULL END`, đúng nguyên văn điều kiện lọc SRS BC2. `STREAM` lấy qua `APPLICATION_SK` (cột 4) → `DIM_CLOS_APPLICATION.STREAM` (giữ nguyên giá trị gốc trên DIM, không lọc — phục vụ BC3/BC9). Là business rule (điều kiện lọc), không phải ảnh chụp sạch nguồn nên tính tại PDTD_DTM, không đặt ở SB_DWH |
 
-- Bảng FACT xương sống bê 1:1 từ SB_DWH, bổ sung khóa T24_CUSTOMER_SK và cột tên bước chuẩn hóa cho báo cáo, dùng cho hệ CLOS.
+**Review 2026-10-01 (theo yêu cầu người dùng):** xóa 3 cột
+`UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/
+`APPROVAL_TAKERESPON` (trước đây cột 60-62) — phát hiện trùng giá trị
+100% với `UNDERWRITERMAKER_USERMAKE`/`UNDERWRITERCHECKER_USERMAKE`/
+`APPROVAL_USERMAKE` (Section 1 → 1.2.2.1 cột 42-44, đã là kết quả
+COALESCE cuối cùng từ SB_DWH), công thức chỉ map thẳng đổi tên, không
+mang business logic khác biệt. BC2 (`lld/BC2.csv`) sửa map thẳng vào
+`*_USERMAKE` thay vì `*_TAKERESPON`. `APPROVAL_TYPE` dịch STT từ 63
+xuống 60. Bảng từ 63 cột xuống còn **60 cột**. Cùng quyết định áp dụng
+cho `FCT_RLOS_APPLICATION` (cột 76-78 cũ, xem Section 2 → 2.3.2.1).
+
+**Xóa `ORG_LEGAL_ID` khỏi ETL (rà soát lại review 2026-09-26, cùng ngày,
+theo yêu cầu người dùng):** giá trị này chỉ là `ID_NUMBER` của khách
+hàng chính — báo cáo BC2 tự JOIN report-time `CUSTOMER_SK` (cột 44, cột
+có sẵn) → `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER` khi cần hiển thị,
+không cần ETL/lưu vật lý một cột riêng cho việc này (khác
+`LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` — 2 cột này BẮT BUỘC ETL
+sẵn vì phải nối chuỗi nhiều dòng khớp, không thể để report tự làm).
+
+- Bảng FACT xương sống bê 1:1 từ SB_DWH, bổ sung khóa T24_CUSTOMER_SK, cột tên bước chuẩn hóa, cột luồng nghiệp vụ/cam kết SLA (chuyển từ DIM_CLOS_APPLICATION), cột thông tin pháp lý (chuyển từ DIM_CLOS_CUSTOMER), cột business rule trạng thái/chịu trách nhiệm (chuyển từ SB_DWH) và cột loại luồng phê duyệt (chuyển từ DIM_CLOS_APPLICATION) cho báo cáo, dùng cho hệ CLOS.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME**.
+- Từ 45 cột (43 bê 1:1 từ SB_DWH sau cắt gọn 2026-09-24 + T24_CUSTOMER_SK
+  + LAST_WORKSTEP) lên 54 cột (review 2026-09-26, +9 cột chuyển từ DIM)
+  lên 58 cột (review 2026-09-26, tiếp theo: +5 cột business rule chuyển
+  từ SB_DWH, -1 cột `ORG_LEGAL_ID` xóa khỏi ETL cùng ngày) lên 63 cột
+  (review 2026-09-30: +4 cột kế thừa từ SB_DWH đã lên 47 cột, +1 cột
+  `APPROVAL_TYPE` bổ sung riêng tại tầng này) xuống còn 60 cột (review
+  2026-10-01: xóa 3 cột `*_TAKERESPON` trùng giá trị với `*_USERMAKE`).
 
-**Ghi chú:** không có cột vật lý `BI_FLOW`/`ZONE`/`SLA_*`/`REF_PRODUCT`
-trên bảng này — join qua `APPLICATION_SK` sang `DIM_CLOS_APPLICATION`
-(2.2.1.1) để lấy các cột đó (đã tính sẵn ở DIM), và join qua `ORG_UNIT_SK`
-sang `DIM_LOS_ORG_UNIT` cho `ZONE` — xem ghi chú lineage tại Section 1 →
-2.2.2.1.
+**Ghi chú:** không có cột vật lý `ZONE` trên bảng này — join qua
+`COMPANY_SK` sang `DIM_LOS_COMPANY` cho `ZONE` — xem ghi chú lineage tại
+Section 1 → 2.2.2.1. `BUSINESS_FLOW`/`REF_PRODUCT`/`SLA_*`/
+`LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` (cột 50-57) trước đây đặt
+tại `DIM_CLOS_APPLICATION`/`DIM_CLOS_CUSTOMER` (review 2026-09-25) — nay
+chuyển hẳn về đây (review 2026-09-26, theo yêu cầu người dùng), xem chi
+tiết lineage tại Section 1 → 2.2.2.1. `APPLICATION_STATUS`/`FLAG_AUTO_CANCEL`
+(cột 58-59) trước đây tính tại SB_DWH — nay chuyển hẳn về đây theo yêu
+cầu "ưu tiên dữ liệu bám sát nguồn STG_LOS nhất có thể" (review
+2026-09-26), xem chi tiết lineage tại Section 1 → 2.2.2.1.
+`UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/
+`APPROVAL_TAKERESPON` (trước đây cột 60-62, cùng lô chuyển này) đã bị
+XÓA (review 2026-10-01, theo yêu cầu người dùng) — phát hiện trùng giá
+trị 100% với `UNDERWRITERMAKER_USERMAKE`/`UNDERWRITERCHECKER_USERMAKE`/
+`APPROVAL_USERMAKE` (cột 42-44, đã là COALESCE cuối cùng từ SB_DWH),
+không cần cột riêng chỉ để đổi tên; BC2 nay map thẳng vào `*_USERMAKE`.
+`APPROVAL_TYPE` (nay cột 60, trước đây cột 63, review 2026-09-30) trước
+đây đặt tại `DIM_CLOS_APPLICATION` — nay chuyển hẳn về đây vì là
+business rule (điều kiện lọc STREAM), không phải ảnh chụp sạch nguồn
+phù hợp SB_DWH;
+`STREAM` (giá trị gốc) vẫn giữ nguyên trên `DIM_CLOS_APPLICATION`.
 
-###### 2.2.2.2 FCT_CLOS_APPLICATION_PARTY — MỚI (factless-fact liên kết, tương tự FCT_RLOS_APPLICATION_PARTY)
+###### 2.2.2.2 FCT_CLOS_APPLICATION_PARTY — ĐÃ XÓA (review 2026-09-26, theo yêu cầu người dùng) — hợp nhất vào FCT_CLOS_LEGAL_PARTY (2.2.2.8), xem mục đó
 
-**Bảng cũ (trước tách):** không có — bảng bị thiếu trong lần thiết kế trước, bổ sung để khớp pattern factless-fact đã áp dụng cho RLOS
-
-Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.2 Bộ bảng CLOS → 1.2.2.2 FCT_CLOS_APPLICATION_PARTY — 6 cột, đã gồm `DATASOURCE`) — không
-thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
-
-- Bảng FACT quan hệ (factless fact), bê nguyên 1:1 từ SB_DWH.
-- Khóa chính của bảng (PK): **DAYID, WI_NAME, LEGAL_PARTY_SK** (giữ nguyên như SB_DWH).
+Xem lý do đầy đủ tại Section 1 → 2.2.2.2. Bản SB_DWH (1.2.2.2) nay cũng
+đã xóa hẳn (cập nhật 2026-09-26, cùng ngày — ban đầu chỉ bản PDTD_DTM bị
+xóa) — xem Section 2 → 1. SB_DWH → 1.2.2.2.
 
 ###### 2.2.2.3 FCT_CLOS_COLLATERAL
 
@@ -6631,30 +7742,44 @@ cột nào ở layer này, không có REF_ nào join thêm.
 **Bảng cũ (trước tách):** `FCT_PDTD_EXCEPTION` → tách phần CLOS thành `FCT_CLOS_EXCEPTION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.2 Bộ bảng CLOS → 1.2.2.4 FCT_CLOS_EXCEPTION — 14 cột (đã gồm
-`DATASOURCE`), đã có sẵn `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`), bổ sung:
+1.2 Bộ bảng CLOS → 1.2.2.4 FCT_CLOS_EXCEPTION — 13 cột, đã gồm
+`DATASOURCE`/`CUSTOMER_SK`, KHÔNG còn `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`
+— review 2026-09-26), bổ sung 3 cột phái sinh tại tầng này:
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 15 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (review 2026-09-22, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" tại Section 1 → 2.2.2.4): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='CLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE |
-| 16 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ — PHÁI SINH: JOIN sang DIM_CLOS_APPLICATION theo APPLICATION_SK, lấy LOANCASEID |
+| 14 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH TẠI PDTD_DTM (review 2026-09-26, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" tại Section 1 → 2.2.2.4): mặc định 'Not First Time Right'; là 'First Time Right' CHỈ KHI mọi dòng cùng WI_NAME đều tồn tại (EXISTS) dòng khớp trong SB_DWH.FCT_CLOS_WORKSTEP_EVENT (WORKSTEP_CODE=DIM_CLOS_EXCEPTION.ACTIVITYNAME AND DECISION_CODE=DIM_CLOS_EXCEPTION.DECISION_CODE, tra qua EXCEPTION_SK) VÀ EXCEPTION_CATEGORY nằm trong whitelist miễn trừ theo CUST_GROUP (tra qua CUSTOMER_SK → DIM_CLOS_CUSTOMER), phân theo nhóm KHDN (MSME/SME/USME) và nhóm KHDNL/ĐT&ĐCTC (FDI/SOC/JSC/NBFI/BANK/STR) — mỗi nhóm 4 tổ hợp WORKSTEP+DECISION với danh sách EXCEPTION_CATEGORY miễn trừ riêng, xem đầy đủ literal tại SRS BC7 BR 1.2 |
+| 15 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH TẠI PDTD_DTM (review 2026-09-26, chuyển từ SB_DWH): WORKSTEP_CODE của dòng SB_DWH.FCT_CLOS_WORKSTEP_EVENT tại MIN(EXITDATE) theo WI_NAME, với điều kiện EXITDATE IS NOT NULL AND ((WORKSTEP_CODE='DetailDataEntry' AND DECISION_CODE='Send_Back') OR (WORKSTEP_CODE IN ('DataInputerChecker','UnderwriterMaker','CreditApproval') AND DECISION_CODE='Additional_Doc_Required') OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send_Back to BranchSupport')) — DECISION_CODE tra qua WORKSTEP_DECISION_SK → DIM_CLOS_WORKSTEP_DECISION |
+| 16 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (review 2026-09-22, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" tại Section 1 → 2.2.2.4): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='CLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE |
 
-- Bảng FACT chi tiết (nhân dòng), bê 1:1 từ SB_DWH, bổ sung PHAN_LOAI_DDE/LOANCASEID cho BC7/BC11.
+- Bảng FACT chi tiết (nhân dòng), bê 1:1 từ SB_DWH (13 cột), bổ sung CHECK_FTR/FIRST_WORKSTEP_RETURN/PHAN_LOAI_DDE cho BC7 — tổng **16 cột**.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME** (giữ nguyên như SB_DWH).
 
 **So với thiết kế cũ (`FCT_PDTD_EXCEPTION` gộp, 16 cột):** bỏ `DATASOURCE`
 (luôn cố định 'CLOS'). Còn 15 cột — 13 cột bê 1:1 từ SB_DWH (đã gồm
 `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` tính sẵn ở đó, xem Section 1/2 →
-1.2.2.4) + 2 cột phái sinh riêng của tầng DTM (`PHAN_LOAI_DDE` — chuyển
-từ SB_DWH, review 2026-09-22 — và `LOANCASEID`). Không đọc thêm STG_LOS
+1.2.2.4) + 1 cột phái sinh riêng của tầng DTM (`PHAN_LOAI_DDE` — chuyển
+từ SB_DWH, review 2026-09-22). Không đọc thêm STG_LOS
 nào ở tầng này — giữ đúng nguyên tắc "DTM chỉ đọc DWH" (`PHAN_LOAI_DDE`
 đọc `REF_PHAN_LOAI_DDE`, một bảng PDTD_DTM, không phải STG_LOS).
 
 **Đối chiếu SRS (BC7):** `CHECK_FTR`, `FIRST_WORKSTEP_RETURN`,
-`PHAN_LOAI_DDE`, `LOANCASEID` khớp đúng công thức SRS nêu (2 cột đầu bê
+`PHAN_LOAI_DDE` khớp đúng công thức SRS nêu (2 cột đầu bê
 nguyên từ SB_DWH, đã đối chiếu tại 1.2.2.4; `PHAN_LOAI_DDE` tính tại đây
-theo REF_PHAN_LOAI_DDE, xem cột 15 ở trên; `LOANCASEID` join
-`DIM_CLOS_APPLICATION` không đổi so với thiết kế gốc).
+theo REF_PHAN_LOAI_DDE, xem cột 16 ở trên).
+
+**Xóa `LOANCASEID` khỏi ETL (review 2026-09-27, theo yêu cầu người
+dùng):** rà soát lại `lld/BC7.csv` xác nhận cột này chỉ là bản dư thừa
+có chủ đích — cùng giá trị đã có sẵn qua đường JOIN `APPLICATION_SK` →
+`DIM_CLOS_APPLICATION.LOANCASEID` (chính `lld/BC7.csv` cũng ghi "2 đường
+đều ra cùng giá trị"). Không phải business rule, không phải aggregate
+cần tính sẵn — chỉ là copy 1 bước JOIN qua FK đã có trên bảng. Rà soát
+lại cũng xác nhận `BC11` KHÔNG dùng cột này (bullet "phục vụ BC11 qua
+LOANCASEID" ở mục đích thiết kế trước đây là sai — `lld/BC11.csv` lấy
+`LOANCASEID` từ `FCT_CLOS_LOAN_DISBURSEMENT`, một bảng hoàn toàn khác).
+Đã xóa hẳn khỏi ETL — báo cáo tự JOIN `APPLICATION_SK` →
+`DIM_CLOS_APPLICATION.LOANCASEID` khi cần. Bảng từ 17 cột xuống còn
+**16 cột**.
 
 ###### 2.2.2.5 FCT_CLOS_DEVIATION
 
@@ -6675,7 +7800,7 @@ nguồn RLOS theo column-optimization rule (`CHECKING_CONDITION`,
 ghi nhầm "8 cột" mâu thuẫn với chính câu trên ghi "9 cột"), toàn bộ bê
 1:1 từ SB_DWH — không có cột phái sinh riêng nào ở tầng DTM nữa
 (`PROCESSED_DATE` đã chuyển hẳn sang tính tại SB_DWH, không còn JOIN
-`FCT_CLOS_APPLICATION_DAILY`, xem 1.2.2.5). Không đọc thêm STG_LOS nào ở
+`FCT_CLOS_APPLICATION`, xem 1.2.2.5). Không đọc thêm STG_LOS nào ở
 tầng này — giữ đúng nguyên tắc "DTM chỉ đọc DWH".
 
 **Đối chiếu SRS (BC6):** `DEVIATION_TYPE_CODE`, `DEV_PROPOSAL`,
@@ -6686,10 +7811,36 @@ tầng này — giữ đúng nguyên tắc "DTM chỉ đọc DWH".
 **Bảng cũ (trước tách):** `FCT_LOS_WORKSTEP_EVENT` (CHUNG) → tách phần CLOS thành `FCT_CLOS_WORKSTEP_EVENT` (xem lý do tách tại Section 1 → 1. SB_DWH → 1.2.2.6)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.2 Bộ bảng CLOS → 1.2.2.6 FCT_CLOS_WORKSTEP_EVENT — nay 23 cột sau khi bổ sung PROCESSED_DATE/WORKSTEP_FLAG/CUSTOMER_SK (review 2026-09-21) rồi bỏ EVENT_SEQ_DESC — cột dư thừa (review 2026-09-22), đã gồm `DATASOURCE`) — không
-thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
+1.2 Bộ bảng CLOS → 1.2.2.6 FCT_CLOS_WORKSTEP_EVENT — 21 cột, gồm cả
+`WF_PROCESSNAME`/`WF_ACTIVITYNAME` thô, KHÔNG có `WORKSTEP_FLAG` hay
+`APPROVAL_FLAG` — review 2026-09-26/27), bổ sung **2 cột phái sinh
+tại tầng này**:
 
-- Bảng FACT nhật ký workflow mức nguyên tử, bê nguyên 1:1 từ SB_DWH, dùng cho hệ CLOS.
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- |
+| 22 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (review 2026-09-27, chuyển từ SB_DWH, tạm thời chỉ nhánh CLOS): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng PDTD_DTM này, bê 1:1 từ SB_DWH), ngược lại 'From Second Approval'. Không JOIN thẳng STG_LOS. Dùng cho BC5.APPROVAL_FLAG |
+| 23 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4) — PHÁI SINH TẠI PDTD_DTM (review 2026-09-26, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" bên dưới): 5 nhánh CASE-WHEN theo thứ tự ưu tiên, đọc `WORKSTEP_CODE`/`DECISION_CODE` (qua `WORKSTEP_DECISION_SK` → `DIM_CLOS_WORKSTEP_DECISION`) của TOÀN BỘ lịch sử `WI_NAME` (EXISTS-check qua các dòng cùng hồ sơ trên chính bảng PDTD_DTM này, bê 1:1 từ SB_DWH) kết hợp `WF_PROCESSNAME`/`WF_ACTIVITYNAME` (cột 19-20, đã bê 1:1) — xem công thức đầy đủ tại Section 1 → 1.2.2.6 ("Đóng PENDING #6"). Phục vụ BC4.FLAG mà không cần JOIN fan-out sang APPLICATION_DAILY, không JOIN thẳng STG_LOS |
+
+**⚠️ Đánh giá kiến trúc — `WORKSTEP_FLAG` chuyển từ SB_DWH sang đây
+(review 2026-09-26, theo yêu cầu người dùng):** cột này là công thức 5
+nhánh CASE-WHEN theo business rule SRS BC4 (không phải giá trị gốc
+STG_LOS) — trước đây tính tại SB_DWH (review 2026-09-21), vi phạm
+nguyên tắc "SB_DWH ảnh chụp sạch nguồn, PDTD_DTM chuẩn hóa/tính business
+rule", cùng bản chất với `CHECK_FTR`/`APPLICATION_STATUS` đã chuyển trước đó.
+SB_DWH nay chỉ giữ 2 cột thô `WF_PROCESSNAME`/`WF_ACTIVITYNAME` (kết quả
+JOIN `WFINSTRUMENTTABLE` đã lọc `CREATEDBY`, không tính CASE WHEN) —
+không cần thêm cột nào khác vì `WORKSTEP_CODE`/`DECISION_CODE` của toàn
+bộ lịch sử `WI_NAME` đã có sẵn ngay trên chính bảng này.
+
+**Đánh giá kiến trúc — `APPROVAL_FLAG` chuyển từ SB_DWH sang đây
+(review 2026-09-27, theo yêu cầu người dùng, tạm thời chỉ CLOS):** cột
+này về bản chất không phải business-rule whitelist (là window function
+so sánh vị trí, không tra danh mục BA định nghĩa) nên không bắt buộc
+phải chuyển — nhưng người dùng chọn chuyển để nhất quán kiến trúc với
+`WORKSTEP_FLAG`. Không cần thêm cột thô nào — `EXITDATE`/`WORKSTEP_CODE`
+đã có sẵn trên chính bảng này.
+
+- Bảng FACT nhật ký workflow mức nguyên tử, bê nguyên 1:1 từ SB_DWH, dùng cho hệ CLOS, bổ sung `APPROVAL_FLAG`/`WORKSTEP_FLAG` tại tầng này.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, WORKSTEP_CODE, ENTRYDATE** (giữ nguyên như SB_DWH).
 
 ###### 2.2.2.7 FCT_CLOS_LOAN_DISBURSEMENT — TÁCH TỪ FCT_LOS_DISBURSEMENT
@@ -6709,7 +7860,7 @@ do tách đầy đủ tại Section 1 → 2.2.2.7.
 | 2 | CONTRACT | VARCHAR2 | Y | 100 | PK | Mã hợp đồng khoản vay — nguồn STG_FCT_LOAN.CONTRACT (1:1 từ SB_DWH.FCT_LOAN.CONTRACT) |
 | 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'T24' — bảng nguồn T24 core banking (STG_FCT_LOAN), không thuộc STG_LOS |
 | 4 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER — nguồn STG_FCT_LOAN.CUSTOMER_SK (surrogate có sẵn, tra thẳng DIM_T24_CUSTOMER.DIMENSION_KEY, không tự lookup qua LEGAL_ID). Mặc định -1 nếu không khớp |
-| 5 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_COMPANY (2.1.4) — PHÁI SINH: lookup theo STG_FCT_LOAN.CO_CODE = DIM_T24_COMPANY.COMPANY_CODE (chỉ bản ghi hiện hành, COMPANY_EXP_DATE IS NULL phía nguồn T24). Mặc định -1. Nguồn của BRANCH_NAME/COMPANY_NAME cho BC11 |
+| 5 | T24_COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_COMPANY (2.1.4) — PHÁI SINH: lookup theo STG_FCT_LOAN.CO_CODE = DIM_T24_COMPANY.COMPANY_CODE (chỉ bản ghi hiện hành, COMPANY_EXP_DATE IS NULL phía nguồn T24). Mặc định -1. Nguồn của BRANCH_NAME/COMPANY_NAME cho BC11 |
 | 6 | CONTRACT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_LOAN (2.1.5) — nguồn STG_FCT_LOAN.CONTRACT_SK (surrogate có sẵn, tra thẳng DIM_T24_LOAN.DIMENSION_KEY). Mặc định -1. Nguồn của VALUE_DATE/MATURITY_DATE/REC_STATUS/CONTRACT_REF/REF_VALUE_DATE cho BC11 |
 | 7 | SEAB_PRODUCTS_DE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_PRODUCTS_DE (2.1.6) — nguồn STG_FCT_LOAN.SEAB_PRODUCTS_DE_SK (surrogate có sẵn, tra thẳng DIM_T24_SEAB_PRODUCTS_DE.DIMENSION_KEY; SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả). Mặc định -1. Nguồn của PRODUCT_T24 cho BC11 |
 | 8 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION, tra theo SEAB_LOS_ID. KHÔNG để NULL — không tra được thì gán -1 (Unknown), tránh phép JOIN của OAS rớt dòng |
@@ -6720,60 +7871,129 @@ do tách đầy đủ tại Section 1 → 2.2.2.7.
 | 13 | NO_DAYS_OVERDUE | NUMBER | N | 6 |  | Số ngày quá hạn — PHÁI SINH: self-join STG_FCT_LOAN (b) ON a.PD_CONTRACT = b.CONTRACT, lấy b.NO_DAYS_OVERDUE |
 | 14 | CUR_BUCKET | NUMBER | N | 2 |  | Nhóm nợ — PHÁI SINH: CASE WHEN NO_DAYS_OVERDUE > 360 THEN 5 WHEN > 180 THEN 4 WHEN > 90 THEN 3 WHEN >= 10 THEN 2 ELSE 1 END, cùng self-join PD_CONTRACT như NO_DAYS_OVERDUE |
 | 15 | LIMIT_REFERENCE | VARCHAR2 | N | 100 |  | Mã hạn mức — nguồn STG_FCT_LOAN.LIMIT_REF. Trường LIMIT_REFERENCE của BC11. Giữ trên fact (không chuyển DIM_T24_LOAN) vì nguồn là chính STG_FCT_LOAN, không phải STG_DIM_LOAN |
-| 16 | CUST_GROUP | VARCHAR2 | N | 100 |  | Nhóm khách hàng — PHÁI SINH: JOIN APPLICATION_SK sang DIM_CLOS_APPLICATION.CUST_GROUP. Trường CUST_GROUP của BC11 |
+| 16 | CUST_GROUP | VARCHAR2 | N | 100 |  | Nhóm khách hàng — PHÁI SINH (⚠️ review 2026-09-25: đổi nguồn sau khi CUST_GROUP chuyển khỏi DIM_CLOS_APPLICATION): JOIN APPLICATION_SK sang DIM_CLOS_APPLICATION, lấy CUSTOMER_SK (cột 34, 2.2.1.1) có sẵn trên DIM đó, rồi JOIN tiếp sang DIM_CLOS_CUSTOMER.CUST_GROUP — không tự tra lại NG_SB_CLOS_CUST_INFO_LEGAL từ đầu, tái sử dụng CUSTOMER_SK đã tính sẵn ở DIM_CLOS_APPLICATION. Trường CUST_GROUP của BC11 |
 | 17 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ cha — PHÁI SINH: JOIN APPLICATION_SK sang DIM_CLOS_APPLICATION.LOANCASEID, CHỈ giữ giá trị khi hồ sơ có CHANGE_REQUEST='New' (đúng công thức SRS BC11), còn lại gán NULL dù DIM có giá trị. Trường LOANCASEID của BC11 |
 | 18 | APPROVAL_WINAME_LOS | VARCHAR2 | N | 100 |  | Mã hồ sơ cha đã được phê duyệt — PHÁI SINH: JOIN APPLICATION_SK sang DIM_CLOS_APPLICATION.FIRST_APPROVED_WI_NAME. Trường APPROVAL_WINAME_LOS của BC11 |
-| 19 | APPROVAL_DATE | DATE | N |  |  | Ngày phê duyệt — PHÁI SINH: JOIN APPLICATION_SK sang DIM_CLOS_APPLICATION.FIRST_APPROVED_DATE. Trường APPROVAL_DATE của BC11 |
+| 19 | APPROVAL_DATE | DATE | N |  |  | Ngày phê duyệt — PHÁI SINH: JOIN APPLICATION_SK sang FCT_CLOS_APPLICATION.FIRST_APPROVED_DATE (⚠️ review 2026-09-30: đổi nguồn sau khi FIRST_APPROVED_DATE chuyển từ DIM_CLOS_APPLICATION sang FCT_CLOS_APPLICATION, cột 22, xem 2.2.2.1). Trường APPROVAL_DATE của BC11 |
 
 - Bảng FACT đối chiếu T24, lưu khoản vay đã giải ngân của hệ CLOS, nối ngược về hồ sơ LOS qua SEAB_LOS_ID. Grain là **HỢP ĐỒNG** (khác grain hồ sơ của mọi bảng LOS khác), không phải SCD2 — bảng là ảnh chụp theo `DAYID`. Phục vụ BC11.
 - Khóa chính của bảng (PK): **DAYID, CONTRACT**.
+
+###### 2.2.2.8 FCT_CLOS_LEGAL_PARTY — ĐỔI PHÂN LOẠI DIM → FACT (review 2026-09-25, trước đây là DIM_CLOS_LEGAL_PARTY, 2.2.1.7). ⚠️ review 2026-09-26 (theo yêu cầu người dùng): thêm DAYID vào PK, hợp nhất FCT_CLOS_APPLICATION_PARTY (2.2.2.2, đã xóa)
+
+**Bảng cũ (trước đổi phân loại):** `DIM_CLOS_LEGAL_PARTY` (2.2.1.7) — nay đổi từ DIM sang FACT (xem lý do đầy đủ tại Section 1 → 1.2.2.7 / 2.2.2.8)
+
+Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
+1.2 Bộ bảng CLOS → 1.2.2.7 FCT_CLOS_LEGAL_PARTY — 8 cột, đã gồm
+`CUSTOMER_SK`/`APPLICATION_SK`), bổ sung:
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — CỘT MỚI (review 2026-09-26, theo yêu cầu người dùng): thêm vào PK/grain để bảng này hấp thụ luôn vai trò cầu nối theo-ngày của `FCT_CLOS_APPLICATION_PARTY` (2.2.2.2, đã xóa — xem lý do đầy đủ tại Section 1 → 2.2.2.8). Mỗi `DAYID`, lặp lại toàn bộ dòng hiện hành của `FCT_CLOS_LEGAL_PARTY` (SB_DWH, không có DAYID) — 1 dòng SB_DWH sinh N dòng PDTD_DTM (1 dòng/ngày) |
+| 9 | LEGAL_TYPE | VARCHAR2 | N | 50 |  | PHÁI SINH: LEFT JOIN REF_CLOS_LEGAL (2.4.2) theo OBJ_TYPE — chuẩn hóa vai trò pháp lý sang mã tiếng Anh (LEGAL_REPRESENTATIVE, CUSTOMER, COLLATERAL_OWNER, MAIN_CONTRIBUTING_MEMBERS, OTHER); BC2 lọc LEGAL_TYPE='CUSTOMER' khi tra CIF, LEGAL_TYPE='LEGAL_REPRESENTATIVE' khi tra người đại diện |
+
+- Bảng FACT lưu người/đối tượng liên quan vai trò pháp lý của hồ sơ CLOS, bê nguyên 1:1 từ SB_DWH (cả `CUSTOMER_SK`/`APPLICATION_SK`), bổ sung `LEGAL_TYPE` chuẩn hóa và `DAYID` (snapshot theo ngày, review 2026-09-26).
+- Khóa chính của bảng (PK): **DAYID, WI_NAME, ID_NUMBER** (⚠️ review 2026-09-26: thêm `DAYID`, khác SB_DWH — SB_DWH giữ nguyên `WI_NAME, ID_NUMBER` không có DAYID).
+
+**Không còn cơ chế SCD2 (review 2026-09-25):** khác thiết kế cũ (bảng
+từng là DIM với `DIMENSION_KEY`/`EFF_DATE`/`EXP_DATE`, cơ chế nạp
+"full-row-key" so khớp 5 cột nghiệp vụ do nguồn không có CDC key ổn
+định) — nay là FACT snapshot đơn giản, bê nguyên 1:1 từ SB_DWH không
+tính lại gì thêm ở tầng này (ngoài `LEGAL_TYPE`/`DAYID`), không có khái
+niệm hiệu lực theo thời gian.
+
+**Hợp nhất `FCT_CLOS_APPLICATION_PARTY` (2.2.2.2, đã xóa) vào bảng này —
+review 2026-09-26, theo yêu cầu người dùng:** bảng cầu nối cũ
+(factless-fact, PK `DAYID+WI_NAME+LEGAL_PARTY_SK`, 6 cột gồm
+`APPLICATION_SK`/`CUSTOMER_SK`/`LEGAL_PARTY_SK`/`DATASOURCE`) đã xóa
+hẳn khỏi tầng PDTD_DTM. `APPLICATION_SK`/`CUSTOMER_SK` mà bảng đó từng
+cung cấp nay đã có sẵn ngay trên bảng này (kế thừa từ SB_DWH, xem
+1.2.2.7) — chỉ cần thêm `DAYID` vào PK của bảng này là đủ để thay thế
+hoàn toàn vai trò cầu nối theo ngày, không cần cột `LEGAL_PARTY_SK` giả
+lập nào khác (khóa tự nhiên của bảng này, `WI_NAME+ID_NUMBER`, đã đóng
+vai trò đó).
+
+**⚠️ Rà soát lại (review 2026-09-26, cùng ngày, theo yêu cầu người
+dùng):** `FCT_CLOS_APPLICATION.LEGAL_REPRESENTATIVE`/
+`ADD_ID_REPRESENTATIVE` (2.2.2.1, cột 52-53) KHÔNG LEFT JOIN bản
+PDTD_DTM này — đúng luồng ETL SB_DWH→PDTD_DTM, việc tính 2 cột này thực
+hiện ngay tại SB_DWH (`APPLICATION_SK` → `SB_DWH.DIM_CLOS_APPLICATION.
+WI_NAME` → LEFT JOIN `SB_DWH.FCT_CLOS_LEGAL_PARTY`, xem 2.2.2.1). Bảng
+PDTD_DTM này (2.2.2.8) chỉ còn phục vụ report-time lookup `ID_NUMBER`
+(qua `LEGAL_TYPE='CUSTOMER'`) khi báo cáo BC2 cần đối chiếu — không còn
+là nguồn ETL cho `FCT_CLOS_APPLICATION` nữa. `ORG_LEGAL_ID` cũng
+không còn ETL trên `FCT_CLOS_APPLICATION` — báo cáo tự JOIN
+report-time `CUSTOMER_SK` → `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER`.
 
 #### 2.3 Bộ bảng RLOS
 
 ##### 2.3.1 DIM
 
-###### 2.3.1.1 DIM_RLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (đã bổ sung REF_PRODUCT, SLA_*)
+###### 2.3.1.1 DIM_RLOS_APPLICATION — ✅ ĐÃ GIẢI QUYẾT (PROOF_OF_INCOME/COLL_REQUIRE tính CASE WHEN tại đây). ⚠️ review 2026-09-26 (theo yêu cầu người dùng): chuyển hẳn BUSINESS_FLOW/DEVIATION_G3/REF_PRODUCT/SLA_* sang FCT_RLOS_APPLICATION
 
 **Bảng cũ (trước tách):** `DIM_PDTD_APPLICATION` → tách phần thuộc tính RLOS thành `DIM_RLOS_APPLICATION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **kế thừa toàn bộ** từ SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH
-→ 1.3 Bộ bảng RLOS → 1.3.1.1 DIM_RLOS_APPLICATION — nay 28 cột (đã gồm
-`DATASOURCE`, đã bổ sung `APP_GRP`/`DEVIATION_G3`/`CHANGE_TYPE`/
-`LAST_APPROVAL_DATE`; review 2026-09-21: thêm dư thừa `APPROVED_AMT_
-FINAL`/`CURRENCY_CODE`/`APPROVED_TERM` phục vụ BC3), **cộng thêm 6
-cột mới** sinh tại PDTD_DTM:
+→ 1.3 Bộ bảng RLOS → 1.3.1.1 DIM_RLOS_APPLICATION — nay 39 cột (đã gồm
+`DATASOURCE`, đã bổ sung `APP_GRP`/`APPLICATION_DATE`/`LAST_APPROVAL_DATE`;
+review 2026-09-25 lượt 1: bổ sung dư thừa từ driving table
+`NG_SB_RLOS_EXTTABLE`, đồng thời bỏ `DEVIATION_G3` khỏi SB_DWH; review
+2026-09-25 lượt 2: xóa `CHANGE_REQUEST`/`CHANGE_TYPE` (chuyển sang
+`FCT_RLOS_APPLICATION`), xóa `CUS_SEGMENT`/`CUSTOMER_SEGMENT` (chuyển
+sang `DIM_RLOS_APPLICANT`), xóa `APPROVED_AMT_FINAL`/`CURRENCY_CODE`/
+`APPROVED_TERM` (chuyển sang `FCT_RLOS_WORKSTEP_EVENT`), thêm
+`APPLICATION_DATE`; review 2026-09-26: `DIM_RLOS_APPLICANT` đổi thành
+`FCT_RLOS_CUSTOMER` (grain giấy tờ) — nhận lại 9 cột hồ sơ-scoped
+(`ZONE`, `SALE_TYPE`, `BROKER_TYPE`/`BROKER_ID`/`BROKER_NAME`,
+`ACC_OFFICER`, `ACCOUNT_OFFICER_NAME`, `EXISTING_CUSTOMER`,
+`APPLICANT_CIF`, `BUSINESS_MODEL`, `KYC1`); review 2026-09-30 (lượt 1,
+theo yêu cầu người dùng): xóa 12 cột "username/routing tại 1 bước"
+(`UWMAKERUSER`/`UWCHKRUSER`/`CREDAPPRUSER`/`CCOMMITUSER`/`DATACHKUSER`/
+`HOSUPPORTUSER`/`POSTSANCUSER`/`PREDISBMAKUSER`/`PREDISBCHKUSER`/
+`DISBMAKUSER`/`DISBCHKUSER`/`CHECKER3_TARGET`); review 2026-09-30 (lượt
+2, theo yêu cầu người dùng): xóa tiếp 10 cột username tại 1 bước khác
+(`RR_USER`/`POSTDISBDEUSER`/`NORMBRUSER`/`REGBRUSER`/
+`BRASUPPORTSENDER`/`DISBURSEUSER`/`DISBCHECKERUSER`/`LASTAPPROVER`/
+`NORMSUPPORT_DCSN`/`REGSUPPORT_DCSN`) và 2 cột `APPROVAL_REJECT`/
+`APPROVAL_FLAG`, chuyển 11 cột cờ nhánh phụ/trạng thái sang
+`FCT_RLOS_APPLICATION`; review 2026-09-30 (lượt 3, theo yêu cầu người
+dùng): xóa tiếp `CURR_WSNAME`/`PREV_WSNAME`/`DECISION`/
+`CHECKER3_CONDITION`/`DISBURSEMENT_TYPE`/`DISB_DECSION`/`MAJOR_DEV`/
+`MINOR_DEV`/`CANCEL_DATE`, chuyển `TOTALNONELIGIBLE`/`REASON`
+(→`CANCEL_REASON`) sang `FCT_RLOS_APPLICATION` — xem lý do đầy đủ tại
+Section 1 → 1.3.1.1.
+**Không còn cột nào bổ sung riêng tại
+PDTD_DTM ngoài 2 cột biến đổi giá trị** (review 2026-09-26, theo yêu cầu
+người dùng): `BUSINESS_FLOW`/`DEVIATION_G3`/`REF_PRODUCT`/
+`SLA_CREDIT_OFFICER`/`SLA_MARKER`/`SLA_CHECKER`/`SLA_CREDIT_APPROVER`
+(7 cột từng bổ sung ở đây) nay chuyển hẳn sang `FCT_RLOS_APPLICATION`
+(xem Section 2 → 2.3.2.1 và Section 1 → 2.3.1.1/2.3.2.1).
+**Ngoại lệ (review 2026-09-26, vẫn giữ nguyên):**
+2 cột kế thừa `PROOF_OF_INCOME`/`COLL_REQUIRE` (cột 9-10) KHÔNG bê nguyên
+giá trị như các cột kế thừa còn lại — SB_DWH nay chỉ lưu giá trị gốc, còn
+logic `CASE WHEN` map sang giá trị hiển thị áp dụng ngay tại đây khi bê
+1:1 (xem 2 dòng minh họa bên dưới), vì đây là bước biến đổi/chuẩn hóa dữ
+liệu phục vụ báo cáo, không thuộc phạm vi SB_DWH:
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| ... | *(28 cột kế thừa từ SB_DWH, gồm cả DATASOURCE — xem 1.3.1.1)* |  |  |  |  |  |
-| 29 | BI_FLOW | VARCHAR2 | N | 50 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo — PHÁI SINH tại PDTD_DTM: LEFT JOIN `REF_RLOS_FLOW` theo `STREAM` |
-| 30 | REF_PRODUCT | NVARCHAR2 | N | 200 |  | Nhóm sản phẩm dùng để tra cam kết SLA (BC5) — PHÁI SINH: LEFT JOIN `RLOS_REF_SLA_TDKHCN` theo `PRODUCT_LINE`+`CHANGE_TYPE` (either/or)+`DEVIATION_G3`+`SECONDARY_PRODUCTLINE`+`APP_GRP` |
-| 31 | SLA_CREDIT_OFFICER | NUMBER | N | 10,2 |  | Cam kết giờ cho chuyên viên tín dụng — cùng LEFT JOIN trên |
-| 32 | SLA_MARKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước lập hồ sơ thẩm định — cùng LEFT JOIN trên |
-| 33 | SLA_CHECKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát thẩm định — cùng LEFT JOIN trên |
-| 34 | SLA_CREDIT_APPROVER | NUMBER | N | 10,2 |  | Cam kết giờ cho cấp phê duyệt — cùng LEFT JOIN trên |
+| ... | *(7 cột kế thừa 1:1 khác, không đổi giá trị — xem 1.3.1.1)* |  |  |  |  |  |
+| 9 | PROOF_OF_INCOME | VARCHAR2 | N | 200 |  | Hình thức chứng minh thu nhập — PHÁI SINH tại PDTD_DTM (review 2026-09-26, chuyển từ SB_DWH): CASE WHEN DIM_RLOS_APPLICATION.PROOF_OF_INCOME (SB_DWH) = 'proofincome01' THEN 'CHUNGTU_CHUNGMINH_THUNHAP' WHEN = 'proofincome02' THEN 'BANGKE_THUNHAP' END |
+| 10 | COLL_REQUIRE | VARCHAR2 | N | 10 |  | Sản phẩm có yêu cầu tài sản bảo đảm hay không — PHÁI SINH tại PDTD_DTM (review 2026-09-26, chuyển từ SB_DWH): CASE WHEN DIM_RLOS_APPLICATION.COLLREQUIRE (SB_DWH) = 'true' THEN 'YES' ELSE 'NO' END |
+| ... | *(16 cột kế thừa 1:1 tiếp theo, không đổi giá trị — xem 1.3.1.1)* |  |  |  |  |  |
+| 27-37 | (9 cột hồ sơ-scoped chuyển về từ `DIM_RLOS_APPLICANT`) | | | | | ZONE/SALE_TYPE/BROKER_TYPE/BROKER_ID/BROKER_NAME/ACC_OFFICER/ACCOUNT_OFFICER_NAME/EXISTING_CUSTOMER/APPLICANT_CIF/BUSINESS_MODEL/KYC1 — kế thừa 1:1 giá trị gốc, không biến đổi (xem 1.3.1.1 cột 27-37) |
 
-- Bảng DIM lưu danh mục hồ sơ tín dụng RLOS, bê nguyên 1:1 từ SB_DWH và bổ sung 6 cột chuẩn hóa/tra cứu cho báo cáo (BI_FLOW, cam kết SLA phê duyệt tín dụng).
+- Bảng DIM lưu danh mục hồ sơ tín dụng RLOS, bê nguyên 1:1 từ SB_DWH (39 cột), không còn cột phái sinh nào khác ở tầng PDTD_DTM ngoài PROOF_OF_INCOME/COLL_REQUIRE (biến đổi giá trị tại chỗ, không phải cột mới).
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
 
-**Ghi chú `PRODUCT_LINE` either/or với `CHANGE_TYPE`:** khi dòng trên
-`RLOS_REF_SLA_TDKHCN` có `PRODUCT_LINE = 'Trường Change Request'`, so khớp
-theo `CHANGE_TYPE` của hồ sơ thay vì `PRODUCT_LINE`; các dòng khác so khớp
-theo `PRODUCT_LINE` bình thường. `DIM_RLOS_APPLICATION` không có cột
-`PRODUCT_SK` — `PRODUCT_LINE_NAME` (nguồn `DIM_RLOS_PRODUCT`, đính chính
-review 2026-09-21: dùng tên hiển thị, không phải `PRODUCT_LINE_CODE`)
-được ETL lấy gián tiếp qua `FCT_RLOS_APPLICATION_DAILY.PRODUCT_SK` (xem
-2.3.2.1) làm input cho công thức, không phải khóa join có sẵn trên
-chính bảng này — xem giải thích đầy đủ ở Section 1 → 2.3.1.1.
-
 **✅ ĐÃ GIẢI QUYẾT (review 2026-09-21) — bỏ `SLA_DE_RESULT`/`SLA_QC_
-RESULT`/`SLA_DE_TOTAL_RESULT` khỏi bảng này (trước là cột 32-34):**
-đảo lại quyết định đóng PENDING #12 — 3 cột này không còn denormalize
-tại DIM, chuyển sang report-time lookup `REF_SLA_NLTT` (2.4.8) trực
-tiếp bằng `PRODUCT_LINE_NAME` (qua `DIM_RLOS_PRODUCT`) + `SYSTEM_
-CODE='RLOS'`, cùng áp dụng cho nhánh CLOS (`DIM_CLOS_APPLICATION`,
-2.2.1.1) — xem lý do đầy đủ ở Section 1 → 2.3.1.1 và ghi chú `POINT`
-của BC9 (2.1.9).
+RESULT`/`SLA_DE_TOTAL_RESULT` khỏi bảng này (trước là cột 32-34, vẫn giữ
+nguyên sau review 2026-09-26):** đảo lại quyết định đóng PENDING #12 — 3
+cột này không còn denormalize tại DIM, chuyển sang report-time lookup
+`REF_SLA_NLTT` (2.4.8) trực tiếp bằng `PRODUCT_LINE_NAME` (qua `DIM_RLOS_
+PRODUCT`) + `SYSTEM_CODE='RLOS'`, cùng áp dụng cho nhánh CLOS (`DIM_CLOS_
+APPLICATION`, 2.2.1.1) — xem lý do đầy đủ ở Section 1 → 2.3.1.1 và ghi
+chú `POINT` của BC9 (2.1.9).
 
 ###### 2.3.1.2 DIM_RLOS_PRODUCT — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_PRODUCT_LINE/MAS_SUB_PRODUCT, review 2026-09-18; IS_CREDIT_CARD/IS_FAST_PRODUCT chuyển xuống FCT)
 
@@ -6812,7 +8032,7 @@ Card/SeAHome-Fast), nhưng 2 nhóm đó **bù trừ hoàn toàn** (điều kiệ
 lập chính xác) nên `SLHS(Nhóm 1) + SLHS(Nhóm 2)` luôn bằng COUNT trên
 toàn bộ hồ sơ thỏa điều kiện lọc chung — không cần tách nhóm khi tính,
 khác hẳn rule SEC/UNSEC của `TAT_RLOS`. Xem chi tiết đối chiếu SRS đầy
-đủ (gồm 2 điều kiện lọc bổ sung `BI_FLOW`/`COMPANY_CODE`) tại
+đủ (gồm 2 điều kiện lọc bổ sung `BUSINESS_FLOW`/`COMPANY_CODE`) tại
 `AGG_LOS_KPI_YTD_DAILY` (2.1.8, Section 1). Xem Section 3 dòng #3.
 
 ###### 2.3.1.3 DIM_RLOS_WORKSTEP — ✅ ĐÃ GIẢI QUYẾT (nguồn: NG_SB_RLOS_MAS_DECISION, review 2026-09-18)
@@ -6836,7 +8056,7 @@ bảng danh mục thật.
 
 **Đã loại bỏ cột `IS_PDTD_STEP` (review 2026-09-15):** cùng lý do đã
 trình bày đầy đủ tại `DIM_CLOS_WORKSTEP` (2.2.1.3) — công thức thật của
-`NHAN_SU`/`NSLD` (`REF_LOS_KPI_USER_YEAR`, 2.1.7) lọc bằng danh sách 8
+`NHAN_SU`/`NSLD` (`AGG_LOS_KPI_USER_YEAR`, 2.1.7) lọc bằng danh sách 8
 `WORKSTEP` literal hardcode, không JOIN qua `IS_PDTD_STEP`. Đã xóa hẳn
 cột này khỏi cả `DIM_CLOS_WORKSTEP`/`DIM_RLOS_WORKSTEP`.
 
@@ -6858,12 +8078,12 @@ bản SB_DWH nay đọc từ `NG_SB_RLOS_MAS_DECISION` (xem Section 2 →
 1.3.1.4), thay thế `MAP_RLOS_DECISION`, không còn PENDING về bản chất
 nguồn. Bản PDTD_DTM bê 1:1 nên kế thừa nguồn đã chốt.
 
-###### 2.3.1.5 DIM_RLOS_EXCEPTION_REASON
+###### 2.3.1.5 DIM_RLOS_EXCEPTION
 
-**Bảng cũ (trước tách):** `DIM_PDTD_EXCEPTION_REASON` → tách phần thuộc tính RLOS thành `DIM_RLOS_EXCEPTION_REASON` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
+**Bảng cũ (trước tách):** `DIM_PDTD_EXCEPTION_REASON` → tách phần thuộc tính RLOS thành `DIM_RLOS_EXCEPTION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.1.5 DIM_RLOS_EXCEPTION_REASON — 10 cột, đã gồm `DATASOURCE`) — không
+1.3 Bộ bảng RLOS → 1.3.1.5 DIM_RLOS_EXCEPTION — 10 cột, đã gồm `DATASOURCE`) — không
 thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
 
 - Bảng DIM lưu danh mục lý do ngoại lệ RLOS, bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này.
@@ -6880,77 +8100,68 @@ cột nào ở layer này, không có REF_ nào join thêm.
 - Bảng DIM lưu danh mục loại và chi tiết loại thay đổi điều kiện phê duyệt RLOS, bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này.
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
 
-###### 2.3.1.7 DIM_RLOS_GEO
-
-**Bảng cũ (trước tách):** `DIM_PDTD_GEO` → đổi tên thành `DIM_RLOS_GEO` (bảng vốn đã RLOS-only, đổi tên để nhất quán với quy ước `DIM_RLOS_*`)
-
-Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.1.8 DIM_RLOS_GEO — 11 cột, đã gồm `DATASOURCE`) — không thêm/bớt cột
-nào ở layer này, không có REF_ nào join thêm.
-
-- Bảng DIM lưu danh mục địa giới hành chính tỉnh/thành và quận/huyện, bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này.
-- Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
-
-###### 2.3.1.8 DIM_RLOS_CARD_PROMOTION
+###### 2.3.1.7 DIM_RLOS_CARD_PROMOTION
 
 **Bảng cũ (trước tách):** `DIM_PDTD_CARD_PROMOTION` → đổi tên thành `DIM_RLOS_CARD_PROMOTION` (bảng vốn đã RLOS-only, đổi tên để nhất quán với quy ước `DIM_RLOS_*`)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.1.8 DIM_RLOS_CARD_PROMOTION — 7 cột, đã gồm `DATASOURCE`) — không
+1.3 Bộ bảng RLOS → 1.3.1.7 DIM_RLOS_CARD_PROMOTION — 7 cột, đã gồm `DATASOURCE`) — không
 thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
 
 - Bảng DIM lưu danh mục chương trình ưu đãi phí thẻ tín dụng, bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này.
 - Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
 
-###### 2.3.1.9 DIM_RLOS_APPLICANT
-
-**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_PARTY` → tách thuộc tính applicant chính phía RLOS thành DIM riêng (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
-
-Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.1.9 DIM_RLOS_APPLICANT — nay 34 cột sau khi làm
-giàu thêm ZONE/NATIONALITY/TITLE/HOME_PHONE/PHONE_1/PHONE_2/SALE_TYPE/
-BROKER_TYPE/ID/NAME/ACC_OFFICER/ACCOUNT_OFFICER_NAME/EXISTING_CUSTOMER/
-APPLICANT_CIF/BUSINESS_MODEL/KYC1 (review 2026-09-21), đã gồm
-`DATASOURCE`) — không thêm/bớt cột nào ở layer này, không có REF_ nào
-join thêm.
-
-- Bảng DIM lưu thuộc tính người đề nghị vay chính (applicant), bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này.
-- Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
-
-###### 2.3.1.10 DIM_RLOS_COREPAYER
-
-**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_PARTY` → tách thuộc tính corepayer phía RLOS thành DIM riêng (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
-
-Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.1.10 DIM_RLOS_COREPAYER — nay 18 cột sau khi làm
-giàu thêm TITLE/HOUSEHOLD/PHONE_1/PHONE_2/HOME_PHONE (review 2026-09-21),
-đã gồm `DATASOURCE`) — không thêm/bớt
-cột nào ở layer này, không có REF_ nào join thêm.
-
-- Bảng DIM lưu thuộc tính người đồng trả nợ (corepayer), bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này.
-- Khóa chính của bảng (PK): **DIMENSION_KEY** (giữ nguyên giá trị từ SB_DWH).
-
 ##### 2.3.2 FCT
 
-###### 2.3.2.1 FCT_RLOS_APPLICATION_DAILY
+###### 2.3.2.1 FCT_RLOS_APPLICATION — ⚠️ review 2026-09-26 (theo yêu cầu người dùng): nhận thêm 7 cột BUSINESS_FLOW/DEVIATION_G3/REF_PRODUCT/SLA_* từ DIM_RLOS_APPLICATION
 
-**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_DAILY` → tách phần RLOS thành `FCT_RLOS_APPLICATION_DAILY` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
+**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_DAILY` → tách phần RLOS thành `FCT_RLOS_APPLICATION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.2.1 FCT_RLOS_APPLICATION_DAILY — 78 cột (đã gồm
-`DATASOURCE`, `UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_
-TAKERESPON`/`APPROVAL_TAKERESPON`, `APPLICANT_SK`; đã bỏ `WORKSTEP_
-FLAG`, xem PENDING #6 đóng), bổ sung:
+1.3 Bộ bảng RLOS → 1.3.2.1 FCT_RLOS_APPLICATION — 72 cột (đã gồm
+`DATASOURCE`, `UNDERWRITERMAKER_USERMAKE`/`UNDERWRITERCHECKER_
+USERMAKE`/`APPROVAL_USERMAKE` — đổi tên từ `*_TAKERESPON`, review
+2026-09-27, cùng lý do đã áp dụng cho CLOS; đã bỏ `WORKSTEP_
+FLAG`, xem PENDING #6 đóng; review 2026-09-25: bổ sung `CHANGE_REQUEST`/
+`CHANGE_TYPE`, chuyển từ `DIM_RLOS_APPLICATION`; review 2026-09-26: bỏ
+`APPLICANT_SK`; review 2026-09-27: bỏ `AUTO_CANCEL_DATE`/`APPLICATION_STATUS`/
+`FLAG_AUTO_CANCEL`; review 2026-09-30: nhận thêm 11 cột cờ nhánh phụ/
+trạng thái chuyển từ `DIM_RLOS_APPLICATION`, sau đó xóa 16 cột dư thừa
+thật (RI_USER/FA_USER/COMMITTEE_USER/HOS_USER/LAST_UWM_ENTRYDATE/
+PROCESSED_DATE_UWM/FIRST_APPROVAL_DATE/LAST_ACTION_DATE/
+INACTIVE_DAY_CNT/CURRENCY_CODE/HAS_REACHED_*/KPI_VOLUME) và nhận thêm
+TOTALNONELIGIBLE/CANCEL_REASON từ DIM_RLOS_APPLICATION — xem 1.3.2.1),
+bổ sung:
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 79 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), tra qua ADD_ID/ADD_ID_OTHER trên DIM_RLOS_APPLICANT. Mặc định -1 (review 2026-09-17: đổi tên từ CUSTOMER_SK để phân biệt rõ với khách hàng LOS/applicant — link qua FCT theo đúng nguyên tắc không link DIM sang DIM. Đồng thời sửa cách join: ADD_ID là chuỗi đã nối nhiều giấy tờ bằng ";" nên KHÔNG thể so khớp trực tiếp với LEGAL_ID đơn của T24 — ETL phải tách chuỗi ADD_ID thành từng giá trị ID_NUMBER riêng lẻ theo đúng thứ tự đã nối khi dựng ADD_ID (ưu tiên TCC trước, CC sau — xem 1.3.1.9), thử so khớp LEGAL_ID lần lượt theo thứ tự đó, lấy giá trị đầu tiên khớp được; nếu không khớp giá trị nào trong ADD_ID thì tiếp tục thử tương tự với ADD_ID_OTHER) |
-| 80 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước hoàn tất gần nhất, chuẩn hóa dùng chung 2 hệ — LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS theo bước/quyết định của sự kiện hoàn tất gần nhất |
-| 81 | T24_CARD_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CARD (2.1.11) — đóng gap BC1.K_TYPE (review 2026-09-21). Lookup theo RESULT_MAIN_CARD_ID (có sẵn trên DIM_RLOS_APPLICATION, 1.3.1.1 cột 20, qua APPLICATION_SK) = DIM_T24_CARD.MAIN_ID (bê 1:1 từ STG_DTM.STG_DIM_CARD.MAIN_ID — đúng nguyên văn nested table SRS BC1 (BR 1.2: "STG_DTM.STG_DIM_CARD (ad) — LEFT JOIN điều kiện n.RESULT_SEAB_MAIN_CARD_ID = ad.MAIN_ID", n=NG_SB_RLOS_SENT_CBS_LOG)). Mặc định -1. Báo cáo khai thác K_TYPE qua FK này, không denormalize trực tiếp lên FCT |
-| 82 | T24_SEAB_MAIN_CARD_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_MAIN_CARD (2.1.12) — đóng gap BC1.HOME_ADDRESS (review 2026-09-21). Lookup theo RESULT_MAIN_CARD_ID = DIM_T24_SEAB_MAIN_CARD.RECID (bê 1:1 từ STG_DTM.STG_DIM_SEAB_MAIN_CARD.RECID — đúng nguyên văn nested table SRS BC1 (BR 1.2: "STG_DTM.STG_DIM_SEAB_MAIN_CARD (ae) — LEFT JOIN điều kiện n.RESULT_SEAB_MAIN_CARD_ID = ae.RECID")). Mặc định -1. Báo cáo khai thác HOME_ADDRESS qua FK này, không denormalize trực tiếp lên FCT |
+| 73 | APPLICATION_STATUS | VARCHAR2 | N | 50 |  | Trạng thái hồ sơ chuẩn hóa (BC1) — CHUYỂN TỪ SB_DWH, business rule (review 2026-09-27, đồng bộ theo pattern CLOS 2.2.2.1). PHÁI SINH: tra WORKSTEP_CODE/DECISION_CODE qua LAST_WORKSTEP_DECISION_SK (cột có sẵn cột 6 → DIM_RLOS_WORKSTEP_DECISION), áp CASE WHEN DECISION_CODE IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport') THEN 'Approved' WHEN DECISION_CODE='Reject' THEN 'Rejected' WHEN WORKSTEP_CODE IN ('CancelRevoke','CancelPermanent') THEN 'Cancelled' ELSE 'Processing' END |
+| 74 | AUTO_CANCEL_DATE | DATE | N |  |  | Ngày hồ sơ bị hệ thống tự động chuyển sang CancelRevoke (BC1.AUTO_CAN_DATE) — CHUYỂN TỪ SB_DWH, business rule (review 2026-09-27). PHÁI SINH đúng nguyên văn SRS BC1: MIN(ENTRYDATE) trên SB_DWH.FCT_RLOS_WORKSTEP_EVENT tại WORKSTEP_CODE='CancelRevoke' thỏa 1 trong 3 điều kiện OR — (1) dòng CancelRevoke rỗng (USERNAME/EXITDATE/DECISION_CODE NULL); (2) từng treo BranchSupport >= 2400 phút làm việc (hàm get_business_minute, loại ngày nghỉ/ngoài giờ hành chính); (3) không có bước hủy thủ công (DECISION_CODE='Cancel') trước/cùng lúc vào CancelRevoke |
+| 75 | FLAG_AUTO_CANCEL | VARCHAR2 | N | 10 |  | 'YES'/'NO' theo nguyên văn SRS BC1 field FLAG_AUTO_CAN (BC1) — CHUYỂN TỪ SB_DWH, business rule (review 2026-09-27). PHÁI SINH: CASE WHEN AUTO_CANCEL_DATE (cột 74, cùng bảng) IS NOT NULL THEN 'YES' ELSE 'NO' END |
+| 76 | LAST_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước hoàn tất gần nhất, chuẩn hóa dùng chung 2 hệ — LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS theo bước/quyết định của sự kiện hoàn tất gần nhất |
+| 77 | T24_CARD_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CARD (2.1.11) — đóng gap BC1.K_TYPE (review 2026-09-21). Lookup theo RESULT_MAIN_CARD_ID (có sẵn trên DIM_RLOS_APPLICATION, 1.3.1.1 cột 17, qua APPLICATION_SK) = DIM_T24_CARD.MAIN_ID (bê 1:1 từ STG_DTM.STG_DIM_CARD.MAIN_ID — đúng nguyên văn nested table SRS BC1 (BR 1.2: "STG_DTM.STG_DIM_CARD (ad) — LEFT JOIN điều kiện n.RESULT_SEAB_MAIN_CARD_ID = ad.MAIN_ID", n=NG_SB_RLOS_SENT_CBS_LOG)). Mặc định -1. Báo cáo khai thác K_TYPE qua FK này, không denormalize trực tiếp lên FCT |
+| 78 | T24_SEAB_MAIN_CARD_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_MAIN_CARD (2.1.12) — đóng gap BC1.HOME_ADDRESS (review 2026-09-21). Lookup theo RESULT_MAIN_CARD_ID = DIM_T24_SEAB_MAIN_CARD.RECID (bê 1:1 từ STG_DTM.STG_DIM_SEAB_MAIN_CARD.RECID — đúng nguyên văn nested table SRS BC1 (BR 1.2: "STG_DTM.STG_DIM_SEAB_MAIN_CARD (ae) — LEFT JOIN điều kiện n.RESULT_SEAB_MAIN_CARD_ID = ae.RECID")). Mặc định -1. Báo cáo khai thác HOME_ADDRESS qua FK này, không denormalize trực tiếp lên FCT |
+| 79 | BUSINESS_FLOW | VARCHAR2 | N | 50 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo — CHUYỂN TỪ `DIM_RLOS_APPLICATION` (review 2026-09-26, theo yêu cầu người dùng, xem lý do tại Section 1 → 2.3.1.1/2.3.2.1). PHÁI SINH: LEFT JOIN `REF_RLOS_FLOW` theo `STREAM` (`STREAM` đã có sẵn trên `DIM_RLOS_APPLICATION`, tra qua `APPLICATION_SK` cột 4) |
+| 80 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ chính sách trở lên hay không (YES/NO) — CHUYỂN TỪ `DIM_RLOS_APPLICATION` (review 2026-09-26). PHÁI SINH (report-time tại đây, trên chính grain 1 dòng/hồ sơ/DAYID của bảng này): đọc `FCT_RLOS_DEVIATION` (SB_DWH, 1.3.2.x), lọc `DAYID=MAX(DAYID)` mỗi `WI_NAME` (ảnh chụp gần nhất tính đến thời điểm chạy — bảng này KHÔNG có khái niệm point-in-time theo DAYID của chính nó cho cột này, chỉ lấy đúng 1 giá trị ổn định/report-time), `COUNT(*)` theo `WI_NAME`, >=3 → 'YES', còn lại → 'NO'. Cùng Ý NGHĨA NGHIỆP VỤ với `AGG_LOS_KPI_APPLICATION.DEVIATION_G3` (2.1.9) nhưng KHÔNG CÒN cùng cơ chế lọc DAYID sau review 2026-09-27 — bảng đó đã đổi grain sang point-in-time (lọc `DAYID=v_batch_date` trực tiếp, không dùng MAX), còn cột này ở đây vẫn giữ `DAYID=MAX(DAYID)` vì phục vụ mục đích khác (tra cam kết SLA report-time trên `FCT_RLOS_APPLICATION`, không phải input pre-aggregate cho `AGG_LOS_KPI_YTD_DAILY`) — 2 luồng tính độc lập, khác cơ chế lọc DAYID, chỉ giống công thức đếm/ngưỡng. Dùng làm khóa tra cam kết SLA ngay dưới đây |
+| 81 | REF_PRODUCT | NVARCHAR2 | N | 200 |  | Nhóm sản phẩm dùng để tra cam kết SLA (BC5) — CHUYỂN TỪ `DIM_RLOS_APPLICATION` (review 2026-09-26). PHÁI SINH: LEFT JOIN `RLOS_REF_SLA_TDKHCN` theo `PRODUCT_LINE_NAME` (lấy qua `PRODUCT_SK` cột 8, cột có sẵn trên chính bảng này → `DIM_RLOS_PRODUCT`)+`CHANGE_TYPE` (either/or — chỉ so khớp `CHANGE_TYPE` khi dòng REF_ có `PRODUCT_LINE = 'Trường Change Request'`; `CHANGE_TYPE` đã có sẵn trên chính bảng này, cột 59, không cần tra qua bảng khác)+`DEVIATION_G3` (cột 80, bỏ qua điều kiện nếu REF_ để trống — review 2026-09-18)+`SECONDARY_PRODUCTLINE` (=`IS_SEC_PRODUCT`, đã có trên `DIM_RLOS_APPLICATION`, tra qua `APPLICATION_SK`, bỏ qua điều kiện nếu REF_ để trống)+`APP_GRP` (đã có trên `DIM_RLOS_APPLICATION`, tra qua `APPLICATION_SK`). Khóa tra dùng `PRODUCT_LINE_NAME` (tên hiển thị), không phải `PRODUCT_LINE_CODE` (mã) — xác nhận theo dữ liệu seed thật (review 2026-09-21) |
+| 82 | SLA_CREDIT_OFFICER | NUMBER | N | 10,2 |  | Cam kết giờ cho chuyên viên tín dụng — CHUYỂN TỪ `DIM_RLOS_APPLICATION` (review 2026-09-26). Cùng LEFT JOIN trên |
+| 83 | SLA_MARKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước lập hồ sơ thẩm định — CHUYỂN TỪ `DIM_RLOS_APPLICATION` (review 2026-09-26). Cùng LEFT JOIN trên |
+| 84 | SLA_CHECKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát thẩm định — CHUYỂN TỪ `DIM_RLOS_APPLICATION` (review 2026-09-26). Cùng LEFT JOIN trên |
+| 85 | SLA_CREDIT_APPROVER | NUMBER | N | 10,2 |  | Cam kết giờ cho cấp phê duyệt — CHUYỂN TỪ `DIM_RLOS_APPLICATION` (review 2026-09-26). Cùng LEFT JOIN trên |
 
-- Bảng FACT xương sống bê 1:1 từ SB_DWH, bổ sung khóa T24_CUSTOMER_SK, T24_CARD_SK, T24_SEAB_MAIN_CARD_SK và cột tên bước chuẩn hóa cho báo cáo, dùng cho hệ RLOS.
+**Review 2026-10-01 (theo yêu cầu người dùng):** xóa 3 cột
+`UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/
+`APPROVAL_TAKERESPON` (trước đây cột 76-78) — phát hiện trùng giá trị
+100% với `UNDERWRITERMAKER_USERMAKE`/`UNDERWRITERCHECKER_USERMAKE`/
+`APPROVAL_USERMAKE` (cột 55-57, đã là kết quả COALESCE cuối cùng từ
+SB_DWH), công thức chỉ map thẳng đổi tên, không có business logic khác
+biệt. BC1 (`lld/BC1.csv`) sửa map thẳng vào `*_USERMAKE`. Các cột phía
+sau renumber từ 79-88 xuống 76-85. Cùng quyết định áp dụng cho
+`FCT_CLOS_APPLICATION` (xem Section 2 → 2.2.2.1).
+
+- Bảng FACT xương sống bê 1:1 từ SB_DWH, bổ sung khóa T24_CARD_SK, T24_SEAB_MAIN_CARD_SK, cột tên bước chuẩn hóa, và cột luồng nghiệp vụ/DEVIATION_G3/cam kết SLA (chuyển từ DIM_RLOS_APPLICATION) cho báo cáo, dùng cho hệ RLOS. ⚠️ Review 2026-09-26: KHÔNG còn `T24_CUSTOMER_SK` ở đây — chuyển hẳn sang `FCT_RLOS_CUSTOMER` (2.3.2.9), đúng grain giấy tờ, join trực tiếp ID_NUMBER/ID_TYPE.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME**.
+- Bảng bê 1:1 từ SB_DWH (72 cột, đã gồm 11 cột cờ nhận thêm và 16 cột dư thừa xóa đi + 2 cột chuyển vào, review 2026-09-30), nhận thêm `LAST_WORKSTEP`/`T24_CARD_SK`/`T24_SEAB_MAIN_CARD_SK` và 6 cột chuyển từ `DIM_RLOS_APPLICATION` (review 2026-09-26), rồi nhận thêm 3 cột business rule chuyển từ SB_DWH (`APPLICATION_STATUS`/`AUTO_CANCEL_DATE`/`FLAG_AUTO_CANCEL`, review 2026-09-27) lên 88 cột tại thời điểm đó — xóa 3 cột `*_TAKERESPON` dư thừa (review 2026-10-01) xuống còn **85 cột**.
 
 **✅ ĐÃ GIẢI QUYẾT (review 2026-09-21) — `DIM_T24_CARD`/`DIM_T24_
 SEAB_MAIN_CARD` thiết kế theo đúng pattern `DIM_T24_CUSTOMER`/`DIM_T24_
@@ -6961,7 +8172,7 @@ T24 core banking) — không phải điểm đến cuối, phải có `DIM_T24_C
 `DIM_T24_SEAB_MAIN_CARD` tại PDTD_DTM (DIMENSION_KEY riêng) để FCT join
 FK vào, cùng cách `DIM_T24_CUSTOMER` đã làm — không denormalize giá trị
 K_TYPE/HOME_ADDRESS trực tiếp lên FCT. Đã khôi phục 2 FK `T24_CARD_SK`/
-`T24_SEAB_MAIN_CARD_SK` (cột 81-82) và bổ sung `DIM_T24_CARD` (2.1.11)/
+`T24_SEAB_MAIN_CARD_SK` (cột 80-81) và bổ sung `DIM_T24_CARD` (2.1.11)/
 `DIM_T24_SEAB_MAIN_CARD` (2.1.12) — xem thiết kế đầy đủ tại đó.
 `SB_DWH.DIM_CARD`/`DIM_SEAB_MAIN_CARD` không có trong bất kỳ datamodel
 xlsx nào của repo (`DATAMODEL_DWH_LOS_20260908.xlsx` chỉ có `DIM_LOS_
@@ -6971,12 +8182,14 @@ biết từ SRS, không cần thể hiện đầy đủ cấu trúc cột như c
 khác (cùng mức độ chấp nhận đã áp dụng cho `DIM_T24_CUSTOMER`/`DIM_T24_
 COMPANY`, xem Section 3 dòng liên quan).
 
-**Ghi chú:** không có cột vật lý `BI_FLOW`/`ZONE`/`REF_PRODUCT`/`SLA_
-CREDIT_*` trên bảng này — join qua `APPLICATION_SK` sang `DIM_RLOS_
-APPLICATION` (2.3.1.1) để lấy các cột đó (đã tính sẵn ở DIM), và join
-qua `ORG_UNIT_SK` sang `DIM_LOS_ORG_UNIT` cho `ZONE` — xem ghi chú
-lineage tại Section 1 → 2.3.2.1. **✅ ĐÃ GIẢI QUYẾT (đảo lại quyết định
-đóng PENDING #12, review 2026-09-21):** `SLA_DE_RESULT`/`SLA_QC_
+**Ghi chú:** không có cột vật lý `ZONE` trên bảng này — join qua
+`COMPANY_SK` sang `DIM_LOS_COMPANY` cho `ZONE` — xem ghi chú lineage tại
+Section 1 → 2.3.2.1. `BUSINESS_FLOW`/`REF_PRODUCT`/`SLA_CREDIT_*`/
+`DEVIATION_G3` (cột 82-88) trước đây đặt tại `DIM_RLOS_APPLICATION`
+(review 2026-09-25) — nay chuyển hẳn về đây (review 2026-09-26, theo
+yêu cầu người dùng), xem chi tiết lineage tại Section 1 → 2.3.2.1. **✅
+ĐÃ GIẢI QUYẾT (đảo lại quyết định đóng PENDING #12, review 2026-09-21,
+vẫn giữ nguyên sau review 2026-09-26):** `SLA_DE_RESULT`/`SLA_QC_
 RESULT`/`SLA_DE_TOTAL_RESULT` (từ `REF_SLA_NLTT`, phục vụ `POINT` của
 BC9) KHÔNG còn đặt tại `DIM_RLOS_APPLICATION` — cũng không đặt trên
 bảng này. Report/OAS tự `LEFT JOIN REF_SLA_NLTT` runtime bằng
@@ -6984,16 +8197,15 @@ bảng này. Report/OAS tự `LEFT JOIN REF_SLA_NLTT` runtime bằng
 PRODUCT`) + `SYSTEM_CODE='RLOS'`. Xem lý do đầy đủ tại Section 1 →
 2.3.1.1.
 
-###### 2.3.2.2 FCT_RLOS_APPLICATION_PARTY
+###### 2.3.2.2 FCT_RLOS_APPLICATION_PARTY — ĐÃ XÓA (review 2026-09-26, theo yêu cầu người dùng)
 
-**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_PARTY` → thay đổi kiến trúc thành factless-fact liên kết (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
-
-Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.2.2 FCT_RLOS_APPLICATION_PARTY — 6 cột, đã gồm `DATASOURCE`) — không
-thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
-
-- Bảng FACT quan hệ (factless fact), bê nguyên 1:1 từ SB_DWH.
-- Khóa chính của bảng (PK): **DAYID, WI_NAME, COREPAYER_SK** (giữ nguyên như SB_DWH).
+**Đã xóa hẳn bảng này** — cùng lý do đã ghi tại Section 1 → 2.3.2.2/
+1.3.2.2 (main doc): sau khi cả `FCT_RLOS_CUSTOMER` và `FCT_RLOS_
+COREPAYER` (2.3.2.9) đều là FACT chi tiết theo giấy tờ, bảng liên kết
+này mất cả `APPLICANT_SK` lẫn `COREPAYER_SK` — chỉ còn `DAYID+WI_NAME+
+DATASOURCE+APPLICATION_SK`, trùng lặp hoàn toàn với `FCT_RLOS_
+APPLICATION_DAILY` (2.3.2.1). Giữ lại số hiệu `2.3.2.2` như một mục
+rỗng trỏ chuyển tiếp.
 
 ###### 2.3.2.3 FCT_RLOS_COLLATERAL
 
@@ -7011,42 +8223,60 @@ cột nào ở layer này, không có REF_ nào join thêm.
 **Bảng cũ (trước tách):** `FCT_PDTD_SUB_PRODUCT` → đổi tên thành `FCT_RLOS_SUB_PRODUCT` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH — bảng vốn đã RLOS-only)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.2.4 FCT_RLOS_SUB_PRODUCT — 11 cột, đã gồm `DATASOURCE`) — không thêm/bớt
-cột nào ở layer này, không có REF_ nào join thêm.
+1.3 Bộ bảng RLOS → 1.3.2.4 FCT_RLOS_SUB_PRODUCT — 9 cột, đã gồm
+`DATASOURCE`, KHÔNG còn `SUB_PRODUCT_TYPE_CODE` — review 2026-09-27) —
+không thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
 
 - Bảng FACT chi tiết (nhân dòng), bê nguyên 1:1 từ SB_DWH.
-- Khóa chính của bảng (PK): **DAYID, WI_NAME, SUB_PRODUCT_TYPE_CODE, SUB_PRODUCT_BK** (giữ nguyên như SB_DWH).
+- Khóa chính của bảng (PK): **DAYID, SUB_PRODUCT_BK** (giữ nguyên như SB_DWH — review 2026-09-27, rút gọn từ PK cũ sau khi xóa `SUB_PRODUCT_TYPE_CODE`).
 
 ###### 2.3.2.5 FCT_RLOS_EXCEPTION
 
 **Bảng cũ (trước tách):** `FCT_PDTD_EXCEPTION` → tách phần RLOS thành `FCT_RLOS_EXCEPTION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.2.5 FCT_RLOS_EXCEPTION — 14 cột (đã gồm
-`DATASOURCE`), đã có sẵn `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` tính sẵn ở
-tầng SB_DWH), bổ sung:
+1.3 Bộ bảng RLOS → 1.3.2.5 FCT_RLOS_EXCEPTION — 13 cột (đã gồm
+`DATASOURCE`/`SUB_PRODUCT`, KHÔNG còn `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`
+— review 2026-09-27), bổ sung 3 cột phái sinh tại tầng này:
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 15 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (review 2026-09-22, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" tại Section 1 → 2.2.2.4): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='RLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE |
-| 16 | LOANCASEID | VARCHAR2 | N | 100 |  | Mã khoản vay gắn với hồ sơ — PHÁI SINH: JOIN sang DIM_RLOS_APPLICATION theo APPLICATION_SK, lấy LOANCASEID |
+| 14 | CHECK_FTR | VARCHAR2 | N | 20 |  | Vi phạm nguyên tắc First Time Right — PHÁI SINH TẠI PDTD_DTM (review 2026-09-27, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" tại Section 1 → 1.3.2.5): **công thức RIÊNG của RLOS, không dùng chung với CLOS** — mặc định 'Not First Time Right'; là 'First Time Right' CHỈ KHI mọi dòng cùng WI_NAME có EXCEPTION_CATEGORY LIKE '%BR%' (tra trên chính bảng này) đều khớp 1 trong 5 điều kiện miễn trừ theo EXCEPTION_NAME, một số điều kiện phụ theo BI_SUB_PRODUCT — PHÁI SINH TẠI ĐÂY: CASE WHEN SUB_PRODUCT (cột 13, bê 1:1 từ SB_DWH) LIKE '%Phát hành%' OR LIKE '%TTD%' THEN 'Credit Card' ELSE SUB_PRODUCT END, xem đầy đủ literal tại SRS BC7 BR 1.2 |
+| 15 | FIRST_WORKSTEP_RETURN | VARCHAR2 | N | 200 |  | Bước xử lý phát sinh trả về đầu tiên — PHÁI SINH TẠI PDTD_DTM (review 2026-09-27, chuyển từ SB_DWH): WORKSTEP_CODE của dòng SB_DWH.FCT_RLOS_WORKSTEP_EVENT tại MIN(EXITDATE) theo WI_NAME, với điều kiện EXITDATE IS NOT NULL AND ((WORKSTEP_CODE='DetailDataEntry' AND DECISION_CODE='Send_Back') OR (WORKSTEP_CODE IN ('DataInputerChecker','UnderwriterMaker','CreditApproval') AND DECISION_CODE='Additional_Doc_Required') OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send_Back to BranchSupport')) — DECISION_CODE tra qua WORKSTEP_DECISION_SK → DIM_RLOS_WORKSTEP_DECISION |
+| 16 | PHAN_LOAI_DDE | VARCHAR2 | N | 100 |  | Phân loại nguyên nhân trả về ở khâu nhập liệu — PHÁI SINH TẠI PDTD_DTM (review 2026-09-22, chuyển từ SB_DWH — xem "⚠️ Đánh giá kiến trúc" tại Section 1 → 2.2.2.4): LEFT JOIN REF_PHAN_LOAI_DDE theo EXCEPTION_CATEGORY = REF_PHAN_LOAI_DDE.EXCEPTION_CATEGORY AND REF_PHAN_LOAI_DDE.SYSTEMNAME='RLOS', lấy REF_PHAN_LOAI_DDE.PHAN_LOAI_DDE |
 
-- Bảng FACT chi tiết (nhân dòng), bê 1:1 từ SB_DWH, bổ sung PHAN_LOAI_DDE/LOANCASEID cho BC7/BC11.
+- Bảng FACT chi tiết (nhân dòng), bê 1:1 từ SB_DWH (13 cột), bổ sung CHECK_FTR/FIRST_WORKSTEP_RETURN/PHAN_LOAI_DDE cho BC7 — tổng **16 cột**.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME** (giữ nguyên như SB_DWH).
 
 **So với thiết kế cũ (`FCT_PDTD_EXCEPTION` gộp, 16 cột):** bỏ `DATASOURCE`
-(luôn cố định 'RLOS'). Còn 15 cột — 13 cột bê 1:1 từ SB_DWH (đã gồm
-`CHECK_FTR`/`FIRST_WORKSTEP_RETURN` tính sẵn ở đó, xem Section 1/2 →
-1.3.2.5) + 2 cột phái sinh riêng của tầng DTM (`PHAN_LOAI_DDE` — chuyển
-từ SB_DWH, review 2026-09-22 — và `LOANCASEID`). Không đọc thêm STG_LOS
-nào ở tầng này — giữ đúng nguyên tắc "DTM chỉ đọc DWH" (`PHAN_LOAI_DDE`
-đọc `REF_PHAN_LOAI_DDE`, một bảng PDTD_DTM, không phải STG_LOS).
+(luôn cố định 'RLOS'). Còn 15 cột — 13 cột bê 1:1 từ SB_DWH (nay gồm
+`SUB_PRODUCT` thay vì `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` tính sẵn, xem
+Section 1/2 → 1.3.2.5) + 3 cột phái sinh riêng của tầng DTM
+(`CHECK_FTR`/`FIRST_WORKSTEP_RETURN` — chuyển từ SB_DWH, review
+2026-09-27; `PHAN_LOAI_DDE` — chuyển từ SB_DWH, review 2026-09-22).
+Không đọc thêm STG_LOS nào ở tầng này — giữ đúng nguyên
+tắc "DTM chỉ đọc DWH" (`PHAN_LOAI_DDE` đọc `REF_PHAN_LOAI_DDE`,
+`FIRST_WORKSTEP_RETURN` đọc `SB_DWH.FCT_RLOS_WORKSTEP_EVENT` — đều là
+bảng SB_DWH/PDTD_DTM, không phải STG_LOS).
+
+**Xóa `LOANCASEID` khỏi ETL (review 2026-09-27, theo yêu cầu người
+dùng, cùng cơ chế đã áp dụng cho CLOS 2.2.2.4):** rà soát lại
+`lld/BC7.csv` xác nhận cột này chỉ là bản dư thừa có chủ đích — cùng giá
+trị đã có sẵn qua đường JOIN `APPLICATION_SK` → `DIM_RLOS_APPLICATION.
+LOANCASEID` (chính `lld/BC7.csv` cũng ghi "ưu tiên dùng cột trực tiếp"
+nhưng xác nhận 2 đường ra cùng giá trị). Rà soát lại cũng xác nhận `BC11`
+KHÔNG dùng cột này (`lld/BC11.csv` lấy `LOANCASEID` từ `FCT_CLOS_
+LOAN_DISBURSEMENT`, một bảng hoàn toàn khác — CLOS-only, RLOS không có
+bảng loan-disbursement tương ứng). Đã xóa hẳn khỏi ETL — báo cáo tự JOIN
+`APPLICATION_SK` → `DIM_RLOS_APPLICATION.LOANCASEID` khi cần. Bảng từ
+17 cột xuống còn **16 cột**.
 
 **Đối chiếu SRS (BC7):** `CHECK_FTR`, `FIRST_WORKSTEP_RETURN`,
-`PHAN_LOAI_DDE`, `LOANCASEID` khớp đúng công thức SRS nêu cho nhánh RLOS
-(2 cột đầu bê nguyên từ SB_DWH, đã đối chiếu tại 1.3.2.5; `PHAN_LOAI_DDE`
-tính tại đây theo REF_PHAN_LOAI_DDE, xem cột 15 ở trên; `LOANCASEID` join
-`DIM_RLOS_APPLICATION` không đổi so với thiết kế gốc).
+`PHAN_LOAI_DDE`, `LOANCASEID` khớp đúng công thức SRS nêu (2 cột đầu nay
+tính tại đây thay vì bê nguyên từ SB_DWH, đã đối chiếu công thức gốc tại
+1.3.2.5; `PHAN_LOAI_DDE` tính tại đây theo REF_PHAN_LOAI_DDE, xem cột 16
+ở trên; `LOANCASEID` join `DIM_RLOS_APPLICATION` không đổi so với thiết
+kế gốc).
 
 ###### 2.3.2.6 FCT_RLOS_DEVIATION
 
@@ -7065,7 +8295,7 @@ không có REF_ nào join thêm.
 rule (`DEVIATION_TYPE_CODE`, `DEV_PROPOSAL`, `AS_REGULAR` — xem 1.3.2.6).
 Còn 8 cột, toàn bộ bê 1:1 từ SB_DWH — không có cột phái sinh riêng nào ở
 tầng DTM nữa (`PROCESSED_DATE` đã chuyển hẳn sang tính tại SB_DWH, không
-còn JOIN `FCT_RLOS_APPLICATION_DAILY`, xem 1.3.2.6). Không đọc thêm
+còn JOIN `FCT_RLOS_APPLICATION`, xem 1.3.2.6). Không đọc thêm
 STG_LOS nào ở tầng này — giữ đúng nguyên tắc "DTM chỉ đọc DWH".
 
 **Đối chiếu SRS (BC6):** `CHECKING_CONDITION`, `CHECKING_RESULT`,
@@ -7078,10 +8308,27 @@ theo lineage doc + metadata, không sửa theo SRS).
 **Bảng cũ (trước tách):** `FCT_LOS_WORKSTEP_EVENT` (CHUNG) → tách phần RLOS thành `FCT_RLOS_WORKSTEP_EVENT` (xem lý do tách tại Section 1 → 1. SB_DWH → 1.3.2.7)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.2.7 FCT_RLOS_WORKSTEP_EVENT — nay 25 cột sau khi bổ sung PROCESSED_DATE/WORKSTEP_FLAG/APPLICANT_SK (review 2026-09-21) rồi bỏ EVENT_SEQ_DESC — cột dư thừa (review 2026-09-22), đã gồm `DATASOURCE`) — không
-thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
+1.3 Bộ bảng RLOS → 1.3.2.7 FCT_RLOS_WORKSTEP_EVENT — 25 cột, gồm cả
+`WF_PROCESSNAME`/`WF_ACTIVITYNAME` thô, KHÔNG có `WORKSTEP_FLAG`/
+`APPROVAL_FLAG` — review 2026-09-27), bổ sung **2 cột phái sinh tại
+tầng này**:
 
-- Bảng FACT nhật ký workflow mức nguyên tử, bê nguyên 1:1 từ SB_DWH, dùng cho hệ RLOS.
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- |
+| 26 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (review 2026-09-27, chuyển từ SB_DWH, cùng cơ chế đã áp dụng cho CLOS 2.2.2.6): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này), ngược lại 'From Second Approval'. Dùng cho BC5.APPROVAL_FLAG |
+| 27 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4, nhánh RLOS) — PHÁI SINH TẠI PDTD_DTM (review 2026-09-27, chuyển từ SB_DWH): 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE (tra qua WORKSTEP_DECISION_SK → DIM_RLOS_WORKSTEP_DECISION) của TOÀN BỘ lịch sử WI_NAME (EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này) kết hợp WF_PROCESSNAME='RLOS'/WF_ACTIVITYNAME (cột 21-22, đã bê 1:1) — nhánh 2/4/5 khác CLOS (nhánh 4 có thêm OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send to UWChecker')). Phục vụ BC4.FLAG mà không cần JOIN fan-out sang APPLICATION_DAILY, không JOIN thẳng STG_LOS |
+
+**Đánh giá kiến trúc — `WORKSTEP_FLAG`/`APPROVAL_FLAG` chuyển từ
+SB_DWH sang đây (review 2026-09-27, theo yêu cầu người dùng, cùng cơ
+chế đã áp dụng cho CLOS 2.2.2.6):** `WORKSTEP_FLAG` là công thức 5
+nhánh CASE-WHEN theo business rule SRS BC4 — vi phạm nguyên tắc "SB_DWH
+ảnh chụp sạch nguồn, PDTD_DTM chuẩn hóa/tính business rule".
+`APPROVAL_FLAG` chuyển theo để nhất quán kiến trúc. SB_DWH chỉ giữ 2
+cột thô `WF_PROCESSNAME`/`WF_ACTIVITYNAME` — không cần thêm cột nào
+khác vì `WORKSTEP_CODE`/`DECISION_CODE`/`EXITDATE` của toàn bộ lịch sử
+`WI_NAME` đã có sẵn ngay trên chính bảng này.
+
+- Bảng FACT nhật ký workflow mức nguyên tử, bê nguyên 1:1 từ SB_DWH, dùng cho hệ RLOS, bổ sung `APPROVAL_FLAG`/`WORKSTEP_FLAG` tại tầng này.
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, WORKSTEP_CODE, ENTRYDATE** (giữ nguyên như SB_DWH).
 
 ###### 2.3.2.8 FCT_RLOS_LOAN_DISBURSEMENT — TÁCH TỪ FCT_LOS_DISBURSEMENT
@@ -7096,7 +8343,7 @@ phụ thuộc hệ). Xem lý do tách đầy đủ tại Section 1 → 2.2.2.7/2
 | 2 | CONTRACT | VARCHAR2 | Y | 100 | PK | Mã hợp đồng khoản vay — nguồn STG_FCT_LOAN.CONTRACT (1:1 từ SB_DWH.FCT_LOAN.CONTRACT) |
 | 3 | DATASOURCE | VARCHAR2 | Y | 10 |  | Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'T24' — bảng nguồn T24 core banking (STG_FCT_LOAN), không thuộc STG_LOS |
 | 4 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER — nguồn STG_FCT_LOAN.CUSTOMER_SK (surrogate có sẵn, tra thẳng DIM_T24_CUSTOMER.DIMENSION_KEY, không tự lookup qua LEGAL_ID). Mặc định -1 nếu không khớp |
-| 5 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_COMPANY (2.1.4) — PHÁI SINH: lookup theo STG_FCT_LOAN.CO_CODE = DIM_T24_COMPANY.COMPANY_CODE (chỉ bản ghi hiện hành, COMPANY_EXP_DATE IS NULL phía nguồn T24). Mặc định -1. Nguồn của BRANCH_NAME/COMPANY_NAME cho BC10 |
+| 5 | T24_COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_COMPANY (2.1.4) — PHÁI SINH: lookup theo STG_FCT_LOAN.CO_CODE = DIM_T24_COMPANY.COMPANY_CODE (chỉ bản ghi hiện hành, COMPANY_EXP_DATE IS NULL phía nguồn T24). Mặc định -1. Nguồn của BRANCH_NAME/COMPANY_NAME cho BC10 |
 | 6 | CONTRACT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_LOAN (2.1.5) — nguồn STG_FCT_LOAN.CONTRACT_SK (surrogate có sẵn, tra thẳng DIM_T24_LOAN.DIMENSION_KEY). Mặc định -1. Nguồn của VALUE_DATE/MATURITY_DATE/REC_STATUS/CONTRACT_REF/REF_VALUE_DATE cho BC10 |
 | 7 | SEAB_PRODUCTS_DE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_SEAB_PRODUCTS_DE (2.1.6) — nguồn STG_FCT_LOAN.SEAB_PRODUCTS_DE_SK (surrogate có sẵn, tra thẳng DIM_T24_SEAB_PRODUCTS_DE.DIMENSION_KEY; SRS ghi SEAB_PRODUCTS_SK, coi là thiếu chính tả). Mặc định -1. Nguồn của PRODUCT_T24 cho BC10 |
 | 8 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION, tra theo SEAB_LOS_ID. KHÔNG để NULL — không tra được thì gán -1 (Unknown), tránh phép JOIN của OAS rớt dòng |
@@ -7110,6 +8357,33 @@ phụ thuộc hệ). Xem lý do tách đầy đủ tại Section 1 → 2.2.2.7/2
 
 - Bảng FACT đối chiếu T24, lưu khoản vay đã giải ngân của hệ RLOS, nối ngược về hồ sơ LOS qua SEAB_LOS_ID. Grain là **HỢP ĐỒNG** (khác grain hồ sơ của mọi bảng LOS khác), không phải SCD2 — bảng là ảnh chụp theo `DAYID`. Phục vụ BC10.
 - Khóa chính của bảng (PK): **DAYID, CONTRACT**.
+
+###### 2.3.2.9 FCT_RLOS_CUSTOMER — MỚI (đổi từ DIM_RLOS_APPLICANT, review 2026-09-26)
+
+**Bảng cũ (trước đổi):** `DIM_RLOS_APPLICANT` (2.3.1.8 cũ) → đổi thành FACT, đổi grain sang 1 dòng/giấy tờ định danh, xem lý do đầy đủ tại Section 1 → 2.3.2.9
+
+Cấu trúc cột **kế thừa toàn bộ** từ SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
+1.3 Bộ bảng RLOS → 1.3.2.8 FCT_RLOS_CUSTOMER — 37 cột, đã gồm
+`DATASOURCE`/`CUSTOMER_BK`/`T24_CUSTOMER_SK`), **cộng thêm 1 cột mới**:
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
+| --- | --- | --- | --- | --- | --- | --- |
+| ... | *(37 cột kế thừa 1:1, không đổi giá trị — xem 1.3.2.8)* |  |  |  |  |  |
+| 38 | CUSTOMER_SEGMENT | VARCHAR2 | N | 50 |  | Phân khúc khách hàng chuẩn hóa để hiển thị trên báo cáo — PHÁI SINH tại PDTD_DTM (review 2026-09-26, chuyển từ SB_DWH khi bảng còn là DIM): CASE WHEN UPPER(CUS_SEGMENT) LIKE '%XANH' THEN 'XANH' WHEN CUS_SEGMENT = 'CBNV' THEN 'CBNV' ELSE 'THUONG' END |
+
+- Bảng FACT snapshot hàng ngày, bê nguyên 1:1 từ SB_DWH, bổ sung 1 cột chuẩn hóa `CUSTOMER_SEGMENT` cho báo cáo. Phục vụ BC1, BC2, BC3, BC4.
+- Khóa chính của bảng (PK): **DAYID, CUSTOMER_BK** (giữ nguyên như SB_DWH).
+
+###### 2.3.2.10 FCT_RLOS_COREPAYER — MỚI (đổi từ DIM_RLOS_COREPAYER, review 2026-09-26)
+
+**Bảng cũ (trước đổi):** `DIM_RLOS_COREPAYER` (2.3.1.8 cũ) → đổi thành FACT, đổi grain sang 1 dòng/giấy tờ của corepayer, xem lý do đầy đủ tại Section 1 → 1.3.2.9
+
+Cấu trúc cột **kế thừa toàn bộ** từ SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
+1.3 Bộ bảng RLOS → 1.3.2.9 FCT_RLOS_COREPAYER — 17 cột, đã gồm
+`DATASOURCE`/`COREPAYER_BK`), **không bổ sung cột nào ở PDTD_DTM**.
+
+- Bảng FACT snapshot hàng ngày, bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này. Phục vụ BC1.
+- Khóa chính của bảng (PK): **DAYID, COREPAYER_BK** (giữ nguyên như SB_DWH).
 
 #### 2.4 Bộ bảng REF_
 
@@ -7129,9 +8403,9 @@ Excel/CSV gốc.
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | STREAM | VARCHAR2 | Y | 200 | PK | Luồng nghiệp vụ của hồ sơ — nguồn file.STREAM |
-| 2 | BI_FLOW | VARCHAR2 | Y | 100 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo — nguồn file.BI_FLOW. Giá trị quan sát được: KHCN_HO, BL |
+| 2 | BUSINESS_FLOW | VARCHAR2 | Y | 100 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo — nguồn file.BUSINESS_FLOW. Giá trị quan sát được: KHCN_HO, BL |
 
-- Bảng REF map luồng nghiệp vụ (STREAM) của hồ sơ RLOS sang phân nhóm chuẩn hóa (BI_FLOW) dùng để chia báo cáo theo khối, dùng cho hệ RLOS.
+- Bảng REF map luồng nghiệp vụ (STREAM) của hồ sơ RLOS sang phân nhóm chuẩn hóa (BUSINESS_FLOW) dùng để chia báo cáo theo khối, dùng cho hệ RLOS.
 - Khóa chính của bảng (PK): **STREAM**.
 
 ##### 2.4.2 REF_CLOS_LEGAL
@@ -7281,13 +8555,13 @@ của BC9 tại `AGG_LOS_KPI_APPLICATION`, 2.1.9) tự `LEFT JOIN` bảng này
 thật (`input/BC5TAT(REF_SLA).xlsx`, sheet "cam kết SLA NLTT"):
 
 - **Nhánh RLOS:** `PRODUCT_LINE = DIM_RLOS_PRODUCT.PRODUCT_LINE_NAME`
-  (qua `FCT_RLOS_APPLICATION_DAILY.PRODUCT_SK`) + `SYSTEM_CODE='RLOS'`.
+  (qua `FCT_RLOS_APPLICATION.PRODUCT_SK`) + `SYSTEM_CODE='RLOS'`.
   Seed thật xác nhận unique theo đúng `PRODUCT_LINE` (28 dòng, mỗi
   `Product Line` xuất hiện đúng 1 lần) — không còn rủi ro 1:N, đóng
   luôn Section 3 dòng #46.
 - **Nhánh CLOS:** `PRODUCT_LINE = DIM_CLOS_PRODUCT.PRODUCT_LINE_NAME`
   + `(SUB_PRODUCT IS NULL OR SUB_PRODUCT = DIM_CLOS_PRODUCT.PRODUCT_
-  NAME)` (qua `FCT_CLOS_APPLICATION_DAILY.PRODUCT_SK`) + `NEW_CHANGE_
+  NAME)` (qua `FCT_CLOS_APPLICATION.PRODUCT_SK`) + `NEW_CHANGE_
   REQUEST = DIM_CLOS_APPLICATION.CHANGE_REQUEST` (qua `APPLICATION_SK`)
   + `SYSTEM_CODE='CLOS'`. Seed thật (16 dòng) xác nhận unique theo tổ
   hợp 3 cột này, không cần `REF_PRODUCT`/`POLICY`.
@@ -7307,7 +8581,7 @@ thật (`input/BC5TAT(REF_SLA).xlsx`, sheet "cam kết SLA NLTT"):
 | 1 | SYSTEM | VARCHAR2 | Y | 10 |  | Hệ sở hữu/nạp bảng map này — nguồn file.SYSTEM. Giá trị quan sát được: OF. KHÔNG phải cờ phân biệt CLOS/RLOS của dữ liệu — xem ghi chú bên dưới |
 | 2 | IDFLOW | VARCHAR2 | N | 10 |  | Mã luồng xử lý — nguồn file.IDFLOW, ví dụ 12 cho luồng giải ngân |
 | 3 | WORKSTEP | VARCHAR2 | Y | 50 |  | Tên bước xử lý theo đúng cách LOS ghi — nguồn file.WORKSTEP, ví dụ DisbursementMaker |
-| 4 | BI_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước chuẩn hóa để hiển thị trên báo cáo — nguồn file.BI_WORKSTEP, ví dụ 12.Disbursement-Maker |
+| 4 | WORKSTEP_DISPLAY | VARCHAR2 | N | 50 |  | Tên bước chuẩn hóa để hiển thị trên báo cáo — nguồn file.WORKSTEP_DISPLAY, ví dụ 12.Disbursement-Maker |
 | 5 | DECISION | VARCHAR2 | N | 100 |  | Quyết định tại bước xử lý — nguồn file.DECISION. Cùng 1 bước có nhiều quyết định nên phải nằm trong tổ hợp tra |
 
 - Bảng REF map bước xử lý và quyết định của cả 2 hệ CLOS, RLOS về 1 tên bước chuẩn hóa dùng chung trên báo cáo, 1 dòng = 1 tổ hợp SYSTEM + IDFLOW + WORKSTEP + DECISION, dùng chung cho cả 2 hệ.
@@ -7322,7 +8596,7 @@ join (đã biết trước đang xử lý hồ sơ hệ nào), **không dùng đ
 `WHERE SYSTEM = ...`**. `IDFLOW` là cột phân biệt luồng xử lý thật sự
 trong bảng này (ví dụ 12 = luồng giải ngân), không phải `SYSTEM`. Mọi join từ
 `DIM_CLOS_WORKSTEP`/`DIM_RLOS_WORKSTEP` (2.2.1.3/2.3.1.3) và
-`FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (cột
+`FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (cột
 `LAST_WORKSTEP`, 2.2.2.1/2.3.2.1) vào bảng này chỉ dùng `WORKSTEP` (+
 `DECISION`), không lọc theo `SYSTEM`.
 
@@ -7360,60 +8634,75 @@ tương ứng ở Section 1/2 của bảng đó.
 | --- | --- | --- | --- | --- |
 | 1 | `DIM_LOS_USER` | Nguồn nạp trước đây (`NG_SB_CLOS_ENTRY_EXIT`/`NG_SB_RLOS_ENTRY_EXIT`) là bảng event log workflow, không phải bảng master tài khoản LOS — chỉ ghi nhận được tài khoản đã từng xử lý ít nhất 1 bước trên hồ sơ | Đã thay thế bằng bảng khai báo thủ công `MAP_LOS_USER` ở tầng STG_LOS (do BA/DevOps nhập tay, SCD2 theo EFF_DATE khai báo) — xem `.claude/skills/design-hld/references/design-method.md`, mục "Resolution — a manually-maintained MAP_ seed table at STG_LOS" | ĐÃ GIẢI QUYẾT |
 | 2 | `DIM_CLOS_APPLICATION` (DQ-11) | 4 cột (`CREDIT_PROFILE`, `INDUSTRY_LVL1/2/3_CODE`) được SRS BC2 chỉ đích danh nguồn (`NG_SB_CLOS_EXTTABLE.CREDIT_PROFILE`, `NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_1/2/3`) nhưng metadata Column Review (cả 2 bảng đã "Đã xác nhận") không liệt kê các cột nguồn này | Người dùng đã kiểm tra trực tiếp trên database và xác nhận cả 4 cột thật sự tồn tại, đúng tên/bảng như SRS BC2 mô tả — kết luận: tài liệu `CLOS - Metadata.xlsx` (sheet Column Review) bị thiếu sót/lỗi thời, không phải database thiếu cột; BA đã phân tích đúng trong SRS ngay từ đầu | ĐÃ GIẢI QUYẾT |
-| 3 | `DIM_CLOS_PRODUCT`, `DIM_RLOS_PRODUCT` (PDTD_DTM) | 2 cột `IS_CREDIT_CARD`, `IS_FAST_PRODUCT` từng được đánh dấu "CHƯA CHỐT"/"CHO_RULE_BA" ngay trong lineage doc gốc, đặt trên cả 2 bảng CLOS và RLOS — đối chiếu trực tiếp SRS BC9 gốc (không phải metadata suy diễn) cho thấy: (1) CLOS không dùng khái niệm này ở bất kỳ đâu (`SLHS_CLOS`/`SLGN_CLOS`/`TAT_CLOS` phân nhóm bằng `PRODUCT_LINE`/`SUB_PRODUCT` khác hẳn) — đặt ở `DIM_CLOS_PRODUCT` là lỗi khi copy nguyên cột từ bảng PDTD_DTM cũ (gộp CLOS+RLOS); (2) phía RLOS chỉ `TAT_RLOS` thật sự cần phân nhóm SEC/UNSEC theo `PRODUCT_NAME`/`COLLREQUIRE` — `SLHS_RLOS`/`SLGN_RLOS` cũng có "Nhóm 1/Nhóm 2" trong SRS nhưng 2 nhóm bù trừ hoàn toàn (tổng = COUNT toàn bộ hồ sơ thỏa điều kiện lọc chung, không cần tách khi tính), không cùng loại rule với `TAT_RLOS` — không gộp vừa vào 1 cặp cờ boolean cố định trên DIM được | Đã gỡ `IS_CREDIT_CARD`/`IS_FAST_PRODUCT` khỏi cả `DIM_CLOS_PRODUCT` và `DIM_RLOS_PRODUCT`. Rule phân nhóm SEC/UNSEC của `TAT_RLOS` đã đặt trực tiếp tại `TAT_RLOS_SEC_*`/`TAT_RLOS_UNSEC_*` của `AGG_LOS_KPI_YTD_DAILY` (2.1.8, join `PRODUCT_NAME`/`SUB_PRODUCT_CODE` qua `DIM_RLOS_PRODUCT`). `SLHS_RLOS_DAY`/`SLGN_RLOS_DAY` không cần logic phân nhóm sản phẩm nào — chỉ bổ sung 2 điều kiện lọc còn thiếu là `BI_FLOW`/`COMPANY_CODE` (xem 2.1.8) | ĐÃ GIẢI QUYẾT |
+| 3 | `DIM_CLOS_PRODUCT`, `DIM_RLOS_PRODUCT` (PDTD_DTM) | 2 cột `IS_CREDIT_CARD`, `IS_FAST_PRODUCT` từng được đánh dấu "CHƯA CHỐT"/"CHO_RULE_BA" ngay trong lineage doc gốc, đặt trên cả 2 bảng CLOS và RLOS — đối chiếu trực tiếp SRS BC9 gốc (không phải metadata suy diễn) cho thấy: (1) CLOS không dùng khái niệm này ở bất kỳ đâu (`SLHS_CLOS`/`SLGN_CLOS`/`TAT_CLOS` phân nhóm bằng `PRODUCT_LINE`/`SUB_PRODUCT` khác hẳn) — đặt ở `DIM_CLOS_PRODUCT` là lỗi khi copy nguyên cột từ bảng PDTD_DTM cũ (gộp CLOS+RLOS); (2) phía RLOS chỉ `TAT_RLOS` thật sự cần phân nhóm SEC/UNSEC theo `PRODUCT_NAME`/`COLLREQUIRE` — `SLHS_RLOS`/`SLGN_RLOS` cũng có "Nhóm 1/Nhóm 2" trong SRS nhưng 2 nhóm bù trừ hoàn toàn (tổng = COUNT toàn bộ hồ sơ thỏa điều kiện lọc chung, không cần tách khi tính), không cùng loại rule với `TAT_RLOS` — không gộp vừa vào 1 cặp cờ boolean cố định trên DIM được | Đã gỡ `IS_CREDIT_CARD`/`IS_FAST_PRODUCT` khỏi cả `DIM_CLOS_PRODUCT` và `DIM_RLOS_PRODUCT`. Rule phân nhóm SEC/UNSEC của `TAT_RLOS` đã đặt trực tiếp tại `TAT_RLOS_SEC_*`/`TAT_RLOS_UNSEC_*` của `AGG_LOS_KPI_YTD_DAILY` (2.1.8, join `PRODUCT_NAME`/`SUB_PRODUCT_CODE` qua `DIM_RLOS_PRODUCT`). `SLHS_RLOS_DAY`/`SLGN_RLOS_DAY` không cần logic phân nhóm sản phẩm nào — chỉ bổ sung 2 điều kiện lọc còn thiếu là `BUSINESS_FLOW`/`COMPANY_CODE` (xem 2.1.8) | ĐÃ GIẢI QUYẾT |
 | 4 | `DIM_CLOS_PRODUCT`, `DIM_RLOS_PRODUCT` (SB_DWH, kế thừa lên PDTD_DTM) | Cùng pattern với `DIM_LOS_USER` (dòng 1): nguồn nạp trước đây (`NG_SB_CLOS_CUST_INFO`/`NG_SB_CLOS_EXTTABLE` phía CLOS, `NG_SB_RLOS_APPLICANT_GENERAL`/`NG_SB_RLOS_EXTTABLE` phía RLOS) đều là bảng grain-theo-hồ-sơ, không phải danh mục sản phẩm gốc — DIM thực chất là tập hợp tổ hợp thuộc tính sản phẩm quan sát được trên hồ sơ, có thể thiếu sản phẩm chưa từng phát sinh hồ sơ | Đã thay thế bằng bảng khai báo thủ công `MAP_CLOS_PRODUCT`/`MAP_RLOS_PRODUCT` ở tầng STG_LOS (cùng giải pháp với `DIM_LOS_USER`, dòng 1) | ĐÃ GIẢI QUYẾT |
 | 5 | `DIM_CLOS_WORKSTEP`, `DIM_RLOS_WORKSTEP` (SB_DWH, kế thừa lên PDTD_DTM) | Cùng pattern application-scoped source với `DIM_LOS_USER`/`DIM_*_PRODUCT`: nguồn nạp trước đây duy nhất (`NG_SB_CLOS_ENTRY_EXIT`/`NG_SB_RLOS_ENTRY_EXIT`) là bảng lịch sử xử lý bước, không phải danh mục bước BPM gốc — DIM thực chất là tập distinct các mã bước đã từng quan sát được, có thể thiếu bước mới cấu hình nhưng chưa có hồ sơ đi qua. Danh mục bước gốc là hằng số cấu hình cứng trong BPM engine, không phải một bảng database. Riêng RLOS còn có nghi vấn dữ liệu lẫn tiền tố `CLOS_` (`CLOS_DataInputerChecker`) trong tập mẫu khảo sát (khi còn suy từ event log) | Đã thay thế bằng bảng khai báo thủ công `MAP_CLOS_WORKSTEP`/`MAP_RLOS_WORKSTEP` ở tầng STG_LOS — BA/DevOps khai báo đúng theo danh sách bước đã cấu hình trên BPM engine, nghi vấn lẫn tiền tố CLOS_ không còn ảnh hưởng vì không còn suy từ event log | ĐÃ GIẢI QUYẾT |
-| 6 | `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (SB_DWH, 1.2.2.1/1.3.2.1) | `WFINSTRUMENTTABLE` (bảng trạng thái tức thời của workflow instance, cột `PROCESSNAME`/`ACTIVITYNAME`) hiện KHÔNG được nạp vào bất kỳ DIM/FCT nào trên datamart — dữ liệu này cần thiết để tính cột phái sinh xác định bước hồ sơ đang đứng kết hợp quyết định gần nhất, theo đúng công thức 5 nhánh CASE-WHEN mà SRS BC4 mô tả cho trường `FLAG` (lineage doc cũ chỉ ghi chú "đầu vào BC4.FLAG" tại `CURRENT_WORKSTEP_SK`, chưa có cột nào chốt thành giá trị text theo công thức). Người dùng đề xuất đặt tên cột rõ nghĩa hơn, ví dụ `WORKSTEP_FLAG`, thay vì `FLAG` chung chung | Đã thiết kế cột `WORKSTEP_FLAG` (VARCHAR2) trên `FCT_CLOS_APPLICATION_DAILY` (cột 60)/`FCT_RLOS_APPLICATION_DAILY` (cột 74), nạp `WFINSTRUMENTTABLE.PROCESSNAME`/`ACTIVITYNAME` (LEFT JOIN theo `WI_NAME=PROCESSINSTANCEID`, loại 5 `CREATEDBY` hệ thống/test) kết hợp `WORKSTEP`/`DECISION` của `ENTRY_EXIT`, đúng 5 nhánh CASE-WHEN SRS BC4 (khác nhẹ giữa CLOS/RLOS ở nhánh 2, 4, 5). `WFINSTRUMENTTABLE` có CDC key `PROCESSINSTANCEID+WORKITEMID` (DS_BANG_202608.xlsx), đọc trực tiếp qua STG_LOS. **Cập nhật 2026-09-21:** đã bỏ cột `WORKSTEP_FLAG` khỏi cả 2 bảng `APPLICATION_DAILY` này (không còn consumer — BC4 đã đổi sang đọc bản tính độc lập trên `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT`, 1.2.2.6/1.3.2.7); `WFINSTRUMENTTABLE` vẫn giữ trong lineage 2 bảng `APPLICATION_DAILY` vì `VAR_STR12` (CLOS) còn cần join riêng | ĐÃ GIẢI QUYẾT |
+| 6 | `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (SB_DWH, 1.2.2.1/1.3.2.1) | `WFINSTRUMENTTABLE` (bảng trạng thái tức thời của workflow instance, cột `PROCESSNAME`/`ACTIVITYNAME`) hiện KHÔNG được nạp vào bất kỳ DIM/FCT nào trên datamart — dữ liệu này cần thiết để tính cột phái sinh xác định bước hồ sơ đang đứng kết hợp quyết định gần nhất, theo đúng công thức 5 nhánh CASE-WHEN mà SRS BC4 mô tả cho trường `FLAG` (lineage doc cũ chỉ ghi chú "đầu vào BC4.FLAG" tại `CURRENT_WORKSTEP_SK`, chưa có cột nào chốt thành giá trị text theo công thức). Người dùng đề xuất đặt tên cột rõ nghĩa hơn, ví dụ `WORKSTEP_FLAG`, thay vì `FLAG` chung chung | Đã thiết kế cột `WORKSTEP_FLAG` (VARCHAR2) trên `FCT_CLOS_APPLICATION` (cột 60)/`FCT_RLOS_APPLICATION` (cột 74), nạp `WFINSTRUMENTTABLE.PROCESSNAME`/`ACTIVITYNAME` (LEFT JOIN theo `WI_NAME=PROCESSINSTANCEID`, loại 5 `CREATEDBY` hệ thống/test) kết hợp `WORKSTEP`/`DECISION` của `ENTRY_EXIT`, đúng 5 nhánh CASE-WHEN SRS BC4 (khác nhẹ giữa CLOS/RLOS ở nhánh 2, 4, 5). `WFINSTRUMENTTABLE` có CDC key `PROCESSINSTANCEID+WORKITEMID` (DS_BANG_202608.xlsx), đọc trực tiếp qua STG_LOS. **Cập nhật 2026-09-21:** đã bỏ cột `WORKSTEP_FLAG` khỏi cả 2 bảng `APPLICATION_DAILY` này (không còn consumer — BC4 đã đổi sang đọc bản tính độc lập trên `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT`, 1.2.2.6/1.3.2.7); `WFINSTRUMENTTABLE` vẫn giữ trong lineage 2 bảng `APPLICATION_DAILY` vì `VAR_STR12` (CLOS) còn cần join riêng | ĐÃ GIẢI QUYẾT |
 | 8 | `DIM_CLOS_DECISION`, `DIM_RLOS_DECISION` (SB_DWH, kế thừa lên PDTD_DTM) — review 2026-09-16, cập nhật | Cùng pattern application-scoped source với `DIM_*_WORKSTEP` (dòng 5): nguồn nạp trước đây duy nhất (`NG_SB_CLOS_ENTRY_EXIT`/`NG_SB_RLOS_ENTRY_EXIT`) là bảng lịch sử xử lý, không phải danh mục quyết định BPM gốc — `DECISION_CODE` là tập giá trị hữu hạn cấu hình cứng trong BPM engine (Submit, Reject, Send To HOSupport...), có thể thiếu quyết định mới cấu hình nhưng chưa có hồ sơ nào dùng tới | Đã thay thế bằng bảng khai báo thủ công `MAP_CLOS_DECISION`/`MAP_RLOS_DECISION` ở tầng STG_LOS (cùng giải pháp với `DIM_*_WORKSTEP`, dòng 5). Ban đầu có thêm `DECISION_GROUP` khai báo tay đi kèm `DECISION_CODE`, nhưng review lại (2026-09-16, khi review `FCT_CLOS_WORKSTEP_EVENT`) rà soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào lookup trực tiếp `DECISION_GROUP` (mọi report tự tính nhóm quyết định bằng CASE/IN-list trên `DECISION` thô) — đã bỏ cột này khỏi cả `MAP_CLOS_DECISION`/`MAP_RLOS_DECISION` và `DIM_CLOS_DECISION`/`DIM_RLOS_DECISION` theo column-optimization rule | ĐÃ GIẢI QUYẾT |
-| 9 | `DIM_CLOS_APPROVAL_GROUP`, `DIM_RLOS_APPROVAL_GROUP` (đã loại bỏ hoàn toàn) | Ban đầu áp dụng pattern application-scoped source (giống `DIM_*_WORKSTEP`/`DIM_*_DECISION`, dòng 5, 8) — giả định `NG_SB_CLOS_APPROVAL`/`NG_SB_RLOS_APPROVAL` là bảng ghi nhận luồng phê duyệt phát sinh nhiều lần theo hồ sơ, nên tạo `MAP_CLOS_APPROVAL_GROUP`/`MAP_RLOS_APPROVAL_GROUP` thay thế. Sau đó **kiểm tra lại grain thật** (CLOS Metadata + RLOS Metadata, sheet Table Review) xác nhận **cả 2 bảng đều grain 1 dòng = 1 hồ sơ** — không phải bảng sự kiện nhiều dòng như giả định ban đầu | Đã loại bỏ hoàn toàn `DIM_CLOS_APPROVAL_GROUP`/`DIM_RLOS_APPROVAL_GROUP` và `MAP_CLOS_APPROVAL_GROUP`/`MAP_RLOS_APPROVAL_GROUP` — `APP_GRP` (cấp thẩm quyền phê duyệt) đọc thẳng từ `NG_SB_CLOS_APPROVAL`/`NG_SB_RLOS_APPROVAL` lên `DIM_CLOS_APPLICATION`/`DIM_RLOS_APPLICATION` (xem 1.2.1.1/1.3.1.1), cùng cách với `STREAM`/`APPROVAL_TYPE` đã có sẵn. Cột `APPROVAL_GROUP_SK` cũng bị loại khỏi `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY`. `APPROVAL_LEVEL` (thứ tự cấp, dùng gom nhóm SLA) không còn cần thiết — thay bằng `FLAG_APP_GRP` có sẵn trên chính bảng REF_ SLA (`CLOS_REF_SLA_TDKHDNL`/`TDKHDN_2`), xem dòng #13 | ĐÃ GIẢI QUYẾT |
-| 10 | `DIM_RLOS_COLLATERAL_TYPE` (SB_DWH, kế thừa lên PDTD_DTM) | Cột `COLL_GROUP` ban đầu giữ với lý do "đồng bộ kiến trúc dùng chung 2 hệ" với CLOS — rà soát lại (2026-09-22) xác nhận không có báo cáo nào (BC1/BC2/BC9, cả CLOS lẫn RLOS) thực sự lọc xuyên hệ bằng cột này, và phía CLOS cũng đã bỏ hẳn `COLL_GROUP` cùng lý do (xem `DIM_CLOS_COLLATERAL_TYPE`, 1.2.1.6) | Đã xóa hẳn `COLL_GROUP` khỏi `DIM_RLOS_COLLATERAL_TYPE` (cả 3 tầng SB_DWH/STG_DTM/PDTD_DTM) — không có `FCT_*` nào JOIN lookup cột này nên xóa an toàn. BC1 đọc trực tiếp `PROPERTY`/`NUMBERSIGN` từ 4 bảng grid nguồn, BC9 UNION trực tiếp 4 bảng rồi đếm — cả 2 không cần cột nhóm trung gian | ĐÃ GIẢI QUYẾT |
+| 9 | `DIM_CLOS_APPROVAL_GROUP`, `DIM_RLOS_APPROVAL_GROUP` (đã loại bỏ hoàn toàn) | Ban đầu áp dụng pattern application-scoped source (giống `DIM_*_WORKSTEP`/`DIM_*_DECISION`, dòng 5, 8) — giả định `NG_SB_CLOS_APPROVAL`/`NG_SB_RLOS_APPROVAL` là bảng ghi nhận luồng phê duyệt phát sinh nhiều lần theo hồ sơ, nên tạo `MAP_CLOS_APPROVAL_GROUP`/`MAP_RLOS_APPROVAL_GROUP` thay thế. Sau đó **kiểm tra lại grain thật** (CLOS Metadata + RLOS Metadata, sheet Table Review) xác nhận **cả 2 bảng đều grain 1 dòng = 1 hồ sơ** — không phải bảng sự kiện nhiều dòng như giả định ban đầu | Đã loại bỏ hoàn toàn `DIM_CLOS_APPROVAL_GROUP`/`DIM_RLOS_APPROVAL_GROUP` và `MAP_CLOS_APPROVAL_GROUP`/`MAP_RLOS_APPROVAL_GROUP` — `APP_GRP` (cấp thẩm quyền phê duyệt) đọc thẳng từ `NG_SB_CLOS_APPROVAL`/`NG_SB_RLOS_APPROVAL` lên `DIM_CLOS_APPLICATION`/`DIM_RLOS_APPLICATION` (xem 1.2.1.1/1.3.1.1), cùng cách với `STREAM`/`APPROVAL_TYPE` đã có sẵn. Cột `APPROVAL_GROUP_SK` cũng bị loại khỏi `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION`. `APPROVAL_LEVEL` (thứ tự cấp, dùng gom nhóm SLA) không còn cần thiết — thay bằng `FLAG_APP_GRP` có sẵn trên chính bảng REF_ SLA (`CLOS_REF_SLA_TDKHDNL`/`TDKHDN_2`), xem dòng #13 | ĐÃ GIẢI QUYẾT |
+| 10 | `DIM_RLOS_COLLATERAL_TYPE` (SB_DWH, kế thừa lên PDTD_DTM) | Cột `COLL_GROUP` ban đầu giữ với lý do "đồng bộ kiến trúc dùng chung 2 hệ" với CLOS — rà soát lại (2026-09-22) xác nhận không có báo cáo nào (BC1/BC2/BC9, cả CLOS lẫn RLOS) thực sự lọc xuyên hệ bằng cột này, và phía CLOS cũng đã bỏ hẳn `COLL_GROUP` cùng lý do (⚠️ review 2026-09-30: `DIM_CLOS_COLLATERAL_TYPE` sau đó đã bị xóa hẳn khỏi thiết kế, xem dòng mới — tham chiếu gốc chỉ còn giá trị lịch sử) | Đã xóa hẳn `COLL_GROUP` khỏi `DIM_RLOS_COLLATERAL_TYPE` (cả 3 tầng SB_DWH/STG_DTM/PDTD_DTM) — không có `FCT_*` nào JOIN lookup cột này nên xóa an toàn. BC1 đọc trực tiếp `PROPERTY`/`NUMBERSIGN` từ 4 bảng grid nguồn, BC9 UNION trực tiếp 4 bảng rồi đếm — cả 2 không cần cột nhóm trung gian | ĐÃ GIẢI QUYẾT |
 | 11 | `DIM_CLOS_CHANGE_TYPE` (đề xuất tách ban đầu trong `output/Table_Split_Proposal_CLOS_RLOS.md` dòng 80) | Đối chiếu SRS (BC1, BC2, BC5, BC9, BC11) và metadata CLOS (`NG_SB_CLOS_CHANGEREQ.CHANGE_TYPE`) xác nhận: (1) BC2 ("Báo cáo CLOS APPLICATION") lấy `CHANGE_TYPE` thẳng từ `NG_SB_CLOS_CHANGEREQ`, không qua bảng danh mục nào, khác hẳn RLOS có `SB_RLOS_MAS_CHANGE_TYPE` (danh mục gốc thật); (2) giá trị cột là chuỗi tự do đa giá trị đã là tên sẵn (nối bằng dấu `~`, không phải mã cần tra tên); (3) không có `DETAIL_CHANGE_TYPE` nào cho CLOS trong SRS; (4) BC5 không hề dùng CHANGE_TYPE (mô tả cũ về "tra SLA" trong lineage doc gốc không khớp SRS thực tế) | Đã quyết định KHÔNG tách `DIM_CLOS_CHANGE_TYPE` — `CHANGE_TYPE` giữ làm cột text trực tiếp trên `DIM_CLOS_APPLICATION` (1.2.1.1), cùng nguồn với `CHANGE_REQUEST`. Phía RLOS vẫn giữ `DIM_RLOS_CHANGE_TYPE` (1.3.1.8) vì `SB_RLOS_MAS_CHANGE_TYPE` là danh mục gốc thật, phục vụ BC1 | ĐÃ GIẢI QUYẾT |
 | 12 | `DIM_RLOS_APPLICATION` (2.3.1.1, PDTD_DTM) & `REF_SLA_NLTT` (2.4.8) | Cột `SLA_DE_RESULT`/`SLA_QC_RESULT`/`SLA_DE_TOTAL_RESULT` (từ `REF_SLA_NLTT`, SLA Nhập liệu tập trung phục vụ `POINT` của BC9). Lịch sử: ban đầu chưa thêm vào bảng nào → đã thêm vào `DIM_RLOS_APPLICATION` (đóng lần 1) → review 2026-09-21: đảo lại, bỏ khỏi DIM | Review 2026-09-21 (khi đóng gap CLOS chưa từng thiết kế, xem dòng #48): quyết định người dùng đổi kiến trúc — KHÔNG denormalize vào DIM cho cả 2 hệ, chuyển hẳn sang report-time lookup `REF_SLA_NLTT` tại tầng report/OAS (BC5, `POINT` của BC9), dùng khóa `PRODUCT_LINE_NAME` (đã sửa từ `PRODUCT_LINE_CODE`, xem dòng #49) qua `DIM_RLOS_PRODUCT`/`DIM_CLOS_PRODUCT` | ĐÃ GIẢI QUYẾT |
 | 13 | `CLOS_REF_SLA_TDKHDNL` (2.4.6), `CLOS_REF_SLA_TDKHDN` (2.4.7) | Tài liệu nguồn tự ghi "CHỜ RULE BA": 2 bảng có CÙNG cấu trúc cột, CÙNG khóa UNIQUE (REF_PRODUCT, PRODUCT_LINE, SUB_PRODUCT, HAVE_ANY_DEVIATION, FLAG_APP_GRP) nhưng dữ liệu khác nhau (mỗi bảng 36 dòng riêng) — chưa có quy tắc xác định hồ sơ CLOS nào (theo luồng/đơn vị/sản phẩm nào) thì tra cam kết SLA ở bảng nào | Đối chiếu SRS BC5 (BR 1.2 — trích nguyên văn: *"BC5TAT - sheet cam kết SLA TDKHDNL (file3) LEFT JOIN với điều kiện: b.CUST_GROUP IN ('NBFI','JSC','FDI','BANK','STR','SOC')..."*, *"...sheet cam kết SLA TDKHDN luồng 2 (file2) LEFT JOIN với điều kiện: b.CUST_GROUP IN ('MSME','SME','USME')..."*) và xác nhận trực tiếp từ BA: quy tắc chọn bảng dựa trên `CUST_GROUP` của hồ sơ (`NG_SB_CLOS_CUST_INFO`/`DIM_CLOS_APPLICATION.CUST_GROUP`) — `NBFI/JSC/FDI/BANK/STR/SOC` → `CLOS_REF_SLA_TDKHDNL`; `MSME/SME/USME` → `CLOS_REF_SLA_TDKHDN`. Riêng hồ sơ có `APP_GRP='C1'` (SRS gọi "sheet luồng 1", chỉ chứa `REF_PRODUCT`, không có công thức SLA riêng — BA xác nhận `REF_PRODUCT` của nhóm này kế thừa hoàn toàn từ `CLOS_REF_SLA_TDKHDN`, và giá trị SLA là hằng số cứng 4 giờ cho mọi vai trò) — không tạo bảng REF_ vật lý riêng cho trường hợp này, xử lý bằng hằng số trong công thức PHÁI SINH tại `DIM_CLOS_APPLICATION` (2.2.1.1, PDTD_DTM — đã dời khỏi FCT sau khi loại bỏ `DIM_CLOS_APPROVAL_GROUP`, xem dòng #9). Dữ liệu 36 dòng của `CLOS_REF_SLA_TDKHDN` đã đối chiếu qua file thật `input/BC5TAT - Team PDTD cung cấp(cam kết SLA TDKHDN luồng 2).csv` (cột FLAG(APP_GRP) chỉ có CGPD, BOD/CC) | ĐÃ GIẢI QUYẾT |
 | 14 | `DIM_CLOS_APPLICATION` (2.2.1.1, PDTD_DTM) | Công thức quy đổi `APP_GRP` (thô, A1/A2/B1/B2/C1/BOD/CC/SCC/RCC...) sang `FLAG_APP_GRP` (CGPD/BOD-CC, dùng làm khóa tra `CLOS_REF_SLA_TDKHDNL`/`TDKHDN_2`) mới chỉ có ví dụ tạm thời (A1/A2/B1/B2/C1→CGPD, còn lại→BOD/CC), chưa có bảng ánh xạ đầy đủ mọi giá trị `APP_GRP` quan sát được | Người dùng xác nhận công thức hiện tại dựa trên dữ liệu thực tế + trao đổi trực tiếp với BA — giữ nguyên, không cần bảng ánh xạ bổ sung | ĐÃ GIẢI QUYẾT |
-| 15 | `FCT_CLOS_EXCEPTION`/`FCT_RLOS_EXCEPTION` (SB_DWH + PDTD_DTM) | Phát hiện ban đầu: `PHAN_LOAI_DDE` không có trong docx gốc của `FCT_LOS_EXCEPTION`/`FCT_PDTD_EXCEPTION` — đã tạm đánh dấu PENDING chờ BA. Đánh giá lại theo yêu cầu người dùng: `PHAN_LOAI_DDE` (cùng `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`, tên gốc `FLAG_FTR`) thật ra đã có công thức đầy đủ và `DA_CHOT` (chốt) trên `FCT_LOS_APPLICATION_DAILY`/`FCT_PDTD_APPLICATION_DAILY` — chỉ là đặt nhầm bảng: "Trường đích trên báo cáo" của tài liệu gốc tự ghi cả 3 cột chỉ phục vụ `BC7`, rà soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào khác dùng, và BC7 đúng grain của `FCT_*_EXCEPTION` (1 dòng/lần nêu lý do) chứ không phải grain hồ sơ/ngày của `FCT_*_APPLICATION_DAILY` | Đã bỏ PENDING — chuyển nguyên công thức đã chốt (`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE`) từ `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (1.2.2.1/1.3.2.1, đã bỏ 3 cột này) sang tính trực tiếp tại `FCT_CLOS_EXCEPTION` (1.2.2.4, đã thiết kế) — công thức đối chiếu khớp cả 2 nhánh CLOS/RLOS của SRS BC7. `FCT_RLOS_EXCEPTION` sẽ áp dụng cùng công thức khi thiết kế | ĐÃ GIẢI QUYẾT |
-| 16 | `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (SB_DWH + PDTD_DTM) | Người dùng yêu cầu đánh giá lại toàn bộ tham chiếu fact-to-fact khi ETL trên 2 bảng này — phát hiện `DEVIATION_CNT`, `COLLATERAL_CNT` + 9 cột `COLLATERAL_CNT_*` là cột đếm trung gian (COUNT(*) trên `FCT_*_DEVIATION`/`FCT_*_COLLATERAL`), bắt ETL của 2 fact chi tiết phải chạy xong trước `FCT_*_APPLICATION_DAILY`. Rà soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào dùng trực tiếp tên 11 cột này — chúng chỉ là căn cứ trung gian để tính ra các cờ YES/NO thật sự hiển thị (`TSDB_NHOM_0`, `TSDB_BDS/PTVT/MMTB/HTK/KPT/CPTP/TIN_CHAP`, `TIN_CHAP_TQD` của BC2; `TSBD_BDS/PTVT/GTCG` của BC1; `TSBD_G2`, `DEVIATION_G2`, `DEVIATION_G3` của BC9). Công thức SRS thật của `TSBD_G2`/`DEVIATION_G2`/`DEVIATION_G3` (BC9) còn tự UNION trực tiếp các bảng nguồn tài sản/ngoại lệ rồi đếm, không hề nhắc tới `COLLATERAL_CNT`/`DEVIATION_CNT` | Đã bỏ hẳn 11 cột đếm trung gian khỏi `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (cả SB_DWH + PDTD_DTM) — người dùng làm báo cáo bằng OAS (Oracle Analytics Server), xác nhận có thể model `FCT_*_COLLATERAL`/`FCT_*_DEVIATION` như logical fact riêng trong RPD (dùng chung `DIM_*_APPLICATION`/`DAYID` làm conformed dimension — pattern multi-fact chuẩn của OAS), đo lường COUNT(*) lọc theo `COLLATERAL_TYPE_CODE` khi cần đặt làm logical measure, các cờ YES/NO là calculated item wrap quanh measure đó — BI Server tự sinh SQL multi-pass, không fan-out. Kết quả: `FCT_*_APPLICATION_DAILY`, `FCT_*_COLLATERAL`, `FCT_*_DEVIATION` là 3 luồng ETL hoàn toàn độc lập, không còn phụ thuộc thứ tự chạy trước/sau. 9 cờ TSDB_*/TIN_CHAP_TQD của BC2 lọc trực tiếp theo `COLLATERAL_TYPE_CODE` (=`COLLTYPE` gốc tiếng Việt) của `DIM_CLOS_COLLATERAL_TYPE`, đúng nguyên văn SRS | ĐÃ GIẢI QUYẾT |
+| 15 | `FCT_CLOS_EXCEPTION`/`FCT_RLOS_EXCEPTION` (SB_DWH + PDTD_DTM) | Phát hiện ban đầu: `PHAN_LOAI_DDE` không có trong docx gốc của `FCT_LOS_EXCEPTION`/`FCT_PDTD_EXCEPTION` — đã tạm đánh dấu PENDING chờ BA. Đánh giá lại theo yêu cầu người dùng: `PHAN_LOAI_DDE` (cùng `CHECK_FTR`/`FIRST_WORKSTEP_RETURN`, tên gốc `FLAG_FTR`) thật ra đã có công thức đầy đủ và `DA_CHOT` (chốt) trên `FCT_LOS_APPLICATION_DAILY`/`FCT_PDTD_APPLICATION_DAILY` — chỉ là đặt nhầm bảng: "Trường đích trên báo cáo" của tài liệu gốc tự ghi cả 3 cột chỉ phục vụ `BC7`, rà soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào khác dùng, và BC7 đúng grain của `FCT_*_EXCEPTION` (1 dòng/lần nêu lý do) chứ không phải grain hồ sơ/ngày của `FCT_*_APPLICATION_DAILY` | Đã bỏ PENDING — chuyển nguyên công thức đã chốt (`CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE`) từ `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (1.2.2.1/1.3.2.1, đã bỏ 3 cột này) sang tính trực tiếp tại `FCT_CLOS_EXCEPTION` (1.2.2.4, đã thiết kế) — công thức đối chiếu khớp cả 2 nhánh CLOS/RLOS của SRS BC7. `FCT_RLOS_EXCEPTION` sẽ áp dụng cùng công thức khi thiết kế | ĐÃ GIẢI QUYẾT |
+| 16 | `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (SB_DWH + PDTD_DTM) | Người dùng yêu cầu đánh giá lại toàn bộ tham chiếu fact-to-fact khi ETL trên 2 bảng này — phát hiện `DEVIATION_CNT`, `COLLATERAL_CNT` + 9 cột `COLLATERAL_CNT_*` là cột đếm trung gian (COUNT(*) trên `FCT_*_DEVIATION`/`FCT_*_COLLATERAL`), bắt ETL của 2 fact chi tiết phải chạy xong trước `FCT_*_APPLICATION_DAILY`. Rà soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào dùng trực tiếp tên 11 cột này — chúng chỉ là căn cứ trung gian để tính ra các cờ YES/NO thật sự hiển thị (`TSDB_NHOM_0`, `TSDB_BDS/PTVT/MMTB/HTK/KPT/CPTP/TIN_CHAP`, `TIN_CHAP_TQD` của BC2; `TSBD_BDS/PTVT/GTCG` của BC1; `TSBD_G2`, `DEVIATION_G2`, `DEVIATION_G3` của BC9). Công thức SRS thật của `TSBD_G2`/`DEVIATION_G2`/`DEVIATION_G3` (BC9) còn tự UNION trực tiếp các bảng nguồn tài sản/ngoại lệ rồi đếm, không hề nhắc tới `COLLATERAL_CNT`/`DEVIATION_CNT` | Đã bỏ hẳn 11 cột đếm trung gian khỏi `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (cả SB_DWH + PDTD_DTM) — người dùng làm báo cáo bằng OAS (Oracle Analytics Server), xác nhận có thể model `FCT_*_COLLATERAL`/`FCT_*_DEVIATION` như logical fact riêng trong RPD (dùng chung `DIM_*_APPLICATION`/`DAYID` làm conformed dimension — pattern multi-fact chuẩn của OAS), đo lường COUNT(*) lọc theo `COLLATERAL_TYPE_CODE` khi cần đặt làm logical measure, các cờ YES/NO là calculated item wrap quanh measure đó — BI Server tự sinh SQL multi-pass, không fan-out. Kết quả: `FCT_*_APPLICATION_DAILY`, `FCT_*_COLLATERAL`, `FCT_*_DEVIATION` là 3 luồng ETL hoàn toàn độc lập, không còn phụ thuộc thứ tự chạy trước/sau. 9 cờ TSDB_*/TIN_CHAP_TQD của BC2 lọc trực tiếp theo `COLLATERAL_TYPE_CODE` (=`COLLTYPE` gốc tiếng Việt, denormalize trực tiếp trên `FCT_CLOS_COLLATERAL` — ⚠️ review 2026-09-30: `DIM_CLOS_COLLATERAL_TYPE` đã bị xóa hẳn, xem 1.2.2.3), đúng nguyên văn SRS | ĐÃ GIẢI QUYẾT |
 | 17 | `FCT_LOS_WORKSTEP_EVENT`, `FCT_LOS_DISBURSEMENT` (đã tách vật lý) | Đánh giá lại 2026-09-14 theo yêu cầu người dùng: `FCT_LOS_WORKSTEP_EVENT` (CHUNG) có cả 4 cột FK đều polymorphic (`WORKSTEP_SK`/`DECISION_SK`/`APPLICATION_SK`/`PRODUCT_SK`, rẽ nhánh `DIM_CLOS_*`/`DIM_RLOS_*` theo `DATASOURCE`), và `FCT_LOS_DISBURSEMENT` (CHUNG) có 5/18 cột phụ thuộc hệ — không nhất quán với việc `DIM_LOS_WORKSTEP`/`DIM_LOS_DECISION`/... đã tách CLOS/RLOS từ trước | Đã tách vật lý cả 2 bảng: `FCT_LOS_WORKSTEP_EVENT` → `FCT_CLOS_WORKSTEP_EVENT` (1.2.2.6/2.2.2.6) + `FCT_RLOS_WORKSTEP_EVENT` (1.3.2.7/2.3.2.7); `FCT_LOS_DISBURSEMENT` → `FCT_CLOS_LOAN_DISBURSEMENT` (2.2.2.7) + `FCT_RLOS_LOAN_DISBURSEMENT` (2.3.2.8), đổi tên thêm `LOAN` để phân biệt nhánh giải ngân vay khỏi nhánh bảo lãnh (`FCT_LOS_MD_DISBURSEMENT`, xem dòng #18) | ĐÃ GIẢI QUYẾT |
 | 18 | `FCT_LOS_MD_DISBURSEMENT` (dự kiến ban đầu, CLOS-only) | Nguồn `STG_DTM.STG_FCT_MD` (T24, nhánh giải ngân bảo lãnh của CLOS — phát hiện khi đánh giá lại `FCT_LOS_DISBURSEMENT`, cần cho `BC9.SLGN_CLOS`) không có tài liệu extract nào mô tả cấu trúc — chỉ biết qua SRS BC9 (BR 1.2) rằng có cột `SEAB_LOS_ID`, `CUSTOMER`, `CONTRACT` và tham gia JOIN với `STG_DIM_CUSTOMER`. Người dùng xác nhận `MD` = hợp đồng bảo lãnh, `LOAN` = hợp đồng vay; CLOS có cả 2 loại giao dịch T24, RLOS chỉ có vay (đã rà soát SRS BC10/BC11 xác nhận không nhắc `STG_FCT_MD`) | Trao đổi lại với người dùng (2026-09-14) xác nhận nhu cầu thực tế của `STG_FCT_MD` chỉ là kiểm tra tồn tại hợp đồng bảo lãnh cho `SLGN_CLOS` (đếm HỒ SƠ, không đếm số lượng hợp đồng — xác nhận quan hệ 1 hồ sơ = 1 khách hàng T24) — không cần biết đầy đủ cấu trúc cột, không cần bảng/DIM riêng. Giải quyết trực tiếp bằng EXISTS/LEFT JOIN 3 cột đã biết (`SEAB_LOS_ID`, `CUSTOMER`, `CONTRACT`) ngay tại `AGG_LOS_KPI_YTD_DAILY.SLGN_CLOS_DAY` (2.1.8). Không tạo `FCT_LOS_MD_DISBURSEMENT`/`DIM_T24_MD` nào cả | ĐÃ GIẢI QUYẾT |
-| 19 | `DIM_CLOS_CUSTOMER` (2.2.1.7, PDTD_DTM) — review 2026-09-15, xác nhận BA 2026-09-16 | SRS BC2 có 2 trường báo cáo trực tiếp `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` (người đại diện theo pháp luật — nguồn `NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE`/`.ID_NUMBER`, lọc `OBJ_TYPE='Người đại diện theo pháp luật'`) mà thiết kế trước đó chưa có cột nào phục vụ. Vai trò này không giới hạn số người (có thể nhiều đồng đại diện, xem 1.2.1.8) nên khi nén về grain 1 dòng/hồ sơ cần quy tắc xử lý multi-row — SRS hoàn toàn không ghi rõ cách xử lý (không có dấu nối chuỗi, không ROW_NUMBER/MIN/MAX nào trong nguyên văn Business Rules) | Đã bổ sung 2 cột `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` trên `DIM_CLOS_CUSTOMER` (2.2.1.7, cột 9-10) — đã trao đổi trực tiếp với BA và thống nhất: nối chuỗi bằng dấu ";" khi nhiều đại diện, theo đúng pattern đã dùng cho RLOS (`ADD_ID`/`ADD_ID_OTHER`, 1.3.1.10). Quy tắc này đã được BA xác nhận chính thức (không còn là suy luận chưa kiểm chứng) | ĐÃ GIẢI QUYẾT |
-| 20 | `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (SB_DWH, 1.2.2.1/1.3.2.1) — review 2026-09-15, tái xác nhận 2026-09-18, đóng PENDING 2026-09-21 | Tài liệu lineage gốc (đã "DA_CHOT") coi 3 trường `UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/`APPROVAL_TAKERESPON` của BC1/BC2 trùng nghĩa với `UND_MAKER_USER`/`UND_CHECKER_USER`/`APPROVER_USER` sẵn có (người hoàn tất bước gần nhất trên `ENTRY_EXIT`). Đối chiếu lại trực tiếp SRS BC1/BC2 (Business Rules) cho thấy công thức THẬT SỰ khác hẳn — COALESCE với bảng nguồn riêng `NG_SB_CLOS_USER_MAKE_WORK_STEP`/`NG_SB_RLOS_USER_MAKE_WORK_STEP` (LEFT JOIN theo `WI_NAME+WORK_STEP=WORKSTEP`), fallback về `EXTTABLE.UWMAKERUSER`/`UWCHKRUSER` (không phải `ENTRY_EXIT`), và `APPROVAL_TAKERESPON` phía CLOS còn hardcode hằng số theo `APP_GRP`. Bảng nguồn này không có trong `DS_BANG_202608.xlsx` — chưa xác nhận được có tồn tại thật trên hệ nguồn hay không | Theo yêu cầu người dùng, đã dựa vào nguyên văn SRS để thiết kế lại: bổ sung 3 cột mới riêng biệt trên cả `FCT_CLOS_APPLICATION_DAILY` (cột 63-65) và `FCT_RLOS_APPLICATION_DAILY` (cột 76-78), KHÔNG tái sử dụng `UND_MAKER_USER`/`UND_CHECKER_USER`/`APPROVER_USER` vì công thức và nguồn khác nhau thật sự. **Đóng PENDING (review 2026-09-21):** người dùng chỉ ra cả 2 bảng thực ra đã có trong metadata Excel — kiểm tra trực tiếp xác nhận `NG_SB_CLOS_USER_MAKE_WORK_STEP` (`input/CLOS - Metadata.xlsx`, sheet "2. Table Review"/"3. Column Review") ở trạng thái "Đã xác nhận" cho cả bảng và toàn bộ cột (`WI_NAME`, `WORK_STEP`, `USER_MAKE`, `USER_NAME`, `UPDATE_BY`, `UPDATE_TIME`, `USER_ID`), khóa nghiệp vụ `WI_NAME + WORK_STEP + USER_MAKE`, quan hệ khớp đúng với `UWMAKERUSER`/`UWCHKRUSER`/`CREDAPPRUSER`/`CCOMMITUSER` trên `NG_SB_CLOS_EXTTABLE` — đúng cấu trúc đã dùng trong công thức HLD. `NG_SB_RLOS_USER_MAKE_WORK_STEP` (`input/RLOS - Metadata.xlsx`) cũng ở trạng thái "Đã xác nhận" tại sheet "2. Table Review" (bảng tồn tại thật, khóa nghiệp vụ `WI_NAME + WORK_STEP + UPDATE_TIME`, quan hệ với `NG_SB_RLOS_ENTRY_EXIT` dùng resolve `FINAL_BI_APPROVER` cho báo cáo SLA/TAT) — riêng sheet "3. Column Review" của RLOS còn ở trạng thái "Chưa rà soát" (khác "chưa xác nhận tồn tại" — bảng đã xác nhận, chỉ cột chưa được review chi tiết như bên CLOS). `DS_BANG_202608.xlsx` chỉ là danh sách bảng đã cấp quyền STG_LOS ở một thời điểm, không phải nguồn duy nhất xác nhận sự tồn tại — 2 file Metadata này là bằng chứng đủ mạnh hơn. Không cần thay đổi thiết kế cột, không cần quay lại phương án fallback | ĐÃ GIẢI QUYẾT |
-| 21 | `FCT_CLOS_EXCEPTION`/`FCT_RLOS_EXCEPTION` (SB_DWH, 1.2.2.4/1.3.2.5) — review 2026-09-16 | `DIM_CLOS_EXCEPTION_REASON`/`DIM_RLOS_EXCEPTION_REASON` (1.2.1.5/1.3.1.5) khai Natural Key đủ 4 cột (`ACTIVITYNAME + DECISION_CODE + EXCEPTION_CATEGORY + EXCEPTION_NAME` — BA xác nhận 1 tổ hợp bước+quyết định có thể cho phép nhiều loại ngoại lệ khác nhau), nhưng thiết kế ban đầu của `EXCEPTION_REASON_SK` trên FCT chỉ ghi "lookup theo EXCEPTION_CATEGORY" (1 cột) — nguồn FCT (`NG_SB_CLOS_EXCEPTION`/`NG_SB_RLOS_EXCEPTION`) không có ACTIVITYNAME/DECISION để join đủ 4 cột NK. Đối chiếu số liệu `CLOS - Metadata.xlsx`: `NG_SB_CLOS_MAS_EXCEPTION` có 18 ACTIVITYNAME × 13 DECISION = tối đa 234 tổ hợp nhưng tới 320 EXCEPTION_CATEGORY phân biệt — về toán học không thể mỗi category chỉ gắn đúng 1 tổ hợp, xác nhận rủi ro ambiguous lookup là có thật. Đối chiếu lại nguyên văn SRS BC7 (field `ACTIVITYNAME`) phát hiện công thức thật là lookup 2 bước, không phải 1 cột đơn giản — đồng thời phát hiện SRS BC7 ghi nhầm bảng EXISTS ở nhánh CLOS là `NG_SB_RLOS_ENTRY_EXIT` (lỗi copy-paste — 3 field khác cùng khối CLOS đều đúng dùng `NG_SB_CLOS_ENTRY_EXIT`, 2 khối CLOS/RLOS đối xứng tuyệt đối 13/13 field) | Đã thiết kế lại `EXCEPTION_REASON_SK` theo đúng công thức SRS BC7 (không đổi NK 4 cột của DIM — đúng bản chất danh mục cấu hình): (1) LEFT JOIN `DIM_*_EXCEPTION_REASON` theo `EXCEPTION_CATEGORY + EXCEPTION_NAME`; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi `NG_*_ENTRY_EXIT` (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó — dùng đúng `NG_SB_CLOS_ENTRY_EXIT` cho nhánh CLOS, sửa lỗi copy-paste của SRS gốc); không còn dòng khớp → mặc định -1. Đã cập nhật mermaid + ghi chú lineage + mô tả cột cho cả CLOS và RLOS (1.2.2.4/2.2.2.4, 1.3.2.5/2.3.2.5) | ĐÃ GIẢI QUYẾT |
+| 19 | `DIM_CLOS_CUSTOMER` (2.2.1.6, PDTD_DTM) — review 2026-09-15, xác nhận BA 2026-09-16 | SRS BC2 có 2 trường báo cáo trực tiếp `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` (người đại diện theo pháp luật — nguồn `NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE`/`.ID_NUMBER`, lọc `OBJ_TYPE='Người đại diện theo pháp luật'`) mà thiết kế trước đó chưa có cột nào phục vụ. Vai trò này không giới hạn số người (có thể nhiều đồng đại diện, xem 1.2.1.7) nên khi nén về grain 1 dòng/hồ sơ cần quy tắc xử lý multi-row — SRS hoàn toàn không ghi rõ cách xử lý (không có dấu nối chuỗi, không ROW_NUMBER/MIN/MAX nào trong nguyên văn Business Rules) | Đã bổ sung 2 cột `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` trên `DIM_CLOS_CUSTOMER` (2.2.1.6, cột 9-10) — đã trao đổi trực tiếp với BA và thống nhất: nối chuỗi bằng dấu ";" khi nhiều đại diện, theo đúng pattern đã dùng cho RLOS (`ADD_ID`/`ADD_ID_OTHER`, 1.3.1.10). Quy tắc này đã được BA xác nhận chính thức (không còn là suy luận chưa kiểm chứng) | ĐÃ GIẢI QUYẾT |
+| 20 | `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (SB_DWH, 1.2.2.1/1.3.2.1) — review 2026-09-15, tái xác nhận 2026-09-18, đóng PENDING 2026-09-21 | Tài liệu lineage gốc (đã "DA_CHOT") coi 3 trường `UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/`APPROVAL_TAKERESPON` của BC1/BC2 trùng nghĩa với `UND_MAKER_USER`/`UND_CHECKER_USER`/`APPROVER_USER` sẵn có (người hoàn tất bước gần nhất trên `ENTRY_EXIT`). Đối chiếu lại trực tiếp SRS BC1/BC2 (Business Rules) cho thấy công thức THẬT SỰ khác hẳn — COALESCE với bảng nguồn riêng `NG_SB_CLOS_USER_MAKE_WORK_STEP`/`NG_SB_RLOS_USER_MAKE_WORK_STEP` (LEFT JOIN theo `WI_NAME+WORK_STEP=WORKSTEP`), fallback về `EXTTABLE.UWMAKERUSER`/`UWCHKRUSER` (không phải `ENTRY_EXIT`), và `APPROVAL_TAKERESPON` phía CLOS còn hardcode hằng số theo `APP_GRP`. Bảng nguồn này không có trong `DS_BANG_202608.xlsx` — chưa xác nhận được có tồn tại thật trên hệ nguồn hay không | Theo yêu cầu người dùng, đã dựa vào nguyên văn SRS để thiết kế lại: bổ sung 3 cột mới riêng biệt trên cả `FCT_CLOS_APPLICATION` (cột 63-65) và `FCT_RLOS_APPLICATION` (cột 76-78), KHÔNG tái sử dụng `UND_MAKER_USER`/`UND_CHECKER_USER`/`APPROVER_USER` vì công thức và nguồn khác nhau thật sự. **Đóng PENDING (review 2026-09-21):** người dùng chỉ ra cả 2 bảng thực ra đã có trong metadata Excel — kiểm tra trực tiếp xác nhận `NG_SB_CLOS_USER_MAKE_WORK_STEP` (`input/CLOS - Metadata.xlsx`, sheet "2. Table Review"/"3. Column Review") ở trạng thái "Đã xác nhận" cho cả bảng và toàn bộ cột (`WI_NAME`, `WORK_STEP`, `USER_MAKE`, `USER_NAME`, `UPDATE_BY`, `UPDATE_TIME`, `USER_ID`), khóa nghiệp vụ `WI_NAME + WORK_STEP + USER_MAKE`, quan hệ khớp đúng với `UWMAKERUSER`/`UWCHKRUSER`/`CREDAPPRUSER`/`CCOMMITUSER` trên `NG_SB_CLOS_EXTTABLE` — đúng cấu trúc đã dùng trong công thức HLD. `NG_SB_RLOS_USER_MAKE_WORK_STEP` (`input/RLOS - Metadata.xlsx`) cũng ở trạng thái "Đã xác nhận" tại sheet "2. Table Review" (bảng tồn tại thật, khóa nghiệp vụ `WI_NAME + WORK_STEP + UPDATE_TIME`, quan hệ với `NG_SB_RLOS_ENTRY_EXIT` dùng resolve `FINAL_BI_APPROVER` cho báo cáo SLA/TAT) — riêng sheet "3. Column Review" của RLOS còn ở trạng thái "Chưa rà soát" (khác "chưa xác nhận tồn tại" — bảng đã xác nhận, chỉ cột chưa được review chi tiết như bên CLOS). `DS_BANG_202608.xlsx` chỉ là danh sách bảng đã cấp quyền STG_LOS ở một thời điểm, không phải nguồn duy nhất xác nhận sự tồn tại — 2 file Metadata này là bằng chứng đủ mạnh hơn. Không cần thay đổi thiết kế cột, không cần quay lại phương án fallback | ĐÃ GIẢI QUYẾT |
+| 21 | `FCT_CLOS_EXCEPTION`/`FCT_RLOS_EXCEPTION` (SB_DWH, 1.2.2.4/1.3.2.5) — review 2026-09-16 | `DIM_CLOS_EXCEPTION`/`DIM_RLOS_EXCEPTION` (1.2.1.5/1.3.1.5) khai Natural Key đủ 4 cột (`ACTIVITYNAME + DECISION_CODE + EXCEPTION_CATEGORY + EXCEPTION_NAME` — BA xác nhận 1 tổ hợp bước+quyết định có thể cho phép nhiều loại ngoại lệ khác nhau), nhưng thiết kế ban đầu của `EXCEPTION_SK` trên FCT chỉ ghi "lookup theo EXCEPTION_CATEGORY" (1 cột) — nguồn FCT (`NG_SB_CLOS_EXCEPTION`/`NG_SB_RLOS_EXCEPTION`) không có ACTIVITYNAME/DECISION để join đủ 4 cột NK. Đối chiếu số liệu `CLOS - Metadata.xlsx`: `NG_SB_CLOS_MAS_EXCEPTION` có 18 ACTIVITYNAME × 13 DECISION = tối đa 234 tổ hợp nhưng tới 320 EXCEPTION_CATEGORY phân biệt — về toán học không thể mỗi category chỉ gắn đúng 1 tổ hợp, xác nhận rủi ro ambiguous lookup là có thật. Đối chiếu lại nguyên văn SRS BC7 (field `ACTIVITYNAME`) phát hiện công thức thật là lookup 2 bước, không phải 1 cột đơn giản — đồng thời phát hiện SRS BC7 ghi nhầm bảng EXISTS ở nhánh CLOS là `NG_SB_RLOS_ENTRY_EXIT` (lỗi copy-paste — 3 field khác cùng khối CLOS đều đúng dùng `NG_SB_CLOS_ENTRY_EXIT`, 2 khối CLOS/RLOS đối xứng tuyệt đối 13/13 field) | Đã thiết kế lại `EXCEPTION_SK` theo đúng công thức SRS BC7 (không đổi NK 4 cột của DIM — đúng bản chất danh mục cấu hình): (1) LEFT JOIN `DIM_*_EXCEPTION` theo `EXCEPTION_CATEGORY + EXCEPTION_NAME`; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi `NG_*_ENTRY_EXIT` (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó — dùng đúng `NG_SB_CLOS_ENTRY_EXIT` cho nhánh CLOS, sửa lỗi copy-paste của SRS gốc); không còn dòng khớp → mặc định -1. Đã cập nhật mermaid + ghi chú lineage + mô tả cột cho cả CLOS và RLOS (1.2.2.4/2.2.2.4, 1.3.2.5/2.3.2.5) | ĐÃ GIẢI QUYẾT |
 | 22 | `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT` (SB_DWH, 1.2.2.6/1.3.2.7) — review 2026-09-16 | Rà soát toàn bộ SRS BC1-BC11 (bao gồm cell.tables) xác nhận không có báo cáo nào join qua surrogate key `PRODUCT_SK` của 2 bảng này để lấy dữ liệu sản phẩm — mọi report đọc `PRODUCT_LINE`/`SUB_PRODUCT` mã thô trực tiếp từ nguồn khác (application/customer info), kể cả BC9 (ghi chú cũ nói "dùng bởi BC9" nhưng thực tế BC9 chỉ dùng `PRODUCT_NAME` thô trong CASE cục bộ, không cần `DIMENSION_KEY`). Đã xác nhận thêm: PDTD_DTM của 2 bảng này "bê 1:1" từ SB_DWH, không denormalize `PRODUCT_SK` thành mã thô ở tầng nào — nên không có report nào trong toàn bộ chuỗi ETL thực sự cần cột này | Đã bỏ `PRODUCT_SK` khỏi cả `FCT_CLOS_WORKSTEP_EVENT` (22→21 cột) và `FCT_RLOS_WORKSTEP_EVENT` (24→23 cột), cả SB_DWH và PDTD_DTM. Quan hệ hồ sơ↔sản phẩm chính đã có sẵn qua `FCT_CLOS/RLOS_APPLICATION_DAILY.PRODUCT_SK`, không cần lặp lại. Đồng thời rà soát tương tự phát hiện `DECISION_GROUP` (cột trên `MAP_CLOS/RLOS_DECISION`, `DIM_CLOS/RLOS_DECISION`) cũng không báo cáo nào lookup trực tiếp — đã bỏ theo cùng column-optimization rule (xem dòng #8) | ĐÃ GIẢI QUYẾT |
-| 23 | `DIM_RLOS_APPLICATION` (SB_DWH + PDTD_DTM, 1.3.1.1/2.3.1.1) — review 2026-09-16 | Review toàn diện: (a) 5 dòng ghi chú PDTD_DTM (2.3.1.5-2.3.1.9) tham chiếu chéo sai số heading thật của SB_DWH (lệch +1, ví dụ ghi "1.3.1.6 DIM_RLOS_EXCEPTION_REASON" trong khi heading thật là 1.3.1.5); (b) cột `DEVIATION_FLAG` (DQ-11 RLOS) được SRS BC1 chỉ đích danh nguồn nhưng metadata Column Review không liệt kê — cùng dạng lệch tài liệu đã gặp ở DQ-11 của `DIM_CLOS_APPLICATION` (dòng #2); (c) cột `CHANGE_TYPE` dùng làm khóa exact-match either/or tra cam kết SLA (BC5, qua `RLOS_REF_SLA_TDKHCN`) — đã đối chiếu lại nguyên văn SRS BC5 xác nhận công thức hiện tại khớp 100% (alias d=`NG_SB_RLOS_EXTTABLE`), nhưng SRS không xác nhận RLOS có cho phép multi-select loại thay đổi hay không (khác CLOS đã xác nhận multi-value nối bằng ";") | (a) Đã sửa lại đúng 5 số tham chiếu (2.3.1.5→1.3.1.5, 2.3.1.6→1.3.1.6, 2.3.1.7→1.3.1.7, 2.3.1.8→1.3.1.8, 2.3.1.9→1.3.1.9). (b) Theo chỉ đạo người dùng ưu tiên mapping nguồn→chỉ tiêu của BA/SRS hơn tài liệu Metadata — giữ nguyên `DEVIATION_FLAG` làm nguồn chính thức, không chuyển phương án thay thế `MAJOR_DEV`/`MINOR_DEV`, vẫn cần DEV xác nhận tồn tại thật trên database trước LLD. (c) Đã tìm thấy bằng chứng trực tiếp khi review `DIM_RLOS_CHANGE_TYPE` (1.3.1.7): SRS BC1 (BR 1.2, nested table) xác nhận `g.CHANGE_TYPE` (=`NG_SB_RLOS_EXTTABLE.CHANGE_TYPE`, cùng cột đang dùng làm khóa tra SLA) LEFT JOIN `SB_RLOS_MAS_CHANGE_TYPE` theo exact-match đơn giá trị (`g.CHANGE_TYPE = y.CHANGE_TYPE_NAME`), quét toàn bộ 88 dòng BR 1.2 không có string-split/UNION nào cho cột này; giá trị mẫu trên `RLOS - Metadata.xlsx` cũng là 1 chuỗi đơn không dấu phân cách — khác hẳn CLOS (đã xác nhận multi-value nối bằng ";"). Xác nhận RLOS KHÔNG có multi-value `CHANGE_TYPE` — join exact-match tra SLA an toàn, không có rủi ro | ĐÃ GIẢI QUYẾT |
+| 23 | `DIM_RLOS_APPLICATION` (SB_DWH + PDTD_DTM, 1.3.1.1/2.3.1.1) — review 2026-09-16 | Review toàn diện: (a) 5 dòng ghi chú PDTD_DTM (2.3.1.5-2.3.1.9) tham chiếu chéo sai số heading thật của SB_DWH (lệch +1, ví dụ ghi "1.3.1.6 DIM_RLOS_EXCEPTION" trong khi heading thật là 1.3.1.5); (b) cột `DEVIATION_FLAG` (DQ-11 RLOS) được SRS BC1 chỉ đích danh nguồn nhưng metadata Column Review không liệt kê — cùng dạng lệch tài liệu đã gặp ở DQ-11 của `DIM_CLOS_APPLICATION` (dòng #2); (c) cột `CHANGE_TYPE` dùng làm khóa exact-match either/or tra cam kết SLA (BC5, qua `RLOS_REF_SLA_TDKHCN`) — đã đối chiếu lại nguyên văn SRS BC5 xác nhận công thức hiện tại khớp 100% (alias d=`NG_SB_RLOS_EXTTABLE`), nhưng SRS không xác nhận RLOS có cho phép multi-select loại thay đổi hay không (khác CLOS đã xác nhận multi-value nối bằng ";") | (a) Đã sửa lại đúng 5 số tham chiếu (2.3.1.5→1.3.1.5, 2.3.1.6→1.3.1.6, 2.3.1.7→1.3.1.7, 2.3.1.8→1.3.1.8, 2.3.1.9→1.3.1.9). (b) Theo chỉ đạo người dùng ưu tiên mapping nguồn→chỉ tiêu của BA/SRS hơn tài liệu Metadata — giữ nguyên `DEVIATION_FLAG` làm nguồn chính thức, không chuyển phương án thay thế `MAJOR_DEV`/`MINOR_DEV`, vẫn cần DEV xác nhận tồn tại thật trên database trước LLD. (c) Đã tìm thấy bằng chứng trực tiếp khi review `DIM_RLOS_CHANGE_TYPE` (1.3.1.7): SRS BC1 (BR 1.2, nested table) xác nhận `g.CHANGE_TYPE` (=`NG_SB_RLOS_EXTTABLE.CHANGE_TYPE`, cùng cột đang dùng làm khóa tra SLA) LEFT JOIN `SB_RLOS_MAS_CHANGE_TYPE` theo exact-match đơn giá trị (`g.CHANGE_TYPE = y.CHANGE_TYPE_NAME`), quét toàn bộ 88 dòng BR 1.2 không có string-split/UNION nào cho cột này; giá trị mẫu trên `RLOS - Metadata.xlsx` cũng là 1 chuỗi đơn không dấu phân cách — khác hẳn CLOS (đã xác nhận multi-value nối bằng ";"). Xác nhận RLOS KHÔNG có multi-value `CHANGE_TYPE` — join exact-match tra SLA an toàn, không có rủi ro | ĐÃ GIẢI QUYẾT |
 | 24 | `DIM_RLOS_CHANGE_TYPE` (SB_DWH, 1.3.1.7) — review 2026-09-17 | NK khai `CHANGE_TYPE_CODE`, nhưng SRS BC1 (BR 1.2, nested table) thực tế JOIN theo `CHANGE_TYPE_NAME` (`g.CHANGE_TYPE = y.CHANGE_TYPE_NAME`, với `y = SB_RLOS_MAS_CHANGE_TYPE`), không phải theo CODE — nếu LLD tự suy diễn theo CODE sẽ sai khóa join | Đã xác nhận qua `DS_BANG_202608.xlsx` (KEY CDC = CHANGE_TYPE_CODE+DETAIL_CHANGE_TYPE_CODE) và `extract/database/DIM_LOS_CHANGE_TYPE.md`: bảng nguồn thật sự có cột CODE, NK dùng CODE là ĐÚNG, không đổi. SRS join theo NAME chỉ vì FCT nguồn `NG_SB_RLOS_EXTTABLE.CHANGE_TYPE` lưu theo tên — đã thêm ghi chú kỹ thuật ETL yêu cầu map NAME→CODE qua CHANGE_TYPE_NAME trước khi tra NK/SK, tránh LLD tra thẳng theo NAME | ĐÃ GIẢI QUYẾT |
-| 25 | `DIM_RLOS_GEO` (SB_DWH, 1.3.1.8) — review 2026-09-17 | (a) Cột `DISTRICT_CODE` được đánh dấu NK nhưng nullable (Bắt buộc=N) — NK composite có thành phần NULL gây vấn đề so khớp SCD2/UNIQUE (tỉnh thành không có quận huyện sẽ không phân biệt được theo lý thuyết). (b) Cột `REGION_CODE`/`REGION_NAME` tồn tại thật trên bảng nguồn (`H_NG_SB_RLOS_MAS_CITY`/`H_NG_SB_RLOS_MAS_DISTRICT`, theo Metadata) nhưng HLD chưa đưa vào `DIM_RLOS_GEO` — SRS BC10/BC11 dùng nguồn vùng miền khác (`TMP_REF_COMPANY_REGION` theo đơn vị kinh doanh, không phải theo địa chỉ khách hàng), nên hiện chưa xác nhận có report nào cần | (a) Đã tra Metadata/DS_BANG nhưng không có sample data cấp dòng để xác nhận dứt điểm — giữ nguyên nullable, đã ghi chú rõ đây là điểm CẦN DEV XÁC NHẬN bằng dữ liệu thật trước LLD (nếu có NULL thật, cân nhắc đổi sang sentinel). (b) Đã rà soát đủ 11/11 SRS BC1-BC11, xác nhận không báo cáo nào cần REGION theo địa chỉ khách hàng — giữ nguyên không thêm cột, đúng column-optimization rule | ĐÃ GIẢI QUYẾT |
+| 25 | `DIM_RLOS_GEO` (SB_DWH, 1.3.1.8) — review 2026-09-17, tên bảng nguồn cập nhật 2026-09-24 | (a) Cột `DISTRICT_CODE` được đánh dấu NK nhưng nullable (Bắt buộc=N) — NK composite có thành phần NULL gây vấn đề so khớp SCD2/UNIQUE (tỉnh thành không có quận huyện sẽ không phân biệt được theo lý thuyết). (b) Cột `REGION_CODE`/`REGION_NAME` tồn tại thật trên bảng nguồn (`NG_SB_RLOS_MAS_CITY`/`NG_SB_RLOS_MAS_DISTRICT`, theo Metadata) nhưng HLD chưa đưa vào `DIM_RLOS_GEO` — SRS BC10/BC11 dùng nguồn vùng miền khác (`TMP_REF_COMPANY_REGION` theo đơn vị kinh doanh, không phải theo địa chỉ khách hàng), nên hiện chưa xác nhận có report nào cần | (a) Đã tra Metadata/DS_BANG nhưng không có sample data cấp dòng để xác nhận dứt điểm — giữ nguyên nullable, đã ghi chú rõ đây là điểm CẦN DEV XÁC NHẬN bằng dữ liệu thật trước LLD (nếu có NULL thật, cân nhắc đổi sang sentinel). (b) Đã rà soát đủ 11/11 SRS BC1-BC11, xác nhận không báo cáo nào cần REGION theo địa chỉ khách hàng — giữ nguyên không thêm cột, đúng column-optimization rule | ĐÃ GIẢI QUYẾT |
 | 26 | `DIM_RLOS_APPLICANT` (SB_DWH, 1.3.1.10) & `FCT_CLOS/RLOS_APPLICATION_DAILY` (2.2.2.1/2.3.2.1) — review 2026-09-17 | Đánh giá kỹ SRS BC1 (BR 1.2 nested table + field-list): (a) `DATE_OF_BIRTH`/`GENDER` hiện lấy nguồn RLOS, nghi ngờ ban đầu là sai (BC1 cần bản T24). (b) `CUSTOMER_SK` tra qua `ADD_ID`/`ADD_ID_OTHER` đã PIVOT+nối chuỗi ";" — nghi ngờ join sai tầng. (c) Nguồn `NG_SB_RLOS_APPLICANT_IDGRID` không có cột "giấy tờ chính", nhóm TCC/CC có thể nhiều hơn 1 dòng — nghi ngờ thiếu quy tắc chọn 1 dòng đại diện | Người dùng làm rõ mục tiêu thiết kế: DIM ở grain 1 dòng/1 applicant (khách hàng LOS), pivot giấy tờ thành 2 cột để giữ TOÀN BỘ giấy tờ (không chọn đại diện), CUSTOMER_SK là 1 chân T24 riêng link qua FCT (đúng nguyên tắc không link DIM sang DIM). Kết luận: (a) ĐÚNG ý đồ, không sửa — DIM_RLOS_APPLICANT là DIM ở mức applicant LOS, không phải DIM T24. (c) FALSE POSITIVE — "chọn giấy tờ đại diện" là câu hỏi sai, thiết kế cố ý nối chuỗi giữ hết, không chọn 1 dòng; đã bổ sung ghi chú xác nhận thứ tự ưu tiên nối chuỗi TCC trước, CC sau. (b) Đã đổi tên cột từ `CUSTOMER_SK` thành `T24_CUSTOMER_SK` (cả CLOS và RLOS) để phân biệt rõ khách hàng LOS/T24; đồng thời sửa cách join: ADD_ID là chuỗi đã nối nên không thể so khớp trực tiếp với LEGAL_ID đơn — ETL phải tách chuỗi thành từng giá trị theo đúng thứ tự đã nối (TCC trước, CC sau), thử khớp lần lượt, lấy giá trị đầu tiên khớp; không khớp thì thử tiếp ADD_ID_OTHER | ĐÃ GIẢI QUYẾT |
 | 27 | `DIM_RLOS_COREPAYER` (SB_DWH, 1.3.1.11) — review 2026-09-17 | NK khai `WI_NAME + ID_NO_CO`, nhưng `DS_BANG_202608.xlsx` ghi KEY CDC thật của `NG_SB_RLOS_COREPAYER_GENERAL` là `WI_NAME + REL_TO_APPLICANT + ID_NO_CO` (3 cột) — `ID_NO_CO` chỉ là nhãn thứ tự placeholder (giá trị mẫu "Corep1-Corep4"), chưa đủ căn cứ đảm bảo không lặp trong cùng hồ sơ nếu thiếu `REL_TO_APPLICANT`. Mâu thuẫn thêm với RLOS Metadata "2. Table Review" (ghi nhầm grain "1 dòng/hồ sơ", trong khi HLD đã xác nhận trực tiếp với người dùng là 0..4 dòng/hồ sơ) | Theo yêu cầu người dùng, đã thêm `REL_TO_APPLICANT` vào Natural Key (đánh dấu NK) để bám sát đúng KEY CDC trên DS_BANG, ưu tiên an toàn hơn là rủi ro trùng khóa | ĐÃ GIẢI QUYẾT |
-| 28 | `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (SB_DWH, 1.2.2.1/1.3.2.1) — review 2026-09-17 | Rà soát phát hiện 3 cột có mô tả quá chung, thiếu công thức chi tiết dù đã có sẵn nguồn chuẩn để đối chiếu: (a) `KPI_VOLUME` (cả CLOS/RLOS) chỉ ghi "theo bước cao nhất đã đạt", trong khi `AGG_LOS_KPI_APPLICATION.VOLUME` (2.1.9) đã chốt đầy đủ thang điểm 1.0/0.8/0.6/0.5/0.2; (b) `FLAG_BUSINESS_INCOME` (RLOS) chỉ nói chung "dựa trên FAIMILYFLAG/ENTERPRISSEFLAG/NONLICFLAG và loại sản phẩm", thiếu điều kiện loại trừ cụ thể SeAPro/SeALand; cùng vấn đề ở `BUSINESS_INCOM` (2.1.9); (c) `RETURN_CNT_DATAENTRY/UNDERWRITING/APPROVAL` (RLOS) chỉ ghi "số lần trả về ở khâu X", thiếu công thức WORKSTEP/DECISION cụ thể theo SRS BC8 — khi đối chiếu SRS BC8 phát hiện thêm lỗi copy-paste (nhánh RLOS của `RETURN_CNT_UNDERWRITING` ghi nhầm bảng `NG_SB_CLOS_EXCEPTION` thay vì `NG_SB_RLOS_EXCEPTION`, cùng dạng lỗi đã gặp ở BC6/BC7) | Đã bổ sung đầy đủ công thức theo đúng SRS: `KPI_VOLUME` (cả CLOS/RLOS) tham chiếu đúng công thức đã chốt ở `AGG_LOS_KPI_APPLICATION.VOLUME`; `FLAG_BUSINESS_INCOME`/`BUSINESS_INCOM` bổ sung đúng nguyên văn SRS BC9 (loại trừ SeAPro/SeALand qua `PRODUCT_NAME`, kết hợp OR 3 cờ REPAYFLAGS); `RETURN_CNT_*` (RLOS) bổ sung đầy đủ công thức SRS BC8 cho cả 3 cột, sửa lỗi copy-paste dùng đúng `NG_SB_RLOS_EXCEPTION` cho `RETURN_CNT_UNDERWRITING` | ĐÃ GIẢI QUYẾT |
+| 28 | `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (SB_DWH, 1.2.2.1/1.3.2.1) — review 2026-09-17 | Rà soát phát hiện 3 cột có mô tả quá chung, thiếu công thức chi tiết dù đã có sẵn nguồn chuẩn để đối chiếu: (a) `KPI_VOLUME` (cả CLOS/RLOS) chỉ ghi "theo bước cao nhất đã đạt", trong khi `AGG_LOS_KPI_APPLICATION.VOLUME` (2.1.9) đã chốt đầy đủ thang điểm 1.0/0.8/0.6/0.5/0.2; (b) `FLAG_BUSINESS_INCOME` (RLOS) chỉ nói chung "dựa trên FAIMILYFLAG/ENTERPRISSEFLAG/NONLICFLAG và loại sản phẩm", thiếu điều kiện loại trừ cụ thể SeAPro/SeALand; cùng vấn đề ở `BUSINESS_INCOM` (2.1.9); (c) `RETURN_CNT_DATAENTRY/UNDERWRITING/APPROVAL` (RLOS) chỉ ghi "số lần trả về ở khâu X", thiếu công thức WORKSTEP/DECISION cụ thể theo SRS BC8 — khi đối chiếu SRS BC8 phát hiện thêm lỗi copy-paste (nhánh RLOS của `RETURN_CNT_UNDERWRITING` ghi nhầm bảng `NG_SB_CLOS_EXCEPTION` thay vì `NG_SB_RLOS_EXCEPTION`, cùng dạng lỗi đã gặp ở BC6/BC7) | Đã bổ sung đầy đủ công thức theo đúng SRS: `KPI_VOLUME` (cả CLOS/RLOS) tham chiếu đúng công thức đã chốt ở `AGG_LOS_KPI_APPLICATION.VOLUME`; `FLAG_BUSINESS_INCOME`/`BUSINESS_INCOM` bổ sung đúng nguyên văn SRS BC9 (loại trừ SeAPro/SeALand qua `PRODUCT_NAME`, kết hợp OR 3 cờ REPAYFLAGS); `RETURN_CNT_*` (RLOS) bổ sung đầy đủ công thức SRS BC8 cho cả 3 cột, sửa lỗi copy-paste dùng đúng `NG_SB_RLOS_EXCEPTION` cho `RETURN_CNT_UNDERWRITING` | ĐÃ GIẢI QUYẾT |
 | 29 | `FCT_RLOS_LOAN_DISBURSEMENT` (PDTD_DTM, 2.3.2.8) — review 2026-09-17 | Cột `LIMIT_REFERENCE` không có căn cứ trong SRS BC10 — rà soát toàn bộ 19 trường output của BC10 không có trường nào tên gần "LIMIT". Bản CLOS tương ứng (`FCT_CLOS_LOAN_DISBURSEMENT`, 2.2.2.7) có đúng cột này theo SRS BC11 — cột đã bị copy sang bản RLOS mà chưa kiểm chứng riêng | Đã bỏ hẳn cột `LIMIT_REFERENCE` khỏi `FCT_RLOS_LOAN_DISBURSEMENT` theo column-optimization rule, giảm từ 16 xuống 15 cột | ĐÃ GIẢI QUYẾT |
-| 30 | `REF_LOS_KPI_USER_YEAR` (PDTD_DTM, 2.1.7) — review 2026-09-17 | Đối chiếu lại nguyên văn SRS BC9 (field `NHAN_SU`) phát hiện công thức nguồn có đủ 4 điều kiện lọc, HLD trước đó chỉ thiết kế 2 (8 workstep + loại 2 tài khoản test), thiếu: (1) `BI_APPSTATUS` (`DECISION IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport')` HOẶC `DECISION='Reject'` HOẶC `WORKSTEP IN ('CancelRevoke','CancelPermanent')`); (2) `f.BI_FLOW IN ('BL','KHCN_HO')` (join `RLOS_REF_FLOW`/tương đương). Thiếu 2 điều kiện này sẽ làm `NHAN_SU` đếm dư user xử lý hồ sơ ngoài luồng BL/KHCN_HO hoặc hồ sơ chưa có quyết định hợp lệ | Đã bổ sung đầy đủ 2 điều kiện vào công thức nguồn UNION của `REF_LOS_KPI_USER_YEAR` — `BI_APPSTATUS` dùng thẳng cột `DECISION_CODE`/`WORKSTEP_CODE` đã có sẵn trên `FCT_CLOS/RLOS_WORKSTEP_EVENT`; `BI_FLOW` join `APPLICATION_SK` (đã có sẵn trên cùng bảng) sang `DIM_CLOS/RLOS_APPLICATION.BI_FLOW` — không cần thêm bảng/cột vật lý mới. Đã cập nhật cả mermaid Section 1 và mô tả Section 2 | ĐÃ GIẢI QUYẾT |
-| 31 | `AGG_LOS_KPI_YTD_DAILY` (PDTD_DTM, 2.1.8) — review 2026-09-17 | Đối chiếu lại nguyên văn SRS BC9 (`SLHS_CLOS`, `SLGN_CLOS`, `TAT_CLOS`) phát hiện cả 3 công thức đều có điều kiện `b.STREAM = 'Phê duyệt tín dụng'` (join `NG_SB_CLOS_APPROVAL`) mà HLD trước đó chưa thiết kế — cùng dạng lỗi "bổ sung điều kiện cho RLOS nhưng quên CLOS" đã lặp lại nhiều lần (STREAM là điều kiện tương đương `BI_FLOW` của RLOS, nhưng CLOS dùng khái niệm riêng, không qua `REF_*_FLOW`). Đối chiếu ngược phía RLOS xác nhận SLHS_RLOS/SLGN_RLOS/TAT_RLOS không có STREAM — không phải nhầm lẫn đọc SRS | Đã bổ sung điều kiện `(join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng'` vào công thức `SLHS_CLOS_DAY`, `SLGN_CLOS_DAY`, `TAT_CLOS_SUM_HOUR_DAY`/`TAT_CLOS_CASE_CNT_DAY` — cột `STREAM` đã có sẵn trên `DIM_CLOS_APPLICATION`, không cần thêm cột/bảng mới. Đã cập nhật mermaid Section 1 (thêm node `DIM_CLOS_APPLICATION`) và mô tả Section 2 | ĐÃ GIẢI QUYẾT |
-| 32 | `AGG_LOS_KPI_APPLICATION` (PDTD_DTM, 2.1.9) — review 2026-09-17 | Đối chiếu lại nguyên văn SRS BC9 (`TAT_RLOS`/`TAT_CLOS`) phát hiện điều kiện lọc "Chỉ lấy các hồ sơ được phê duyệt lần đầu" (`EXITDATE <= NVL(MIN(CASE WHEN WORKSTEP IN ('CreditApproval','CreditCommittee') AND DECISION IN ('Submit','Send To HOSupport','Send To PostSanction','Reject','Submit To DisbursementMaker') THEN EXITDATE END) OVER (PARTITION BY WINAME), SYSDATE)`) mà `TAT_APPLICATION_HOUR` chưa áp dụng — đang SUM toàn bộ lịch sử hồ sơ, kể cả vòng làm lại (rework) sau lần EXIT đầu tiên khỏi CreditApproval/CreditCommittee, có thể làm TAT bị thổi phồng | Đối chiếu chéo với SRS BC5 xác nhận công thức này khớp 100% với công thức đã dùng để tính cột `BI_FLAG_APPROVAL` (có sẵn trên `FCT_CLOS/RLOS_WORKSTEP_EVENT`, thiết kế cho BC5 — cùng WORKSTEP, cùng DECISION, cùng công thức MIN/PARTITION BY, chỉ khác cách dùng: BC5 gán nhãn, BC9 dùng làm điều kiện lọc). Đã bổ sung điều kiện `BI_FLAG_APPROVAL = 'First Approval'` khi tính `TAT_APPLICATION_HOUR`, tái sử dụng cột có sẵn, không tạo cột/điều kiện riêng | ĐÃ GIẢI QUYẾT |
+| 30 | `AGG_LOS_KPI_USER_YEAR` (PDTD_DTM, 2.1.7) — review 2026-09-17 | Đối chiếu lại nguyên văn SRS BC9 (field `NHAN_SU`) phát hiện công thức nguồn có đủ 4 điều kiện lọc, HLD trước đó chỉ thiết kế 2 (8 workstep + loại 2 tài khoản test), thiếu: (1) `APPLICATION_STATUS` (`DECISION IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport')` HOẶC `DECISION='Reject'` HOẶC `WORKSTEP IN ('CancelRevoke','CancelPermanent')`); (2) `f.BUSINESS_FLOW IN ('BL','KHCN_HO')` (join `RLOS_REF_FLOW`/tương đương). Thiếu 2 điều kiện này sẽ làm `NHAN_SU` đếm dư user xử lý hồ sơ ngoài luồng BL/KHCN_HO hoặc hồ sơ chưa có quyết định hợp lệ | Đã bổ sung đầy đủ 2 điều kiện vào công thức nguồn UNION của `AGG_LOS_KPI_USER_YEAR` — `APPLICATION_STATUS` dùng thẳng cột `DECISION_CODE`/`WORKSTEP_CODE` đã có sẵn trên `FCT_CLOS/RLOS_WORKSTEP_EVENT`; `BUSINESS_FLOW` join `APPLICATION_SK` (đã có sẵn trên cùng bảng) sang `DIM_CLOS/RLOS_APPLICATION.BUSINESS_FLOW` — không cần thêm bảng/cột vật lý mới. Đã cập nhật cả mermaid Section 1 và mô tả Section 2 | ĐÃ GIẢI QUYẾT |
+| 31 | `AGG_LOS_KPI_YTD_DAILY` (PDTD_DTM, 2.1.8) — review 2026-09-17 | Đối chiếu lại nguyên văn SRS BC9 (`SLHS_CLOS`, `SLGN_CLOS`, `TAT_CLOS`) phát hiện cả 3 công thức đều có điều kiện `b.STREAM = 'Phê duyệt tín dụng'` (join `NG_SB_CLOS_APPROVAL`) mà HLD trước đó chưa thiết kế — cùng dạng lỗi "bổ sung điều kiện cho RLOS nhưng quên CLOS" đã lặp lại nhiều lần (STREAM là điều kiện tương đương `BUSINESS_FLOW` của RLOS, nhưng CLOS dùng khái niệm riêng, không qua `REF_*_FLOW`). Đối chiếu ngược phía RLOS xác nhận SLHS_RLOS/SLGN_RLOS/TAT_RLOS không có STREAM — không phải nhầm lẫn đọc SRS | Đã bổ sung điều kiện `(join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng'` vào công thức `SLHS_CLOS_DAY`, `SLGN_CLOS_DAY`, `TAT_CLOS_SUM_HOUR_DAY`/`TAT_CLOS_CASE_CNT_DAY` — cột `STREAM` đã có sẵn trên `DIM_CLOS_APPLICATION`, không cần thêm cột/bảng mới. Đã cập nhật mermaid Section 1 (thêm node `DIM_CLOS_APPLICATION`) và mô tả Section 2 | ĐÃ GIẢI QUYẾT |
+| 32 | `AGG_LOS_KPI_APPLICATION` (PDTD_DTM, 2.1.9) — review 2026-09-17 | Đối chiếu lại nguyên văn SRS BC9 (`TAT_RLOS`/`TAT_CLOS`) phát hiện điều kiện lọc "Chỉ lấy các hồ sơ được phê duyệt lần đầu" (`EXITDATE <= NVL(MIN(CASE WHEN WORKSTEP IN ('CreditApproval','CreditCommittee') AND DECISION IN ('Submit','Send To HOSupport','Send To PostSanction','Reject','Submit To DisbursementMaker') THEN EXITDATE END) OVER (PARTITION BY WINAME), SYSDATE)`) mà `TAT_APPLICATION_HOUR` chưa áp dụng — đang SUM toàn bộ lịch sử hồ sơ, kể cả vòng làm lại (rework) sau lần EXIT đầu tiên khỏi CreditApproval/CreditCommittee, có thể làm TAT bị thổi phồng | Đối chiếu chéo với SRS BC5 xác nhận công thức này khớp 100% với công thức đã dùng để tính cột `APPROVAL_FLAG` (có sẵn trên `FCT_CLOS/RLOS_WORKSTEP_EVENT`, thiết kế cho BC5 — cùng WORKSTEP, cùng DECISION, cùng công thức MIN/PARTITION BY, chỉ khác cách dùng: BC5 gán nhãn, BC9 dùng làm điều kiện lọc). Đã bổ sung điều kiện `APPROVAL_FLAG = 'First Approval'` khi tính `TAT_APPLICATION_HOUR`, tái sử dụng cột có sẵn, không tạo cột/điều kiện riêng | ĐÃ GIẢI QUYẾT |
 | 33 | `AGG_LOS_KPI_APPLICATION` (PDTD_DTM, 2.1.9) — review 2026-09-17 | Công thức `QUY_DOI` ghi sai chiều phép tính so với SRS BC9 — HLD ghi `POINT/8*VOLUME`, nguyên văn SRS (đã đọc cả run-text XML để loại trừ lỗi ghép nối) là `POINT*8/VOLUME`. 2 công thức cho kết quả khác nhau tới 64 lần, ảnh hưởng trực tiếp `QUY_DOI_RLOS_DAY`/`QUY_DOI_CLOS_DAY` (2.1.8) và cuối cùng `NSLD` của toàn Khối PDTD | Đã sửa lại đúng `POINT*8/VOLUME` (NULL nếu VOLUME NULL) tại cột `QUY_DOI` (2.1.9) và đồng bộ ghi chú tại 2.1.8 (Section 1 + mô tả `QUY_DOI_RLOS_DAY`) | ĐÃ GIẢI QUYẾT |
 | 34 | `AGG_LOS_KPI_APPLICATION` (PDTD_DTM, 2.1.9) — review 2026-09-17 | `TSBD_G2`/`DEVIATION_G2`/`DEVIATION_G3` UNION+đếm trực tiếp từ `FCT_CLOS/RLOS_COLLATERAL`/`FCT_CLOS/RLOS_DEVIATION` theo `WI_NAME`, nhưng 4 bảng nguồn này đều là full-snapshot-mỗi-ngày (PK `DAYID + WI_NAME + COLLATERAL_BK`/`DEVIATION_BK`, dựng theo quy trình A2) — 1 tài sản/1 ngoại lệ còn hiệu lực N ngày sẽ có N dòng. Thiết kế trước đó không lọc DAYID trước khi đếm — nếu ETL thực thi đúng nguyên văn sẽ đếm nhân theo số ngày tồn tại, làm sai gần như toàn bộ giá trị 3 cờ này | Đã bổ sung điều kiện lọc: CHỈ lấy `DAYID = MAX(DAYID)` của từng `WI_NAME` (ảnh chụp gần nhất) trước khi `COUNT DISTINCT COLLATERAL_BK`/`DEVIATION_BK` theo `WI_NAME`. Đã cập nhật mermaid Section 1 (thêm node `FCT_CLOS/RLOS_DEVIATION`, trước đó bị thiếu hoàn toàn dù Section 2 đã dùng làm nguồn) và mô tả Section 2 cho cả 3 cột | ĐÃ GIẢI QUYẾT |
 | 35 | `DIM_DATE` (PDTD_DTM, 2.1.10) — review 2026-09-17 | 3 vấn đề: (a) cột `DATASOURCE='T24'` copy máy móc pattern từ nhóm `DIM_T24_*` dù `DIM_DATE` là chiều hệ thống dùng chung, không có FK/lookup nào cần phân biệt theo cột này; (b) `REPORT_WEEK` mô tả sai định dạng "YYYY-WW", SRS BC4 xác nhận đúng là khoảng ngày đầu tuần-cuối tuần; (c) `YEAR_MONTH` trích dẫn sai căn cứ "Trường YEAR_MONTH của BC9" — đối chiếu SRS xác nhận field đó của BC9 thực chất là ngày đại diện cho tham số lọc "Năm báo cáo", không phải cột tháng YYYY-MM | (a) Đã bỏ hẳn cột `DATASOURCE` khỏi `DIM_DATE`. (b) Đã sửa mô tả `REPORT_WEEK` thành đúng định dạng khoảng ngày YYYYMMDD-YYYYMMDD theo SRS BC4, tăng độ lớn cột lên 17. (c) Đã sửa mô tả `YEAR_MONTH` thành cột kỹ thuật group-theo-tháng chuẩn của bảng chiều ngày, bỏ tham chiếu sai tới BC9 (vẫn giữ cột vì hữu ích kỹ thuật) | ĐÃ GIẢI QUYẾT |
-| 36 | `DIM_CLOS_LEGAL_PARTY` (SB_DWH, 1.2.1.8) — review 2026-09-17 | Nguồn `NG_SB_CLOS_CUST_INFO_LEGAL` có KEY CDC RỖNG trong `DS_BANG_202608.xlsx` — cùng tình huống đã gặp ở `NG_SB_RLOS_MANUAL_DEVIATION` (nơi HLD kết luận "SCD2/DIM không khả thi", chuyển sang FCT snapshot). Metadata CLOS xác nhận cơ chế đồng bộ thực tế so khớp bằng tổ hợp rộng (WI_NAME+LEGAL_DOC+ID_NUMBER+NAMEE, bao gồm cả thuộc tính mô tả) — không phải định danh nghiệp vụ ổn định. HLD trước đó thiết kế EFF_DATE/EXP_DATE chuẩn mà không cảnh báo rủi ro này. Khác `FCT_*_DEVIATION`, bảng này đang được dùng làm FK thật (`LEGAL_PARTY_SK` trên `FCT_CLOS_APPLICATION_PARTY`, và `DIM_CLOS_CUSTOMER` LEFT JOIN lấy giá trị hiện hành) — chuyển sang FCT snapshot sẽ kéo theo sửa cấu trúc PK/join ở cả 2 nơi, phức tạp hơn nhiều so với DEVIATION | Theo yêu cầu người dùng, giữ nguyên kiến trúc DIM/SK ổn định (không đổi FK ở các bảng phụ thuộc) — đổi khóa nghiệp vụ dùng để so khớp SCD2 tại ETL PDTD_DTM thành TOÀN BỘ 5 cột nghiệp vụ (WI_NAME, ID_NUMBER, FULL_NAME, OBJ_TYPE, LEGAL_DOC, đã đánh dấu NK cả 5). Cơ chế nạp: tổ hợp 5 cột đang hiện hành nhưng không còn ở nguồn → EXP_DATE=ngày chạy; tổ hợp mới hoàn toàn (kể cả chỉ khác 1 ký tự FULL_NAME/LEGAL_DOC) → INSERT mới. Giải quyết đúng gốc rễ CDC rỗng mà không đổi cấu trúc DIMENSION_KEY/LEGAL_PARTY_SK. Đã bổ sung ghi chú đầy đủ tại cả SB_DWH (1.2.1.8) và PDTD_DTM (2.2.1.8) | ĐÃ GIẢI QUYẾT |
-| 37 | `FCT_CLOS_APPLICATION_PARTY` (SB_DWH, 1.2.2.2) — review 2026-09-17 | (a) Mô tả cột `LEGAL_PARTY_SK` viết tách rời dễ gây hiểu nhầm là bảng chỉ join đúng 1 dòng vai trò CUSTOMER, trong khi "Grain" ở Section 1 xác nhận ý đồ thật là join đủ N dòng cho cả 5 vai trò. (b) Rà soát toàn bộ BC1-BC11 xác nhận hiện chỉ 2/5 vai trò (CUSTOMER, LEGAL_REPRESENTATIVE) có báo cáo dùng — đã giải quyết riêng qua nối chuỗi trên DIM_CLOS_CUSTOMER, không qua bảng này; 3 vai trò còn lại (COLLATERAL_OWNER, MAIN_CONTRIBUTING_MEMBERS, OTHER) chưa có báo cáo nào cần | (a) Đã sửa mô tả cột LEGAL_PARTY_SK, làm rõ join đủ N dòng cho cả 5 vai trò, câu "-1 chỉ Unknown" chỉ áp dụng riêng cho vai trò CUSTOMER. (b) Theo quyết định người dùng: giữ nguyên bảng đúng grain N=5 vai trò đầy đủ (không cắt theo column-optimization rule) để đảm bảo toàn vẹn thông tin/mô hình đúng quan hệ N:N, dù hiện 3/5 vai trò chưa có report nào dùng — quyết định có chủ đích | ĐÃ GIẢI QUYẾT |
+| 36 | `DIM_CLOS_LEGAL_PARTY` (SB_DWH, 1.2.1.7) — review 2026-09-17 | Nguồn `NG_SB_CLOS_CUST_INFO_LEGAL` có KEY CDC RỖNG trong `DS_BANG_202608.xlsx` — cùng tình huống đã gặp ở `NG_SB_RLOS_MANUAL_DEVIATION` (nơi HLD kết luận "SCD2/DIM không khả thi", chuyển sang FCT snapshot). Metadata CLOS xác nhận cơ chế đồng bộ thực tế so khớp bằng tổ hợp rộng (WI_NAME+LEGAL_DOC+ID_NUMBER+NAMEE, bao gồm cả thuộc tính mô tả) — không phải định danh nghiệp vụ ổn định. HLD trước đó thiết kế EFF_DATE/EXP_DATE chuẩn mà không cảnh báo rủi ro này. Khác `FCT_*_DEVIATION`, bảng này đang được dùng làm FK thật (`LEGAL_PARTY_SK` trên `FCT_CLOS_APPLICATION_PARTY`, và `DIM_CLOS_CUSTOMER` LEFT JOIN lấy giá trị hiện hành) — chuyển sang FCT snapshot sẽ kéo theo sửa cấu trúc PK/join ở cả 2 nơi, phức tạp hơn nhiều so với DEVIATION | Theo yêu cầu người dùng, giữ nguyên kiến trúc DIM/SK ổn định (không đổi FK ở các bảng phụ thuộc) — đổi khóa nghiệp vụ dùng để so khớp SCD2 tại ETL PDTD_DTM thành TOÀN BỘ 5 cột nghiệp vụ (WI_NAME, ID_NUMBER, FULL_NAME, OBJ_TYPE, LEGAL_DOC, đã đánh dấu NK cả 5). Cơ chế nạp: tổ hợp 5 cột đang hiện hành nhưng không còn ở nguồn → EXP_DATE=ngày chạy; tổ hợp mới hoàn toàn (kể cả chỉ khác 1 ký tự FULL_NAME/LEGAL_DOC) → INSERT mới. Giải quyết đúng gốc rễ CDC rỗng mà không đổi cấu trúc DIMENSION_KEY/LEGAL_PARTY_SK. Đã bổ sung ghi chú đầy đủ tại cả SB_DWH (1.2.1.7) và PDTD_DTM (2.2.1.7) | ĐÃ GIẢI QUYẾT |
+| 37 | `FCT_CLOS_APPLICATION_PARTY` (SB_DWH, 1.2.2.2) — review 2026-09-17 | (a) Mô tả cột `LEGAL_PARTY_SK` viết tách rời dễ gây hiểu nhầm là bảng chỉ join đúng 1 dòng vai trò CUSTOMER, trong khi "Grain" ở Section 1 xác nhận ý đồ thật là join đủ N dòng cho cả 5 vai trò. (b) Rà soát toàn bộ BC1-BC11 xác nhận hiện chỉ 2/5 vai trò (CUSTOMER, LEGAL_REPRESENTATIVE) có báo cáo dùng — đã giải quyết riêng qua nối chuỗi trên DIM_CLOS_CUSTOMER, không qua bảng này; 3 vai trò còn lại (COLLATERAL_OWNER, MAIN_CONTRIBUTING_MEMBERS, OTHER) chưa có báo cáo nào cần | (a) Đã sửa mô tả cột LEGAL_PARTY_SK, làm rõ join đủ N dòng cho cả 5 vai trò, câu "-1 chỉ Unknown" chỉ áp dụng riêng cho vai trò CUSTOMER. (b) Theo quyết định người dùng: giữ nguyên bảng đúng grain N=5 vai trò đầy đủ (không cắt theo column-optimization rule) để đảm bảo toàn vẹn thông tin/mô hình đúng quan hệ N:N, dù hiện 3/5 vai trò chưa có report nào dùng — quyết định có chủ đích. (⚠️ review 2026-09-26: quyết định "giữ nguyên bảng" ở đây đã bị đảo ngược — `FCT_CLOS_APPLICATION_PARTY` nay đã **xóa hẳn** cả SB_DWH lẫn PDTD_DTM, hợp nhất vào `FCT_CLOS_LEGAL_PARTY` (1.2.2.7/2.2.2.8), do bảng đích đã tự đủ `WI_NAME`/`CUSTOMER_SK`/`APPLICATION_SK` để join trực tiếp — xem 1.2.2.2/2.2.2.2 đã cập nhật) | ĐÃ GIẢI QUYẾT |
 | 38 | `FCT_CLOS_COLLATERAL` (SB_DWH, 1.2.2.3) — review 2026-09-17 | Cột `CERTIFICATE_NO` ghi "chưa xác nhận cột tương ứng trên NG_SB_CLOS_COLL_CD — tạm để NULL", nhưng chưa được log vào Section 3 dù đã tồn tại từ trước | Đối chiếu SRS BC1/BC2/BC3 và `CLOS - Metadata.xlsx` xác nhận `NG_SB_CLOS_COLL_CD` thực sự không có cột "số giấy chứng nhận" tương ứng (khác RLOS có `NO_CERTI`/`CERTIFICATENO`) — theo column-optimization rule, đã bỏ hẳn cột `CERTIFICATE_NO` khỏi `FCT_CLOS_COLLATERAL` (cả SB_DWH và PDTD_DTM), giảm từ 13 xuống 12 cột, thay vì giữ cột luôn NULL | ĐÃ GIẢI QUYẾT |
 | 39 | `FCT_CLOS_DEVIATION` (SB_DWH, 1.2.2.5) — review 2026-09-17 | (a) Mô tả bảng ghi "Phục vụ BC6, BC5, BC9" nhưng đối chiếu trực tiếp SRS xác nhận BC5 không hề tham chiếu `NG_SB_CLOS_CONDITON_CDGRID`, BC9 chỉ có `DEVIATION_G2`/`DEVIATION_G3` cho nhánh RLOS (nguồn khác) — suy đoán đối xứng với RLOS, không có căn cứ SRS thật cho CLOS. (b) Mô tả cột `AS_REGULAR` ghi "được đưa vào khóa nghiệp vụ của bảng" mâu thuẫn với chính công thức `DEVIATION_BK` (loại trừ AS_REGULAR khỏi hash) — câu bị cắt cụt từ lineage doc gốc ("BA đề xuất... nhưng bị từ chối vì là trường nhập tùy biến"). (c) Section 2 (PDTD_DTM) ghi mâu thuẫn nội bộ "9 cột" rồi "Còn 8 cột" trong cùng đoạn | (a) Đã sửa mô tả bảng chỉ còn "Phục vụ BC6", bỏ BC5/BC9. (b) Đã sửa lại mô tả `AS_REGULAR` đúng ý gốc: BA từng đề xuất nhưng bị từ chối vì free-text, vẫn nạp vì là thuộc tính gốc nguồn. (c) Đã sửa "Còn 8 cột" thành "Còn 9 cột" cho khớp | ĐÃ GIẢI QUYẾT |
 | 40 | `DIM_RLOS_CARD_PROMOTION` (SB_DWH, 1.3.1.9) — review 2026-09-17 | Section 1 (lineage) khẳng định bảng "không có cột DATASOURCE" trong khi Section 2 (column design) lại thêm cột `DATASOURCE` — mâu thuẫn nội bộ giữa 2 section của cùng 1 bảng | Xác nhận Section 2 đúng: quyết định có chủ đích bổ sung `DATASOURCE` (cố định 'RLOS') đồng bộ với mọi DIM/FCT RLOS khác sau khi tách vật lý CLOS/RLOS. Đã sửa lại câu ở Section 1 cho khớp với Section 2, không bỏ cột | ĐÃ GIẢI QUYẾT |
 | 41 | `FCT_RLOS_APPLICATION_PARTY` (SB_DWH, 1.3.2.2) & `FCT_CLOS_APPLICATION_PARTY` (SB_DWH, 1.2.2.2) — review 2026-09-17 | (a) [False positive, đã loại] mô tả FK APPLICATION_SK/APPLICANT_SK/CUSTOMER_SK chỉ ghi "Mặc định -1", nghi thiếu cụm "theo phiên bản hiệu lực tại DAYID" như các FCT khác — xác nhận không cần: bảng đã có DAYID trong PK (snapshot theo ngày), nên version-at-DAYID đã ngụ ý sẵn, không phải FK tĩnh cần làm rõ thời điểm. (b) Mermaid Section 1 của cả 2 bảng không vẽ subgraph STG_LOS, khác pattern mọi FCT khác — gây cảm giác thiếu lineage | (a) Không sửa, xác nhận false positive. (b) Đã thêm ghi chú giải thích tại Section 1 của cả 2 bảng: đây là factless-fact build hoàn toàn từ join lại các DIM đã có sẵn (không đọc STG_LOS), không phải thiếu sót | ĐÃ GIẢI QUYẾT |
 | 42 | `FCT_RLOS_COLLATERAL` (SB_DWH + PDTD_DTM, 1.3.2.3 / 2.3.2.3) — review 2026-09-17 | (a) Cột `IS_FORMED_FROM_LOAN` mô tả sai công thức: bản cũ ghi "nguồn NG_SB_RLOS_DISB_COL_GRID.PROPERTY_FORMED, 'YES'→'Y'" (coi là cờ passthrough), nhưng đọc nguyên văn SRS BC1 (field PROPERTY_FORMED, đối chiếu cú pháp với các hàng khác cùng mẫu câu trong docx) xác nhận giá trị trả về thật sự là cột `COL_TYPE`, còn `PROPERTY_FORMED='YES'` chỉ là điều kiện WHERE lọc dòng — khác bản chất hoàn toàn (không phải cờ boolean mà là giá trị phân loại). (b) Section 2 PDTD_DTM ghi "21 cột" trong khi SB_DWH có đúng 22 cột (khớp câu tổng kết riêng của SB_DWH) — số cũ chưa đồng bộ khi thêm TYPES_OF_COLLATERALS, bảng chị em FCT_CLOS_COLLATERAL đã được cập nhật đúng nhưng RLOS bị bỏ sót | (a) Đã sửa lại mô tả cột đúng theo SRS: giá trị trả về là COL_TYPE của dòng lọc theo PROPERTY_FORMED='YES' (cột filter), NULL nếu không có dòng thỏa. Vẫn giữ ghi chú cần BA/DEV xác nhận cấu trúc bảng nguồn (NG_SB_RLOS_DISB_COL_GRID/NG_SB_RLOS_COLL_CERTIGRD không có trong RLOS Metadata để đối chiếu độc lập). (b) Đã sửa "21 cột" thành "22 cột" | ĐÃ GIẢI QUYẾT |
 | 43 | `FCT_RLOS_DEVIATION` (SB_DWH, 1.3.2.6) & `AGG_LOS_KPI_APPLICATION` (PDTD_DTM, 2.1.9) — review 2026-09-17 | (a) Mô tả FCT_RLOS_DEVIATION ghi "BC5, BC9 dùng ngưỡng đếm số dòng... tính trực tiếp ở tầng report/OAS" — sai và không có căn cứ SRS, bỏ sót việc bảng này là nguồn trực tiếp cho AGG_LOS_KPI_APPLICATION.DEVIATION_G2/G3 ở tầng datamart. (b) AGG_LOS_KPI_APPLICATION.DEVIATION_G2/G3 và TSBD_G2 dùng COUNT DISTINCT DEVIATION_BK/COLLATERAL_BK — đọc nguyên văn SRS BC9/BC5 xác nhận công thức đúng là COUNT thô ("đếm số lượng dòng theo WI_NAME"), không có ý loại trùng theo nội dung/hash — COUNT DISTINCT có rủi ro đếm hụt vì BK loại trừ cột CLOB khỏi hash. (c) TSBD_G2 bản cũ tính cho cả CLOS+RLOS, nhưng SRS BC9 chỉ định nghĩa field này trong khối "Nguồn RLOS" (UNION 4 bảng RLOS collateral), khối "Nguồn CLOS" không có field này, rà soát BC1-BC11 xác nhận không báo cáo nào khác cần TSBD_G2 cho CLOS — thiết kế thừa. (d) SRS ghi Ý nghĩa TSBD_G2 là "≥2" nhưng Cách lấy dữ liệu ghi literal "=2" — mâu thuẫn nội bộ SRS | (a) Đã sửa mô tả bảng và đoạn "Đối chiếu SRS" của FCT_RLOS_DEVIATION, nêu đúng liên kết thật với AGG_LOS_KPI_APPLICATION. (b) Đã sửa cả 3 cột (TSBD_G2, DEVIATION_G2, DEVIATION_G3) từ COUNT DISTINCT sang COUNT(*) trên các dòng đã lọc DAYID=MAX. (c) Đã bỏ UNION FCT_CLOS_COLLATERAL khỏi TSBD_G2, chỉ còn đọc FCT_RLOS_COLLATERAL, để NULL nhánh CLOS (nhất quán INCOM_3/BUSINESS_INCOM); cập nhật mermaid Section 1 (2.1.9) đổi node thành FCT_RLOS_COLLATERAL, dùng dotted edge. (d) Áp dụng >=2 theo đúng ý nghĩa nghiệp vụ, coi "=2" là lỗi soạn thảo SRS | ĐÃ GIẢI QUYẾT |
-| 44 | `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (SB_DWH, 1.2.2.1/1.3.2.1) — review 2026-09-17 | Bảng xương sống có `APPLICATION_SK` và `T24_CUSTOMER_SK` (chân T24) nhưng KHÔNG có FK nào trỏ tới `DIM_CLOS_CUSTOMER`/`DIM_RLOS_APPLICANT` (chân khách hàng LOS) — khác `FCT_*_APPLICATION_PARTY` (đã có đủ 3 chân). Tra cứu xác nhận: `DIM_CLOS_CUSTOMER`/`DIM_RLOS_APPLICANT` có NK=WI_NAME (quan hệ 1:1 với hồ sơ), SRS BC1 gốc join tới IDGRID (chứa ADD_ID) bằng business key `WI_NAME` thuần, không qua surrogate — nên về mặt kỹ thuật join qua WI_NAME+SCD2 time-window vẫn hợp lệ, không bắt buộc phải có FK riêng | Theo quyết định người dùng: vì đã tách thành DIM riêng có DIMENSION_KEY sinh sequence, nên vẫn link qua khóa surrogate cho nhất quán với mọi FK khác trong tài liệu, thay vì join business key trực tiếp. Đã bổ sung `CUSTOMER_SK` (cột 66, → DIM_CLOS_CUSTOMER) trên FCT_CLOS_APPLICATION_DAILY và `APPLICANT_SK` (cột 79, → DIM_RLOS_APPLICANT) trên FCT_RLOS_APPLICATION_DAILY, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID (quan hệ 1:1 nên không fan-out). Đã đánh số lại các cột PDTD_DTM bổ sung sau đó (T24_CUSTOMER_SK/LAST_WORKSTEP) và cập nhật mermaid Section 1 của cả 2 bảng | ĐÃ GIẢI QUYẾT |
+| 44 | `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (SB_DWH, 1.2.2.1/1.3.2.1) — review 2026-09-17 | Bảng xương sống có `APPLICATION_SK` và `T24_CUSTOMER_SK` (chân T24) nhưng KHÔNG có FK nào trỏ tới `DIM_CLOS_CUSTOMER`/`DIM_RLOS_APPLICANT` (chân khách hàng LOS) — khác `FCT_*_APPLICATION_PARTY` (đã có đủ 3 chân). Tra cứu xác nhận: `DIM_CLOS_CUSTOMER`/`DIM_RLOS_APPLICANT` có NK=WI_NAME (quan hệ 1:1 với hồ sơ), SRS BC1 gốc join tới IDGRID (chứa ADD_ID) bằng business key `WI_NAME` thuần, không qua surrogate — nên về mặt kỹ thuật join qua WI_NAME+SCD2 time-window vẫn hợp lệ, không bắt buộc phải có FK riêng | Theo quyết định người dùng: vì đã tách thành DIM riêng có DIMENSION_KEY sinh sequence, nên vẫn link qua khóa surrogate cho nhất quán với mọi FK khác trong tài liệu, thay vì join business key trực tiếp. Đã bổ sung `CUSTOMER_SK` (cột 66, → DIM_CLOS_CUSTOMER) trên FCT_CLOS_APPLICATION và `APPLICANT_SK` (cột 79, → DIM_RLOS_APPLICANT) trên FCT_RLOS_APPLICATION, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID (quan hệ 1:1 nên không fan-out). Đã đánh số lại các cột PDTD_DTM bổ sung sau đó (T24_CUSTOMER_SK/LAST_WORKSTEP) và cập nhật mermaid Section 1 của cả 2 bảng | ĐÃ GIẢI QUYẾT |
 | 45 | `DIM_CLOS_APPLICATION` (PDTD_DTM, 2.2.1.1) — cột `FLAG_APP_GRP`/`REF_PRODUCT` — review 2026-09-18, đối chiếu SRS BC5 cập nhật | (a) Công thức quy đổi `APP_GRP`→`FLAG_APP_GRP` trước đây ghi tạm `('BOD','CC')`→`'BOD/CC'`, chưa xác nhận đủ mọi giá trị `APP_GRP` (còn `SCC`, `RCC` chưa rõ nhóm). (b) Điều kiện `SUB_PRODUCT` khi tra `CLOS_REF_SLA_TDKHDNL`/`TDKHDN`/sheet luồng 1 trước đây gắn với `CHANGE_REQUEST <> 'Change Request'` | Đối chiếu SRS BC5 bản cập nhật (BR 1.2, nested table) xác nhận: (a) `APP_GRP IN ('BOD','CC','SCC','RCC')` nay map thành `FLAG_APP_GRP='HDTD'` (đổi nhãn từ `'BOD/CC'`, mở rộng thêm `SCC`/`RCC` vào nhóm này). (b) SRS mới đã bỏ hẳn điều kiện `CHANGE_REQUEST` cho `SUB_PRODUCT` — nay luôn so khớp trực tiếp (chỉ bỏ qua nếu giá trị REF là NULL). Đã sửa cả 2 điểm tại `DIM_CLOS_APPLICATION` (2.2.1.1) | ĐÃ GIẢI QUYẾT |
 | 46 | `REF_SLA_NLTT` (2.4.8) — điều kiện JOIN nhánh RLOS, review 2026-09-21 với dữ liệu seed thật | Rủi ro JOIN 1:N nếu 1 `PRODUCT_LINE` khớp nhiều dòng seed — nghi vấn treo từ review 2026-09-18 vì SRS không đề cập cách xử lý trùng | Đã có dữ liệu seed thật (`input/BC5TAT(REF_SLA).xlsx`, sheet "cam kết SLA NLTT", 28 dòng nhánh RLOS) — xác nhận mỗi `Product Line` xuất hiện đúng 1 lần, unique thật theo đúng khóa `PRODUCT_LINE`+`SYSTEM_CODE='RLOS'`. Không còn rủi ro 1:N | ĐÃ GIẢI QUYẾT |
 | 47 | `AGG_LOS_KPI_YTD_DAILY.SLGN_CLOS_DAY` (PDTD_DTM, 2.1.8) — nhánh LD — review 2026-09-18, đối chiếu SRS BC9 cập nhật, làm rõ thêm 2026-09-18 lần 2 | Nhánh giải ngân LD trước đây kiểm tra tồn tại hợp đồng trên `STG_FCT_LOAN` theo `SEAB_LOS_ID`+`CUSTOMER_CODE` | SRS BC9 bản cập nhật đổi công thức `LISTAGG(g.CONTRACT)` từ nhóm theo `SEAB_LOS_ID`+`CUSTOMER_CODE` sang nhóm theo `c.VAR_STR12` (`c`=`WFINSTRUMENTTABLE`). **Làm rõ lần 2 (2026-09-18):** đọc lại chi tiết mục "Các bảng sử dụng" xác nhận đây KHÔNG phải đổi điều kiện JOIN giữa `WFINSTRUMENTTABLE` và `STG_FCT_LOAN` (2 bảng này không join trực tiếp với nhau, mỗi bảng join độc lập vào `NG_SB_CLOS_ENTRY_EXIT`/`NG_SB_CLOS_APPROVAL`) — khóa JOIN `SEAB_LOS_ID`+`CUSTOMER_CODE` giữa hồ sơ và `STG_FCT_LOAN` vẫn giữ nguyên không đổi; thay đổi thực sự chỉ nằm ở bước GROUP BY sau khi đã JOIN xong (đổi cách gộp danh sách CONTRACT thành 1 nhóm khi đếm). Đã cập nhật ghi chú đầy đủ tại Section 1 → 2.1.8. **✅ ĐÃ GIẢI QUYẾT (review 2026-09-21):** `VAR_STR12` là cột generic trên `WFINSTRUMENTTABLE`, SRS không có định nghĩa ý nghĩa nghiệp vụ, nhưng người dùng xác nhận trực tiếp cột này tồn tại thật trên `WFINSTRUMENTTABLE` (khớp metadata `VAR_STR1`-`VAR_STR20`) — theo quyết định người dùng, bám sát đúng nguyên văn công thức SRS BC9 là đủ căn cứ để viết ETL, không cần biết ý nghĩa nghiệp vụ cụ thể mới viết được SQL. Đã chính thức đổi `SLGN_CLOS_DAY` sang `LISTAGG(CONTRACT)` nhóm theo `VAR_STR12` (khóa JOIN vào `STG_FCT_LOAN` vẫn giữ `SEAB_LOS_ID`+`CUSTOMER_CODE`, không đổi) | ĐÃ GIẢI QUYẾT |
 | 48 | `AGG_LOS_KPI_APPLICATION` (PDTD_DTM, 2.1.9) — tập hồ sơ nền (`WI_NAME`) — review 2026-09-18, đối chiếu SRS BC9 cập nhật | Trước đây bảng nhận MỌI hồ sơ có trên `FCT_CLOS/RLOS_APPLICATION_DAILY` (kể cả đang xử lý dở dang, chưa tới quyết định cuối) — không có điều kiện lọc loại trừ theo trạng thái xử lý | SRS BC9 bản cập nhật đổi bước dựng nguồn cơ sở ("Nguồn RLOS"/"Nguồn CLOS") từ `LEFT JOIN EXTTABLE-ENTRY_EXIT` thành `INNER JOIN ... AND (DECISION IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport','Reject') OR WORKSTEP IN ('CancelRevoke','CancelPermanent'))` — chỉ hồ sơ đã đến quyết định cuối/đã hủy mới được tính KPI, hồ sơ đang xử lý dở dang bị loại khỏi bảng. Đã xác nhận đây là thay đổi có chủ ý của SRS (không phải sơ suất) — đã bổ sung điều kiện lọc tương ứng vào ghi chú thiết kế tại Section 1 → 2.1.9 | ĐÃ GIẢI QUYẾT |
-| 49 | `DIM_LOS_ORG_UNIT`, `DIM_LOS_USER`, `DIM_CLOS/RLOS_PRODUCT`, `DIM_CLOS/RLOS_WORKSTEP`, `DIM_CLOS/RLOS_DECISION` (SB_DWH, 1.1.1/1.1.2/1.2.1.2-4/1.3.1.2-4) — review 2026-09-18, theo `input/DS Bảng danh mục.xlsx` + `Meeting_note_20260909.xlsx` mục #1-#3, #5 | Các DIM này trước đây dùng bảng khai báo thủ công (`MAP_LOS_USER`, `MAP_CLOS/RLOS_PRODUCT`, `MAP_CLOS/RLOS_WORKSTEP`, `MAP_CLOS/RLOS_DECISION`) hoặc nguồn hồ sơ LOS (`DIM_LOS_ORG_UNIT`) làm giải pháp tạm vì chưa có danh mục gốc thật | BA LOS đã xác nhận (16/09) các bảng danh mục thật sẵn có ở STG_LOS: `NG_SB_RLOS_MAS_COMPANY`/`MAS_BRANCH`/`MAS_REGION` (ORG_UNIT), `NG_SB_RLOS_MAS_USER` (USER), `NG_SB_CLOS_MAS_PRO_LINE`/`MAS_SUB_PROD` + `NG_SB_RLOS_MAS_PRODUCT_LINE`/`MAS_SUB_PRODUCT` (PRODUCT), `NG_SB_CLOS/RLOS_MAS_DECISION` (WORKSTEP+DECISION, DISTINCT theo từng cột) — đã đổi toàn bộ nguồn nạp sang các bảng này, loại bỏ hoàn toàn 7 bảng `MAP_` cùng mọi mô tả liên quan (đã xóa khỏi tài liệu, không còn tồn tại ở bất kỳ đâu — xem nguồn mới tại Section 1/2 → SB_DWH → từng DIM tương ứng trong `hld/HLD_DIM_SB_DWH.md`). `DIM_LOS_ORG_UNIT` đổi cấu trúc: denormalize thêm cột từ MAS_BRANCH/MAS_REGION (10→16 cột), `DIM_LOS_USER` thiết kế dư thừa đầy đủ 25 cột nguồn theo yêu cầu người dùng (6→26 cột), `DIM_RLOS_PRODUCT` thêm PRODUCT_LINE_NAME/SECONDARY_PRODUCT/SCORE_REQUIRED/SCORE_MODEL (8→12 cột). SCD2 đổi cơ chế: EFF_DATE nay do ETL tính qua CDC (so sánh bản ghi cũ/mới của bảng nguồn), không còn khai báo tay như MAP_* | ĐÃ GIẢI QUYẾT |
+| 49 | `DIM_LOS_COMPANY`, `DIM_LOS_USER`, `DIM_CLOS/RLOS_PRODUCT`, `DIM_CLOS/RLOS_WORKSTEP`, `DIM_CLOS/RLOS_DECISION` (SB_DWH, 1.1.1/1.1.2/1.2.1.2-4/1.3.1.2-4) — review 2026-09-18, theo `input/DS Bảng danh mục.xlsx` + `Meeting_note_20260909.xlsx` mục #1-#3, #5 | Các DIM này trước đây dùng bảng khai báo thủ công (`MAP_LOS_USER`, `MAP_CLOS/RLOS_PRODUCT`, `MAP_CLOS/RLOS_WORKSTEP`, `MAP_CLOS/RLOS_DECISION`) hoặc nguồn hồ sơ LOS (`DIM_LOS_COMPANY`) làm giải pháp tạm vì chưa có danh mục gốc thật | BA LOS đã xác nhận (16/09) các bảng danh mục thật sẵn có ở STG_LOS: `NG_SB_RLOS_MAS_COMPANY`/`MAS_BRANCH`/`MAS_REGION` (ORG_UNIT), `NG_SB_RLOS_MAS_USER` (USER), `NG_SB_CLOS_MAS_PRO_LINE`/`MAS_SUB_PROD` + `NG_SB_RLOS_MAS_PRODUCT_LINE`/`MAS_SUB_PRODUCT` (PRODUCT), `NG_SB_CLOS/RLOS_MAS_DECISION` (WORKSTEP+DECISION, DISTINCT theo từng cột) — đã đổi toàn bộ nguồn nạp sang các bảng này, loại bỏ hoàn toàn 7 bảng `MAP_` cùng mọi mô tả liên quan (đã xóa khỏi tài liệu, không còn tồn tại ở bất kỳ đâu — xem nguồn mới tại Section 1/2 → SB_DWH → từng DIM tương ứng trong `hld/HLD_DIM_SB_DWH.md`). `DIM_LOS_COMPANY` đổi cấu trúc: denormalize thêm cột từ MAS_BRANCH/MAS_REGION (10→16 cột), `DIM_LOS_USER` thiết kế dư thừa đầy đủ 25 cột nguồn theo yêu cầu người dùng (6→26 cột), `DIM_RLOS_PRODUCT` thêm PRODUCT_LINE_NAME/SECONDARY_PRODUCT/SCORE_REQUIRED/SCORE_MODEL (8→12 cột). SCD2 đổi cơ chế: EFF_DATE nay do ETL tính qua CDC (so sánh bản ghi cũ/mới của bảng nguồn), không còn khai báo tay như MAP_* | ĐÃ GIẢI QUYẾT |
 | 50 | `DIM_RLOS_PRODUCT` (SB_DWH, 1.3.1.2) — cột `SCORE_REQUIRED`/`SCORE_MODEL` (`NG_SB_RLOS_MAS_SUB_PRODUCT`) — review 2026-09-18 | Bảng danh mục thật có 2 cột chấm điểm chưa từng xuất hiện trong thiết kế cũ | Rà soát SRS BC1-BC11 chưa xác nhận báo cáo nào khai thác 2 cột này — đã thêm vào DIM theo nguyên tắc "thiết kế dư thừa" (quyết định có chủ đích, không phải rủi ro cần BA gỡ bỏ). Người dùng xác nhận (2026-09-18): đây đúng là thiết kế dư thừa hợp lệ theo quy ước đã chốt cho nhóm DIM — không cần hành động thêm, giữ nguyên cột, chỉ log lại để biết cột nào có sẵn nhưng chưa dùng | ĐÃ GIẢI QUYẾT (theo dõi) |
 | 51 | `DIM_LOS_USER` (SB_DWH, 1.1.2) — các cột `*_GROUP`/`DEPARTMENT_*`/`HUB` (`NG_SB_RLOS_MAS_USER`) — review 2026-09-18 | 23 cột nghiệp vụ mới (ngoài USERNAME) được thiết kế dư thừa đầy đủ theo yêu cầu người dùng, nhưng rà soát SRS BC1-BC4/BC7/BC9 hiện tại xác nhận chưa report nào join tới các cột này | Người dùng xác nhận (2026-09-18): đây đúng là thiết kế dư thừa hợp lệ (cùng bản chất với #50), không phải PENDING chờ quyết định — giữ nguyên để theo dõi: khi triển khai vấn đề #27 Meeting note (KPI theo phòng ban) hoặc bất kỳ report mới nào cần phân quyền theo ĐVKD/khối nghiệp vụ, các cột `DEPARTMENT_CODE/NAME`, `UWMAKER_GROUP`, `UWCHECKER_GROUP`, `AP_GROUP`, `PREDISB_*_GROUP`, `DISB_*_GROUP`, `HUB` đã sẵn sàng dùng ngay, không cần sửa DIM | ĐÃ GIẢI QUYẾT (theo dõi) |
 | 52 | `DIM_CLOS/RLOS_WORKSTEP`, `DIM_CLOS/RLOS_DECISION` (SB_DWH, 1.2.1.3-4/1.3.1.3-4) — quan hệ N-N của `NG_SB_CLOS/RLOS_MAS_DECISION` — review 2026-09-18 | Bảng nguồn `MAS_DECISION` là quan hệ N-N thật giữa WORKSTEP (`QUEUE_NAME`) và DECISION (`DECISION`) — theo quyết định người dùng, vẫn giữ tách 2 DIM riêng (suy ra bằng DISTINCT từng cột), không giữ lại thông tin "WORKSTEP nào cho phép DECISION nào" | Nếu về sau có report cần biết chính xác tổ hợp WORKSTEP-DECISION hợp lệ (khác với việc chỉ liệt kê danh mục riêng từng loại), cần quay lại thiết kế bảng cầu nối (bridge table) riêng từ `MAS_DECISION`, không suy được từ 2 DIM hiện tại | PENDING |
-| 53 | `DIM_LOS_ORG_UNIT` (PDTD_DTM, 2.1.1) — khái niệm khu vực trùng tên khác nguồn — review 2026-09-18 | `REGION_CODE`/`REGION_NAME` mới (nguồn `NG_SB_RLOS_MAS_REGION`) và khu vực chuẩn hóa dùng cho BC10/BC11 (map qua `TMP_REF_COMPANY_REGION_KHCN`/`_KHDN`, nguồn T24-side riêng) là 2 khái niệm khác nhau nhưng cùng gọi là "khu vực/region" | Đã rà soát lại phạm vi dùng thực tế: `TMP_REF_COMPANY_REGION_KHCN`/`_KHDN` chỉ phục vụ đúng 1 cột `ZONE` trên `FCT_CLOS/RLOS_LOAN_DISBURSEMENT` (BC10/BC11, xem `hld/HLD_FCT_PDTD_DTM.md`), hoàn toàn không liên quan tới `REGION_CODE`/`REGION_NAME` trên `DIM_LOS_ORG_UNIT` (nguồn LOS, dùng cho danh mục tổ chức, chưa report nào join tới). Đây là 2 cơ chế độc lập phục vụ 2 mục đích khác nhau rõ ràng (LOS org structure vs T24 mapping cho báo cáo giải ngân) — không có bằng chứng nào cho thấy cần hợp nhất. Người dùng xác nhận (2026-09-18): đóng vấn đề này, không cần hỏi thêm BA, giữ nguyên tách biệt như thiết kế hiện tại | ĐÃ GIẢI QUYẾT |
+| 53 | `DIM_LOS_COMPANY` (PDTD_DTM, 2.1.1) — khái niệm khu vực trùng tên khác nguồn — review 2026-09-18 | `REGION_CODE`/`REGION_NAME` mới (nguồn `NG_SB_RLOS_MAS_REGION`) và khu vực chuẩn hóa dùng cho BC10/BC11 (map qua `TMP_REF_COMPANY_REGION_KHCN`/`_KHDN`, nguồn T24-side riêng) là 2 khái niệm khác nhau nhưng cùng gọi là "khu vực/region" | Đã rà soát lại phạm vi dùng thực tế: `TMP_REF_COMPANY_REGION_KHCN`/`_KHDN` chỉ phục vụ đúng 1 cột `ZONE` trên `FCT_CLOS/RLOS_LOAN_DISBURSEMENT` (BC10/BC11, xem `hld/HLD_FCT_PDTD_DTM.md`), hoàn toàn không liên quan tới `REGION_CODE`/`REGION_NAME` trên `DIM_LOS_COMPANY` (nguồn LOS, dùng cho danh mục tổ chức, chưa report nào join tới). Đây là 2 cơ chế độc lập phục vụ 2 mục đích khác nhau rõ ràng (LOS org structure vs T24 mapping cho báo cáo giải ngân) — không có bằng chứng nào cho thấy cần hợp nhất. Người dùng xác nhận (2026-09-18): đóng vấn đề này, không cần hỏi thêm BA, giữ nguyên tách biệt như thiết kế hiện tại | ĐÃ GIẢI QUYẾT |
 | 54 | `DIM_CLOS/RLOS_APPROVAL_GROUP` — đánh giá không khôi phục — review 2026-09-18, theo Meeting note mục #4 | Meeting note mục #4 yêu cầu danh mục cấp phê duyệt riêng; HLD trước đó đã chủ động loại bỏ `DIM_CLOS/RLOS_APPROVAL_GROUP` (APP_GRP là thuộc tính ổn định 1:1 trên Application, xem #9 lịch sử). Nay có bảng danh mục thật `NG_SB_CLOS_MAS_APPROV_LEVEL`/`NG_SB_RLOS_DYN_APPROVAL` (LEVEL_CODE/LEVEL_NAME/DESCRIPTION) sẵn sàng nếu cần label hiển thị cho APP_GRP | Người dùng xác nhận hiện không có báo cáo nào cần hiển thị LEVEL_NAME/DESCRIPTION — không tạo DIM/REF_ mới. Giữ nguyên APP_GRP là cột trên `DIM_CLOS/RLOS_APPLICATION`, không đổi thiết kế. Log lại để nếu sau này có report cần tên/mô tả cấp phê duyệt, đã biết ngay nguồn dùng | ĐÃ GIẢI QUYẾT (không cần thiết kế thêm) |
 | 55 | `FCT_CLOS_EXCEPTION`/`FCT_RLOS_EXCEPTION` (SB_DWH, 1.2.2.4/1.3.2.5) — cột `CHECK_FTR`, `FIRST_WORKSTEP_RETURN`, `PHAN_LOAI_DDE` — review 2026-09-18, đối chiếu SRS BC7 cập nhật (BC7 upload lại) | SRS BC7 bản mới đổi hẳn công thức cả 3 cột so với bản trước: (a) `CHECK_FTR` đảo ngược bản chất phép tính từ "có vi phạm trực tiếp → NOT FTR" sang whitelist miễn trừ (mặc định NOT FTR, chỉ FTR nếu MỌI exception đều thuộc danh sách miễn trừ) — CLOS phân nhóm theo `CUST_GROUP` (thêm JOIN `NG_SB_CLOS_CUST_INFO` mới), RLOS phân nhóm theo `BI_SUB_PRODUCT` derive từ `NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT` (không còn dùng `RCTYPE`/pattern `%BR%`/`%FTR%` như trước); (b) `FIRST_WORKSTEP_RETURN` bổ sung nhánh lọc thứ 3 (`UnderwriterMaker`+`Send_Back to BranchSupport`) cho cả CLOS/RLOS; (c) `PHAN_LOAI_DDE` đổi hẳn từ CASE-WHEN tính trực tiếp sang lookup bảng danh mục mới `REF_PHAN_LOAI_DDE` (JOIN theo `EXCEPTION_CATEGORY`+`SYSTEMNAME`). Cũng phát hiện lỗi copy-paste lặp lại ở field `ACTIVITYNAME` nhánh CLOS (SRS ghi nhầm `NG_SB_RLOS_ENTRY_EXIT` — cùng dạng lỗi đã xác nhận ở bản SRS trước) | Đã xác nhận với người dùng đây là thay đổi có chủ ý của SRS — đã cập nhật đầy đủ công thức mới cho cả 2 nhánh tại Section 1/2 → 1.2.2.4/1.3.2.5 (`hld/HLD_FCT_SB_DWH.md`), thêm bảng REF_ mới `REF_PHAN_LOAI_DDE` (2.4.10, `hld/HLD_REF.md`) với cấu trúc/dữ liệu mẫu do người dùng cung cấp trực tiếp (`input/REF_PHAN_LOAI_DDE.xlsx`, 19 dòng). Lỗi copy-paste `ACTIVITYNAME` tiếp tục xử lý theo hướng dùng đúng `NG_SB_CLOS_ENTRY_EXIT` cho nhánh CLOS, nhất quán với cách đã xử lý bản SRS trước | ĐÃ GIẢI QUYẾT |
 | 56 | `DIM_CLOS_APPLICATION` (2.2.1.1) & `REF_SLA_NLTT` (2.4.8) — gap CLOS chưa thiết kế `SLA_DE_RESULT`/`SLA_QC_RESULT`/`SLA_DE_TOTAL_RESULT`/`QD_DDE`/`QD_QC` — review 2026-09-21, phát hiện khi rà soát mapping BC5/BC9 | SRS BC5/BC9 yêu cầu CLOS đọc cam kết SLA nhập liệu tập trung từ `REF_SLA_NLTT` (`SYSTEM_CODE='CLOS'`) nhưng toàn bộ HLD chỉ thiết kế đường JOIN này cho nhánh RLOS — nhánh CLOS chưa từng có ở bất kỳ DIM/FCT nào | Đọc lại bảng lồng "Các bảng sử dụng" (BR 1.2) của SRS BC5 (trước đây chỉ đọc dòng RLOS liền kề, bỏ sót dòng CLOS) xác nhận đủ điều kiện JOIN cho CLOS: `New/Change Request`=`DIM_CLOS_APPLICATION.CHANGE_REQUEST`, `Product Line`=`DIM_CLOS_PRODUCT.PRODUCT_LINE_NAME`, `Sub Product`=`DIM_CLOS_PRODUCT.PRODUCT_NAME` (bỏ qua nếu seed để trống). Quyết định người dùng: không denormalize cho cả 2 hệ — chuyển hẳn sang report-time lookup `REF_SLA_NLTT`, xem chi tiết tại 2.4.8 | ĐÃ GIẢI QUYẾT |
 | 57 | `RLOS_REF_SLA_TDKHCN` (2.4.5), `CLOS_REF_SLA_TDKHDNL`/`CLOS_REF_SLA_TDKHDN` (2.4.6/2.4.7), `REF_SLA_NLTT` (2.4.8) — khóa JOIN dùng sai `PRODUCT_LINE_CODE`/`SUB_PRODUCT_CODE` (mã), review 2026-09-21 | Toàn bộ 4 bảng REF_ SLA đều được thiết kế JOIN bằng `PRODUCT_LINE_CODE`/`SUB_PRODUCT_CODE` (mã nội bộ) từ `DIM_CLOS_PRODUCT`/`DIM_RLOS_PRODUCT` — nhưng chưa từng đối chiếu với dữ liệu seed thật để xác nhận cột nào seed lưu | Đối chiếu trực tiếp dữ liệu seed thật (`input/BC5TAT(REF_SLA).xlsx` và `input/BC5TAT - Team PDTD cung cấp(cam kết SLA TDKHDN luồng 2).csv`, cột "Product Line"/"Sub Product") xác nhận giá trị lưu là TÊN hiển thị (`SeAHome-Buy`, `Hạn mức`...), khớp `PRODUCT_LINE_NAME`/`PRODUCT_NAME` — không khớp `*_CODE`. Đã sửa lại khóa JOIN sang `PRODUCT_LINE_NAME`/`PRODUCT_NAME` tại `DIM_RLOS_APPLICATION` (2.3.1.1), `DIM_CLOS_APPLICATION` (2.2.1.1), và ghi chú report-time lookup của `REF_SLA_NLTT` (2.4.8). **Tái xác nhận (review 2026-09-21):** đã đọc trực tiếp 2 sheet còn lại trong `input/BC5TAT(REF_SLA).xlsx` — "cam kết SLA TDKHDNL" (nguồn seed của `CLOS_REF_SLA_TDKHDNL`, 2.4.6) và "cam kết SLA TDKHCN" (nguồn seed của `RLOS_REF_SLA_TDKHCN`, 2.4.5) — cả 2 đều xác nhận cột "Product Line"/"Sub Product" lưu TÊN hiển thị (ví dụ "Cấp tín dụng ngắn hạn", "Hạn mức", "SeAHome-TTD", "SeAHome-Buy"), khớp đúng `PRODUCT_LINE_NAME`/`PRODUCT_NAME` — cùng kết luận với 2 bảng đã kiểm trước đó. Không có sai lệch nào, đóng hẳn vấn đề này cho cả 4 bảng REF_ SLA | ĐÃ GIẢI QUYẾT |
-| 58 | `FCT_RLOS_APPLICATION_DAILY` (PDTD_DTM, 2.3.2.1) — `T24_CARD_SK`/`T24_SEAB_MAIN_CARD_SK`, trỏ `DIM_T24_CARD`/`DIM_T24_SEAB_MAIN_CARD` — review 2026-09-21, đóng gap BC1.K_TYPE/HOME_ADDRESS | SRS BC1 (BR 1.2, nested table) xác nhận `K_TYPE`/`HOME_ADDRESS` nguồn từ `STG_DTM.STG_DIM_CARD`/`STG_DIM_SEAB_MAIN_CARD`, join qua `RESULT_MAIN_CARD_ID` (có sẵn trên `DIM_RLOS_APPLICATION`) = `MAIN_ID`/`RECID`. `SB_DWH.DIM_CARD`/`DIM_SEAB_MAIN_CARD` (nguồn gốc T24 của 2 bảng STG này) không có trong bất kỳ datamodel xlsx nào của repo — từng cân nhắc bỏ FK, join trực tiếp STG vào fact, nhưng không đúng kiến trúc chuẩn của tài liệu (mọi nguồn T24 phải đi qua `DIM_T24_*` tại PDTD_DTM, FK trên fact, không denormalize) | Người dùng xác nhận (2026-09-21): đúng kiến trúc là FK trên fact trỏ `DIM_T24_CARD`/`DIM_T24_SEAB_MAIN_CARD` (2.1.11/2.1.12, cùng pattern `DIM_T24_CUSTOMER`/`DIM_T24_COMPANY`), không denormalize giá trị trực tiếp lên FCT; 2 bảng T24 gốc có sẵn trên database, chỉ cần map đúng tên bảng/cột đã biết từ SRS (`MAIN_ID`/`K_TYPE`, `RECID`/`HOME_ADDRESS`), không cần thể hiện đầy đủ cấu trúc cột. Đã bổ sung `DIM_T24_CARD` (2.1.11)/`DIM_T24_SEAB_MAIN_CARD` (2.1.12) và khôi phục 2 FK trên `FCT_RLOS_APPLICATION_DAILY` (cột 81-82) | ĐÃ GIẢI QUYẾT |
-| 59 | `FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (SB_DWH, 1.2.2.1/1.3.2.1) — sơ đồ lineage thiếu vẽ DIM cho nhiều FK đã có cột thật — review 2026-09-21, theo yêu cầu người dùng rà soát toàn bộ *_SK trên FCT | Rà soát toàn bộ cột `*_SK` trên mọi bảng FCT và đối chiếu với node DIM trong mermaid lineage (Section 1) phát hiện 2 bảng lớn nhất chỉ vẽ đúng 1 DIM (CUSTOMER/APPLICANT) trong khi cột thật có tới 6-8 FK — `CURRENT_WORKSTEP_SK`, `LAST_WORKSTEP_SK`, `LAST_DECISION_SK`, `LAST_USER_SK`, `PRODUCT_SK`, `ORG_UNIT_SK` (cả CLOS/RLOS) + `CHANGE_TYPE_SK`, `CARD_PROMOTION_SK` (riêng RLOS) đều "mồ côi" trong sơ đồ. Riêng `FCT_RLOS_APPLICATION_DAILY.PRODUCT_SK` còn thiếu CẢ công thức lookup ở Section 2 (chỉ ghi "Khóa tới DIM_RLOS_PRODUCT", không nêu nguồn) — không chỉ thiếu vẽ | Đã bổ sung đủ node + cạnh JOIN vào mermaid của cả 2 bảng (`hld/HLD_Table_Design.md` và mirror `hld/HLD_FCT_SB_DWH.md`), dùng đúng công thức đã có sẵn ở Section 2 cho các FK đã có công thức (`PRODUCT_SK`/`ORG_UNIT_SK` CLOS), và bổ sung công thức mới cho `PRODUCT_SK` RLOS (nguồn `NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE/SUB_PRODUCT`, đối xứng pattern CLOS, đã xác nhận tồn tại thật qua `RLOS - Metadata.xlsx`) — cập nhật đồng thời mô tả cột 9 ở Section 2 của cả 2 file. Các bảng FCT còn lại (WORKSTEP_EVENT, EXCEPTION, COLLATERAL, DEVIATION, APPLICATION_PARTY, SUB_PRODUCT, LOAN_DISBURSEMENT...) đã rà soát và xác nhận không có gap tương tự | ĐÃ GIẢI QUYẾT |
+| 58 | `FCT_RLOS_APPLICATION` (PDTD_DTM, 2.3.2.1) — `T24_CARD_SK`/`T24_SEAB_MAIN_CARD_SK`, trỏ `DIM_T24_CARD`/`DIM_T24_SEAB_MAIN_CARD` — review 2026-09-21, đóng gap BC1.K_TYPE/HOME_ADDRESS | SRS BC1 (BR 1.2, nested table) xác nhận `K_TYPE`/`HOME_ADDRESS` nguồn từ `STG_DTM.STG_DIM_CARD`/`STG_DIM_SEAB_MAIN_CARD`, join qua `RESULT_MAIN_CARD_ID` (có sẵn trên `DIM_RLOS_APPLICATION`) = `MAIN_ID`/`RECID`. `SB_DWH.DIM_CARD`/`DIM_SEAB_MAIN_CARD` (nguồn gốc T24 của 2 bảng STG này) không có trong bất kỳ datamodel xlsx nào của repo — từng cân nhắc bỏ FK, join trực tiếp STG vào fact, nhưng không đúng kiến trúc chuẩn của tài liệu (mọi nguồn T24 phải đi qua `DIM_T24_*` tại PDTD_DTM, FK trên fact, không denormalize) | Người dùng xác nhận (2026-09-21): đúng kiến trúc là FK trên fact trỏ `DIM_T24_CARD`/`DIM_T24_SEAB_MAIN_CARD` (2.1.11/2.1.12, cùng pattern `DIM_T24_CUSTOMER`/`DIM_T24_COMPANY`), không denormalize giá trị trực tiếp lên FCT; 2 bảng T24 gốc có sẵn trên database, chỉ cần map đúng tên bảng/cột đã biết từ SRS (`MAIN_ID`/`K_TYPE`, `RECID`/`HOME_ADDRESS`), không cần thể hiện đầy đủ cấu trúc cột. Đã bổ sung `DIM_T24_CARD` (2.1.11)/`DIM_T24_SEAB_MAIN_CARD` (2.1.12) và khôi phục 2 FK trên `FCT_RLOS_APPLICATION` (cột 81-82) | ĐÃ GIẢI QUYẾT |
+| 59 | `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (SB_DWH, 1.2.2.1/1.3.2.1) — sơ đồ lineage thiếu vẽ DIM cho nhiều FK đã có cột thật — review 2026-09-21, theo yêu cầu người dùng rà soát toàn bộ *_SK trên FCT | Rà soát toàn bộ cột `*_SK` trên mọi bảng FCT và đối chiếu với node DIM trong mermaid lineage (Section 1) phát hiện 2 bảng lớn nhất chỉ vẽ đúng 1 DIM (CUSTOMER/APPLICANT) trong khi cột thật có tới 6-8 FK — `CURRENT_WORKSTEP_SK`, `LAST_WORKSTEP_SK`, `LAST_DECISION_SK`, `LAST_USER_SK`, `PRODUCT_SK`, `COMPANY_SK` (cả CLOS/RLOS) + `CHANGE_TYPE_SK`, `CARD_PROMOTION_SK` (riêng RLOS) đều "mồ côi" trong sơ đồ. Riêng `FCT_RLOS_APPLICATION.PRODUCT_SK` còn thiếu CẢ công thức lookup ở Section 2 (chỉ ghi "Khóa tới DIM_RLOS_PRODUCT", không nêu nguồn) — không chỉ thiếu vẽ | Đã bổ sung đủ node + cạnh JOIN vào mermaid của cả 2 bảng (`hld/HLD_Table_Design.md` và mirror `hld/HLD_FCT_SB_DWH.md`), dùng đúng công thức đã có sẵn ở Section 2 cho các FK đã có công thức (`PRODUCT_SK`/`COMPANY_SK` CLOS), và bổ sung công thức mới cho `PRODUCT_SK` RLOS (nguồn `NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE/SUB_PRODUCT`, đối xứng pattern CLOS, đã xác nhận tồn tại thật qua `RLOS - Metadata.xlsx`) — cập nhật đồng thời mô tả cột 9 ở Section 2 của cả 2 file. Các bảng FCT còn lại (WORKSTEP_EVENT, EXCEPTION, COLLATERAL, DEVIATION, APPLICATION_PARTY, SUB_PRODUCT, LOAN_DISBURSEMENT...) đã rà soát và xác nhận không có gap tương tự | ĐÃ GIẢI QUYẾT |
+| 60 | `DIM_CLOS_LEGAL_PARTY` — QUYẾT ĐỊNH THAY THẾ dòng #36 (review 2026-09-25) | Dòng #36 (2026-09-17) giải quyết CDC-key-rỗng bằng cách GIỮ NGUYÊN kiến trúc DIM, chỉ đổi khóa so khớp SCD2 sang full-row-key 5 cột. Người dùng nay quyết định đổi hướng khác | Chuyển hẳn `DIM_CLOS_LEGAL_PARTY` thành **FACT** (`FCT_CLOS_LEGAL_PARTY`, SB_DWH 1.2.2.7 / PDTD_DTM 2.2.2.8) — đúng theo "Red flag — source table has no CDC key → can't be a DIM/SCD2" (`design-method.md`). Bỏ `DIMENSION_KEY`/`EFF_DATE`/`EXP_DATE`, PK đổi thành composite `WI_NAME+ID_NUMBER`. Đồng thời bổ sung 2 chiều FK mới `CUSTOMER_SK`/`APPLICATION_SK` (yêu cầu mới của người dùng). Quyết định #36 (giữ DIM) coi như đã bị thay thế — không xóa dòng #36, chỉ ghi nhận thay đổi tại đây | ĐÃ GIẢI QUYẾT |
+| 61 | `DIM_CLOS_CUSTOMER` (SB_DWH 1.2.1.6 / PDTD_DTM 2.2.1.6) — đổi grain "1 dòng/hồ sơ" → "1 dòng/khách hàng" — review 2026-09-25 | NK cũ (`WI_NAME`) khiến 1 khách hàng nộp nhiều hồ sơ tạo nhiều dòng trùng lặp trong DIM khách hàng — sai bản chất DIM. Đồng thời rà soát lại phát hiện nhiều cột "làm giàu" (review 2026-09-21) thực chất là thuộc tính HỒ SƠ, không phải khách hàng | Đổi NK sang `ID_NUMBER` (số ĐKKD/CMND, lấy qua `NG_SB_CLOS_CUST_INFO_LEGAL` lọc `OBJ_TYPE='Khách hàng'`), dedupe bằng `ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME)=1`. Xóa 8 cột hồ sơ-grain (`APP_DATE`, `ZONE`, `LOAN_PURPOSE`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER`) và cột `ORG_LEGAL_ID` (trùng NK mới). Thêm `CUST_GROUP` (chuyển từ `DIM_CLOS_APPLICATION`) + 3 cột `INDUSTRY_LVL1/2/3_CODE` (xem dòng #62, #63 riêng) | ĐÃ GIẢI QUYẾT |
+| 62 | `DIM_CLOS_APPLICATION` (1.2.1.1/2.2.1.1) — `CUST_GROUP` còn trùng lặp tạm thời sau khi chuyển sang `DIM_CLOS_CUSTOMER` — review 2026-09-25 | `CUST_GROUP` đã được thêm vào `DIM_CLOS_CUSTOMER` (dòng #61) vì là thuộc tính khách hàng thật, nhưng THEO YÊU CẦU NGƯỜI DÙNG chưa xóa khỏi `DIM_CLOS_APPLICATION` trong lượt review này (để dành đánh giá khi review riêng bảng đó — cột này đang là input tính `BUSINESS_FLOW`/chọn bảng SLA ở `DIM_CLOS_APPLICATION`) | Khi review `DIM_CLOS_APPLICATION`: quyết định có xóa `CUST_GROUP` khỏi đó không (đổi công thức `BUSINESS_FLOW`/SLA sang JOIN qua `CUSTOMER_SK` lấy từ `DIM_CLOS_CUSTOMER` thay vì đọc cột local) | ĐÃ GIẢI QUYẾT |
+| 63 | `DIM_CLOS_CUSTOMER` — 3 cột `INDUSTRY_LVL1/2/3_CODE` mới, gap SRS vs metadata (cùng pattern DQ-11, dòng #2) — review 2026-09-25 | SRS gốc `BC2_PDTD_DTM_SRS_v1.0.docx` (table 8, rows 9-11) xác nhận trực tiếp nguồn `NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_1/2/3`, nhưng `CLOS - Metadata.xlsx` (sheet "3. Column Review", 20 cột đã review của `NG_SB_CLOS_CUST_INFO`) KHÔNG liệt kê 3 cột này | Cần xác nhận trực tiếp trên database (giống cách đã làm cho DQ-11, dòng #2) rằng 3 cột `INDUSTRY_CODE_LEVEL_1/2/3` thật sự tồn tại trên `NG_SB_CLOS_CUST_INFO` — hiện mới chỉ có bằng chứng giấy tờ SRS, chưa kiểm tra DB thực tế | PENDING |
+| 64 | `DIM_CLOS_CUSTOMER` — 8 cột hồ sơ-grain bị loại, chưa có đích đến — review 2026-09-25 | `APP_DATE`, `ZONE`, `LOAN_PURPOSE`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER` đã bị xóa khỏi `DIM_CLOS_CUSTOMER` (xác định lại là thuộc tính hồ sơ, không phải khách hàng) nhưng CHƯA được thêm vào bất kỳ bảng nào khác — hiện "mồ côi" | Khi review `DIM_CLOS_APPLICATION`: quyết định đưa 8 cột này về đó (cùng nguồn `NG_SB_CLOS_CUST_INFO`, quan hệ 1:1 với hồ sơ) hay bỏ hẳn theo column-optimization rule (kiểm tra lại xem còn báo cáo nào cần không) | ĐÃ GIẢI QUYẾT |
+| 65 | `DIM_CLOS_APPLICATION` (1.2.1.1/2.2.1.1) — hoàn tất tách bạch KHÁCH HÀNG vs HỒ SƠ với `DIM_CLOS_CUSTOMER` — review 2026-09-25 (lượt 1, xem tiếp #66/#67 cho lượt 2) | Tiếp nối dòng #61/#62/#64: `DIM_CLOS_CUSTOMER` đã đổi grain sang 1 dòng/khách hàng, cần `DIM_CLOS_APPLICATION` xử lý dứt điểm 2 phần: (1) xóa `CUST_GROUP` (dòng #62), (2) nhận lại 8 cột hồ sơ-grain mồ côi (dòng #64) | Đã xóa `CUST_GROUP` khỏi `DIM_CLOS_APPLICATION` (SB_DWH 1.2.1.1, PDTD_DTM 2.2.1.1) — mọi công thức từng đọc cột local (`BUSINESS_FLOW`, chọn bảng SLA `CLOS_REF_SLA_TDKHDNL`/`CLOS_REF_SLA_TDKHDN` cho `REF_PRODUCT`/`SLA_*`) đổi sang JOIN qua `CUSTOMER_SK` → `DIM_CLOS_CUSTOMER.CUST_GROUP`. Đã cập nhật tương tự `CHECK_FTR` trên `FCT_CLOS_EXCEPTION` (1.2.2.4, whitelist theo CUST_GROUP) và `CUST_GROUP` denormalize trên `FCT_CLOS_LOAN_DISBURSEMENT` (2.2.2.7, qua CUSTOMER_SK có sẵn trên DIM_CLOS_APPLICATION). Đã thêm 8 cột hồ sơ-grain (`ZONE`, `APP_DATE`, `LOAN_PURPOSE`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER`) vào `DIM_CLOS_APPLICATION`. **Cập nhật (lượt 2, xem #66):** số cột đã đổi tiếp, xem dòng #66 | ĐÃ GIẢI QUYẾT |
+| 66 | `DIM_CLOS_APPLICATION` (1.2.1.1/2.2.1.1) — đổi driving table, thêm thông tin hồ sơ/khách hàng chính và dư thừa EXTTABLE — review 2026-09-25 (lượt 2) | Người dùng yêu cầu: (1) đổi driving table sang `NG_SB_CLOS_EXTTABLE` (đúng bảng "cầm trịch" WI_NAME của hồ sơ CLOS theo KEY CDC); (2) bổ sung thông tin khách hàng chính (`CUSTOMER_NAME`/`ID_NUMBER`) lên DIM này để thể hiện quan hệ hồ sơ↔khách hàng sau khi `DIM_CLOS_CUSTOMER` đổi NK bỏ `WI_NAME`; (3) rà soát lại SRS+metadata để bổ sung cột hồ sơ-grain còn thiếu; (4) chuyển `CHANGE_REQUEST`/`CHANGE_TYPE` (nguồn `NG_SB_CLOS_CHANGEREQ`, "thay đổi thường xuyên") sang Fact | Đổi NK `WI_NAME` sang nguồn `NG_SB_CLOS_EXTTABLE` (KEY CDC=WI_NAME, xác nhận qua `DS_BANG_202608.xlsx`, cùng grain với CUST_INFO nên không đổi ý nghĩa dữ liệu). Xóa `CHANGE_REQUEST`/`CHANGE_TYPE` khỏi DIM (chuyển hẳn sang `FCT_CLOS_APPLICATION` khi review riêng bảng đó — theo yêu cầu người dùng, chấp nhận để lại tham chiếu treo tạm thời ở `FCT_CLOS_WORKSTEP_EVENT`/`FCT_CLOS_EXCEPTION`/`FCT_CLOS_DEVIATION`/`FCT_CLOS_COLLATERAL`/`FCT_CLOS_APPLICATION_PARTY`/`REF_PRODUCT`+`SLA_*` PDTD_DTM cho tới khi đó, xem #67). Thêm `PRODUCT_LINE`/`SUB_PRODUCT` (CUST_INFO, text as-is, không join `DIM_CLOS_PRODUCT` — khóa tra `REF_PRODUCT`/`SLA_*` vẫn giữ nguyên qua `DIM_CLOS_PRODUCT`/FCT như cũ, xác nhận theo yêu cầu người dùng). Thêm `ID_NUMBER` (qua `NG_SB_CLOS_CUST_INFO_LEGAL` lọc `OBJ_TYPE='KHÁCH HÀNG'`). Thêm 18 cột dư thừa lưu vết nguồn EXTTABLE (`CUSTOMER_NAME`, `DECISION`, `CURR_WSNAME`, `PREV_WSNAME`, `PRODUCT_NAME`, 10 cột `*USER`, `CHECKER3_TARGET`, `CHANNEL`) — không có report nào dùng trực tiếp nhưng người dùng quyết định vẫn thêm để không bỏ sót thuộc tính gốc của driving table mới. Loại trừ `RN` (rác 100% rỗng) và `COMPANY_CODE`/`COMPANY_NAME`/`BRANCH_CODE`/`BRANCH_NAME` (đã có `COMPANY_SK` → `DIM_LOS_COMPANY`, không cần thêm lại dạng text). SB_DWH: 33→52 cột; PDTD_DTM: 40→59 cột | ĐÃ GIẢI QUYẾT |
+| 67 | `FCT_CLOS_WORKSTEP_EVENT`/`FCT_CLOS_EXCEPTION`/`FCT_CLOS_DEVIATION`/`FCT_CLOS_COLLATERAL`/`FCT_CLOS_APPLICATION_PARTY` và `REF_PRODUCT`/`SLA_*` (PDTD_DTM 2.2.1.1) — tham chiếu treo tới `CHANGE_REQUEST`/`CHANGE_TYPE` sau khi 2 cột này bị xóa khỏi `DIM_CLOS_APPLICATION` — review 2026-09-25 (lượt 2) | Dòng #66 xóa `CHANGE_REQUEST`/`CHANGE_TYPE` khỏi `DIM_CLOS_APPLICATION` ngay lập tức (theo yêu cầu người dùng, chấp nhận rủi ro tạm thời) trong khi hơn 10 vị trí khác (mermaid lineage + công thức either/or `PRODUCT_LINE`/`CHANGE_TYPE` cho `REF_PRODUCT`/`SLA_*`) vẫn còn tham chiếu 2 cột này qua `DIM_CLOS_APPLICATION` | Cần cập nhật từng vị trí khi review `FCT_CLOS_APPLICATION` (nơi 2 cột sẽ được thêm vào): đổi mọi mermaid `-->|1:1 CHANGE_REQUEST, CHANGE_TYPE\|` trỏ `DIM_CLOS_APPLICATION` sang trỏ `FCT_CLOS_APPLICATION`, và sửa công thức either/or `CHANGE_TYPE` trong `REF_PRODUCT`/`SLA_*` (2.2.1.1 PDTD_DTM) lấy qua `APPLICATION_SK` thay vì đọc cột local đã xóa. (⚠️ review 2026-09-26: `FCT_CLOS_APPLICATION_PARTY` PDTD_DTM đã xóa hẳn, 2.2.2.2 — loại khỏi danh sách tham chiếu treo này, không còn tồn tại để cập nhật) | PENDING |
+| 80 | `DIM_CLOS_APPLICATION` (1.2.1.1/2.2.1.1) — xóa `INDUSTRY_LVL1/2/3_CODE` trùng lặp, đổi nguồn `EMPLOYEE_CODE`/`EMPLOYEE_NAME` — review 2026-09-25 (lượt 3) | Sau lượt 2, `INDUSTRY_LVL1/2/3_CODE` vẫn còn tồn tại song song ở cả `DIM_CLOS_APPLICATION` và `DIM_CLOS_CUSTOMER` — người dùng xác nhận đây là thuộc tính khách hàng thật (ngành nghề kinh doanh cố hữu), không phải hồ sơ, cần xóa khỏi `DIM_CLOS_APPLICATION`. Đồng thời `EMPLOYEE_CODE`/`EMPLOYEE_NAME` (trước đây nguồn `NG_SB_CLOS_CUST_INFO.EMP_CODE`/`EMP_NAME`) cần đổi sang lấy trực tiếp từ driving table `NG_SB_CLOS_EXTTABLE` (đã có sẵn 2 cột cùng tên theo metadata) | Đã xóa `INDUSTRY_LVL1/2/3_CODE` khỏi `DIM_CLOS_APPLICATION` (SB_DWH 1.2.1.1, PDTD_DTM 2.2.1.1) — vẫn giữ nguyên ở `DIM_CLOS_CUSTOMER` (1.2.1.6), không còn trùng lặp. Đã đổi nguồn `EMPLOYEE_CODE`/`EMPLOYEE_NAME` sang `NG_SB_CLOS_EXTTABLE.EMPLOYEE_CODE`/`EMPLOYEE_NAME`, cùng driving table với `WI_NAME`/`LOANCASEID`/`CREDIT_PROFILE`, không cần LEFT JOIN `NG_SB_CLOS_CUST_INFO` cho 2 cột này nữa. SB_DWH: 52→49 cột; PDTD_DTM: 59→56 cột | ĐÃ GIẢI QUYẾT |
+| 81 | `DIM_RLOS_APPLICATION` (1.3.1.1/2.3.1.1) — lấy đầy đủ cột dư thừa driving table `NG_SB_RLOS_EXTTABLE`, chuyển `DEVIATION_G3` sang report-time PDTD_DTM — review 2026-09-25 (lượt 1) | Tương tự lượt review `DIM_CLOS_APPLICATION` (#66): driving table đã đổi sang `NG_SB_RLOS_EXTTABLE` từ trước (review 2026-09-22) nhưng mới lấy 4 cột (`WI_NAME`, `LOANCASEID`, `CHANGE_REQUEST`, `CHANGE_TYPE`), bỏ sót các cột khác. Đồng thời phát hiện `DEVIATION_G3` (SB_DWH, SCD2, đọc thẳng `NG_SB_RLOS_MANUAL_DEVIATION`) trùng khái niệm/công thức với `AGG_LOS_KPI_APPLICATION.DEVIATION_G3` (PDTD_DTM, report-time, đọc qua `FCT_RLOS_DEVIATION`) — 2 luồng tính song song không cần thiết cho cùng 1 khái niệm | Rà soát toàn bộ 50 cột `NG_SB_RLOS_EXTTABLE` đối chiếu SRS BC1: xác nhận `UWMAKERUSER`/`UWCHKRUSER`/`CREDAPPRUSER`/`CCOMMITUSER` có report dùng thật (fallback COALESCE cho `UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/`APPROVAL_TAKERESPON`); thêm 49 cột còn lại làm "Thiết kế dư thừa"; loại trừ `ITEMINDEX` (khóa vật lý kỹ thuật) và `BRANCH_CODE`/`BRANCH_NAME` (đã có qua `COMPANY_SK`→`DIM_LOS_COMPANY`). Theo yêu cầu người dùng: bỏ hẳn `DEVIATION_G3` khỏi `DIM_RLOS_APPLICATION` SB_DWH, chuyển tính report-time tại PDTD_DTM (2.3.1.1) đọc `FCT_RLOS_DEVIATION`, dùng chung nguồn/công thức với `AGG_LOS_KPI_APPLICATION` — khóa tra SLA (`REF_PRODUCT`/`SLA_*`) dùng giá trị report-time này. SB_DWH: 28→80 cột; PDTD_DTM: 34→87 cột (7 cột mới, thêm `DEVIATION_G3`) | ĐÃ GIẢI QUYẾT |
+| 82 | `DIM_RLOS_APPLICATION` (1.3.1.1/2.3.1.1) — chuyển `CHANGE_REQUEST`/`CHANGE_TYPE` sang `FCT_RLOS_APPLICATION`, `CUS_SEGMENT`/`CUSTOMER_SEGMENT` sang `DIM_RLOS_APPLICANT`, `APPROVED_AMT_FINAL`/`CURRENCY_CODE`/`APPROVED_TERM` sang `FCT_RLOS_WORKSTEP_EVENT`, bổ sung `APPLICATION_DATE` — review 2026-09-25 (lượt 2) | Người dùng yêu cầu: (1) `CHANGE_REQUEST`/`CHANGE_TYPE` (nguồn `NG_SB_RLOS_EXTTABLE`, "thay đổi thường xuyên") không phù hợp SCD2 của DIM, chuyển sang Fact — cùng lý do đã áp dụng cho CLOS (#66) nhưng lần này thêm thẳng vào Fact ngay, không để PENDING; (2) `CUS_SEGMENT` (nguồn `NG_SB_RLOS_APPLICANT_DETAIL`) là thuộc tính khách hàng/cá nhân applicant, không phải hồ sơ, chuyển sang `DIM_RLOS_APPLICANT` (dự kiến đổi tên `DIM_RLOS_CUSTOMER` ở lượt sau); (3) rà soát thêm `NG_SB_RLOS_APPLICANT_GENERAL` để bổ sung cột hồ sơ-grain còn thiếu; (4) `APPROVED_AMT_FINAL`/`CURRENCY_CODE`/`APPROVED_TERM` (trước là "dư thừa có chủ đích" trên DIM) chuyển sang `FCT_RLOS_WORKSTEP_EVENT`, tính độc lập tại đó | Xóa `CHANGE_REQUEST`/`CHANGE_TYPE` khỏi DIM, thêm thẳng vào `FCT_RLOS_APPLICATION` (cột 78-79, đọc trực tiếp `NG_SB_RLOS_EXTTABLE.REQ_TYPE`/`CHANGE_TYPE`) — không để lại tham chiếu treo, đã cập nhật toàn bộ mermaid/công thức either/or `REF_PRODUCT`/`SLA_*` (PDTD_DTM 2.3.1.1) lấy `CHANGE_TYPE` qua `APPLICATION_SK`. Xóa `CUS_SEGMENT`/`CUSTOMER_SEGMENT` khỏi DIM, thêm vào `DIM_RLOS_APPLICANT` (SB_DWH 1.3.1.9 cột 33-34, PDTD_DTM 2.3.1.9). Xóa `APPROVED_AMT_FINAL`/`CURRENCY_CODE`/`APPROVED_TERM` khỏi DIM, thêm vào `FCT_RLOS_WORKSTEP_EVENT` (SB_DWH 1.3.2.7 cột 24-26, tính độc lập từ `NG_SB_RLOS_CREDIT_PROPOSAL`, cùng pattern `PROCESSED_DATE`/`WORKSTEP_FLAG` đã có). Bổ sung `APPLICATION_DATE` (nguồn `NG_SB_RLOS_APPLICANT_GENERAL.APPLICATION_DATE`, dư thừa song song với `CREATION_DATE` đã có). SB_DWH: 80→74 cột; PDTD_DTM: 87→81 cột; `FCT_RLOS_APPLICATION` SB_DWH 77→79 cột (PDTD_DTM bê 1:1); `FCT_RLOS_WORKSTEP_EVENT` SB_DWH+PDTD_DTM 23→26 cột; `DIM_RLOS_APPLICANT` SB_DWH+PDTD_DTM 34→36 cột | ĐÃ GIẢI QUYẾT |
+| 83 | `DIM_RLOS_GEO` (SB_DWH 1.3.1.7 cũ / PDTD_DTM 2.3.1.7 cũ) — gộp vào `DIM_RLOS_APPLICANT` — review 2026-09-26, theo yêu cầu người dùng | Người dùng yêu cầu không tách `DIM_RLOS_GEO` riêng nữa — quan hệ applicant↔địa bàn cư trú hiện tại là 1:1 (không phải danh mục dùng chung nhiều nơi như `DIM_LOS_COMPANY`), không có báo cáo nào dùng `DIM_RLOS_GEO` độc lập ngoài `DIM_RLOS_APPLICANT.GEO_SK` — tách riêng chỉ tạo thêm 1 JOIN không cần thiết | Xóa hẳn `DIM_RLOS_GEO` (cả 2 layer): xóa cột `GEO_SK` trên `DIM_RLOS_APPLICANT`, thay bằng denormalize thẳng 6 cột `CITY_CODE`/`CITY_NAME`/`CITY_NAME_VN`/`DISTRICT_CODE`/`DISTRICT_NAME`/`DISTRICT_NAME_VN` (LEFT JOIN trực tiếp `NG_SB_RLOS_MAS_CITY`/`NG_SB_RLOS_MAS_DISTRICT` theo `CITY_CURR_RES`/`DISTRICT_CURR_RES`, giữ nguyên công thức/nguồn gốc của `DIM_RLOS_GEO` cũ). Đánh số lại heading Section 1+2: `DIM_RLOS_CARD_PROMOTION` 1.3.1.7 cũ→giữ nguyên số (SB_DWH) do đứng trước GEO trong Section 1 nhưng đổi từ 1.3.1.8 xuống 1.3.1.7 ở Section 2 (PDTD_DTM 2.3.1.8 cũ→2.3.1.7); `DIM_RLOS_APPLICANT` 1.3.1.9 cũ→1.3.1.8 (PDTD_DTM 2.3.1.9 cũ→2.3.1.8); `DIM_RLOS_COREPAYER` 1.3.1.10 cũ→1.3.1.9 (PDTD_DTM 2.3.1.10 cũ→2.3.1.9). SB_DWH+PDTD_DTM `DIM_RLOS_APPLICANT`: 36→41 cột. Đã cập nhật toàn bộ mermaid/cross-reference liên quan trong Section 1+2 (không cập nhật số cũ trong các dòng lịch sử #19/#23/#26/#40/#82 phía trên — giữ nguyên làm bằng chứng lịch sử tại thời điểm ghi nhận) | ĐÃ GIẢI QUYẾT |
+| 84 | `DIM_RLOS_APPLICANT` (SB_DWH 1.3.1.8 cũ / PDTD_DTM 2.3.1.8 cũ) — đổi thành `FCT_RLOS_CUSTOMER`, đổi grain sang giấy tờ định danh — review 2026-09-26, theo yêu cầu người dùng | Nguồn `NG_SB_RLOS_APPLICANT_GENERAL` lẫn cả thuộc tính hồ sơ (ZONE/SALE_TYPE/BROKER_*/ACC_OFFICER/EXISTING_CUSTOMER/APPLICANT_CIF/BUSINESS_MODEL/KYC1) trên 1 DIM khách hàng — người dùng xác nhận qua dữ liệu thực đây là thuộc tính hồ sơ, không phải khách hàng. Đồng thời WI_NAME (mã hồ sơ) không hợp lý làm khóa nghiệp vụ cho ý định "grain khách hàng" — người dùng muốn đổi khóa nghiệp vụ sang chi tiết tới `ID_TYPE`+`ID_NUMBER` của khách hàng (giống hướng minh họa ảnh SQL: driving table IDGRID, join GENERAL lấy thông tin khách hàng, join DETAIL bổ sung thông tin, bỏ pivot ADD_ID/ADD_ID_OTHER từ IDGRID, giữ nguyên 6 cột địa bàn vừa gộp từ DIM_RLOS_GEO — xem dòng #83) | Cân nhắc ban đầu: dedup xuyên hồ sơ về 1 dòng/khách hàng (`DIM_RLOS_CUSTOMER`, chọn hồ sơ mới nhất làm đại diện thuộc tính, giống pattern `DIM_CLOS_CUSTOMER`) — REJECTED: nguồn `NG_SB_RLOS_APPLICANT_IDGRID` không có KEY CDC trong `DS_BANG_202608.xlsx` (cùng "red flag" đã khiến `DIM_CLOS_LEGAL_PARTY`→`FCT_CLOS_LEGAL_PARTY`, xem dòng #36 gốc/1.2.2.7), không đủ căn cứ chuẩn hóa để dedup an toàn xuyên hồ sơ — người dùng quyết định đổi hẳn thành **FACT** thay vì DIM, grain **WI_NAME+ID_TYPE+ID_NUMBER** (không dedup xuyên hồ sơ, mỗi dòng gắn với đúng 1 hồ sơ cụ thể), nhất quán với cách `FCT_CLOS_LEGAL_PARTY` đã xử lý vấn đề tương tự. Không SCD2 (snapshot theo `DAYID`, giống `FCT_RLOS_APPLICATION`). Đổi driving table GENERAL→IDGRID (1 dòng/giấy tờ, không dedup); GENERAL/DETAIL LEFT JOIN theo đúng WI_NAME của chính dòng IDGRID đang xét (không group by ID_NUMBER). Bổ sung `CUSTOMER_BK` (VARCHAR2(64), `STANDARD_HASH(WI_NAME‖'~'‖ID_TYPE‖'~'‖ID_NUMBER, 'SHA256')`, cùng công thức `EXCEPTION_BK`) làm PK đơn thay 3 cột composite; PK cuối = `DAYID+CUSTOMER_BK`. Bỏ hẳn `ADD_ID`/`ADD_ID_OTHER` (không cần nữa vì mỗi giấy tờ đã 1 dòng riêng — BC1 cần dạng chuỗi sẽ LISTAGG lại ở PDTD_DTM khi review riêng). Chuyển `T24_CUSTOMER_SK` từ `FCT_RLOS_APPLICATION` sang đây, join trực tiếp `ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME` (đúng SRS BC1 BR 1.2, không cần tách chuỗi ADD_ID theo thứ tự ưu tiên TCC/CC nữa). Bổ sung `CIF` (IDGRID.CIF, dư thừa) + 7 cột dư thừa khác từ IDGRID (`ISSUE_DATE`/`EXPIRY_DATE`/`ISSUE_PLACE`/`ISSUE_DATE_VISA`/`EXPIRY_DATE_VISA`/`CUST_CLASS`/`IS_FETCH`; loại 3 cột kỹ thuật thuần `RSPAN`/`TIME_UPDATE`/`RECID`). Chuyển 9 cột hồ sơ-scoped VỀ `DIM_RLOS_APPLICATION` (73-83, xác nhận qua dữ liệu thực). Chuyển `CUSTOMER_SEGMENT` sang PDTD_DTM (SB_DWH chỉ giữ `CUS_SEGMENT` thô). Ripple: `FCT_RLOS_APPLICATION_PARTY` bỏ `APPLICANT_SK` (chỉ còn hồ sơ×corepayer, applicant link qua WI_NAME trực tiếp sang FCT mới); `FCT_RLOS_APPLICATION` bỏ `APPLICANT_SK`+`T24_CUSTOMER_SK` (79→78 cột SB_DWH); `FCT_RLOS_WORKSTEP_EVENT` bỏ `APPLICANT_SK` (26→25 cột). SB_DWH: `DIM_RLOS_APPLICATION` 74→83 cột; `FCT_RLOS_CUSTOMER` mới 37 cột (SB_DWH), 38 cột (PDTD_DTM, +`CUSTOMER_SEGMENT`). Đánh số lại heading: `DIM_RLOS_COREPAYER` 1.3.1.9 cũ→1.3.1.8 (PDTD_DTM 2.3.1.9 cũ→2.3.1.8); `FCT_RLOS_CUSTOMER` mới thêm tại 1.3.2.8/2.3.2.9 (Section FCT, không còn ở Section DIM) | ĐÃ GIẢI QUYẾT |
 | 60 | `FCT_RLOS_SUB_PRODUCT` (SB_DWH, 1.3.2.4) — cột `PRODUCT_SK` — review 2026-09-22, phát hiện khi thiết kế lại LLD | Dòng #59 từng kết luận `SUB_PRODUCT` "đã rà soát và xác nhận không có gap tương tự" — kết luận đó sai: rà soát lại toàn bộ 11 SRS BC1-BC11 xác nhận KHÔNG báo cáo nào dùng `PRODUCT_SK` của bảng này (chỉ 3 field `SAN_PHAM_PHU`/`SPP_Amount`/`SPP_Term` dùng bảng, xem `lld/BC1.csv`), và HLD cũng không có công thức JOIN key cụ thể nào cho cột này (chỉ mô tả bằng lời "theo tổ hợp PRODUCT_LINE/SUB_PRODUCT tương ứng SUB_PRODUCT_TYPE_CODE" — không có mapping literal, khác hẳn `PRODUCT_SK` đã có công thức đầy đủ ở dòng #59) | Người dùng xác nhận: chiều sản phẩm chính/nhánh của hồ sơ đã có đủ trên `DIM_RLOS_APPLICATION` qua `NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE`/`SUB_PRODUCT` (đã join `DIM_RLOS_PRODUCT` ở đó theo đúng SRS BC1) — sản phẩm phụ (`SUB_PRODUCT_LINE`) là thuộc tính bổ sung độc lập của hồ sơ, không phải 1 sản phẩm cần tra riêng trong `DIM_RLOS_PRODUCT`, nên không cần lặp lại chiều sản phẩm ở FCT này. Cùng lý do/pattern đã áp dụng cho `PRODUCT_SK` trên `FCT_CLOS/RLOS_WORKSTEP_EVENT` (dòng #22). Đã loại bỏ hoàn toàn `PRODUCT_SK` khỏi `FCT_RLOS_SUB_PRODUCT` (SB_DWH, 11→10 cột) — xóa node `DIM_RLOS_PRODUCT`/`NG_SB_RLOS_MAS_PRODUCT_LINE`/`NG_SB_RLOS_MAS_SUB_PRODUCT` khỏi mermaid Section 1 (không còn cạnh nào dùng tới), xóa dòng bảng cột Section 2, đánh số lại STT liên tục | ĐÃ GIẢI QUYẾT |
+| 85 | `DIM_RLOS_COREPAYER` (SB_DWH 1.3.1.8 / PDTD_DTM 2.3.1.8) — đổi thành `FCT_RLOS_COREPAYER`, đổi grain sang giấy tờ định danh; xóa hẳn `FCT_RLOS_APPLICATION_PARTY` — review 2026-09-26, theo yêu cầu người dùng | Người dùng yêu cầu "chi tiết theo dòng" thay vì pivot giấy tờ (`ADD_ID_COREPAYER`/`ADD_ID_OTHER_COREPAYER`) — cùng dạng thay đổi đã áp dụng cho `DIM_RLOS_APPLICANT` (dòng #84), dù nguồn của corepayer (`NG_SB_RLOS_COREPAYER_GENERAL`: KEY CDC=`WI_NAME+REL_TO_APPLICANT+ID_NO_CO`; `NG_SB_RLOS_COREP_IDGRID`: KEY CDC=`WI_NAME+ID_NUMBER+ID_TYPE`) **CÓ** khai khóa CDC đầy đủ trong `DS_BANG_202608.xlsx` — khác hẳn `NG_SB_RLOS_APPLICANT_IDGRID`/`NG_SB_CLOS_CUST_INFO_LEGAL` (không có CDC key, "red flag" buộc phải đổi FACT ở dòng #36/#84). Về lý thuyết SCD2 vẫn khả thi ở đây | Người dùng xác nhận vẫn đổi thành **FACT** (`FCT_RLOS_COREPAYER`, 1.3.2.9/2.3.2.10) để nhất quán kiến trúc với `FCT_RLOS_CUSTOMER`/`FCT_CLOS_LEGAL_PARTY`, không phải vì bắt buộc bởi CDC key. Đổi driving table GENERAL→COREP_IDGRID (1 dòng/giấy tờ, không dedup); GENERAL LEFT JOIN vào theo `WI_NAME+PIN=ID_NO_CO` (điều kiện đã xác nhận nghiệp vụ trước đây, giữ nguyên). Bỏ pivot `ADD_ID_COREPAYER`/`ADD_ID_OTHER_COREPAYER` — BC1 cần dạng chuỗi sẽ LISTAGG lại ở PDTD_DTM khi review riêng (chưa xử lý trong lượt này). Bổ sung `COREPAYER_BK` (VARCHAR2(64), `STANDARD_HASH(WI_NAME‖'~'‖REL_TO_APPLICANT‖'~'‖ID_NO_CO‖'~'‖ID_TYPE‖'~'‖ID_NUMBER, 'SHA256')`, cùng công thức `CUSTOMER_BK`/`EXCEPTION_BK`) làm PK đơn thay 5 cột composite; PK cuối = `DAYID+COREPAYER_BK`. Không SCD2 (snapshot theo `DAYID`). Không có `T24_CUSTOMER_SK` (quyết định người dùng — chỉ khách hàng chính và người liên quan pháp lý mới cần chân T24, corepayer thì không). Giữ nguyên 5 cột làm giàu (`TITLE`/`HOUSEHOLD`/`PHONE_1`/`PHONE_2`/`HOME_PHONE`), chỉ đổi cách join. Ripple: `FCT_RLOS_APPLICATION_PARTY` (1.3.2.2/2.3.2.2) **xóa hẳn** — sau khi mất cả `APPLICANT_SK` (dòng #84) và `COREPAYER_SK`, bảng liên kết chỉ còn `DAYID+WI_NAME+DATASOURCE+APPLICATION_SK`, trùng lặp hoàn toàn với `FCT_RLOS_APPLICATION`, không còn lý do tồn tại. Khác phía CLOS — `FCT_CLOS_APPLICATION_PARTY` (1.2.2.2) vẫn giữ nguyên vì `DIM_CLOS_CUSTOMER`/`FCT_CLOS_LEGAL_PARTY` không trải qua thay đổi tương tự. SB_DWH+PDTD_DTM `DIM_RLOS_COREPAYER`→`FCT_RLOS_COREPAYER`: 18→17 cột. (⚠️ review 2026-09-26, cùng ngày: nhận định "CLOS vẫn giữ nguyên" ở trên đã bị đảo ngược cùng ngày — `FCT_CLOS_APPLICATION_PARTY` (1.2.2.2) nay cũng đã **xóa hẳn**, hợp nhất vào `FCT_CLOS_LEGAL_PARTY` vì bảng đích đã tự đủ khóa join trực tiếp, không phải vì CLOS trải qua thay đổi tương tự RLOS — xem 1.2.2.2/2.2.2.2 đã cập nhật) | ĐÃ GIẢI QUYẾT |
+| 86 | `DIM_CLOS_COLLATERAL_TYPE` (SB_DWH 1.2.1.6 cũ / PDTD_DTM 2.2.1.6 cũ) — xóa hẳn khỏi thiết kế — review 2026-09-30, theo yêu cầu người dùng | Nghiệp vụ không thực sự cần một bảng danh mục loại tài sản bảo đảm riêng cho CLOS — rà soát lại SRS (BC1, BC2, BC3, BC9) xác nhận chỉ khai thác trực tiếp giá trị text `NG_SB_CLOS_COLL_CD.COLLTYPE` (BC2 tính 9 cờ TSDB_*/TIN_CHAP_TQD, BC3 lấy `TYPES_OF_COLLATERALS`), không có công thức báo cáo nào cần `DIMENSION_KEY`/SCD2 của một bảng danh mục riêng | Xóa hẳn `DIM_CLOS_COLLATERAL_TYPE` (cả SB_DWH và PDTD_DTM, cả Section 1 lineage lẫn Section 2 cột chi tiết) — đảo ngược cả quyết định tách DIM ban đầu lẫn quyết định đổi nguồn sang `NG_SB_RLOS_MAS_COLL_CODE` (review 2026-09-26). `FCT_CLOS_COLLATERAL` bỏ cột `COLLATERAL_TYPE_SK`, thêm lại cột denormalize `COLLATERAL_TYPE_CODE` (nguồn trực tiếp `COLLTYPE`, xem 1.2.2.3) — đúng tiền lệ đã áp dụng cho `FCT_RLOS_COLLATERAL` khi xóa `DIM_RLOS_COLLATERAL_TYPE` (review 2026-09-22, xem 1.3.2.3). Đây cũng là đảo ngược quyết định review 2026-09-24 (khi đó đã chủ động bỏ cột denormalize này để quay về join qua SK) — lần này người dùng xác nhận trực tiếp chỉ cần lưu giá trị `COLLTYPE` trên fact, không cần qua DIM. Renumber: `DIM_CLOS_CUSTOMER` 1.2.1.7 cũ→1.2.1.6 (PDTD_DTM 2.2.1.7 cũ→2.2.1.6); `DIM_CLOS_LEGAL_PARTY` (mục rỗng trỏ chuyển tiếp) 1.2.1.8 cũ→1.2.1.7 (PDTD_DTM 2.2.1.8 cũ→2.2.1.7). Đã rà soát và cập nhật toàn bộ cross-reference liên quan trong Section 1+2 (không cập nhật số cũ trong các dòng lịch sử #19/#36 phía trên — giữ nguyên làm bằng chứng lịch sử tại thời điểm ghi nhận) | ĐÃ GIẢI QUYẾT |

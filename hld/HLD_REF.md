@@ -1,116 +1,8 @@
 # HLD — REF_ tables (bảng danh mục dùng chung)
 
 **Trích xuất từ:** `hld/HLD_Table_Design.md` (nguồn tổng, giữ nguyên không xóa)
-**Phạm vi:** REF_LOS_KPI_USER_YEAR (2.1.7 PDTD_DTM), 10 bảng REF_/TMP_REF_/Q_RLOS_REF_ (2.4 PDTD_DTM, bổ sung REF_PHAN_LOAI_DDE — review 2026-09-18).
-**Ghi chú:** nhóm này dùng chung giữa CLOS/RLOS (và một số giữa SB_DWH/PDTD_DTM), nên tách riêng khỏi 4 file DIM/FCT theo layer để tránh trùng lặp.
-**Quy ước đồng bộ:** sửa nội dung tại file này TRƯỚC, sau đó copy đoạn đã sửa về đúng vị trí tương ứng trong `hld/HLD_Table_Design.md`. Section 3 (Vấn đề mở) chỉ quản lý tại file tổng, không lặp ở đây.
-
----
-
-## 2.1.7 REF_LOS_KPI_USER_YEAR
-
-### Data Lineage
-
-##### 2.1.7 REF_LOS_KPI_USER_YEAR — ĐỔI KIẾN TRÚC (đổi từ FCT_LOS_KPI_USER_YEAR sang bảng danh mục REF_, bỏ DAYID khỏi khóa)
-
-```mermaid
-flowchart LR
-    subgraph SB_DWH
-        C["FCT_CLOS_WORKSTEP_EVENT"]
-        D["FCT_RLOS_WORKSTEP_EVENT"]
-    end
-    subgraph PDTD_DTM
-        E["REF_LOS_KPI_USER_YEAR"]
-    end
-    C -->|"UNION theo USERNAME, lọc BI_APPSTATUS + BI_FLOW (join APPLICATION_SK), loại 2 tài khoản test, MIN(EXITDATE) trong năm — chỉ INSERT nếu (KPI_YEAR, USERNAME) chưa tồn tại"| E
-    D -->|"UNION theo USERNAME, lọc BI_APPSTATUS + BI_FLOW (join APPLICATION_SK), loại 2 tài khoản test, MIN(EXITDATE) trong năm — chỉ INSERT nếu (KPI_YEAR, USERNAME) chưa tồn tại"| E
-```
-
-**Ghi chú lineage — đổi từ FCT sang REF_ theo yêu cầu người dùng:** tài
-liệu lineage gốc (`FCT_PDTD_KPI_USER_YEAR`) thiết kế bảng này với PK
-`DAYID + KPI_YEAR + USERNAME`, nhưng bản chất không có metric nào biến
-đổi theo `DAYID` — đây thuần túy là **danh sách user đã tham gia xử lý
-trong năm** (registry/seed), không phải bảng sự kiện đo lường theo
-ngày. Người dùng xác nhận: bỏ `DAYID` khỏi khóa, chỉ giữ `KPI_YEAR +
-USERNAME` làm PK, đổi tiền tố `FCT_` → `REF_` cho đồng bộ nhóm bảng
-danh mục đặt tại PDTD_DTM. Lưu ý khác biệt so với 9 bảng `REF_` gốc
-(`REF_RLOS_FLOW`...): 9 bảng đó là danh mục TĨNH, khởi tạo/cập nhật THỦ
-CÔNG bởi BA, không qua ETL — còn `REF_LOS_KPI_USER_YEAR` vẫn giữ nguyên
-cơ chế ETL TỰ ĐỘNG (INSERT-if-not-exists chạy mỗi ngày), chỉ mượn tiền
-tố `REF_` theo đúng yêu cầu người dùng để thể hiện đây là bảng danh mục
-nhỏ tại PDTD_DTM, không phải fact đo lường theo ngày như `FCT_`. Nguồn:
-UNION
-`FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT` (thay
-`FCT_PDTD_WORKSTEP_EVENT` gộp cũ, theo đúng 2 bảng đã tách CLOS/RLOS ở
-2.2.2.6/2.3.2.7), lọc đúng 8 workstep (`DetailDataEntry`,
-`DataInputerChecker`, `UnderwriterMaker`, `UnderwriterChecker`,
-`PhoneVerification`, `CreditApproval`, `CreditCommittee`, `HOSupport`)
-theo công thức `NHAN_SU` của SRS BC9.
-
-**Bổ sung 2 điều kiện lọc còn thiếu (review 2026-09-17):** đối chiếu lại
-nguyên văn SRS BC9 phát hiện công thức `NHAN_SU` có đủ 4 điều kiện, HLD
-trước đó chỉ mới thiết kế 2 (8 workstep + loại 2 tài khoản test):
-- `BI_APPSTATUS`: `(DECISION_CODE IN ('Submit','Send To PostSanction',
-  'Submit To DisbursementMaker','Send To HOSupport') OR DECISION_CODE =
-  'Reject' OR WORKSTEP_CODE IN ('CancelRevoke','CancelPermanent'))` —
-  dùng thẳng cột `DECISION_CODE`/`WORKSTEP_CODE` đã có sẵn trên
-  `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT`, không cần join
-  thêm.
-- `BI_FLOW IN ('BL','KHCN_HO')`: JOIN `APPLICATION_SK` (đã có sẵn trên
-  `FCT_CLOS/RLOS_WORKSTEP_EVENT`) sang `DIM_CLOS_APPLICATION.BI_FLOW`/
-  `DIM_RLOS_APPLICATION.BI_FLOW` (2.2.1.1/2.3.1.1) — cùng cột `BI_FLOW`
-  đã dùng cho điều kiện lọc `SLHS_RLOS_DAY`/`SLGN_RLOS_DAY` tại
-  `AGG_LOS_KPI_YTD_DAILY` (2.1.8).
-
-Thiếu 2 điều kiện này sẽ làm `NHAN_SU` đếm dư user chỉ xử lý hồ sơ ngoài
-phạm vi luồng BL/KHCN_HO hoặc hồ sơ chưa có quyết định hợp lệ (đang xử lý
-dở dang, không thuộc nhóm DECISION được chấp nhận/hủy) — sai lệch KPI
-năng suất lao động (`NSLD`) của cả Khối PDTD.
-
-**Loại 2 tài khoản test/kỹ thuật
-`USERNAME NOT IN ('hanh.nh2','hai.bt2')`** ngay tại nguồn UNION — theo
-đúng công thức `NHAN_SU` gốc, đây là loại trực tiếp DÒNG có username
-đó (đếm theo user), khác với `IS_TEST_ACCOUNT` trên `AGG_LOS_KPI_
-APPLICATION` (2.1.9, loại theo HỒ SƠ cho `SLHS_*`/`SLGN_*`/`TAT_*`) —
-2 tài khoản này không bao giờ được INSERT vào bảng, không phải lọc khi
-đếm. Quy tắc load: mỗi lần chạy, với mỗi `USERNAME` mới xuất hiện
-(đã lọc đủ 4 điều kiện: 8 workstep, BI_APPSTATUS, BI_FLOW, loại 2 tài
-khoản test), kiểm tra `(KPI_YEAR, USERNAME)` đã tồn
-tại chưa — chưa có thì INSERT kèm `FIRST_ELIGIBLE_TS` = thời điểm đầu
-tiên trong năm user đó thỏa điều kiện; đã có thì bỏ qua, không UPDATE.
-
-
-### Column Design
-
-##### 2.1.7 REF_LOS_KPI_USER_YEAR — ĐỔI KIẾN TRÚC (đổi từ FCT_LOS_KPI_USER_YEAR sang bảng danh mục REF_, bỏ DAYID khỏi khóa)
-
-**Bảng cũ (trước tách):** `FCT_PDTD_KPI_USER_YEAR` (PK `DAYID + KPI_YEAR + USERNAME`) — đổi kiến trúc theo yêu cầu người dùng: bỏ `DAYID` khỏi khóa (bảng không có metric biến đổi theo ngày, chỉ là danh sách user/năm), đổi tiền tố `FCT_` → `REF_` cho đồng bộ nhóm bảng danh mục tại PDTD_DTM — riêng bảng này vẫn giữ cơ chế ETL tự động (INSERT-if-not-exists), khác 9 bảng `REF_` gốc (khởi tạo/cập nhật thủ công bởi BA, xem 2.4)
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | KPI_YEAR | NUMBER | Y | 4 | PK | Năm KPI — tập user reset vào 1/1 hằng năm |
-| 2 | USERNAME | VARCHAR2 | Y | 100 | PK | Tên tài khoản cán bộ xử lý hồ sơ — nguồn UNION FCT_CLOS_WORKSTEP_EVENT.USERNAME/FCT_RLOS_WORKSTEP_EVENT.USERNAME |
-| 3 | FIRST_ELIGIBLE_TS | TIMESTAMP | Y |  |  | Thời điểm đầu tiên trong năm user xử lý 1 bước thuộc phạm vi tính nhân sự (8 workstep) — quyết định user được tính vào năm nào và ngày nào trên AGG_LOS_KPI_YTD_DAILY.NEW_USER_CNT_DAY |
-
-- Bảng danh mục (registry) lưu tập user phân biệt đã tham gia xử lý hồ sơ, lũy kế theo năm — để `NHAN_SU` không phải đếm lại DISTINCT từ đầu năm mỗi ngày. Không phải bảng sự kiện đo lường theo `DAYID`. Phục vụ BC9 (đầu vào `NHAN_SU`/`NEW_USER_CNT_DAY` của `AGG_LOS_KPI_YTD_DAILY`, 2.1.8).
-- Khóa chính của bảng (PK): **KPI_YEAR, USERNAME**. UNIQUE tự nhiên (đúng bằng PK).
-
-**Đã bỏ `USER_SK` (review 2026-09-17):** người dùng xác nhận mục đích
-báo cáo (`NHAN_SU`) chỉ cần đếm số lượng user phân biệt trong năm, không
-cần thông tin chi tiết của từng user — không có nhu cầu join sang
-`DIM_LOS_USER`. Cột này cũng không có căn cứ SRS trực tiếp (công thức
-`NHAN_SU` chỉ yêu cầu `COUNT(DISTINCT USERNAME)`). Bảng còn đúng 3 cột:
-`KPI_YEAR`, `USERNAME`, `FIRST_ELIGIBLE_TS`.
-
-**Quy tắc load:** mỗi lần chạy ETL, với mỗi `USERNAME` phát sinh trong
-ngày (theo UNION `FCT_CLOS_WORKSTEP_EVENT`/`FCT_RLOS_WORKSTEP_EVENT`,
-lọc `WORKSTEP IN (DetailDataEntry, DataInputerChecker, UnderwriterMaker,
-UnderwriterChecker, PhoneVerification, CreditApproval, CreditCommittee,
-HOSupport)`), kiểm tra `(KPI_YEAR, USERNAME)` đã tồn tại chưa — **chưa
-có thì INSERT** kèm `FIRST_ELIGIBLE_TS` = `MIN(EXITDATE)` của user đó
-trong năm; **đã có thì bỏ qua**, không UPDATE (đúng theo yêu cầu người
-dùng: "kiểm tra nếu chưa tồn tại thì insert, còn nếu tồn tại thì không
-xử lý").
+**Phạm vi:** 9 bảng REF_/TMP_REF_/Q_RLOS_REF_
+**Ghi chú:** nhóm này dùng chung giữa CLOS/RLOS
 
 
 ---
@@ -133,9 +25,9 @@ Excel/CSV gốc.
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | STREAM | VARCHAR2 | Y | 200 | PK | Luồng nghiệp vụ của hồ sơ — nguồn file.STREAM |
-| 2 | BI_FLOW | VARCHAR2 | Y | 100 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo — nguồn file.BI_FLOW. Giá trị quan sát được: KHCN_HO, BL |
+| 2 | BUSINESS_FLOW | VARCHAR2 | Y | 100 |  | Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo — nguồn file.BUSINESS_FLOW. Giá trị quan sát được: KHCN_HO, BL |
 
-- Bảng REF map luồng nghiệp vụ (STREAM) của hồ sơ RLOS sang phân nhóm chuẩn hóa (BI_FLOW) dùng để chia báo cáo theo khối, dùng cho hệ RLOS.
+- Bảng REF map luồng nghiệp vụ (STREAM) của hồ sơ RLOS sang phân nhóm chuẩn hóa (BUSINESS_FLOW) dùng để chia báo cáo theo khối, dùng cho hệ RLOS.
 - Khóa chính của bảng (PK): **STREAM**.
 
 ##### 2.4.2 REF_CLOS_LEGAL
@@ -286,12 +178,12 @@ xác nhận từ dữ liệu seed thật (`input/BC5TAT(REF_SLA).xlsx`, sheet
 "cam kết SLA NLTT"):
 
 - **Nhánh RLOS:** `PRODUCT_LINE = DIM_RLOS_PRODUCT.PRODUCT_LINE_NAME`
-  (qua `FCT_RLOS_APPLICATION_DAILY.PRODUCT_SK`) + `SYSTEM_CODE='RLOS'`.
+  (qua `FCT_RLOS_APPLICATION.PRODUCT_SK`) + `SYSTEM_CODE='RLOS'`.
   Seed thật xác nhận unique theo đúng `PRODUCT_LINE` (28 dòng, mỗi
   `Product Line` xuất hiện đúng 1 lần) — không còn rủi ro 1:N.
 - **Nhánh CLOS:** `PRODUCT_LINE = DIM_CLOS_PRODUCT.PRODUCT_LINE_NAME`
   + `(SUB_PRODUCT IS NULL OR SUB_PRODUCT = DIM_CLOS_PRODUCT.PRODUCT_
-  NAME)` (qua `FCT_CLOS_APPLICATION_DAILY.PRODUCT_SK`) + `NEW_CHANGE_
+  NAME)` (qua `FCT_CLOS_APPLICATION.PRODUCT_SK`) + `NEW_CHANGE_
   REQUEST = DIM_CLOS_APPLICATION.CHANGE_REQUEST` (qua `APPLICATION_SK`)
   + `SYSTEM_CODE='CLOS'`. Seed thật (16 dòng) xác nhận unique theo tổ
   hợp 3 cột này, không cần `REF_PRODUCT`/`POLICY`.
@@ -313,7 +205,7 @@ Chi tiết đầy đủ (mermaid, lịch sử PENDING #12/#46/#56/#57) xem tại
 | 1 | SYSTEM | VARCHAR2 | Y | 10 |  | Hệ sở hữu/nạp bảng map này — nguồn file.SYSTEM. Giá trị quan sát được: OF. KHÔNG phải cờ phân biệt CLOS/RLOS của dữ liệu — xem ghi chú bên dưới |
 | 2 | IDFLOW | VARCHAR2 | N | 10 |  | Mã luồng xử lý — nguồn file.IDFLOW, ví dụ 12 cho luồng giải ngân |
 | 3 | WORKSTEP | VARCHAR2 | Y | 50 |  | Tên bước xử lý theo đúng cách LOS ghi — nguồn file.WORKSTEP, ví dụ DisbursementMaker |
-| 4 | BI_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước chuẩn hóa để hiển thị trên báo cáo — nguồn file.BI_WORKSTEP, ví dụ 12.Disbursement-Maker |
+| 4 | WORKSTEP_DISPLAY | VARCHAR2 | N | 50 |  | Tên bước chuẩn hóa để hiển thị trên báo cáo — nguồn file.WORKSTEP_DISPLAY, ví dụ 12.Disbursement-Maker |
 | 5 | DECISION | VARCHAR2 | N | 100 |  | Quyết định tại bước xử lý — nguồn file.DECISION. Cùng 1 bước có nhiều quyết định nên phải nằm trong tổ hợp tra |
 
 - Bảng REF map bước xử lý và quyết định của cả 2 hệ CLOS, RLOS về 1 tên bước chuẩn hóa dùng chung trên báo cáo, 1 dòng = 1 tổ hợp SYSTEM + IDFLOW + WORKSTEP + DECISION, dùng chung cho cả 2 hệ.
@@ -328,7 +220,7 @@ join (đã biết trước đang xử lý hồ sơ hệ nào), **không dùng đ
 `WHERE SYSTEM = ...`**. `IDFLOW` là cột phân biệt luồng xử lý thật sự
 trong bảng này (ví dụ 12 = luồng giải ngân), không phải `SYSTEM`. Mọi join từ
 `DIM_CLOS_WORKSTEP`/`DIM_RLOS_WORKSTEP` (2.2.1.3/2.3.1.3) và
-`FCT_CLOS_APPLICATION_DAILY`/`FCT_RLOS_APPLICATION_DAILY` (cột
+`FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (cột
 `LAST_WORKSTEP`, 2.2.2.1/2.3.2.1) vào bảng này chỉ dùng `WORKSTEP` (+
 `DECISION`), không lọc theo `SYSTEM`.
 
@@ -342,12 +234,3 @@ trong bảng này (ví dụ 12 = luồng giải ngân), không phải `SYSTEM`. 
 
 - Bảng REF map nhóm lý do ngoại lệ (`EXCEPTION_CATEGORY`) sang phân loại nguyên nhân nhập liệu chuẩn hóa (`PHAN_LOAI_DDE`) dùng cho BC7, 1 dòng = 1 tổ hợp EXCEPTION_CATEGORY + SYSTEMNAME, dùng chung cho cả 2 hệ (cột SYSTEMNAME phân biệt CLOS/RLOS).
 - Khóa chính của bảng (PK): **UNIQUE (EXCEPTION_CATEGORY, SYSTEMNAME)**; không có PK kỹ thuật riêng.
-
-**Mới (review 2026-09-18, theo SRS BC7 cập nhật):** bảng danh mục tĩnh
-này thay thế công thức CASE-WHEN cũ của cột `PHAN_LOAI_DDE` trên
-`FCT_CLOS_EXCEPTION`/`FCT_RLOS_EXCEPTION` (SB_DWH, 1.2.2.4/1.3.2.5) —
-xem chi tiết thay đổi tại `hld/HLD_FCT_SB_DWH.md`. Cấu trúc và dữ liệu
-mẫu do người dùng cung cấp trực tiếp (`input/REF_PHAN_LOAI_DDE.xlsx`, 19
-dòng seed: 12 dòng RLOS, 7 dòng CLOS) — cùng cơ chế khởi tạo/cập nhật
-thủ công bởi BA như 9 bảng REF_ khác trong mục này (không qua ETL/CDC,
-BA insert/update trực tiếp khi danh mục lý do ngoại lệ có thay đổi).

@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>HLD_REF_review</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 1400px;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    p, li { max-width: 46em; }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    table { border-collapse: collapse; width: 100%; font-size: 0.78em; table-layout: fixed; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 4px 6px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+    th:nth-child(1), td:nth-child(1) { width: 4%; }
+    th:nth-child(2), td:nth-child(2) { width: 13%; }
+    th:nth-child(3), td:nth-child(3) { width: 8%; }
+    th:nth-child(4), td:nth-child(4) { width: 6%; }
+    th:nth-child(5), td:nth-child(5) { width: 6%; }
+    th:nth-child(6), td:nth-child(6) { width: 5%; }
+    th:nth-child(7), td:nth-child(7) { width: 58%; }
+    h4, h5 { break-after: avoid; page-break-after: avoid; }
+    table { break-inside: avoid; page-break-inside: avoid; }
+    @page { size: A3 landscape; margin: 12mm; }
+    @media print {
+      body { max-width: 100%; padding: 0; font-size: 13px; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">HLD_REF_review</h1>
+</header>
+<h1 id="hld--ref_-tables-bảng-danh-mục-dùng-chung">HLD — REF_ tables
+(bảng danh mục dùng chung)</h1>
+<p><strong>Trích xuất từ:</strong> <code>hld/HLD_Table_Design.md</code>
+(nguồn tổng, giữ nguyên không xóa) <strong>Phạm vi:</strong> 10 bảng
+REF_/TMP_REF_/Q_RLOS_REF_ <strong>Ghi chú:</strong> nhóm này dùng chung
+giữa CLOS/RLOS</p>
+<hr />
+<h4 id="24-bộ-bảng-ref_">2.4 Bộ bảng REF_</h4>
+<p>Cả 10 bảng dưới đây chỉ tồn tại vật lý ở tầng PDTD_DTM (không có bản
+SB_DWH) — không phân theo CHUNG/CLOS/RLOS/DIM/FCT như các nhóm khác. Đây
+là <strong>danh mục tĩnh khởi tạo/cập nhật thủ công</strong> từ file
+Excel/CSV do BA cung cấp, không phải luồng ETL — không có bước "Data
+Lineage" ở Section 1 cho nhóm bảng này (khác mọi DIM/FCT khác của tài
+liệu): BA/DevOps insert/update trực tiếp lên bảng REF_ tại PDTD_DTM khi
+khởi tạo lần đầu hoặc khi danh mục có thay đổi (thêm sản phẩm mới, sửa
+cam kết SLA...), không đi qua STG_LOS, không qua CDC, không có job ETL
+định kỳ. Cột "Mô tả" bên dưới ghi
+<code>nguồn file.&lt;TÊN_CỘT&gt;</code> nghĩa là cột tương ứng trong
+file Excel/CSV gốc.</p>
+<h5 id="241-ref_rlos_flow">2.4.1 REF_RLOS_FLOW</h5>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>STREAM</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Luồng nghiệp vụ của hồ sơ — nguồn file.STREAM</td>
+</tr>
+<tr>
+<td>2</td>
+<td>BI_FLOW</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>100</td>
+<td></td>
+<td>Luồng nghiệp vụ chuẩn hóa để hiển thị trên báo cáo — nguồn
+file.BI_FLOW. Giá trị quan sát được: KHCN_HO, BL</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF map luồng nghiệp vụ (STREAM) của hồ sơ RLOS sang phân nhóm
+chuẩn hóa (BI_FLOW) dùng để chia báo cáo theo khối, dùng cho hệ
+RLOS.</li>
+<li>Khóa chính của bảng (PK): <strong>STREAM</strong>.</li>
+</ul>
+<h5 id="242-ref_clos_legal">2.4.2 REF_CLOS_LEGAL</h5>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>OBJ_TYPE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>50</td>
+<td>PK</td>
+<td>Loại đối tượng của giấy tờ pháp lý — nguồn file.OBJ_TYPE, ví dụ
+Người đại diện theo pháp luật, Khách hàng</td>
+</tr>
+<tr>
+<td>2</td>
+<td>LEGAL_TYPE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>50</td>
+<td></td>
+<td>Nhóm vai trò của giấy tờ pháp lý — nguồn file.LEGAL_TYPE. BC2 lọc
+LEGAL_TYPE = 'CUSTOMER' để chỉ lấy giấy tờ của chính khách hàng khi tra
+CIF</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF map vai trò pháp lý của người liên quan (OBJ_TYPE) sang
+nhóm vai trò chuẩn hóa (LEGAL_TYPE), dùng để tra CIF khách hàng, dùng
+cho hệ CLOS.</li>
+<li>Khóa chính của bảng (PK): <strong>OBJ_TYPE</strong>.</li>
+</ul>
+<h5 id="243-tmp_ref_company_region_khcn">2.4.3
+TMP_REF_COMPANY_REGION_KHCN</h5>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>COMPANY_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>20</td>
+<td>PK</td>
+<td>Mã đơn vị kinh doanh — nguồn file.COMPANY_CODE</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DVKD</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>50</td>
+<td></td>
+<td>Tên đơn vị kinh doanh — nguồn file.DVKD, ví dụ Sở Giao Dịch</td>
+</tr>
+<tr>
+<td>3</td>
+<td>CHI_NHANH</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>50</td>
+<td></td>
+<td>Tên chi nhánh quản lý đơn vị — nguồn file.CHI_NHANH</td>
+</tr>
+<tr>
+<td>4</td>
+<td>VUNG</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>30</td>
+<td></td>
+<td>Tên vùng — nguồn file.VUNG, đổ vào trường ZONE của BC10</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF map đơn vị kinh doanh sang chi nhánh và vùng, dùng cho
+luồng khách hàng cá nhân (BC10), dùng cho hệ RLOS.</li>
+<li>Khóa chính của bảng (PK): <strong>COMPANY_CODE</strong>.</li>
+</ul>
+<h5 id="244-tmp_ref_company_region_khdn">2.4.4
+TMP_REF_COMPANY_REGION_KHDN</h5>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>COMPANY_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>20</td>
+<td>PK</td>
+<td>Mã đơn vị kinh doanh — nguồn file.COMPANY_CODE</td>
+</tr>
+<tr>
+<td>2</td>
+<td>TEN_CN_T24</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>50</td>
+<td></td>
+<td>Tên chi nhánh theo cách T24 ghi — nguồn file.TEN_CN_T24, ví dụ AN
+GIANG BRANCH</td>
+</tr>
+<tr>
+<td>3</td>
+<td>TRUNG_TAM</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>50</td>
+<td></td>
+<td>Tên trung tâm khách hàng doanh nghiệp — nguồn file.Trung_tam, ví dụ
+TT KHDN An Giang</td>
+</tr>
+<tr>
+<td>4</td>
+<td>VUNG</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>50</td>
+<td></td>
+<td>Tên vùng — nguồn file.Vung, đổ vào trường ZONE của BC11. Giá trị:
+Miền Bắc, Miền Nam, Hà Nội</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF map đơn vị kinh doanh sang trung tâm và vùng, dùng cho
+luồng khách hàng doanh nghiệp (BC11), dùng cho hệ CLOS.</li>
+<li>Khóa chính của bảng (PK): <strong>COMPANY_CODE</strong>.</li>
+</ul>
+<h5 id="245-rlos_ref_sla_tdkhcn">2.4.5 RLOS_REF_SLA_TDKHCN</h5>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>REF_PRODUCT</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Nhóm sản phẩm dùng để tra cam kết SLA — nguồn file.REF_PRODUCT, ví
+dụ Unsecured_CreditCard, Unsecured-loan</td>
+</tr>
+<tr>
+<td>2</td>
+<td>PRODUCT_LINE</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Dòng sản phẩm theo cách LOS hiển thị — nguồn file.Product_Line, ví
+dụ SeAHome-TTD</td>
+</tr>
+<tr>
+<td>3</td>
+<td>CHANGE_TYPE</td>
+<td>NVARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td>PK</td>
+<td>Loại thay đổi điều kiện phê duyệt — nguồn file.Change_Type. Để trống
+nghĩa là áp cho mọi loại thay đổi</td>
+</tr>
+<tr>
+<td>4</td>
+<td>DEVIATION_G3</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td>PK</td>
+<td>Hồ sơ có từ 3 ngoại lệ chính sách trở lên hay không — nguồn
+file.DEVIATION_G3. Để trống nghĩa là áp cho mọi tình trạng</td>
+</tr>
+<tr>
+<td>5</td>
+<td>SECONDARY_PRODUCTLINE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td>PK</td>
+<td>Sản phẩm phụ đi kèm hay không — nguồn file.SECONDARY_PRODUCTLINE. Để
+trống nghĩa là áp cho mọi trường hợp</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SLA_CREDIT_OFFICER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho chuyên viên tín dụng — nguồn
+file.SLA_CREDIT_OFFICER, đơn vị giờ</td>
+</tr>
+<tr>
+<td>7</td>
+<td>SLA_MARKER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho bước lập hồ sơ thẩm định — nguồn file.SLA_MARKER,
+đơn vị giờ</td>
+</tr>
+<tr>
+<td>8</td>
+<td>SLA_CHECKER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho bước kiểm soát thẩm định — nguồn file.SLA_CHECKER,
+đơn vị giờ</td>
+</tr>
+<tr>
+<td>9</td>
+<td>SLA_CREDIT_APPROVER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho cấp phê duyệt — nguồn file.SLA_CREDIT_APPROVER, đơn
+vị giờ</td>
+</tr>
+<tr>
+<td>10</td>
+<td>APP_GRP</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Cấp thẩm quyền áp dụng — nguồn file.APP_GRP, ví dụ CGPD cấp B,C (B1,
+B2, C1, C2)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF cam kết SLA cho luồng khách hàng cá nhân RLOS, 1 dòng = 1
+tổ hợp REF_PRODUCT + PRODUCT_LINE + CHANGE_TYPE + DEVIATION_G3 +
+SECONDARY_PRODUCTLINE + APP_GRP, dùng cho hệ RLOS.</li>
+<li>Khóa chính của bảng (PK): <strong>UNIQUE (REF_PRODUCT, PRODUCT_LINE,
+CHANGE_TYPE, DEVIATION_G3, SECONDARY_PRODUCTLINE, APP_GRP)</strong>;
+không có PK kỹ thuật riêng.</li>
+</ul>
+<h5 id="246-clos_ref_sla_tdkhdnl">2.4.6 CLOS_REF_SLA_TDKHDNL</h5>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>REF_PRODUCT</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Nhóm sản phẩm dùng để tra cam kết SLA — nguồn file.REF_PRODUCT, ví
+dụ Cấp tín dụng món ngắn hạn, Hạn mức STK</td>
+</tr>
+<tr>
+<td>2</td>
+<td>PRODUCT_LINE</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Dòng sản phẩm — nguồn file.Product_Line, ví dụ Cấp tín dụng ngắn
+hạn, Hạn mức</td>
+</tr>
+<tr>
+<td>3</td>
+<td>SUB_PRODUCT</td>
+<td>NVARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td>PK</td>
+<td>Sản phẩm nhánh — nguồn file.Sub_Product, ví dụ Vay cầm cố GTCG theo
+món. Để trống nghĩa là áp cho mọi sản phẩm nhánh</td>
+</tr>
+<tr>
+<td>4</td>
+<td>HAVE_ANY_DEVIATION</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Hồ sơ có ngoại lệ hay không — nguồn file.Have_any_deviation. Giá trị
+quan sát được: Có, Không</td>
+</tr>
+<tr>
+<td>5</td>
+<td>SLA_CREDIT_OFFICER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho chuyên viên tín dụng — nguồn
+file.SLA_CREDIT_OFFICER, đơn vị giờ</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SLA_MARKER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho bước lập hồ sơ thẩm định — nguồn file.SLA_MARKER,
+đơn vị giờ</td>
+</tr>
+<tr>
+<td>7</td>
+<td>SLA_CHECKER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho bước kiểm soát thẩm định — nguồn file.SLA_CHECKER,
+đơn vị giờ</td>
+</tr>
+<tr>
+<td>8</td>
+<td>SLA_CREDIT_APPROVER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho cấp phê duyệt — nguồn file.SLA_CREDIT_APPROVER, đơn
+vị giờ</td>
+</tr>
+<tr>
+<td>9</td>
+<td>FLAG_APP_GRP</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Cấp thẩm quyền áp dụng — nguồn file.FLAG_APP_GRP, ví dụ CGPD (A1,
+A2, B1, B2)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF cam kết SLA cho hồ sơ CLOS doanh nghiệp lớn/định chế
+(<code>CUST_GROUP IN ('NBFI','JSC','FDI','BANK','STR','SOC')</code>), 1
+dòng = 1 tổ hợp REF_PRODUCT + PRODUCT_LINE + SUB_PRODUCT +
+HAVE_ANY_DEVIATION + FLAG_APP_GRP, dùng cho hệ CLOS.</li>
+<li>Khóa chính của bảng (PK): <strong>UNIQUE (REF_PRODUCT, PRODUCT_LINE,
+SUB_PRODUCT, HAVE_ANY_DEVIATION, FLAG_APP_GRP)</strong>; không có PK kỹ
+thuật riêng.</li>
+<li>Quy tắc chọn giữa bảng này và <code>CLOS_REF_SLA_TDKHDN</code>
+(2.4.7): theo <code>CUST_GROUP</code> của hồ sơ CLOS (SRS BC5 BR 1.2;
+chi tiết + trích SRS tại <code>hld/HLD_Table_Design.md</code> Section 1
+→ 2.4.6, Section 3 dòng #13).</li>
+</ul>
+<h5 id="247-clos_ref_sla_tdkhdn">2.4.7 CLOS_REF_SLA_TDKHDN</h5>
+<p>Cấu trúc cột <strong>giống hệt</strong>
+<code>CLOS_REF_SLA_TDKHDNL</code> (2.4.6) — cùng 9 cột, cùng khóa UNIQUE
+(REF_PRODUCT, PRODUCT_LINE, SUB_PRODUCT, HAVE_ANY_DEVIATION,
+FLAG_APP_GRP). Khác biệt duy nhất là dữ liệu — cam kết SLA cho hồ sơ
+CLOS doanh nghiệp vừa/nhỏ
+(<code>CUST_GROUP IN ('MSME','SME','USME')</code>). Dữ liệu thật gồm 36
+dòng, cột <code>FLAG (APP_GRP)</code> chỉ quan sát được 2 giá trị:
+<code>CGPD</code>, <code>BOD/CC</code>.</p>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>REF_PRODUCT</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Nhóm sản phẩm dùng để tra cam kết SLA — nguồn file.REF_PRODUCT</td>
+</tr>
+<tr>
+<td>2</td>
+<td>PRODUCT_LINE</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Dòng sản phẩm — nguồn file.Product_Line</td>
+</tr>
+<tr>
+<td>3</td>
+<td>SUB_PRODUCT</td>
+<td>NVARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td>PK</td>
+<td>Sản phẩm nhánh — nguồn file.Sub_Product. Để trống nghĩa là áp cho
+mọi sản phẩm nhánh</td>
+</tr>
+<tr>
+<td>4</td>
+<td>HAVE_ANY_DEVIATION</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Hồ sơ có ngoại lệ hay không — nguồn file.Have_any_deviation. Giá trị
+quan sát được: Có, Không</td>
+</tr>
+<tr>
+<td>5</td>
+<td>SLA_CREDIT_OFFICER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho chuyên viên tín dụng — nguồn
+file.SLA_CREDIT_OFFICER, đơn vị giờ</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SLA_MARKER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho bước lập hồ sơ thẩm định — nguồn file.SLA_MARKER,
+đơn vị giờ</td>
+</tr>
+<tr>
+<td>7</td>
+<td>SLA_CHECKER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho bước kiểm soát thẩm định — nguồn file.SLA_CHECKER,
+đơn vị giờ</td>
+</tr>
+<tr>
+<td>8</td>
+<td>SLA_CREDIT_APPROVER</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho cấp phê duyệt — nguồn file.SLA_CREDIT_APPROVER, đơn
+vị giờ</td>
+</tr>
+<tr>
+<td>9</td>
+<td>FLAG_APP_GRP</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Cấp thẩm quyền áp dụng — nguồn file.FLAG_APP_GRP, ví dụ CGPD,
+BOD/CC</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF cam kết SLA cho hồ sơ CLOS doanh nghiệp vừa/nhỏ
+(<code>CUST_GROUP IN ('MSME','SME','USME')</code>), cùng cấu trúc với
+<code>CLOS_REF_SLA_TDKHDNL</code>, dùng cho hệ CLOS.</li>
+<li>Khóa chính của bảng (PK): <strong>UNIQUE (REF_PRODUCT, PRODUCT_LINE,
+SUB_PRODUCT, HAVE_ANY_DEVIATION, FLAG_APP_GRP)</strong>; không có PK kỹ
+thuật riêng.</li>
+</ul>
+<p><strong>Trường hợp <code>APP_GRP = 'C1'</code></strong> (SRS gọi là
+"sheet cam kết SLA TDKHDN luồng 1"): SRS BC5 có 1 sheet thứ ba trong
+<code>BC5TAT.xlsx</code> chỉ chứa <code>REF_PRODUCT</code> cho hồ sơ có
+<code>APP_GRP='C1'</code> — sheet này chỉ có 1 giá trị SLA duy nhất
+(hằng số 4 giờ cho mọi vai trò:
+<code>SLA_CREDIT_OFFICER</code>/<code>SLA_MARKER</code>/<code>SLA_CHECKER</code>/<code>SLA_CREDIT_APPROVER</code>),
+còn <code>REF_PRODUCT</code> của nó kế thừa hoàn toàn từ chính bảng này
+(<code>CLOS_REF_SLA_TDKHDN</code>, tra theo
+<code>PRODUCT_LINE</code>+<code>SUB_PRODUCT</code>). Vì vậy
+<strong>không tạo bảng REF_ vật lý riêng cho "luồng 1"</strong> — giữ
+đúng 9 bảng REF_ đã liệt kê trong split-proposal. Khi hồ sơ có
+<code>APP_GRP='C1'</code>: <code>REF_PRODUCT</code> vẫn lookup bình
+thường vào <code>CLOS_REF_SLA_TDKHDN</code>; còn 4 cột
+<code>SLA_*</code> dùng hằng số cứng = 4 giờ trong công thức PHÁI SINH
+tại <code>DIM_CLOS_APPLICATION</code> (2.2.1.1), không lookup bảng
+nào.</p>
+<h5 id="248-ref_sla_nltt">2.4.8 REF_SLA_NLTT</h5>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>REF_PRODUCT</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Nhóm sản phẩm dùng để tra cam kết SLA — nguồn file.REF_PRODUCT</td>
+</tr>
+<tr>
+<td>2</td>
+<td>PRODUCT_LINE</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Dòng sản phẩm — nguồn file.Product_Line, ví dụ SeAHome-TTD</td>
+</tr>
+<tr>
+<td>3</td>
+<td>POLICY</td>
+<td>NVARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td>PK</td>
+<td>Chính sách tín dụng áp dụng cho hồ sơ — nguồn file.Policy, ví dụ
+THETD.THU.NHAP. Ký tự * nghĩa là khớp theo mẫu</td>
+</tr>
+<tr>
+<td>4</td>
+<td>SUB_PRODUCT</td>
+<td>NVARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td>PK</td>
+<td>Sản phẩm nhánh — nguồn file.Sub_Product. Để trống nghĩa là áp cho
+mọi sản phẩm nhánh</td>
+</tr>
+<tr>
+<td>5</td>
+<td>NEW_CHANGE_REQUEST</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td>PK</td>
+<td>Loại yêu cầu — nguồn file.New_Change_Request, ví dụ New cho hồ sơ
+mới</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SLA_DE_RESULT</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho bước nhập liệu chi tiết — nguồn file.SLA_DE_RESULT.
+Tên cột có hậu tố RESULT nhưng đây là số giờ cam kết, không phải kết quả
+đạt/không đạt</td>
+</tr>
+<tr>
+<td>7</td>
+<td>SLA_QC_RESULT</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho bước kiểm soát nhập liệu — nguồn file.SLA_QC_RESULT.
+Cũng là số giờ, không phải kết quả</td>
+</tr>
+<tr>
+<td>8</td>
+<td>SLA_DE_TOTAL_RESULT</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Cam kết giờ cho cả khâu nhập liệu, bằng tổng SLA_DE_RESULT +
+SLA_QC_RESULT — nguồn file.SLA_DE_TOTAL_RESULT. Là 1 thành phần của
+POINT ở BC9</td>
+</tr>
+<tr>
+<td>9</td>
+<td>QD_DDE</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Điểm quy đổi năng suất bước nhập liệu — nguồn file.QD_DDE</td>
+</tr>
+<tr>
+<td>10</td>
+<td>QD_QC</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>10,2</td>
+<td></td>
+<td>Điểm quy đổi năng suất bước kiểm soát nhập liệu — nguồn
+file.QD_QC</td>
+</tr>
+<tr>
+<td>11</td>
+<td>SYSTEM_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td>PK</td>
+<td>Hệ nguồn của dòng cam kết: CLOS hoặc RLOS — nguồn
+file.SYSTEM_CODE</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF cam kết SLA và điểm quy đổi cho 2 bước nhập liệu/kiểm soát
+nhập liệu, 1 dòng = 1 tổ hợp REF_PRODUCT + PRODUCT_LINE + POLICY +
+SUB_PRODUCT + NEW_CHANGE_REQUEST + SYSTEM_CODE, dùng chung cho cả 2 hệ
+(cột SYSTEM_CODE phân biệt CLOS/RLOS).</li>
+<li>Khóa chính của bảng (PK): <strong>UNIQUE (REF_PRODUCT, PRODUCT_LINE,
+POLICY, SUB_PRODUCT, NEW_CHANGE_REQUEST, SYSTEM_CODE)</strong>; không có
+PK kỹ thuật riêng.</li>
+<li>Phân biệt với <code>Q_RLOS_REF_WORKSTEP_2SYSTEMS</code> (2.4.9): ở
+bảng này, cột <code>SYSTEM_CODE</code> THẬT SỰ là 1 phần khóa PK và phân
+biệt CLOS/RLOS của từng dòng cam kết — khác với cột <code>SYSTEM</code>
+ở 2.4.9 (không phải cờ phân biệt hệ, xem ghi chú ở đó).</li>
+</ul>
+<p><strong>Cách khai thác — report-time lookup, không denormalize vào
+DIM (cả 2 hệ):</strong> báo cáo (BC5, và <code>POINT</code> của BC9 tại
+<code>AGG_LOS_KPI_APPLICATION</code>) tự <code>LEFT JOIN</code> bảng này
+<strong>tại thời điểm truy vấn</strong>, theo khóa đã xác nhận từ dữ
+liệu seed thật (<code>input/BC5TAT(REF_SLA).xlsx</code>, sheet "cam kết
+SLA NLTT"):</p>
+<ul>
+<li><strong>Nhánh RLOS:</strong>
+<code>PRODUCT_LINE = DIM_RLOS_PRODUCT.PRODUCT_LINE_NAME</code> (qua
+<code>FCT_RLOS_APPLICATION_DAILY.PRODUCT_SK</code>) +
+<code>SYSTEM_CODE='RLOS'</code>. Seed thật xác nhận unique theo đúng
+<code>PRODUCT_LINE</code> (28 dòng, mỗi <code>Product Line</code> xuất
+hiện đúng 1 lần) — không rủi ro 1:N.</li>
+<li><strong>Nhánh CLOS:</strong>
+<code>PRODUCT_LINE = DIM_CLOS_PRODUCT.PRODUCT_LINE_NAME</code>
+<ul>
+<li><code>(SUB_PRODUCT IS NULL OR SUB_PRODUCT = DIM_CLOS_PRODUCT.PRODUCT_ NAME)</code>
+(qua <code>FCT_CLOS_APPLICATION_DAILY.PRODUCT_SK</code>) +
+<code>NEW_CHANGE_ REQUEST = DIM_CLOS_APPLICATION.CHANGE_REQUEST</code>
+(qua <code>APPLICATION_SK</code>)</li>
+<li><code>SYSTEM_CODE='CLOS'</code>. Seed thật (16 dòng) xác nhận unique
+theo tổ hợp 3 cột này, không cần
+<code>REF_PRODUCT</code>/<code>POLICY</code>.</li>
+</ul></li>
+<li>Cả 2 nhánh <strong>không dùng cột
+<code>REF_PRODUCT</code>/<code>POLICY</code></strong> làm khóa tra cho
+nhóm SLA nhập liệu tập trung — 2 cột này vẫn giữ trong khai báo cấu trúc
+bảng nhưng không phải điều kiện JOIN thật.</li>
+<li><code>QD_DDE</code>/<code>QD_QC</code> dùng chung đúng 1 điều kiện
+JOIN với <code>SLA_DE_RESULT</code> ở trên.</li>
+</ul>
+<p>Chi tiết đầy đủ (mermaid) xem tại
+<code>hld/HLD_Table_Design.md</code> Section 1/2/3.</p>
+<h5 id="249-q_rlos_ref_workstep_2systems">2.4.9
+Q_RLOS_REF_WORKSTEP_2SYSTEMS</h5>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>SYSTEM</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Hệ sở hữu/nạp bảng map này — nguồn file.SYSTEM. Giá trị quan sát
+được: OF. KHÔNG phải cờ phân biệt CLOS/RLOS của dữ liệu — xem ghi chú
+bên dưới</td>
+</tr>
+<tr>
+<td>2</td>
+<td>IDFLOW</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Mã luồng xử lý — nguồn file.IDFLOW, ví dụ 12 cho luồng giải
+ngân</td>
+</tr>
+<tr>
+<td>3</td>
+<td>WORKSTEP</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>50</td>
+<td></td>
+<td>Tên bước xử lý theo đúng cách LOS ghi — nguồn file.WORKSTEP, ví dụ
+DisbursementMaker</td>
+</tr>
+<tr>
+<td>4</td>
+<td>BI_WORKSTEP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Tên bước chuẩn hóa để hiển thị trên báo cáo — nguồn
+file.BI_WORKSTEP, ví dụ 12.Disbursement-Maker</td>
+</tr>
+<tr>
+<td>5</td>
+<td>DECISION</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Quyết định tại bước xử lý — nguồn file.DECISION. Cùng 1 bước có
+nhiều quyết định nên phải nằm trong tổ hợp tra</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF map bước xử lý và quyết định của cả 2 hệ CLOS, RLOS về 1
+tên bước chuẩn hóa dùng chung trên báo cáo, 1 dòng = 1 tổ hợp SYSTEM +
+IDFLOW + WORKSTEP + DECISION, dùng chung cho cả 2 hệ.</li>
+<li>Khóa chính của bảng (PK): không khai PK/UNIQUE trên DDL gốc — tra
+theo tổ hợp <strong>WORKSTEP</strong> (+ <strong>DECISION</strong> khi
+cần phân biệt nhiều quyết định cùng 1 bước).</li>
+<li>Cột <code>SYSTEM</code> KHÔNG phải cờ phân biệt CLOS/RLOS: toàn bộ
+132 dòng dữ liệu chỉ quan sát được giá trị <code>OF</code> — đây là cột
+nội bộ của chính bảng map này (hệ sở hữu/nạp file map), không phải cờ
+đánh dấu dòng dữ liệu thuộc CLOS hay RLOS. Việc phân biệt CLOS/RLOS khi
+tra bảng này nằm ở phía DIM/FCT gọi join (đã biết trước đang xử lý hồ sơ
+hệ nào), <strong>không dùng điều kiện
+<code>WHERE SYSTEM = ...</code></strong>. <code>IDFLOW</code> là cột
+phân biệt luồng xử lý thật sự trong bảng này (ví dụ 12 = luồng giải
+ngân), không phải <code>SYSTEM</code>. Mọi join từ
+<code>DIM_CLOS_WORKSTEP</code>/<code>DIM_RLOS_WORKSTEP</code>
+(2.2.1.3/2.3.1.3) và
+<code>FCT_CLOS_APPLICATION_DAILY</code>/<code>FCT_RLOS_APPLICATION_DAILY</code>
+(cột <code>LAST_WORKSTEP</code>, 2.2.2.1/2.3.2.1) vào bảng này chỉ dùng
+<code>WORKSTEP</code> (+ <code>DECISION</code>), không lọc theo
+<code>SYSTEM</code>.</li>
+</ul>
+<h5 id="2410-ref_phan_loai_dde">2.4.10 REF_PHAN_LOAI_DDE</h5>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>EXCEPTION_CATEGORY</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>500</td>
+<td>PK</td>
+<td>Nhóm lý do quyết định (nguyên văn, gồm cả mã tiền tố như
+BC3-DE-NEW/UW-DE) — nguồn file.EXCEPTION_CATEGORY</td>
+</tr>
+<tr>
+<td>2</td>
+<td>SYSTEMNAME</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td>PK</td>
+<td>Hệ nguồn của dòng phân loại: CLOS hoặc RLOS — nguồn
+file.SYSTEMNAME</td>
+</tr>
+<tr>
+<td>3</td>
+<td>PHAN_LOAI_DDE</td>
+<td>NVARCHAR2</td>
+<td>Y</td>
+<td>100</td>
+<td></td>
+<td>Phân loại nguyên nhân trả về ở khâu nhập liệu — nguồn
+file.PHAN_LOAI_DDE. Chỉ quan sát được 2 giá trị: 'Lỗi Nhập liệu', 'Thiếu
+Checklist'</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bảng REF map nhóm lý do ngoại lệ (<code>EXCEPTION_CATEGORY</code>)
+sang phân loại nguyên nhân nhập liệu chuẩn hóa
+(<code>PHAN_LOAI_DDE</code>) dùng cho BC7, 1 dòng = 1 tổ hợp
+EXCEPTION_CATEGORY + SYSTEMNAME, dùng chung cho cả 2 hệ (cột SYSTEMNAME
+phân biệt CLOS/RLOS).</li>
+<li>Khóa chính của bảng (PK): <strong>UNIQUE (EXCEPTION_CATEGORY,
+SYSTEMNAME)</strong>; không có PK kỹ thuật riêng.</li>
+</ul>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, securityLevel: "loose" });
+</script>
+</body>
+</html>

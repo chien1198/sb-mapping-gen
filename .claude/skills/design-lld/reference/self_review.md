@@ -779,3 +779,185 @@ BETWEEN DIM_RLOS_COREPAYER.EFF_DATE AND NVL(DIM_RLOS_COREPAYER.EXP_DATE, FCT_RLO
 > Áp dụng lại quy ước này cho MỌI dòng `etl_logic_type=direct` khác trong
 > `lld/` có `etl_logic` chứa từ khóa `JOIN` khi có dịp rà soát lại bảng đó
 > — chưa cần chủ động quét sửa hàng loạt nếu người dùng không yêu cầu.
+
+## RV — Điều kiện SCD2 so sánh trực tiếp cột `DAYID` thay vì `v_batch_date`
+
+**Lỗi đã phát hiện (review 2026-09-28, `FCT_CLOS_COLLATERAL`/
+`FCT_CLOS_EXCEPTION`/`FCT_CLOS_DEVIATION`/`FCT_RLOS_DEVIATION`):** điều
+kiện SCD2 khi lookup DIM viết `<DIM>.EFF_DATE <= DAYID AND (<DIM>.EXP_DATE
+> DAYID OR <DIM>.EXP_DATE IS NULL)` — dùng token `DAYID` trần (tên cột PK
+của chính dòng CSV đang build) làm mốc so sánh. Khác với mục "RV — Biến
+tham số ngày ETL phải là `v_batch_date`" (nói về ký hiệu bind variable sai
+tên `:ETL_DATE`/`:P_DATE`) — đây là dùng nhầm tên CỘT thay vì BIẾN, dù 2
+lỗi cho cùng 1 hệ quả: không nhất quán với mẫu `v_batch_date` dùng xuyên
+suốt tài liệu.
+
+**Quy ước:** mọi điều kiện SCD2 viết `v_batch_date BETWEEN <DIM>.EFF_DATE
+AND NVL(<DIM>.EXP_DATE, v_batch_date)` — không tham chiếu lại cột `DAYID`
+của chính dòng đang build dù giá trị 2 bên tương đương.
+
+**Cách kiểm tra khi self-review:** grep `<= DAYID`, `> DAYID`, `BETWEEN...
+AND DAYID` trong cột `etl_logic` (không tính `description`/`note` nhắc
+"DAYID" như mô tả hợp lệ) — thấy thì đổi `DAYID` trần thành `v_batch_date`.
+
+**Test case đối chiếu:**
+```
+input (sai — literal DAYID trần):
+DIM_CLOS_APPLICATION.EFF_DATE <= DAYID AND (DIM_CLOS_APPLICATION.EXP_DATE
+> DAYID OR DIM_CLOS_APPLICATION.EXP_DATE IS NULL)
+
+output đúng:
+v_batch_date BETWEEN DIM_CLOS_APPLICATION.EFF_DATE AND
+NVL(DIM_CLOS_APPLICATION.EXP_DATE, v_batch_date)
+```
+
+> Áp dụng lại quy ước này cho MỌI dòng còn literal `DAYID` trần trong điều
+> kiện SCD2 ở các file `lld/` đã sinh trước 2026-09-28 khi có dịp rà soát
+> lại bảng đó.
+
+## RV — Placeholder mô tả bằng lời trong dấu `<...>` (biến thể khác `<current>`)
+
+**Lỗi đã phát hiện (review 2026-09-28, nhiều file `FCT_RLOS_*`):** ngoài
+`<current>` đã có mục RV riêng, còn nhiều biến thể placeholder khác cùng
+bản chất — mô tả ý định bằng lời đặt trong `<>` rồi bỏ sót, chưa thay bằng
+SQL/tên cột thật: `<sự kiện hoàn tất gần nhất>`, `<bước hồ sơ đang đứng tại
+DAYID>`, `<mọi cột không phải CLOB>`, `<LOANRATE của đúng bảng grid>`. Dễ
+lọt qua vì trông giống chú thích hợp lệ. Phân biệt với `<NULL>` (literal
+string trong công thức hash, hợp lệ theo `attributes_format.md`) — chỉ cụm
+mô tả NHIỀU TỪ mới là lỗi.
+
+**Quy ước:** không để lại `<cụm mô tả>` trong `etl_logic`. Nếu công thức
+thật cần dữ liệu chưa xác nhận được (VD danh sách cột chưa có metadata),
+chuyển `etl_logic_type=pending` và ghi lý do trong `note`, không viết
+`join`/`computed` kèm placeholder coi như đã xong.
+
+**Cách kiểm tra khi self-review:** regex `<[chữ cái + khoảng trắng]+>`
+(loại trừ `<NULL>`) trong `etl_logic` — có kết quả thì viết lại cụ thể hoặc
+chuyển `pending`.
+
+**Test case đối chiếu:**
+```
+input (sai): DIM_RLOS_WORKSTEP_DECISION.WORKSTEP_CODE =
+<bước hồ sơ đang đứng tại DAYID>
+
+output đúng: DIM_RLOS_WORKSTEP_DECISION.WORKSTEP_CODE = (SELECT
+NG_SB_RLOS_ENTRY_EXIT_CUR.WORKSTEP FROM NG_SB_RLOS_ENTRY_EXIT
+NG_SB_RLOS_ENTRY_EXIT_CUR WHERE NG_SB_RLOS_ENTRY_EXIT_CUR.WINAME =
+NG_SB_RLOS_ENTRY_EXIT.WINAME AND NG_SB_RLOS_ENTRY_EXIT_CUR.ENTRYDATE <=
+v_batch_date ORDER BY NG_SB_RLOS_ENTRY_EXIT_CUR.ENTRYDATE DESC FETCH FIRST
+1 ROW ONLY)
+```
+
+> Mở rộng của mục "RV — `<current>`" — cùng gốc lỗi, khác hình dạng ký
+> hiệu. Áp dụng lại khi rà soát bảng khác có dịp.
+
+## RV — Soạn lại toàn bộ file làm mất công thức đúng đã có sẵn ở cột không đổi
+
+**Lỗi đã phát hiện (review 2026-09-28, `FCT_CLOS_APPLICATION_DAILY`/
+`FCT_RLOS_APPLICATION_DAILY`, ~20 cột mỗi bảng):** khi cấu trúc 1 bảng đổi
+lớn theo HLD mới, ghi đè TOÀN BỘ file bằng 1 lệnh khiến các cột KHÔNG đổi ý
+nghĩa (VD `RI_USER` vẫn luôn là "USERNAME tại bước RequestInitiate") bị
+viết lại theo trí nhớ thay vì tra lại công thức SQL correlated-subquery đã
+đúng chuẩn từ bản cũ — hồi quy từ SQL hợp lệ thành mô tả lời không thực thi
+được.
+
+**Quy ước:** trước khi ghi đè 1 file đã tồn tại, liệt kê cột KHÔNG đổi ý
+nghĩa theo HLD mới (chỉ đổi số thứ tự/tên bảng driving nếu có) — với nhóm
+này, lấy nguyên văn `etl_logic` từ bản cũ (`git show HEAD:<path>`), không
+viết lại theo trí nhớ. Chỉ viết mới cho cột thực sự đổi công thức/nguồn.
+
+**Cách kiểm tra khi self-review:** đọc lại bản cũ qua `git show HEAD:<path>`
+song song với file mới cho từng cột common — nếu HLD không ghi chú đổi
+công thức mà bản mới "gọn" hẳn (mất `SELECT`/`FROM`/`WHERE`) so với bản cũ,
+đó là dấu hiệu hồi quy.
+
+**Test case đối chiếu:**
+```
+bản cũ (đúng chuẩn): (SELECT NG_SB_CLOS_ENTRY_EXIT.USERNAME FROM
+NG_SB_CLOS_ENTRY_EXIT WHERE NG_SB_CLOS_ENTRY_EXIT.WINAME =
+FCT_CLOS_APPLICATION_DAILY.WI_NAME AND NG_SB_CLOS_ENTRY_EXIT.WORKSTEP =
+'RequestInitiate')
+
+bản mới sau soạn lại (hồi quy — sai): USERNAME của bước
+WORKSTEP='RequestInitiate' trên NG_SB_CLOS_ENTRY_EXIT theo WI_NAME
+```
+
+> Rủi ro tăng theo số cột soạn lại cùng lúc — với file > 15 cột, đối chiếu
+> bản cũ ngay trong lúc soạn thay vì soạn xong mới rà.
+
+## RV — Bảng UNION nhiều nguồn không driving table chung bị viết phẳng thay vì nhân dòng theo khối
+
+**Lỗi đã phát hiện (review 2026-09-28, `FCT_RLOS_COLLATERAL`, UNION 4 bảng
+grid tài sản):** đúng pattern "UNION nhiều nguồn không driving table
+chung" đã quy định trong `attributes_format.md` (phải nhân dòng theo
+khối), nhưng bị viết PHẲNG 1 dòng/cột với `etl_logic` mô tả chung "của
+đúng bảng grid nguồn" — không thể hiện tên cột nguồn thật khác nhau giữa
+các khối (VD `REL_TO_CUSTOMER` là `REL_CUSTOMER` ở khối REALESTATE nhưng
+`RELATION_CUSTOMER` ở 3 khối còn lại, chỉ phát hiện được khi tra metadata).
+
+**Quy ước:** khi mermaid Section 1 vẽ N bảng cùng mức nối vào bảng đích,
+không bảng nào là driving chung — lặp `target_column` N lần (1 dòng/khối
+nguồn), mỗi dòng ghi rõ "khối nguồn <TÊN_BẢNG>". Cột chỉ tồn tại ở 1 khối
+thì các khối khác không có dòng tương ứng.
+
+**Cách kiểm tra khi self-review:** trước khi soạn `etl_logic` cho bảng có
+nhiều bảng `STG_LOS` cùng mức nối vào đích, xác định driving chung hay
+UNION độc lập — nếu UNION độc lập, tra metadata (`input/RLOS - Metadata.xlsx`/
+`input/CLOS - Metadata.xlsx` sheet "3. Column Review") lấy đúng tên cột
+thật từng khối, không giả định tên cột giống nhau giữa các khối.
+
+**Test case đối chiếu:**
+```
+input (sai — 1 dòng phẳng, giả định tên cột giống nhau):
+"REL_TO_CUSTOMER" | "REL_CUSTOMER/RELATION_CUSTOMER của đúng bảng grid nguồn"
+
+output đúng (nhân dòng, tên cột đã tra metadata):
+"REL_TO_CUSTOMER" | khối REALESTATE | NG_SB_RLOS_COL_REALESTATE.REL_CUSTOMER
+"REL_TO_CUSTOMER" | khối TRANSPORT  | NG_SB_RLOS_COL_TRANSPORT.RELATION_CUSTOMER
+```
+
+> Áp dụng lại quy ước này cho MỌI bảng UNION nhiều nguồn khác còn viết
+> phẳng khi có dịp rà soát lại.
+
+## RV — Suy đoán định dạng/tên hàm từ tài liệu cũ thay vì xác nhận bằng chứng thật
+
+**Lỗi đã phát hiện (review 2026-09-28):** 2 trường hợp cùng gốc "tự tin kết
+luận mà chưa đủ bằng chứng":
+1. `FCT_CLOS_COLLATERAL.APPRAISED_VALUE`/`LOAN_RATE_LTV` — công thức ép
+   kiểu số đổi qua đổi lại giữa "định dạng Việt Nam" (theo mô tả tài liệu
+   thiết kế cũ) và "định dạng Anh-Mỹ" (theo 1 ví dụ đơn lẻ người dùng đưa)
+   mà chưa đối chiếu dữ liệu mẫu thật đa dạng — thực tế dữ liệu HỖN HỢP cả
+   2 dạng cộng text, không theo đúng 1 quy tắc nào.
+2. `GET_BUSINESS_MINUTE`/`GET_BUSINESS_MINUTE_CPC` (`FCT_*_WORKSTEP_EVENT`)
+   — tên hàm không phải Oracle built-in, HLD dùng như thể có sẵn, không có
+   `note` xác nhận bản chất là custom function nội bộ.
+
+**Quy ước:**
+- Định dạng số/text phụ thuộc dữ liệu thật: khi tài liệu và ví dụ mâu
+  thuẫn, xin NHIỀU dòng dữ liệu mẫu thật trước khi chốt công thức. Với dữ
+  liệu hỗn hợp, dùng `TO_NUMBER(REPLACE(<col>, ',', '') DEFAULT NULL ON
+  CONVERSION ERROR)` — bỏ dấu phẩy ngăn nghìn, giữ dấu chấm thập phân,
+  `DEFAULT NULL ON CONVERSION ERROR` tự NULL hoá text.
+- Tên hàm lạ (không thuộc `TRUNC`/`NVL`/`TO_NUMBER`/`TO_CHAR`/`REPLACE`/
+  `INSTR`/`REGEXP_SUBSTR`/`STANDARD_HASH`/`ROW_NUMBER`/`LAG`/`COALESCE`/
+  `GREATEST`/`CAST`...): giữ nguyên tên hàm trong `etl_logic` (không tự
+  expand khi HLD chưa đủ chi tiết), nhưng bắt buộc `note` xác nhận đây là
+  custom function nội bộ cần DE xác nhận tồn tại trong DB trước khi triển
+  khai.
+
+**Cách kiểm tra khi self-review:** với công thức ép kiểu số, note có ghi
+"đã đối chiếu dữ liệu mẫu thật" chưa — chưa thì đánh dấu cần xác nhận thêm.
+Với tên hàm lạ, note có xác nhận "không phải Oracle built-in, là custom
+function" chưa — thiếu thì bổ sung.
+
+**Test case đối chiếu:**
+```
+Dữ liệu mẫu thật: 4798000000 | 4,697,000,000.00 | "Theo quy định của S..."
+Công thức đúng: TO_NUMBER(REPLACE(<col>, ',', '') DEFAULT NULL ON
+CONVERSION ERROR) — xử lý đúng cả số nguyên thuần, số có dấu phẩy, và NULL
+hoá text.
+```
+
+> Áp dụng lại cho MỌI công thức ép kiểu số/tên hàm lạ khác trong `lld/` —
+> luôn xin bằng chứng thật khi có nghi vấn, không suy đoán từ tài liệu cũ
+> hoặc 1 ví dụ đơn lẻ.

@@ -1,0 +1,4957 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>HLD_DIM_PDTD_DTM_review</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 1400px;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    p, li { max-width: 46em; }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    table { border-collapse: collapse; width: 100%; font-size: 0.78em; table-layout: fixed; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 4px 6px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+    th:nth-child(1), td:nth-child(1) { width: 4%; }
+    th:nth-child(2), td:nth-child(2) { width: 13%; }
+    th:nth-child(3), td:nth-child(3) { width: 8%; }
+    th:nth-child(4), td:nth-child(4) { width: 6%; }
+    th:nth-child(5), td:nth-child(5) { width: 6%; }
+    th:nth-child(6), td:nth-child(6) { width: 5%; }
+    th:nth-child(7), td:nth-child(7) { width: 58%; }
+    h4, h5 { break-after: avoid; page-break-after: avoid; }
+    table { break-inside: avoid; page-break-inside: avoid; }
+    @page { size: A3 landscape; margin: 12mm; }
+    @media print {
+      body { max-width: 100%; padding: 0; font-size: 13px; }
+      a { color: inherit; text-decoration: none; }
+    }
+
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">HLD_DIM_PDTD_DTM_review</h1>
+</header>
+<h1 id="hld-review--dim-tables-pdtd_dtm">HLD Review — DIM tables
+(PDTD_DTM)</h1>
+<h2 id="1-dim_los_company">1. DIM_LOS_COMPANY</h2>
+<h3 id="11-mục-đích-thiết-kế">1.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục đơn vị kinh doanh (phòng
+giao dịch/chi nhánh/khu vực) khởi tạo hồ sơ, dùng chung cho cả hai hệ
+CLOS và RLOS — một đơn vị kinh doanh vật lý xử lý cả hồ sơ CLOS lẫn RLOS
+nên không tách theo hệ. Bảng bê nguyên 1:1 từ SB_DWH, không thêm/bớt cột
+nào ở layer PDTD_DTM.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code> (giữ nguyên giá trị từ SB_DWH, không sinh
+sequence mới)</li>
+<li><strong>Khóa nghiệp vụ (NK):</strong> <code>COMPANY_CODE</code> — kế
+thừa nguyên văn từ SB_DWH, mức PGD/CN nhỏ nhất</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng lưu lịch sử thông tin
+thay đổi theo thời gian (SCD Type 2, khóa tự nhiên
+<code>COMPANY_CODE</code> — mức PGD/CN nhỏ nhất), do SB_DWH quản lý
+SCD2, PDTD_DTM chỉ bê qua vùng chìa STG_DTM.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo RLOS APPLICATION (BC1)</li>
+<li>Báo cáo CLOS APPLICATION (BC2)</li>
+<li>Báo cáo KPI (BC9) — tra khóa <code>COMPANY_CODE</code> làm điều kiện
+lọc chi nhánh khi tính
+<code>SLHS_RLOS_*</code>/<code>SLGN_RLOS_*</code></li>
+</ul></li>
+</ul>
+<h3 id="12-sơ-đồ-lineage">1.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        C["DIM_LOS_COMPANY"]
+    end
+    subgraph PDTD_DTM
+        D["DIM_LOS_COMPANY"]
+    end
+    C -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| D</pre>
+<h3 id="13-cấu-trúc-bảng">1.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_LOS_COMPANY — giữ nguyên giá trị từ
+SB_DWH qua vùng chìa STG_DTM, không sinh sequence mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Nguồn hệ dùng chung cho cả hai hệ CLOS và RLOS — cột kỹ thuật, luôn
+cố định 'LOS'</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>COMPANY_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_LOS_COMPANY, bằng đúng giá trị
+DIMENSION_KEY của cùng dòng — dùng để các FCT lookup vào DIM này</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>COMPANY_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>50</td>
+<td>NK</td>
+<td>Mã đơn vị kinh doanh (PGD/CN — mức chi tiết nhất) — nguồn
+MAS_COMPANY.COMPANY_CODE</td>
+<td>Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION
+(BC2)<br>Báo cáo KPI (BC9) — điều kiện lọc chi nhánh loại trừ</td>
+<td>MÃ PGD (Mã đơn vị kinh doanh); nguồn cho chỉ tiêu
+SLHS_RLOS_<em>/SLGN_RLOS_</em> (điều kiện lọc chi nhánh trên
+AGG_LOS_KPI_YTD_DAILY)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>COMPANY_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_NAME_VN</td>
+<td>Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION
+(BC2)</td>
+<td>TÊN PGD (Tên đơn vị kinh doanh)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>COMPANY_ADDRESS</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>500</td>
+<td></td>
+<td>Địa chỉ đơn vị kinh doanh — nguồn
+MAS_COMPANY.COMPANY_ADDRESS_VN</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>7</td>
+<td>COMPANY_EMAIL</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Email đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_EMAIL</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>8</td>
+<td>ZONE</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>18</td>
+<td></td>
+<td>Mã khu vực nội bộ theo LOS (khác REGION_CODE của MAS_REGION) — nguồn
+MAS_COMPANY.ZONE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>9</td>
+<td>BRANCH_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN
+MAS_BRANCH.BRANCH_ID</td>
+<td>Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION
+(BC2)</td>
+<td>MÃ CHI NHÁNH</td>
+</tr>
+<tr>
+<td>10</td>
+<td>BRANCH_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN</td>
+<td>Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION
+(BC2)</td>
+<td>TÊN CHI NHÁNH</td>
+</tr>
+<tr>
+<td>11</td>
+<td>CITY</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã tỉnh/thành phố của chi nhánh — nguồn MAS_BRANCH.CITY</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>12</td>
+<td>DISTRICT</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã quận/huyện của chi nhánh — nguồn MAS_BRANCH.DISTRICT</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>13</td>
+<td>REGION_CODE</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>18</td>
+<td></td>
+<td>Mã khu vực địa lý — nguồn MAS_BRANCH.REGION, LEFT JOIN
+MAS_REGION.REGION_CODE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>14</td>
+<td>REGION_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên khu vực địa lý — nguồn MAS_REGION.REGION_NAME_VN. Lưu ý: khái
+niệm khu vực này KHÁC với khu vực chuẩn hóa dùng cho BC10/BC11 (qua
+<code>TMP_REF_COMPANY_REGION_KHCN</code>/<code>KHDN</code>) — 2 nguồn
+khác nhau (LOS vs T24-side mapping riêng), không hợp nhất</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>15</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do SB_DWH
+quản lý, bê nguyên qua vùng chìa, không tính lại SCD2 ở DTM</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>16</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành —
+do SB_DWH quản lý, bê nguyên qua vùng chìa</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-dim_los_user">2. DIM_LOS_USER</h2>
+<h3 id="21-mục-đích-thiết-kế">2.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục tài khoản người dùng trên
+ứng dụng LOS (không phải danh sách nhân sự HR) — dùng chung cho cả hai
+hệ CLOS và RLOS, vì một cán bộ có thể xử lý cả hồ sơ CLOS lẫn RLOS. Bảng
+bê nguyên 1:1 từ SB_DWH, không thêm/bớt cột nào ở layer PDTD_DTM.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code> (giữ nguyên giá trị từ SB_DWH, không sinh
+sequence mới)</li>
+<li><strong>Khóa nghiệp vụ (NK):</strong> <code>USERNAME</code> — kế
+thừa nguyên văn từ SB_DWH</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng lưu lịch sử thông tin
+thay đổi theo thời gian (SCD Type 2, khóa tự nhiên
+<code>USERNAME</code>), do SB_DWH quản lý SCD2, PDTD_DTM chỉ bê qua vùng
+chìa STG_DTM.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo RLOS APPLICATION (BC1) — qua giá trị <code>USERNAME</code>
+hiển thị thẳng trên các FCT, không join thuộc tính từ DIM</li>
+<li>Báo cáo Thông tin phê duyệt (BC3) — tương tự, <code>USERNAME</code>
+hiển thị thẳng</li>
+<li>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — tương tự</li>
+<li>Báo cáo NGOẠI LỆ (BC6) / Báo cáo EXCEPTION - FTR (BC7) — tương
+tự</li>
+<li>Báo cáo KPI (BC9) — đếm số lượng nhân sự theo
+<code>USERNAME</code></li>
+</ul></li>
+</ul>
+<h3 id="22-sơ-đồ-lineage">2.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        C["DIM_LOS_USER"]
+    end
+    subgraph PDTD_DTM
+        D["DIM_LOS_USER"]
+    end
+    C -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| D</pre>
+<h3 id="23-cấu-trúc-bảng">2.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_LOS_USER — giữ nguyên giá trị từ
+SB_DWH qua vùng chìa STG_DTM, không sinh sequence mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Nguồn hệ dùng chung cho cả hai hệ CLOS và RLOS — cột kỹ thuật, luôn
+cố định 'LOS'</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>USER_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_LOS_USER, bằng đúng giá trị
+DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu
+không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>USERNAME</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>100</td>
+<td>NK</td>
+<td>Tên tài khoản của cán bộ xử lý hồ sơ trên ứng dụng LOS — nguồn
+MAS_USER.LOGIN_ID</td>
+<td>Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo Thông tin phê duyệt
+(BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4)<br>Báo cáo NGOẠI LỆ
+(BC6)<br>Báo cáo EXCEPTION - FTR (BC7)<br>Báo cáo KPI (BC9)</td>
+<td>UND_MAKER (User Chuyên viên thẩm định); BI_APPROVER/BI_COMMITTEE
+(User phê duyệt/Hội đồng tín dụng); RAISED_BY (User tạo lý do); NHAN_SU
+(đếm số nhân sự theo USERNAME) — các báo cáo đều đọc giá trị thô trên
+FCT (thường qua CASE WHEN theo WORKSTEP_CODE trên chính dòng event),
+không join thuộc tính qua DIM này</td>
+</tr>
+<tr>
+<td>5</td>
+<td>EMPLOYEE_NAME</td>
+<td>NVARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên nhân viên — nguồn MAS_USER.EMPLOYEE_NAME</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>6</td>
+<td>EMPLOYEE_STATUS</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Trạng thái tài khoản — nguồn MAS_USER.EMPLOYEE_STATUS</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>7</td>
+<td>EMAIL</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Email — nguồn MAS_USER.EMAIL</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>8</td>
+<td>IP_PHONE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Số máy nội bộ — nguồn MAS_USER.IP_PHONE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>9</td>
+<td>SB_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Mã SB của cán bộ — nguồn MAS_USER.SB_CODE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>10</td>
+<td>ID_CUSTOMER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Mã khách hàng gắn với tài khoản (nếu có) — nguồn
+MAS_USER.ID_CUSTOMER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>11</td>
+<td>COMPANY_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Mã chi nhánh/ĐVKD quản lý tài khoản — nguồn
+MAS_USER.COMPANY_CODE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>12</td>
+<td>COMPANY_NAME</td>
+<td>NVARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên chi nhánh/ĐVKD quản lý tài khoản — nguồn
+MAS_USER.COMPANY_NAME</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>13</td>
+<td>TITLE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Danh xưng/chức danh — nguồn MAS_USER.TITLE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>14</td>
+<td>DEPARTMENT_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Mã phòng ban — nguồn MAS_USER.DEPARTMENT_CODE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>15</td>
+<td>DEPARTMENT_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên phòng ban — nguồn MAS_USER.DEPARTMENT_NAME</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>16</td>
+<td>UWMAKER_GROUP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Nhóm thẩm định — nguồn MAS_USER.UWMAKER_GROUP</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>17</td>
+<td>UWCHECKER_GROUP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Nhóm kiểm soát thẩm định — nguồn MAS_USER.UWCHECKER_GROUP</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>18</td>
+<td>AP_GROUP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Nhóm phê duyệt — nguồn MAS_USER.AP_GROUP</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>19</td>
+<td>PREDISB_MAKER_GROUP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Nhóm soạn thảo hồ sơ XLTD — nguồn MAS_USER.PREDISB_MAKER_GROUP</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>20</td>
+<td>PREDISB_GROUP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Nhóm kiểm soát soạn thảo hồ sơ XLTD — nguồn
+MAS_USER.PREDISB_GROUP</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>21</td>
+<td>DISB_MAKER_GROUP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Nhóm giải ngân — nguồn MAS_USER.DISB_MAKER_GROUP</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>22</td>
+<td>DISB_CHECKER_GROUP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Nhóm kiểm soát giải ngân — nguồn MAS_USER.DISB_CHECKER_GROUP</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>23</td>
+<td>HUB</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Đơn vị/cụm xử lý — nguồn MAS_USER.HUB</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>24</td>
+<td>BRANCH_MANAGER_EMAIL</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Email giám đốc chi nhánh quản lý tài khoản — nguồn
+MAS_USER.BRANCH_MANAGER_EMAIL</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>25</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do SB_DWH
+quản lý, bê nguyên qua vùng chìa, không tính lại SCD2 ở DTM</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>26</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành —
+do SB_DWH quản lý, bê nguyên qua vùng chìa</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-dim_clos_application">3. DIM_CLOS_APPLICATION</h2>
+<h3 id="31-mục-đích-thiết-kế">3.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục hồ sơ tín dụng CLOS (doanh
+nghiệp/tổ chức) — lưu các thông tin ít thay đổi của 1 hồ sơ (luồng
+nghiệp vụ, phê duyệt, ngành nghề khách hàng, cấp thẩm quyền, cờ ngoại
+lệ, khu vực xử lý, mục đích vay, cờ yêu cầu phát sinh theo hồ sơ, quan
+hệ tới khách hàng chính...). Thuộc tính KHÁCH HÀNG thật (phân khúc,
+ngành nghề cố hữu...) tách riêng ở <code>DIM_CLOS_CUSTOMER</code> (mục
+5). <strong>Đổi phương án (review 2026-09-26, theo yêu cầu người
+dùng):</strong> bảng này quay lại bê nguyên 1:1 từ SB_DWH, không còn cột
+phái sinh nào ở tầng PDTD_DTM — <code>BI_FLOW</code> và nhóm cam kết SLA
+(<code>REF_PRODUCT</code>, <code>SLA_CREDIT_OFFICER</code>,
+<code>SLA_MARKER</code>, <code>SLA_CHECKER</code>,
+<code>SLA_CREDIT_APPROVER</code>) đã chuyển hẳn sang
+<code>FCT_CLOS_APPLICATION_DAILY</code> (xem
+<code>HLD_FCT_PDTD_DTM_review.md</code> mục 3) — lý do: khóa tra các cột
+này (<code>CUST_GROUP</code>/<code>APP_GRP</code>) là thuộc tính ổn
+định/gán một lần của hồ sơ hoặc khách hàng (không phải SCD2-sensitive
+theo lịch sử phiên bản hồ sơ), nên đặt phép JOIN REF ở tầng FCT không
+làm mất tính đúng point-in-time, đồng thời giữ nguyên tắc "DIM PDTD_DTM
+giống hệt DIM SB_DWH" xuyên suốt toàn bộ layer.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code> (giữ nguyên giá trị từ SB_DWH, không sinh
+sequence mới)</li>
+<li><strong>Khóa nghiệp vụ (NK):</strong> <code>WI_NAME</code> — kế thừa
+nguyên văn từ SB_DWH (<code>EFF_DATE</code> chỉ là điều kiện UNIQUE cho
+SCD2, không phải thành phần khóa)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng hồ sơ lưu lịch sử thông
+tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên
+<code>WI_NAME</code> + <code>EFF_DATE</code>).</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo CLOS APPLICATION (BC2)</li>
+<li>Báo cáo Thông tin phê duyệt (BC3)</li>
+<li>Báo cáo SLA - TAT (BC5) — tra khóa
+<code>APP_GRP</code>/<code>HAVE_ANY_DEVIATION</code>/<code>CUST_GROUP</code>
+(qua <code>CUSTOMER_SK</code> → <code>DIM_CLOS_CUSTOMER</code>)</li>
+<li>Báo cáo KPI (BC9) — tra điều kiện lọc
+<code>STREAM</code>/<code>APP_GRP</code></li>
+<li>Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua
+<code>FCT_CLOS_LOAN_DISBURSEMENT</code></li>
+</ul></li>
+</ul>
+<h3 id="32-sơ-đồ-lineage">3.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        F["DIM_CLOS_APPLICATION"]
+    end
+    subgraph PDTD_DTM
+        G["DIM_CLOS_APPLICATION"]
+    end
+    F -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1, không còn cột phái sinh nào| G</pre>
+<p><strong>Chuyển
+<code>BI_FLOW</code>/<code>REF_PRODUCT</code>/<code>SLA_*</code> sang
+FCT (review 2026-09-26, theo yêu cầu người dùng):</strong> sơ đồ join
+<code>CLOS_REF_SLA_TDKHDNL</code>/ <code>CLOS_REF_SLA_TDKHDN</code> và
+<code>DIM_CLOS_PRODUCT</code> để sinh 6 cột này nay chuyển hẳn sang
+<code>FCT_CLOS_APPLICATION_DAILY</code> — xem
+<code>HLD_FCT_PDTD_DTM_review.md</code> mục 3.</p>
+<p><strong>Sửa lệch cấu trúc so với SB_DWH (review 2026-09-26, theo yêu
+cầu người dùng):</strong> mục 3.3 trước đây còn sót lại tổ hợp cột lỗi
+thời từ 1 phương án thiết kế cũ hơn nữa (<code>CHANGE_REQUEST</code>,
+<code>CHANGE_TYPE</code>, <code>CUST_GROUP</code>,
+<code>INDUSTRY_LVL1/2/3_CODE</code>) — các cột này KHÔNG có trong
+<code>DIM_CLOS_APPLICATION</code> hiện hành của SB_DWH
+(<code>HLD_DIM_SB_DWH_review.md</code> mục 3 xác nhận rõ:
+<code>CUST_GROUP</code>/<code>INDUSTRY_LVL1/2/3_CODE</code> thuộc
+<code>DIM_CLOS_CUSTOMER</code>, còn
+<code>CHANGE_REQUEST</code>/<code>CHANGE_TYPE</code> thuộc phạm vi
+<code>FCT_CLOS_APPLICATION_DAILY</code>). Đã dựng lại toàn bộ mục 3.3
+khớp đúng 1:1 với cấu trúc 49 cột hiện hành của SB_DWH mục 3 (từ 26 cột
+lỗi thời → 49 cột).</p>
+<h3 id="33-cấu-trúc-bảng">3.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_CLOS_APPLICATION — giữ nguyên giá trị
+từ SB_DWH qua vùng chìa STG_DTM, không sinh sequence mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS'</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>APPLICATION_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_CLOS_APPLICATION, bằng đúng giá
+trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown)
+nếu không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>WI_NAME</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>100</td>
+<td>NK</td>
+<td>Mã hồ sơ tín dụng CLOS — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.WI_NAME). UNIQUE (WI_NAME, EFF_DATE)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo Thông tin phê duyệt
+(BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4)<br>Báo cáo SLA - TAT
+(BC5)<br>Báo cáo NGOẠI LỆ (BC6)<br>Báo cáo EXCEPTION - FTR (BC7)<br>Báo
+cáo RETURN (BC8)<br>Báo cáo KPI (BC9)<br>Báo cáo Giải ngân _ Quá hạn
+KHDN (BC11) — qua FIRST_APPROVED_WI_NAME</td>
+<td>WINAME / WI_NAME (Mã hồ sơ)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>LOANCASEID</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã khoản vay gắn với hồ sơ — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.LOANCASEID), giữ nguyên văn không lọc</td>
+<td>Báo cáo EXCEPTION - FTR (BC7)<br>Báo cáo Giải ngân _ Quá hạn KHDN
+(BC11)</td>
+<td>LOANCASEID (Mã LOANCASEID)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>FIRST_APPROVED_WI_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã hồ sơ cha (BC11.APPROVAL_WINAME_LOS) — kế thừa nguyên văn từ
+SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: MIN(WI_NAME) trên
+NG_SB_CLOS_EXTTABLE, group theo LOANCASEID, gán cho mọi hồ sơ cùng
+LOANCASEID</td>
+<td>Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua
+FCT_CLOS_LOAN_DISBURSEMENT</td>
+<td>APPROVAL_WINAME_LOS (Mã hồ sơ phê duyệt)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>FIRST_APPROVED_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày phê duyệt (BC11.APPROVAL_DATE) — kế thừa nguyên văn từ SB_DWH,
+PHÁI SINH sẵn tại tầng SB_DWH: MAX(EXITDATE) trên NG_SB_CLOS_ENTRY_EXIT
+của hồ sơ thỏa USERNAME IS NOT NULL AND WORKSTEP IN
+('CreditApproval','CreditCommittee') AND DECISION IN ('Submit','Send To
+HOSupport','Send To PostSanction')</td>
+<td>Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua
+FCT_CLOS_LOAN_DISBURSEMENT</td>
+<td>APPROVAL_DATE (Ngày phê duyệt)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>STREAM</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Luồng nghiệp vụ của hồ sơ — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_APPROVAL.STREAM)</td>
+<td>Báo cáo Thông tin phê duyệt (BC3)<br>Báo cáo KPI (BC9) — điều kiện
+lọc STREAM cho SLHS_CLOS/SLGN_CLOS/TAT_CLOS</td>
+<td>BC3: STREAM (Luồng hồ sơ); nguồn cho chỉ tiêu
+SLHS_CLOS_<em>/SLGN_CLOS_</em>/TAT_CLOS_* (điều kiện lọc trên
+AGG_LOS_KPI_YTD_DAILY)</td>
+</tr>
+<tr>
+<td>9</td>
+<td>APPROVAL_TYPE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Loại luồng phê duyệt — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_APPROVAL.STREAM đọc theo nghĩa luồng phê duyệt tại bước kiểm
+soát nhập liệu)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>APPROVAL_TYPE (Luồng phê duyệt)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>CREDIT_PROFILE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Cấp tín dụng của hồ sơ (TVTD/CTD) — kế thừa nguyên văn từ SB_DWH
+(nguồn gốc NG_SB_CLOS_EXTTABLE.CREDIT_PROFILE)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>CAP_TIN_DUNG (Hồ sơ tư vấn tín dụng hay cấp tín dụng)</td>
+</tr>
+<tr>
+<td>11</td>
+<td>EMPLOYEE_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã cán bộ quản lý hồ sơ — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.EMPLOYEE_CODE)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>EMPLOYEE_CODE (Mã CRO)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>EMPLOYEE_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>225</td>
+<td></td>
+<td>Tên cán bộ quản lý hồ sơ — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.EMPLOYEE_NAME)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>EMPLOYEE_NAME (Tên CRO)</td>
+</tr>
+<tr>
+<td>13</td>
+<td>CREATION_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Ngày khởi tạo hồ sơ — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn
+tại tầng SB_DWH: MIN(ENTRYDATE) theo WI_NAME trên NG_SB_CLOS_ENTRY_EXIT,
+TRUNC về ngày</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>CREATION_DATE (Ngày hồ sơ khởi tạo)</td>
+</tr>
+<tr>
+<td>14</td>
+<td>APP_GRP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Cấp thẩm quyền phê duyệt của hồ sơ (A1-C3, BOD, CC, SCC, RCC,
+DEBTCC) — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_APPROVAL.APP_GRP)</td>
+<td>Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp<br>Báo cáo SLA -
+TAT (BC5) — khóa tra REF_PRODUCT/SLA_*<br>Báo cáo KPI (BC9) — khóa tra
+điểm KPI (POINT)</td>
+<td>APP_GRP (Cấp phân quyền phê duyệt); nguồn cho chỉ tiêu POINT (BC9),
+SLA_CREDIT_OFFICER/SLA_MARKER/SLA_CHECKER/SLA_CREDIT_APPROVER (BC5)</td>
+</tr>
+<tr>
+<td>15</td>
+<td>HAVE_ANY_DEVIATION</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Hồ sơ có ngoại lệ/độ lệch so với chính sách chuẩn hay không
+(Có/Không) — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_CREDITINFO_COMM.HAVE_ANY_DEVIATION). Chỉ có giá trị từ khi hồ
+sơ tới bước Hội đồng tín dụng, NULL ở các phiên bản trước đó</td>
+<td>Báo cáo SLA - TAT (BC5) — khóa tra REF_PRODUCT/SLA_*</td>
+<td>Nguồn cho chỉ tiêu REF_PRODUCT/SLA_* (BC5)</td>
+</tr>
+<tr>
+<td>16</td>
+<td>CREDIT_LIMIT_COMMITTEE</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>20,2</td>
+<td></td>
+<td>Hạn mức do hội đồng phê duyệt (BC3.CREDIT_LIMIT) — kế thừa nguyên
+văn từ SB_DWH, DƯ THỪA CÓ CHỦ ĐÍCH, cùng nguồn/giá trị với
+FCT_CLOS_APPLICATION_DAILY.CREDIT_LIMIT_COMMITTEE</td>
+<td>Báo cáo Thông tin phê duyệt (BC3) — qua FCT_CLOS_WORKSTEP_EVENT</td>
+<td>CREDIT_LIMIT (Số tiền phê duyệt)</td>
+</tr>
+<tr>
+<td>17</td>
+<td>CURRENCY_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Loại tiền (BC3.CURRENCY) — kế thừa nguyên văn từ SB_DWH, DƯ THỪA CÓ
+CHỦ ĐÍCH, cùng lý do cột 16</td>
+<td>Báo cáo Thông tin phê duyệt (BC3) — qua FCT_CLOS_WORKSTEP_EVENT</td>
+<td>CURRENCY (Đơn vị tiền tệ)</td>
+</tr>
+<tr>
+<td>18</td>
+<td>APPROVED_TERM</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>5</td>
+<td></td>
+<td>Kỳ hạn phê duyệt (BC3.CREDIT_TERM) — kế thừa nguyên văn từ SB_DWH,
+DƯ THỪA CÓ CHỦ ĐÍCH, cùng lý do cột 16</td>
+<td>Báo cáo Thông tin phê duyệt (BC3) — qua FCT_CLOS_WORKSTEP_EVENT</td>
+<td>CREDIT_TERM (Thời hạn phê duyệt)</td>
+</tr>
+<tr>
+<td>19</td>
+<td>ZONE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Khu vực/vùng quản lý tự khai theo hồ sơ (BC1/BC2.ZONE) — kế thừa
+nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO.ZONEE, đổi tên bỏ
+chữ E cuối cho gọn). Khác bản chất với DIM_LOS_COMPANY.ZONE (mã nội bộ
+chuẩn hóa từ MAS_COMPANY, dùng làm khóa join đơn vị kinh doanh) — cột
+này là giá trị tự khai gắn với hồ sơ, không dùng để join</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>ZONE (Khu vực)</td>
+</tr>
+<tr>
+<td>20</td>
+<td>APP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày khởi tạo/nộp hồ sơ — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_CUST_INFO.APP_DATE)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>21</td>
+<td>LOAN_PURPOSE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Mục đích vay của khoản đang xin trong hồ sơ này (có/không tạo doanh
+thu) — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_CUST_INFO.LOAN_PURPOSE)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>22</td>
+<td>LG_REQ</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ yêu cầu bảo lãnh (Letter of Guarantee) phát sinh theo hồ sơ — kế
+thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO.LG_REQ,
+boolean true/false). Cần BA xác nhận ý nghĩa và điều kiện phát sinh cụ
+thể</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>23</td>
+<td>FI_REQ</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ yêu cầu (tương tự LG_REQ) — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_CUST_INFO.FI_REQ, boolean true/false). Cần BA xác nhận ý
+nghĩa và điều kiện phát sinh cụ thể</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>24</td>
+<td>PHONE_REQ</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ yêu cầu xác minh điện thoại (tương tự LG_REQ) — kế thừa nguyên
+văn từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO.PHONE_REQ, boolean
+true/false). Cần BA xác nhận ý nghĩa và điều kiện phát sinh cụ thể</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>25</td>
+<td>EMAIL</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Email liên hệ khai theo hồ sơ — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_CUST_INFO.EMAIL)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>26</td>
+<td>DISTANCE_BRANCH_CUSTOMER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Dải khoảng cách từ khách hàng đến chi nhánh xử lý hồ sơ này (đã phân
+nhóm sẵn, không phải số đo thô) — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_CUST_INFO.DISTANCE_BRANCH_CUSTOMER). Cần BA xác nhận đơn
+vị đo (nghi vấn km)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>27</td>
+<td>PRODUCT_LINE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Dòng sản phẩm tự khai theo hồ sơ (mã PRO01-06) — kế thừa nguyên văn
+từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO.PRODUCT_LINE). Text as-is,
+KHÔNG dùng để tra REF_PRODUCT/SLA_* (khóa tra vẫn qua
+DIM_CLOS_PRODUCT/FCT, xem ghi chú cuối mục)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>PRODUCT_LINE (Dòng sản phẩm)</td>
+</tr>
+<tr>
+<td>28</td>
+<td>SUB_PRODUCT</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Sản phẩm vay chi tiết tự khai theo hồ sơ — kế thừa nguyên văn từ
+SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO.SUB_PRODUCT). Text as-is, cùng lý
+do cột 27</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>SUB_PRODUCT (Sản phẩm nhánh)</td>
+</tr>
+<tr>
+<td>29</td>
+<td>ID_NUMBER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Số ĐKKD/CMND của khách hàng đứng tên vay chính — kế thừa nguyên văn
+từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN
+theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG')</td>
+<td>—</td>
+<td>Thể hiện quan hệ hồ sơ↔︎khách hàng trực tiếp trên DIM này</td>
+</tr>
+<tr>
+<td>30</td>
+<td>CUSTOMER_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên khách hàng vay — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.CUSTOMER_NAME)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>31</td>
+<td>DECISION</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Quyết định tại bước hiện tại (ảnh chụp mới nhất) — kế thừa nguyên
+văn từ SB_DWH (nguồn gốc NG_SB_CLOS_EXTTABLE.DECISION)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>32</td>
+<td>CURR_WSNAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Tên bước xử lý hiện tại — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.CURR_WSNAME)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>33</td>
+<td>PREV_WSNAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Tên bước xử lý trước đó — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.PREV_WSNAME)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>34</td>
+<td>PRODUCT_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>150</td>
+<td></td>
+<td>Tên sản phẩm vay (đầy đủ hơn SUB_PRODUCT) — kế thừa nguyên văn từ
+SB_DWH (nguồn gốc NG_SB_CLOS_EXTTABLE.PRODUCT_NAME)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>35</td>
+<td>DATACHKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Data Check — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.DATACHKUSER)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>36</td>
+<td>UWMAKERUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Underwriting Maker — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_EXTTABLE.UWMAKERUSER). SRS BC2 dùng làm fallback COALESCE
+cho UNDERWRITERMAKER_TAKERESPON (giá trị chính tính từ
+FCT_CLOS_WORKSTEP_EVENT)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>37</td>
+<td>UWCHKRUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Underwriting Checker — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_EXTTABLE.UWCHKRUSER). Cùng vai trò fallback như cột 36,
+cho UNDERWRITERCHECKER_TAKERESPON</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>38</td>
+<td>CREDAPPRUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Credit Approval — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.CREDAPPRUSER)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>39</td>
+<td>CCOMMITUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Credit Committee — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.CCOMMITUSER)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>40</td>
+<td>HOSUPPORTUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username HO Support — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.HOSUPPORTUSER)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>41</td>
+<td>POSTSANCUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Post Sanction — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_EXTTABLE.POSTSANCUSER)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>42</td>
+<td>PREDISBMAKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Pre-Disbursement Maker — kế thừa nguyên văn từ SB_DWH
+(nguồn gốc NG_SB_CLOS_EXTTABLE.PREDISBMAKUSER)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>43</td>
+<td>PREDISBCHKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Pre-Disbursement Checker — kế thừa nguyên văn từ SB_DWH
+(nguồn gốc NG_SB_CLOS_EXTTABLE.PREDISBCHKUSER)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>44</td>
+<td>DISBCHKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Disbursement Checker — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_EXTTABLE.DISBCHKUSER)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>45</td>
+<td>DISBMAKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Disbursement Maker — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_EXTTABLE.DISBMAKUSER)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>46</td>
+<td>CHECKER3_TARGET</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Đích định tuyến sau BranchChecker3 — kế thừa nguyên văn từ SB_DWH
+(nguồn gốc NG_SB_CLOS_EXTTABLE.CHECKER3_TARGET)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>47</td>
+<td>CHANNEL</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Kênh nộp hồ sơ (eBanking/khác) — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_EXTTABLE.CHANNEL)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>48</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>49</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Ghi chú thiết kế:</strong></p>
+<ul>
+<li><code>CUST_GROUP</code> và <code>INDUSTRY_LVL1/2/3_CODE</code> không
+có ở bảng này — thuộc tính khách hàng thật (phân khúc, ngành nghề kinh
+doanh cố hữu), xem <code>DIM_CLOS_CUSTOMER</code> (mục 5). Bảng này có
+<code>CUSTOMER_SK</code> (khóa tới <code>DIM_CLOS_CUSTOMER</code>) để
+<code>BI_FLOW</code>/chọn bảng SLA
+(<code>CLOS_REF_SLA_TDKHDNL</code>/<code>CLOS_REF_SLA_TDKHDN</code>) tra
+<code>CUST_GROUP</code> qua khóa này.</li>
+<li><code>CHANGE_REQUEST</code>/<code>CHANGE_TYPE</code> (nguồn
+<code>NG_SB_CLOS_CHANGEREQ</code>) không có ở bảng này — bản chất "thay
+đổi thường xuyên" theo hồ sơ không phù hợp cột ổn định SCD2, thuộc phạm
+vi <code>FCT_CLOS_APPLICATION_DAILY</code>.</li>
+<li><code>PRODUCT_LINE</code>/<code>SUB_PRODUCT</code> (cột 27-28) là
+text tự khai theo hồ sơ từ <code>NG_SB_CLOS_CUST_INFO</code>, không dùng
+để tra <code>REF_PRODUCT</code>/<code>SLA_*</code> — khóa tra vẫn là
+<code>PRODUCT_LINE_NAME</code>/<code>PRODUCT_NAME</code> chuẩn hóa từ
+<code>DIM_CLOS_PRODUCT</code>, lấy gián tiếp qua
+<code>FCT_CLOS_APPLICATION_DAILY.PRODUCT_SK</code>.</li>
+<li><code>COMPANY_CODE</code>/<code>COMPANY_NAME</code>/<code>BRANCH_CODE</code>/<code>BRANCH_NAME</code>
+không có ở bảng này — quan hệ hồ sơ↔︎đơn vị kinh doanh đã có sẵn qua
+<code>COMPANY_SK</code> → <code>DIM_LOS_COMPANY</code>.</li>
+</ul>
+<p><strong>Sửa lệch cấu trúc so với SB_DWH (review 2026-09-26, theo yêu
+cầu người dùng):</strong> mục 3.3 trước đây còn sót lại tổ hợp cột lỗi
+thời từ 1 phương án thiết kế cũ hơn nữa (<code>CHANGE_REQUEST</code>,
+<code>CHANGE_TYPE</code>, <code>CUST_GROUP</code>,
+<code>INDUSTRY_LVL1/2/3_CODE</code>) — các cột này KHÔNG có trong
+<code>DIM_CLOS_APPLICATION</code> hiện hành của SB_DWH
+(<code>HLD_DIM_SB_DWH_review.md</code> mục 3 xác nhận rõ:
+<code>CUST_GROUP</code>/<code>INDUSTRY_LVL1/2/3_CODE</code> thuộc
+<code>DIM_CLOS_CUSTOMER</code>, còn
+<code>CHANGE_REQUEST</code>/<code>CHANGE_TYPE</code> thuộc phạm vi
+<code>FCT_CLOS_APPLICATION_DAILY</code>). Đã dựng lại toàn bộ mục 3.3
+khớp đúng 1:1 với cấu trúc 49 cột hiện hành của SB_DWH mục 3 (từ 26 cột
+lỗi thời, gồm các cột không tồn tại ở SB_DWH, lên 49 cột khớp đúng
+SB_DWH).</p>
+<h2 id="4-dim_clos_collateral_type">4. DIM_CLOS_COLLATERAL_TYPE</h2>
+<h3 id="41-mục-đích-thiết-kế">4.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục loại tài sản bảo đảm (TSBĐ)
+dùng trong hồ sơ CLOS (doanh nghiệp) — mỗi dòng là 1 loại tài sản bảo
+đảm đã được ngân hàng định nghĩa sẵn (bất động sản, phương tiện vận tải,
+hàng tồn kho, giấy tờ có giá...), không gắn theo hồ sơ cụ thể nào.
+<strong>Đổi nguồn ở tầng SB_DWH (review 2026-09-26):</strong> DIM này bê
+1:1 từ SB_DWH, nơi nguồn đã đổi từ
+<code>NG_SB_CLOS_COLL_CD.COLLTYPE</code> sang
+<code>NG_SB_RLOS_MAS_COLL_CODE</code> (danh mục dùng chung CLOS+RLOS) —
+xem chi tiết tại <code>HLD_DIM_SB_DWH_review.md</code> mục 4.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (NK):</strong>
+<code>COLLATERAL_TYPE_CODE</code> — kế thừa nguyên văn từ SB_DWH</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 loại tài sản bảo
+đảm, bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng
+PDTD_DTM.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo Thông tin phê duyệt (BC3)</li>
+<li>Báo cáo CLOS APPLICATION (BC2)</li>
+</ul></li>
+</ul>
+<h3 id="42-sơ-đồ-lineage">4.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        D["DIM_CLOS_COLLATERAL_TYPE"]
+    end
+    subgraph PDTD_DTM
+        E["DIM_CLOS_COLLATERAL_TYPE"]
+    end
+    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E</pre>
+<h3 id="43-cấu-trúc-bảng">4.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_CLOS_COLLATERAL_TYPE, kế thừa nguyên
+giá trị từ SB_DWH, không sinh sequence mới ở tầng PDTD_DTM</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS'</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>COLLATERAL_TYPE_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_CLOS_COLLATERAL_TYPE, bằng đúng
+giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng
+Unknown) nếu không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>COLLATERAL_TYPE_CODE</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>NK</td>
+<td>Mã danh mục tài sản theo nguồn — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_RLOS_MAS_COLL_CODE.COLLATERAL_CODE, đổi nguồn review
+2026-09-26, trước đây NG_SB_CLOS_COLL_CD.COLLTYPE). Chỉ là mã kỹ thuật
+theo nguồn, KHÔNG dùng cho công thức báo cáo nào</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>COLLATERAL_TYPE_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên danh mục tài sản — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_RLOS_MAS_COLL_CODE.CODE_NAME, bổ sung mới review 2026-09-26). Là
+trường DUY NHẤT báo cáo dùng, tương đương giá trị COLLTYPE gốc trong SRS
+BC2/BC3</td>
+<td>Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo
+CLOS APPLICATION (BC2) — khóa lọc 9 cờ TSDB_*</td>
+<td>TYPES_OF_COLLATERALS (Loại TSBĐ, BC3); nguồn cho chỉ tiêu/trường
+TSDB_NHOM_0/TSDB_BDS/TSDB_PTVT/TSDB_MMTB/TSDB_HTK/TSDB_KPT/TSDB_CP_TP/TSDB_TIN_CHAP/TIN_CHAP_TQD
+(BC2)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>7</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-dim_clos_customer">5. DIM_CLOS_CUSTOMER</h2>
+<h3 id="51-mục-đích-thiết-kế">5.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> thông tin doanh nghiệp khách hàng
+chính CLOS — lưu tên khách hàng cùng các thuộc tính mô tả CỐ HỮU của
+khách hàng (phân khúc, loại hình pháp lý, ngành nghề kinh doanh...). Bê
+nguyên 1:1 từ SB_DWH. <strong>Đổi phương án (review 2026-09-26, theo yêu
+cầu người dùng):</strong>
+<code>ORG_LEGAL_ID</code>/<code>LEGAL_REPRESENTATIVE</code>/<code>ADD_ID_REPRESENTATIVE</code>
+(tra từ vai trò pháp lý theo
+<code>WI_NAME</code>+<code>LEGAL_TYPE</code>) không còn đặt ở DIM này
+nữa, chuyển hẳn sang <code>FCT_CLOS_APPLICATION_DAILY</code> — vì
+<code>DIM_CLOS_LEGAL_PARTY</code> (nguồn tra) đã đổi thành FCT
+(<code>FCT_CLOS_LEGAL_PARTY</code>) ở tầng PDTD_DTM, DIM không còn được
+phép JOIN sang FCT khác để giữ đúng nguyên tắc "DIM PDTD_DTM giống hệt
+DIM SB_DWH".</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (NK):</strong> <code>ID_NUMBER</code> — kế
+thừa nguyên văn từ SB_DWH, số ĐKKD/CMND, định danh pháp lý ổn định không
+đổi giữa các hồ sơ khác nhau</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 khách hàng (theo
+<code>ID_NUMBER</code> — số ĐKKD/CMND, định danh pháp lý ổn định không
+đổi giữa các hồ sơ khác nhau), bê nguyên 1:1 từ SB_DWH. Lưu lịch sử
+thông tin thay đổi theo thời gian (SCD Type 2).</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo CLOS APPLICATION (BC2)</li>
+<li>Báo cáo Thông tin phê duyệt (BC3)</li>
+<li>Báo cáo Tuần Chuyên viên Thẩm định (BC4)</li>
+</ul></li>
+</ul>
+<h3 id="52-sơ-đồ-lineage">5.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        C["DIM_CLOS_CUSTOMER"]
+    end
+    subgraph PDTD_DTM
+        D["DIM_CLOS_CUSTOMER"]
+    end
+    C -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1, không còn cột phái sinh nào| D</pre>
+<p><strong>Chuyển
+<code>ORG_LEGAL_ID</code>/<code>LEGAL_REPRESENTATIVE</code>/<code>ADD_ID_REPRESENTATIVE</code>
+sang FCT (review 2026-09-26, theo yêu cầu người dùng):</strong> join
+sang <code>FCT_CLOS_LEGAL_PARTY</code> (theo
+<code>WI_NAME</code>+<code>LEGAL_TYPE</code>+<code>DAYID=DAYID</code>)
+để sinh 3 cột này nay đặt tại <code>FCT_CLOS_APPLICATION_DAILY</code> —
+xem <code>HLD_FCT_PDTD_DTM_review.md</code> mục 3 (khóa tra
+<code>FCT_CLOS_LEGAL_PARTY</code> là mục 9a của file đó — bảng này không
+còn xuất hiện như DIM ở tầng PDTD_DTM nữa, chỉ SB_DWH mới giữ
+<code>DIM_CLOS_LEGAL_PARTY</code> làm DIM; ở PDTD_DTM nó đã hấp thụ luôn
+vai trò cầu nối của <code>FCT_CLOS_APPLICATION_PARTY</code> đã xóa, xem
+<code>HLD_FCT_PDTD_DTM_review.md</code> mục 9a để biết chi tiết).</p>
+<h3 id="53-cấu-trúc-bảng">5.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_CLOS_CUSTOMER, kế thừa nguyên giá trị
+từ SB_DWH</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS'</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>CUSTOMER_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_CLOS_CUSTOMER, bằng đúng giá trị
+DIMENSION_KEY của cùng dòng. Mặc định -1</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>ID_NUMBER</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>100</td>
+<td>NK</td>
+<td>Số ĐKKD/CMND của khách hàng — định danh pháp lý ổn định, không đổi
+giữa các hồ sơ khác nhau — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_CUST_INFO LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL theo WI_NAME +
+UPPER(OBJ_TYPE)='KHÁCH HÀNG')</td>
+<td>—</td>
+<td>Nguồn cho chỉ tiêu/trường CUSTOMER_SK (khóa join
+FCT_CLOS_APPLICATION_DAILY, tra qua ID_NUMBER;
+FCT_CLOS_LEGAL_PARTY.CUSTOMER_SK)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>FULL_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên doanh nghiệp khách hàng — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME, dòng đại diện đã chọn ở cột
+ID_NUMBER)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo Thông tin phê duyệt
+(BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4)</td>
+<td>CUSTOMER_NAME (Tên khách hàng)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>CUST_GROUP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Phân khúc khách hàng doanh nghiệp
+(SME/MSME/USME/STR/JSC/SOC/BANK/FDI/NBFI) — kế thừa nguyên văn từ SB_DWH
+(nguồn gốc NG_SB_CLOS_CUST_INFO.CUST_GROUP)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>CUST_GROUP (Nhóm phân loại khách hàng)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>CUST_CATEGORY</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Phân loại khách hàng — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_CUST_INFO.CUST_CATEGORY)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>8</td>
+<td>PRECUSTGROUP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Phân khúc khách hàng trước xử lý — kế thừa nguyên văn từ SB_DWH
+(nguồn gốc NG_SB_CLOS_CUST_INFO.PRECUSTGROUP, cùng bộ giá trị với
+CUST_GROUP)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>9</td>
+<td>INDUSTRY_LVL1_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Mã ngành kinh doanh cấp 1 — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_1)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>INDUSTRY_GROUP (Ngành kinh doanh cấp 1)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>INDUSTRY_LVL2_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Mã ngành kinh doanh cấp 2 — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_2)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>INDUSTRY_CLASS (Ngành kinh doanh cấp 2)</td>
+</tr>
+<tr>
+<td>11</td>
+<td>INDUSTRY_LVL3_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Mã ngành kinh doanh cấp 3 — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_3)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>INDUSTRY (Ngành kinh doanh cấp 3)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>13</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Sửa lệch cấu trúc so với SB_DWH (review 2026-09-26, theo yêu
+cầu người dùng):</strong> mục 5.3 trước đây còn ở phương án cũ hơn
+(grain theo <code>WI_NAME</code>, 1:1 với hồ sơ) lẫn 7 cột thuộc phạm vi
+<code>DIM_CLOS_APPLICATION</code> (<code>APP_DATE</code>,
+<code>LOAN_PURPOSE</code>, <code>LG_REQ</code>, <code>FI_REQ</code>,
+<code>PHONE_REQ</code>, <code>EMAIL</code>,
+<code>DISTANCE_BRANCH_CUSTOMER</code>) và cột <code>ZONE</code> (cũng
+thuộc <code>DIM_CLOS_APPLICATION</code> — xem mục 3), đồng thời thiếu
+<code>CUST_GROUP</code>/<code>CUST_CATEGORY</code>/<code>PRECUSTGROUP</code>/
+<code>INDUSTRY_LVL1/2/3_CODE</code>. Đã dựng lại toàn bộ mục 5.3 khớp
+đúng 1:1 với cấu trúc 13 cột, grain theo <code>ID_NUMBER</code> hiện
+hành của SB_DWH mục 5 (từ 17 cột lỗi thời → 13 cột khớp đúng
+SB_DWH).</p>
+<h2 id="6-dim_clos_workstep_decision">6. DIM_CLOS_WORKSTEP_DECISION</h2>
+<h3 id="61-mục-đích-thiết-kế">6.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục các cặp (bước xử lý, quyết
+định) hợp lệ trên workflow CLOS (ví dụ WORKSTEP=CreditCommittee +
+DECISION=Submit) — đây là danh mục cấu hình gốc của BPM engine, không
+phải bảng sự kiện/giao dịch theo hồ sơ. Bê nguyên 1:1 từ SB_DWH, không
+có cột phái sinh nào ở tầng PDTD_DTM.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (BK):</strong> composite
+<code>WORKSTEP_CODE</code> + <code>DECISION_CODE</code> — hash vào cột
+<code>WORKSTEP_DECISION_BK</code>, kế thừa nguyên văn từ SB_DWH (review
+2026-09-26, đồng bộ pattern <code>EXCEPTION_BK</code>)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 cặp (WORKSTEP_CODE,
+DECISION_CODE) hợp lệ trên bảng nguồn.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo CLOS APPLICATION (BC2) — qua LAST_WORKSTEP_DECISION_SK trên
+FCT_CLOS_APPLICATION_DAILY</li>
+<li>Báo cáo RLOS APPLICATION (BC1), Thông tin phê duyệt (BC3), Tuần
+Chuyên viên Thẩm định (BC4), SLA - TAT (BC5), EXCEPTION - FTR (BC7),
+RETURN (BC8), KPI (BC9) — qua WORKSTEP_DECISION_SK trên
+FCT_CLOS_WORKSTEP_EVENT</li>
+</ul></li>
+</ul>
+<h3 id="62-sơ-đồ-lineage">6.2 Sơ đồ lineage</h3>
+<p><strong>Gộp 2 DIM thành 1 (review 2026-09-24):</strong>
+<code>DIM_CLOS_WORKSTEP</code> và <code>DIM_CLOS_DECISION</code> (mục cũ
+#11) gộp thành 1 bảng — quyết định cũ (review 2026-09-18) tách 2 DIM
+riêng (mỗi DIM DISTINCT 1 cột) làm mất thông tin cặp (WORKSTEP,
+DECISION) nào thực sự hợp lệ trên bảng nguồn
+<code>NG_SB_CLOS_MAS_DECISION</code> — nay gộp lại thành 1 DIM
+composite, giữ đúng grain "1 dòng = 1 cặp (WORKSTEP, DECISION) hợp
+lệ".</p>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        D["DIM_CLOS_WORKSTEP_DECISION"]
+    end
+    subgraph PDTD_DTM
+        E["DIM_CLOS_WORKSTEP_DECISION"]
+    end
+    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E</pre>
+<h3 id="63-cấu-trúc-bảng">6.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_CLOS_WORKSTEP_DECISION, kế thừa nguyên
+giá trị từ SB_DWH</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS'</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>WORKSTEP_DECISION_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_CLOS_WORKSTEP_DECISION, bằng đúng
+giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng
+Unknown) nếu không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>WORKSTEP_DECISION_BK</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>64</td>
+<td>BK</td>
+<td>Khóa nghiệp vụ hash của cặp (bước xử lý, quyết định) — kế thừa
+nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH:
+STANDARD_HASH(WORKSTEP_CODE || '~' || DECISION_CODE, 'SHA256'). Bổ sung
+(review 2026-09-26, đồng bộ pattern EXCEPTION_BK) để composite key có 1
+cột khóa duy nhất</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>WORKSTEP_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td></td>
+<td>Mã bước xử lý trên workflow CLOS — nguồn
+NG_SB_CLOS_MAS_DECISION.QUEUE_NAME. Cùng với DECISION_CODE là thành phần
+nguồn của WORKSTEP_DECISION_BK (review 2026-09-26, không còn tự đánh dấu
+khóa — xem cột 4)</td>
+<td>Báo cáo RLOS APPLICATION (BC1), CLOS APPLICATION (BC2), Thông tin
+phê duyệt (BC3), Tuần Chuyên viên Thẩm định (BC4), SLA - TAT (BC5),
+EXCEPTION - FTR (BC7), RETURN (BC8), KPI (BC9)</td>
+<td>WORKSTEP (Bước hồ sơ) — giá trị đọc trực tiếp trên
+FCT_CLOS_WORKSTEP_EVENT.WORKSTEP_CODE, DIM này phục vụ làm danh mục đối
+chiếu/chuẩn hóa mã bước</td>
+</tr>
+<tr>
+<td>6</td>
+<td>DECISION_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td></td>
+<td>Mã quyết định phát sinh tại bước xử lý trên — nguồn
+NG_SB_CLOS_MAS_DECISION.DECISION. UNIQUE (WORKSTEP_CODE, DECISION_CODE,
+EFF_DATE)</td>
+<td>Báo cáo CLOS APPLICATION (BC2)</td>
+<td>LAST_DECISION (Quyết định bước cuối)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>CHANNEL</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Kênh áp dụng của cặp (bước xử lý, quyết định) — nguồn
+NG_SB_CLOS_MAS_DECISION.CHANNEL. Bổ sung (review 2026-09-24, theo yêu
+cầu người dùng) để không bỏ sót thuộc tính gốc của bảng nguồn — giữ có
+chủ đích, thiết kế dư thừa cho thông tin nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>8</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL
+tính qua CDC khi phát hiện thay đổi trên MAS_DECISION</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>9</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-dim_clos_exception">7. DIM_CLOS_EXCEPTION</h2>
+<h3 id="71-mục-đích-thiết-kế">7.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục các lý do ngoại lệ được cấu
+hình cho từng tổ hợp bước xử lý + quyết định trên workflow CLOS — đây là
+danh mục cấu hình gốc thật sự, không phải bảng sự kiện/giao dịch theo hồ
+sơ.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (BK):</strong> composite
+<code>ACTIVITYNAME</code> + <code>DECISION_CODE</code> +
+<code>EXCEPTION_CATEGORY</code> + <code>EXCEPTION_NAME</code> — hash vào
+cột <code>EXCEPTION_BK</code>, kế thừa nguyên văn từ SB_DWH</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 tổ hợp bước xử lý +
+quyết định + nhóm lý do + tên lý do, bê nguyên 1:1 từ SB_DWH, không có
+cột phái sinh nào ở tầng PDTD_DTM.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo EXCEPTION - FTR (BC7)</li>
+</ul></li>
+</ul>
+<h3 id="72-sơ-đồ-lineage">7.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        D["DIM_CLOS_EXCEPTION"]
+    end
+    subgraph PDTD_DTM
+        E["DIM_CLOS_EXCEPTION"]
+    end
+    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E</pre>
+<h3 id="73-cấu-trúc-bảng">7.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_CLOS_EXCEPTION, kế thừa nguyên giá trị
+từ SB_DWH</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS'</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>EXCEPTION_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_CLOS_EXCEPTION, bằng đúng giá trị
+DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu
+không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>EXCEPTION_BK</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>64</td>
+<td></td>
+<td>Khóa nghiệp vụ hash của tổ hợp (bước, quyết định, nhóm lý do, tên lý
+do) — kế thừa nguyên văn từ SB_DWH. Bổ sung (review 2026-09-24, theo yêu
+cầu người dùng)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>ACTIVITYNAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td>NK</td>
+<td>Tên bước phát sinh nội dung cần làm rõ — kế thừa nguyên văn từ
+SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.ACTIVITYNAME)</td>
+<td>Báo cáo EXCEPTION - FTR (BC7)</td>
+<td>ACTIVITYNAME (Tên bước)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>DECISION_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td>NK</td>
+<td>Mã quyết định tại bước xử lý — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_MAS_EXCEPTION.DECISION)</td>
+<td>—</td>
+<td>Nguồn cho chỉ tiêu/trường EXCEPTION_SK (khóa join 2 bước của
+FCT_CLOS_EXCEPTION)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>EXCEPTION_CATEGORY</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>500</td>
+<td>NK</td>
+<td>Phân nhóm nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY)</td>
+<td>Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp<br>Báo cáo
+EXCEPTION - FTR (BC7) — khóa join 2 bước cùng ACTIVITYNAME</td>
+<td>EXCEPTION_CATEGORY (Nhóm lý do quyết định)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>EXCEPTION_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>500</td>
+<td>NK</td>
+<td>Tên nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_NAME)</td>
+<td>Báo cáo EXCEPTION - FTR (BC7)</td>
+<td>EXCEPTION_NAME (Tên lý do)</td>
+</tr>
+<tr>
+<td>9</td>
+<td>EXCEPTION_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Mã nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn
+tại tầng DIM: CASE WHEN INSTR(EXCEPTION_CATEGORY, ':') &gt; 0 THEN
+REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END, đặt sẵn trên
+DIM để tránh tính lại ở tầng report</td>
+<td>Báo cáo EXCEPTION - FTR (BC7)</td>
+<td>EXCEPTION_CODE (Code lý do)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>RAISE_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>5</td>
+<td></td>
+<td>Cờ cho biết ngoại lệ này có được phép Raise (nêu lý do) tại tổ hợp
+bước/quyết định này hay không — kế thừa nguyên văn từ SB_DWH (nguồn gốc
+NG_SB_CLOS_MAS_EXCEPTION.RAISE). Bổ sung (review 2026-09-24) — thiết kế
+dư thừa cho thông tin nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>11</td>
+<td>CLEAR_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>5</td>
+<td></td>
+<td>Cờ cho biết ngoại lệ này có được phép Clear (trả lời làm rõ) tại tổ
+hợp bước/quyết định này hay không — kế thừa nguyên văn từ SB_DWH (nguồn
+gốc NG_SB_CLOS_MAS_EXCEPTION.CLEAR). Bổ sung (review 2026-09-24) — thiết
+kế dư thừa cho thông tin nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>12</td>
+<td>SOURCE_ID</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>18</td>
+<td></td>
+<td>Số định danh nội bộ của bản ghi danh mục trên bảng nguồn — kế thừa
+nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.ID, đổi tên
+thêm tiền tố SOURCE, tránh trùng khái niệm với DIMENSION_KEY — review
+2026-09-24). Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông
+tin nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>13</td>
+<td>EXCEPTION_SHORT_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Mã viết tắt của tổ hợp ngoại lệ — kế thừa nguyên văn từ SB_DWH
+(nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.CODE, đổi tên tránh trùng khái niệm
+với EXCEPTION_CODE phái sinh ở cột 9 — review 2026-09-24). Bổ sung
+(review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>14</td>
+<td>STATUS</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Trạng thái bản ghi danh mục trên bảng nguồn — kế thừa nguyên văn từ
+SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.STATUS), giữ nguyên tên
+nguồn. Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông tin
+nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>15</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>16</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-dim_date">8. DIM_DATE</h2>
+<h3 id="81-mục-đích-thiết-kế">8.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> bảng chiều ngày dùng chung toàn ngân
+hàng, đã có sẵn tại <code>SB_DWH.DIM_DATE</code> — không tự dựng lịch ở
+tầng PDTD_DTM, bê nguyên 1:1 để mọi báo cáo dùng chung 1 định nghĩa ngày
+làm việc/tuần/tháng báo cáo. Không thuộc phạm vi split CLOS/RLOS (chiều
+hệ thống chung, không phải chiều do PDTD tạo ra).</li>
+<li><strong>Khóa chính của bảng (PK):</strong> <code>DAYID</code> —
+không có <code>DATE_SK</code>/surrogate key riêng, <code>DAYID</code>
+(kiểu DATE, đã duy nhất) vừa là khóa tự nhiên vừa là khóa phân vùng của
+mọi bảng FCT trong toàn tài liệu, nên fact join thẳng vào đây bằng
+<code>DAYID</code>.</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 ngày. Không phải
+SCD2 — quy tắc load là nạp lại toàn bộ bảng từ
+<code>SB_DWH.DIM_DATE</code> khi lịch (ngày lễ, ngày làm việc) có thay
+đổi, không phải nạp incremental theo <code>DAYID</code> mới.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — qua
+<code>REPORT_WEEK</code></li>
+<li>Báo cáo KPI (BC9) — qua <code>YEAR_ID</code> (mốc reset lũy kế YTD)
+và <code>IS_WORKING_DAY</code> (đầu vào hàm tính TAT theo giờ làm
+việc)</li>
+<li>Báo cáo SLA - TAT (BC5) — qua <code>IS_WORKING_DAY</code> (đầu vào
+hàm get_business_minute tính TAT)</li>
+<li>Mọi báo cáo FCT khác — qua <code>DAYID</code> làm khóa phân
+vùng/join trực tiếp, không hiển thị như 1 chỉ tiêu riêng</li>
+</ul></li>
+</ul>
+<h3 id="82-sơ-đồ-lineage">8.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        A(["DIM_DATE"])
+    end
+    subgraph PDTD_DTM
+        D["DIM_DATE"]
+    end
+    A -->|Bê 1:1 toàn bộ, nạp lại toàn bộ khi lịch thay đổi| D</pre>
+<h3 id="83-cấu-trúc-bảng">8.3 Cấu trúc bảng</h3>
+<p>Lấy 1:1 từ bảng có sẵn trên <code>STG_DTM.DIM_DATE</code>.</p>
+<h2 id="9-dim_clos_product">9. DIM_CLOS_PRODUCT</h2>
+<h3 id="91-mục-đích-thiết-kế">9.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục sản phẩm tín dụng CLOS
+(doanh nghiệp) — gồm dòng sản phẩm và sản phẩm nhánh chi tiết, là thông
+tin ít thay đổi theo bộ mã ổn định. Bê nguyên 1:1 từ SB_DWH, không bổ
+sung cột nào ở tầng PDTD_DTM (kể cả
+<code>REF_PRODUCT</code>/<code>SLA_*</code> — nhóm cột này chỉ tồn tại
+trên <code>DIM_CLOS_APPLICATION</code>, không phải trên
+<code>DIM_CLOS_PRODUCT</code>).</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (BK):</strong> composite
+<code>PRODUCT_LINE_CODE</code> + <code>PRODUCT_LINE_NAME</code> +
+<code>SUB_PRODUCT_CODE</code> + <code>PRODUCT_NAME</code> — hash vào cột
+<code>PRODUCT_BK</code>, kế thừa nguyên văn từ SB_DWH (review
+2026-09-26, đồng bộ pattern <code>EXCEPTION_BK</code>)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng lưu lịch sử thay đổi
+của 1 tổ hợp dòng sản phẩm + sản phẩm nhánh theo thời gian (SCD Type 2,
+do ETL tính qua CDC).</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp dòng sản
+phẩm/sản phẩm nhánh, khóa join qua
+<code>FCT_CLOS_APPLICATION_DAILY.PRODUCT_SK</code></li>
+<li>Báo cáo SLA - TAT (BC5) — khóa tra cam kết SLA nhập liệu tập trung
+REF_SLA_NLTT</li>
+<li>Báo cáo KPI (BC9) — qua công thức điểm KPI nhánh CLOS
+(SLA_DE_TOTAL_RESULT)</li>
+</ul></li>
+</ul>
+<h3 id="92-sơ-đồ-lineage">9.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        D["DIM_CLOS_PRODUCT"]
+    end
+    subgraph PDTD_DTM
+        E["DIM_CLOS_PRODUCT"]
+    end
+    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E</pre>
+<h3 id="93-cấu-trúc-bảng">9.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_CLOS_PRODUCT, sinh bằng Oracle
+sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence
+mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS' sau khi tách vật
+lý CLOS/RLOS</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>PRODUCT_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_CLOS_PRODUCT, bằng đúng giá trị
+DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu
+không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>PRODUCT_BK</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>64</td>
+<td>BK</td>
+<td>Khóa nghiệp vụ hash của tổ hợp (dòng sản phẩm, tên dòng, sản phẩm
+nhánh, tên sản phẩm) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại
+tầng SB_DWH: STANDARD_HASH(PRODUCT_LINE_CODE || '~' || PRODUCT_LINE_NAME
+|| '~' || SUB_PRODUCT_CODE || '~' || PRODUCT_NAME, 'SHA256'). Bổ sung
+(review 2026-09-26, đồng bộ pattern EXCEPTION_BK) để composite key có 1
+cột khóa duy nhất</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>PRODUCT_LINE_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_CODE.
+UNIQUE (PRODUCT_LINE_CODE, PRODUCT_LINE_NAME, SUB_PRODUCT_CODE,
+EFF_DATE). Thành phần nguồn của PRODUCT_BK (không còn tự đánh dấu khóa,
+xem cột 4)</td>
+<td>Báo cáo CLOS APPLICATION (BC2) — khóa join qua
+FCT_CLOS_APPLICATION_DAILY.PRODUCT_SK</td>
+<td>PRODUCT_LINE (Dòng sản phẩm)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>PRODUCT_LINE_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên dòng sản phẩm — nguồn
+NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_NAME</td>
+<td>Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9)
+— qua SLA_DE_TOTAL_RESULT</td>
+<td>Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa
+JOIN Product Line trên REF_SLA_NLTT)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>SUB_PRODUCT_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã sản phẩm nhánh — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_CODE
+(review 2026-09-18: đổi nguồn, MAS_SUB_PROD không có cột PRODUCT_NAME
+riêng như MAP_CLOS_PRODUCT trước đây)</td>
+<td>Báo cáo CLOS APPLICATION (BC2) — khóa join qua
+FCT_CLOS_APPLICATION_DAILY.PRODUCT_SK</td>
+<td>SUB_PRODUCT (Sản phẩm nhánh)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>PRODUCT_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>150</td>
+<td></td>
+<td>Tên sản phẩm nhánh chi tiết — nguồn
+NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_NAME (review 2026-09-18: đổi nguồn từ
+MAP_CLOS_PRODUCT.PRODUCT_NAME sang MAS_SUB_PROD.SUB_PROD_NAME, cùng ý
+nghĩa "tên sản phẩm nhánh (BC)")</td>
+<td>Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9)
+— qua SLA_DE_TOTAL_RESULT</td>
+<td>Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa
+JOIN Sub Product trên REF_SLA_NLTT)</td>
+</tr>
+<tr>
+<td>9</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL
+tính qua CDC khi phát hiện thay đổi trên MAS_PRO_LINE/MAS_SUB_PROD
+(không có cột khai báo tay như MAP_CLOS_PRODUCT trước đây)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>10</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-dim_rlos_application">10. DIM_RLOS_APPLICATION</h2>
+<h3 id="101-mục-đích-thiết-kế">10.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục hồ sơ tín dụng RLOS (bán
+lẻ/cá nhân) — lưu các thông tin ít thay đổi của 1 hồ sơ (luồng nghiệp
+vụ, chính sách, chương trình bán, cấp thẩm quyền phê duyệt, cờ ngoại lệ,
+các username phụ trách từng bước xử lý, kênh bán hàng/đối tác giới
+thiệu/AO phụ trách hồ sơ...). Thuộc tính KHÁCH HÀNG/cá nhân applicant
+(phân khúc, nhân khẩu học...) tách riêng ở
+<code>FCT_RLOS_CUSTOMER</code> (<code>HLD_FCT_PDTD_DTM_review.md</code>
+mục 18, đổi từ DIM sang FACT, đổi grain sang giấy tờ định danh, review
+2026-09-26). <strong>Đổi phương án (review 2026-09-26, theo yêu cầu
+người dùng):</strong> bảng này quay lại bê nguyên 1:1 từ SB_DWH (85 cột,
+đã gồm 9 cột hồ sơ-scoped
+<code>ZONE</code>/<code>SALE_TYPE</code>/<code>BROKER_TYPE</code>/<code>BROKER_ID</code>/<code>BROKER_NAME</code>/<code>ACC_OFFICER</code>/<code>ACCOUNT_OFFICER_NAME</code>/<code>EXISTING_CUSTOMER</code>/<code>APPLICANT_CIF</code>/<code>BUSINESS_MODEL</code>/<code>KYC1</code>
+nhận lại từ <code>FCT_RLOS_CUSTOMER</code>, review 2026-09-26 — xem
+<code>HLD_DIM_SB_DWH_review.md</code> mục 10), không còn cột phái sinh
+nào ở tầng PDTD_DTM — <code>BI_FLOW</code>, <code>DEVIATION_G3</code> và
+nhóm
+<code>REF_PRODUCT</code>/<code>SLA_CREDIT_OFFICER</code>/<code>SLA_MARKER</code>/<code>SLA_CHECKER</code>/<code>SLA_CREDIT_APPROVER</code>
+đã chuyển hẳn sang <code>FCT_RLOS_APPLICATION_DAILY</code> (xem
+<code>HLD_FCT_PDTD_DTM_review.md</code> mục 10) — cùng lý do đã áp dụng
+cho <code>DIM_CLOS_APPLICATION</code> (mục 3): khóa tra
+(<code>STREAM</code>/<code>APP_GRP</code>) là thuộc tính ổn định của hồ
+sơ, <code>DEVIATION_G3</code> vốn đã là event-grain report-time từ
+<code>FCT_RLOS_DEVIATION</code>.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (NK):</strong> <code>WI_NAME</code> — kế thừa
+nguyên văn từ SB_DWH (<code>EFF_DATE</code> chỉ là điều kiện UNIQUE cho
+SCD2, không phải thành phần khóa)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng hồ sơ lưu lịch sử thông
+tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên
+<code>WI_NAME</code> + <code>EFF_DATE</code>).</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo RLOS APPLICATION (BC1) — <code>BI_FLOW</code> (Phân khúc hồ
+sơ) nay đọc từ <code>FCT_RLOS_APPLICATION_DAILY</code></li>
+<li>Báo cáo CLOS APPLICATION (BC2) — đối chiếu
+<code>STREAM</code>/<code>CREATION_DATE</code> nhánh chung</li>
+<li>Báo cáo Thông tin phê duyệt (BC3) — <code>STREAM</code></li>
+<li>Báo cáo SLA - TAT (BC5) — tra khóa <code>APP_GRP</code>;
+<code>DEVIATION_G3</code>/<code>REF_PRODUCT</code>/<code>SLA_CREDIT_OFFICER</code>/<code>SLA_MARKER</code>/<code>SLA_CHECKER</code>/<code>SLA_CREDIT_APPROVER</code>
+nay đọc từ <code>FCT_RLOS_APPLICATION_DAILY</code></li>
+<li>Báo cáo EXCEPTION - FTR (BC7) — <code>LOANCASEID</code></li>
+<li>Báo cáo KPI (BC9) — <code>APP_GRP</code>,
+<code>UWMAKERUSER</code>/<code>UWCHKRUSER</code>/<code>CREDAPPRUSER</code>/<code>CCOMMITUSER</code>
+(fallback COALESCE); <code>DEVIATION_G3</code> nay đọc từ
+<code>FCT_RLOS_APPLICATION_DAILY</code></li>
+<li>Báo cáo Giải ngân _ Quá hạn KHCN (BC10) —
+<code>LAST_APPROVAL_DATE</code></li>
+</ul></li>
+</ul>
+<h3 id="102-sơ-đồ-lineage">10.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        F["DIM_RLOS_APPLICATION"]
+    end
+    subgraph PDTD_DTM
+        G["DIM_RLOS_APPLICATION"]
+    end
+    F -->|"SCD2, giữ nguyên DIMENSION_KEY, bê 1:1, không còn cột phái sinh nào (đã gồm 9 cột hồ sơ-scoped ZONE/SALE_TYPE/BROKER_*/ACC_OFFICER/ACCOUNT_OFFICER_NAME/EXISTING_CUSTOMER/APPLICANT_CIF/BUSINESS_MODEL/KYC1, review 2026-09-26)"| G</pre>
+<p><strong>Chuyển
+<code>BI_FLOW</code>/<code>DEVIATION_G3</code>/<code>REF_PRODUCT</code>/<code>SLA_*</code>
+sang FCT (review 2026-09-26, theo yêu cầu người dùng):</strong> sơ đồ
+join <code>REF_RLOS_FLOW</code>, <code>RLOS_REF_SLA_TDKHCN</code>,
+<code>FCT_RLOS_DEVIATION</code>, <code>DIM_RLOS_PRODUCT</code> để sinh 7
+cột này nay chuyển hẳn sang <code>FCT_RLOS_APPLICATION_DAILY</code> —
+xem <code>HLD_FCT_PDTD_DTM_review.md</code> mục 10.</p>
+<h3 id="103-cấu-trúc-bảng">10.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_RLOS_APPLICATION, sinh bằng Oracle
+sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence
+mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật
+lý CLOS/RLOS</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>APPLICATION_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_RLOS_APPLICATION, bằng đúng giá
+trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown)
+nếu không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>WI_NAME</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>100</td>
+<td>NK</td>
+<td>Mã hồ sơ tín dụng RLOS — nguồn NG_SB_RLOS_EXTTABLE.WI_NAME. UNIQUE
+(WI_NAME, EFF_DATE)</td>
+<td>Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION
+(BC2)<br>Báo cáo Thông tin phê duyệt (BC3)<br>Báo cáo SLA - TAT
+(BC5)<br>Báo cáo NGOẠI LỆ (BC6)<br>Báo cáo EXCEPTION - FTR (BC7)<br>Báo
+cáo RETURN (BC8)<br>Báo cáo KPI (BC9)</td>
+<td>WINAME / WI_NAME (Mã hồ sơ)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>LOANCASEID</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã khoản vay gắn với hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.LOANCASEID,
+giữ nguyên văn không lọc</td>
+<td>Báo cáo EXCEPTION - FTR (BC7)</td>
+<td>LOANCASEID (Mã LOANCASEID)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>STREAM</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Luồng nghiệp vụ của hồ sơ — nguồn NG_SB_RLOS_APPROVAL.STREAM</td>
+<td>Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp, đồng thời là
+khóa tra BI_FLOW<br>Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo Thông tin
+phê duyệt (BC3)</td>
+<td>STREAM (Luồng hồ sơ); nguồn cho chỉ tiêu/trường BI_FLOW (Phân khúc
+hồ sơ, BC1)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>POLICY</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Chính sách tín dụng áp dụng cho hồ sơ — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.POLICY</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>POLICY (Chính sách áp dụng)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>CAMPAIGN</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Chương trình bán áp dụng cho hồ sơ — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.CAMPAIGN</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>CAMPAIGN (Mã chương trình tiếp thị)</td>
+</tr>
+<tr>
+<td>9</td>
+<td>PROOF_OF_INCOME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Hình thức chứng minh thu nhập — PHÁI SINH tại PDTD_DTM: CASE WHEN
+DIM_RLOS_APPLICATION.PROOF_OF_INCOME (SB_DWH, giá trị gốc) =
+'proofincome01' THEN 'CHUNGTU_CHUNGMINH_THUNHAP' WHEN = 'proofincome02'
+THEN 'BANGKE_THUNHAP' END</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>PROOF_OF_INCOME (Nguồn thu nhập)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>COLL_REQUIRE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Hồ sơ có yêu cầu tài sản bảo đảm hay không — PHÁI SINH tại PDTD_DTM:
+CASE WHEN DIM_RLOS_APPLICATION.COLLREQUIRE (SB_DWH, giá trị gốc) =
+'true' THEN 'YES' ELSE 'NO' END</td>
+<td>Báo cáo KPI (BC9)</td>
+<td>Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_<em>/TAT_RLOS_UNSEC_</em>
+(điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY)</td>
+</tr>
+<tr>
+<td>11</td>
+<td>IS_SEC_PRODUCT</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Hồ sơ có sản phẩm phụ đi kèm hay không — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.IS_SEC_PRODUCT. Đối chiếu SRS BC5: đây
+chính là nguồn của SECONDARY_PRODUCTLINE khi tra cam kết SLA</td>
+<td>Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo SLA -
+TAT (BC5) — khóa tra REF_PRODUCT/SLA_*</td>
+<td>SECONDARY_PRODUCTLINE (Có sản phẩm phụ — YES/NO)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>DEVIATION_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Hồ sơ có ngoại lệ chính sách hay không — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.DEVIATION_FLAG (DQ-11, đã giải quyết)</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>DEVIATION (Hồ sơ có ngoại lệ — YES/NO)</td>
+</tr>
+<tr>
+<td>13</td>
+<td>EMPLOYEE_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Mã cán bộ quản lý hồ sơ — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.EMPLOYEE_CODE</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>EMPLOYEE_CODE (Mã CRO)</td>
+</tr>
+<tr>
+<td>14</td>
+<td>EMPLOYEE_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên cán bộ quản lý hồ sơ — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.EMPLOYEE_NAME</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>EMPLOYEE_NAME (Tên CRO)</td>
+</tr>
+<tr>
+<td>15</td>
+<td>CREATION_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Ngày khởi tạo hồ sơ — PHÁI SINH: MIN(ENTRYDATE) theo WI_NAME trên
+NG_SB_RLOS_ENTRY_EXIT, TRUNC về ngày</td>
+<td>Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION
+(BC2)</td>
+<td>CREATION_DATE (Ngày khởi tạo hồ sơ)</td>
+</tr>
+<tr>
+<td>16</td>
+<td>APPLICATION_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày khởi tạo hồ sơ khai theo form — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.APPLICATION_DATE</td>
+<td>—</td>
+<td>Thiết kế dư thừa (song song với CREATION_DATE, khác nguồn)</td>
+</tr>
+<tr>
+<td>17</td>
+<td>RESULT_MAIN_CARD_ID</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã thẻ chính do hệ thẻ (T24) trả về — nguồn
+NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID, lấy dòng mới nhất
+STATUS='OK'</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>K_TYPE (Loại thẻ tín dụng); HOME_ADDRESS (Địa chỉ nhận Pin/Thẻ) — cả
+2 phái sinh từ lookup RESULT_MAIN_CARD_ID → STG_DIM_CARD</td>
+</tr>
+<tr>
+<td>18</td>
+<td>APP_GRP</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Cấp thẩm quyền phê duyệt của hồ sơ — nguồn
+NG_SB_RLOS_APPROVAL.APP_GRP. BC1/BC2 hiển thị trực tiếp; BC9 dùng làm
+khóa tra điểm KPI; dùng làm khóa tra cam kết SLA ở PDTD_DTM</td>
+<td>Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo SLA -
+TAT (BC5) — khóa tra REF_PRODUCT/SLA_*<br>Báo cáo KPI (BC9) — khóa tra
+điểm KPI</td>
+<td>APP_GRP (Cấp phân quyền phê duyệt)</td>
+</tr>
+<tr>
+<td>19</td>
+<td>LAST_APPROVAL_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày phê duyệt gần nhất của hồ sơ — PHÁI SINH: MAX(EXITDATE) trên
+NG_SB_RLOS_ENTRY_EXIT tại WORKSTEP/DECISION theo SRS BC10</td>
+<td>Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — qua
+FCT_RLOS_LOAN_DISBURSEMENT</td>
+<td>APPROVAL_DATE (Ngày phê duyệt)</td>
+</tr>
+<tr>
+<td>20</td>
+<td>UWMAKERUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Underwriting Maker — nguồn
+NG_SB_RLOS_EXTTABLE.UWMAKERUSER</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>Fallback COALESCE cho UNDERWRITERMAKER_TAKERESPON (giá trị chính từ
+NG_SB_RLOS_USER_MAKE_WORK_STEP khi WORK_STEP='UnderwriterMaker')</td>
+</tr>
+<tr>
+<td>21</td>
+<td>UWCHKRUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Underwriting Checker — nguồn
+NG_SB_RLOS_EXTTABLE.UWCHKRUSER</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>Fallback COALESCE cho UNDERWRITERCHECKER_TAKERESPON</td>
+</tr>
+<tr>
+<td>22</td>
+<td>CREDAPPRUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Credit Approval — nguồn
+NG_SB_RLOS_EXTTABLE.CREDAPPRUSER</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>Fallback COALESCE (1/2) cho APPROVAL_TAKERESPON</td>
+</tr>
+<tr>
+<td>23</td>
+<td>CCOMMITUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username Credit Committee — nguồn
+NG_SB_RLOS_EXTTABLE.CCOMMITUSER</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>Fallback COALESCE (2/2) cho APPROVAL_TAKERESPON</td>
+</tr>
+<tr>
+<td>24</td>
+<td>CURR_WSNAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Tên bước xử lý hiện tại — nguồn NG_SB_RLOS_EXTTABLE.CURR_WSNAME</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>25</td>
+<td>PREV_WSNAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Tên bước xử lý trước đó — nguồn NG_SB_RLOS_EXTTABLE.PREV_WSNAME</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>26</td>
+<td>DECISION</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Quyết định gần nhất tại bước hiện tại/trước đó — nguồn
+NG_SB_RLOS_EXTTABLE.DECISION</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>27</td>
+<td>CUSTOMER_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>150</td>
+<td></td>
+<td>Tên khách hàng — nguồn NG_SB_RLOS_EXTTABLE.CUSTOMER_NAME</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>28</td>
+<td>PRODUCT_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>150</td>
+<td></td>
+<td>Tên sản phẩm vay — nguồn NG_SB_RLOS_EXTTABLE.PRODUCT_NAME</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>29</td>
+<td>APPROVAL_CONDITION</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Nhóm/cấp phê duyệt áp dụng cho hồ sơ, cùng bộ mã với APP_GRP (cột
+18) — nguồn NG_SB_RLOS_EXTTABLE.APPROVAL_CONDITION</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>30</td>
+<td>APPROVER_TYPE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Loại cấp phê duyệt xử lý hồ sơ — nguồn
+NG_SB_RLOS_EXTTABLE.APPROVER_TYPE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>31</td>
+<td>CHECKER3_CONDITION</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Quyết định tại bước kiểm soát thứ 3 trong chuỗi phê duyệt — nguồn
+NG_SB_RLOS_EXTTABLE.CHECKER3_CONDITION</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>32</td>
+<td>CHECKER3_TARGET</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mô tả luồng/đích chuyển tiếp hồ sơ sau phê duyệt — nguồn
+NG_SB_RLOS_EXTTABLE.CHECKER3_TARGET</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>33</td>
+<td>DISBURSEMENT_TYPE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Hình thức giải ngân (Full/Partial) — nguồn
+NG_SB_RLOS_EXTTABLE.DISBURSEMENT_TYPE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>34</td>
+<td>DISB_DECSION</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Quyết định tại bước giải ngân — nguồn
+NG_SB_RLOS_EXTTABLE.DISB_DECSION (giữ nguyên tên gốc dù thiếu chữ so với
+"DECISION" — lỗi đặt tên từ hệ thống nguồn)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>35</td>
+<td>STP_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Cờ xử lý tự động (Straight-Through Processing) — nguồn
+NG_SB_RLOS_EXTTABLE.STP_FLAG</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>36</td>
+<td>ELIGIBLE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Cờ đủ điều kiện — nguồn NG_SB_RLOS_EXTTABLE.ELIGIBLE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>37</td>
+<td>C_PHONE_CREATE_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>20</td>
+<td></td>
+<td>Cờ đánh dấu hồ sơ có phát sinh nhánh phụ Xác minh điện thoại — nguồn
+NG_SB_RLOS_EXTTABLE.C_PHONE_CREATE_FLAG</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>38</td>
+<td>C_FI_CREATE_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>20</td>
+<td></td>
+<td>Cờ đánh dấu hồ sơ có phát sinh nhánh phụ Thẩm định thực địa — nguồn
+NG_SB_RLOS_EXTTABLE.C_FI_CREATE_FLAG</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>39</td>
+<td>C_LEGAL_CREATE_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>20</td>
+<td></td>
+<td>Cờ đánh dấu hồ sơ có phát sinh nhánh phụ Thẩm định pháp chế — nguồn
+NG_SB_RLOS_EXTTABLE.C_LEGAL_CREATE_FLAG</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>40</td>
+<td>C_PHONE_DELETE_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ đánh dấu nhánh phụ Xác minh điện thoại đã được xóa/hủy — nguồn
+NG_SB_RLOS_EXTTABLE.C_PHONE_DELETE_FLAG</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>41</td>
+<td>C_FI_DELETE_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ đánh dấu nhánh phụ Thẩm định thực địa đã được xóa/hủy — nguồn
+NG_SB_RLOS_EXTTABLE.C_FI_DELETE_FLAG</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>42</td>
+<td>C_LEGAL_DELETE_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ đánh dấu nhánh phụ Thẩm định pháp chế đã được xóa/hủy — nguồn
+NG_SB_RLOS_EXTTABLE.C_LEGAL_DELETE_FLAG</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>43</td>
+<td>REINITIATE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>5</td>
+<td></td>
+<td>Cờ đánh dấu hồ sơ đang ở luồng khởi tạo lại (ReInitiate) sau khi bị
+từ chối — nguồn NG_SB_RLOS_EXTTABLE.REINITIATE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>44</td>
+<td>RR_USER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Username cán bộ xử lý tại bước tái thẩm định (Round-Robin
+re-appraisal) — nguồn NG_SB_RLOS_EXTTABLE.RR_USER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>45</td>
+<td>DATACHKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username cán bộ Kiểm soát nhập liệu (DataInputerChecker) — nguồn
+NG_SB_RLOS_EXTTABLE.DATACHKUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>46</td>
+<td>HOSUPPORTUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username cán bộ Hỗ trợ Hội sở (HOSupport) — nguồn
+NG_SB_RLOS_EXTTABLE.HOSUPPORTUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>47</td>
+<td>POSTSANCUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username cán bộ Sau phê duyệt (PostSanction) — nguồn
+NG_SB_RLOS_EXTTABLE.POSTSANCUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>48</td>
+<td>PREDISBMAKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username cán bộ Soạn hợp đồng (PreDisbursementMaker) — nguồn
+NG_SB_RLOS_EXTTABLE.PREDISBMAKUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>49</td>
+<td>PREDISBCHKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username cán bộ Kiểm soát hợp đồng (PreDisbursementChecker) — nguồn
+NG_SB_RLOS_EXTTABLE.PREDISBCHKUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>50</td>
+<td>DISBMAKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username cán bộ Giải ngân (DisbursementMaker) — nguồn
+NG_SB_RLOS_EXTTABLE.DISBMAKUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>51</td>
+<td>DISBCHKUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username cán bộ Kiểm soát giải ngân (DisbursementChecker) — nguồn
+NG_SB_RLOS_EXTTABLE.DISBCHKUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>52</td>
+<td>POSTDISBDEUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Username cán bộ Nhập liệu sau giải ngân (PostDisbursementDataEntry)
+— nguồn NG_SB_RLOS_EXTTABLE.POSTDISBDEUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>53</td>
+<td>NORMBRUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Username cán bộ ký hợp đồng tại chi nhánh, hồ sơ không công chứng —
+nguồn NG_SB_RLOS_EXTTABLE.NORMBRUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>54</td>
+<td>REGBRUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Username cán bộ ký hợp đồng tại chi nhánh, hồ sơ có công chứng —
+nguồn NG_SB_RLOS_EXTTABLE.REGBRUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>55</td>
+<td>NORMSUPPORT_DCSN</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Quyết định tại bước ký hợp đồng chi nhánh, hồ sơ không công chứng —
+nguồn NG_SB_RLOS_EXTTABLE.NORMSUPPORT_DCSN</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>56</td>
+<td>REGSUPPORT_DCSN</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Quyết định tại bước ký hợp đồng chi nhánh, hồ sơ có công chứng —
+nguồn NG_SB_RLOS_EXTTABLE.REGSUPPORT_DCSN</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>57</td>
+<td>NORMALBRHOLD</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ tạm giữ (hold) hồ sơ tại bước ký hợp đồng, hồ sơ không công chứng
+— nguồn NG_SB_RLOS_EXTTABLE.NORMALBRHOLD</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>58</td>
+<td>REGBRHOLD</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ tạm giữ (hold) hồ sơ tại bước ký hợp đồng, hồ sơ có công chứng —
+nguồn NG_SB_RLOS_EXTTABLE.REGBRHOLD</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>59</td>
+<td>BRASUPPORTSENDER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Username cán bộ gửi hồ sơ tại bước Hỗ trợ chi nhánh — nguồn
+NG_SB_RLOS_EXTTABLE.BRASUPPORTSENDER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>60</td>
+<td>DISBURSEUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>150</td>
+<td></td>
+<td>Username cán bộ thực hiện thao tác giải ngân thực tế — nguồn
+NG_SB_RLOS_EXTTABLE.DISBURSEUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>61</td>
+<td>DISBCHECKERUSER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>150</td>
+<td></td>
+<td>Username cán bộ kiểm soát thao tác giải ngân thực tế — nguồn
+NG_SB_RLOS_EXTTABLE.DISBCHECKERUSER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>62</td>
+<td>LASTAPPROVER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>250</td>
+<td></td>
+<td>Username người phê duyệt gần nhất — nguồn
+NG_SB_RLOS_EXTTABLE.LASTAPPROVER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>63</td>
+<td>APP_STATUS</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Trạng thái hồ sơ (giá trị mẫu quan sát được là lý do từ chối theo
+câu hỏi Knock-out) — nguồn NG_SB_RLOS_EXTTABLE.APP_STATUS</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>64</td>
+<td>APPROVAL_REJECT</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ đánh dấu hồ sơ bị từ chối tại bước phê duyệt — nguồn
+NG_SB_RLOS_EXTTABLE.APPROVAL_REJECT</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>65</td>
+<td>APPROVAL_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>75</td>
+<td></td>
+<td>Cờ xác nhận đã hoàn tất phê duyệt — nguồn
+NG_SB_RLOS_EXTTABLE.APPROVAL_FLAG</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>66</td>
+<td>MAJOR_DEV</td>
+<td>NUMBER</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Số lượng sai lệch chính sách (deviation) mức lớn ghi nhận trên hồ sơ
+— nguồn NG_SB_RLOS_EXTTABLE.MAJOR_DEV. Khác nguồn với DEVIATION_G3 (cột
+76, đếm report-time qua FCT_RLOS_DEVIATION) — không dùng cột này để suy
+ra/thay thế DEVIATION_G3</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>67</td>
+<td>MINOR_DEV</td>
+<td>NUMBER</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Số lượng sai lệch chính sách (deviation) mức nhỏ ghi nhận trên hồ sơ
+— nguồn NG_SB_RLOS_EXTTABLE.MINOR_DEV. Cùng ghi chú cột 66</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>68</td>
+<td>TOTALNONELIGIBLE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>5</td>
+<td></td>
+<td>Số lượng điều kiện không đủ tiêu chuẩn ghi nhận trên hồ sơ — nguồn
+NG_SB_RLOS_EXTTABLE.TOTALNONELIGIBLE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>69</td>
+<td>CANCEL_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hồ sơ bị hủy — nguồn NG_SB_RLOS_EXTTABLE.CANCEL_DATE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>70</td>
+<td>REASON</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>500</td>
+<td></td>
+<td>Lý do hủy hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.REASON, rất ít khi có dữ
+liệu</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>71</td>
+<td>RMEMAILID</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>250</td>
+<td></td>
+<td>Email cán bộ quan hệ khách hàng (RM) phụ trách — nguồn
+NG_SB_RLOS_EXTTABLE.RMEMAILID</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>72</td>
+<td>REMARKS</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>4000</td>
+<td></td>
+<td>Ghi chú — nguồn NG_SB_RLOS_EXTTABLE.REMARKS, dữ liệu HTML thô, rất
+ít khi có dữ liệu</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>73</td>
+<td>ZONE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Vùng miền quản lý tự khai theo hồ sơ (BC1/BC2.ZONE) — kế thừa 1:1 từ
+SB_DWH, CHUYỂN TỪ <code>FCT_RLOS_CUSTOMER</code> (review 2026-09-26, xác
+nhận qua dữ liệu thực là thuộc tính hồ sơ, không phải khách hàng): nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.ZONE</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>ZONE (Khu vực hoạt động)</td>
+</tr>
+<tr>
+<td>74</td>
+<td>SALE_TYPE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Kênh bán hàng — kế thừa 1:1 từ SB_DWH, CHUYỂN TỪ
+<code>FCT_RLOS_CUSTOMER</code> (review 2026-09-26) — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.SALE_TYPE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>75</td>
+<td>BROKER_TYPE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Loại đối tác giới thiệu (cộng tác viên, đại diện đối tác, đối tác
+liên kết) — kế thừa 1:1 từ SB_DWH, CHUYỂN TỪ
+<code>FCT_RLOS_CUSTOMER</code> (review 2026-09-26) — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.BROKER_TYPE</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>76</td>
+<td>BROKER_ID</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã đối tác giới thiệu — kế thừa 1:1 từ SB_DWH, CHUYỂN TỪ
+<code>FCT_RLOS_CUSTOMER</code> (review 2026-09-26) — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.BROKER_ID</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>77</td>
+<td>BROKER_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên đối tác giới thiệu — kế thừa 1:1 từ SB_DWH, CHUYỂN TỪ
+<code>FCT_RLOS_CUSTOMER</code> (review 2026-09-26) — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.BROKER_NAME</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>78</td>
+<td>ACC_OFFICER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã nhân viên quan hệ khách hàng (Account Officer) phụ trách hồ sơ —
+kế thừa 1:1 từ SB_DWH, CHUYỂN TỪ <code>FCT_RLOS_CUSTOMER</code> (review
+2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.ACC_OFFICER</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>79</td>
+<td>ACCOUNT_OFFICER_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên Account Officer phụ trách hồ sơ — kế thừa 1:1 từ SB_DWH, CHUYỂN
+TỪ <code>FCT_RLOS_CUSTOMER</code> (review 2026-09-26) — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.ACCOUNT_OFFICER_NAME</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>80</td>
+<td>EXISTING_CUSTOMER</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ khách hàng hiện hữu tại thời điểm nộp hồ sơ — kế thừa 1:1 từ
+SB_DWH, CHUYỂN TỪ <code>FCT_RLOS_CUSTOMER</code> (review 2026-09-26) —
+nguồn NG_SB_RLOS_APPLICANT_GENERAL.EXISTING_CUSTOMER. ⚠️ Metadata: không
+có dữ liệu trong tập mẫu khảo sát</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>81</td>
+<td>APPLICANT_CIF</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Mã CIF khách hàng (định danh ngân hàng lõi) tại thời điểm hồ sơ — kế
+thừa 1:1 từ SB_DWH, CHUYỂN TỪ <code>FCT_RLOS_CUSTOMER</code> (review
+2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.APPLICANTCIF (đổi tên
+cho rõ nghĩa). ⚠️ Metadata: không có dữ liệu trong tập mẫu khảo sát, chỉ
+được gắn vào hồ sơ ở giai đoạn gần giải ngân. Khác <code>CIF</code> trên
+<code>FCT_RLOS_CUSTOMER</code> (nguồn IDGRID.CIF, gắn theo giấy tờ)</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>82</td>
+<td>BUSINESS_MODEL</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Mô hình kinh doanh áp dụng cho kênh giới thiệu của hồ sơ — kế thừa
+1:1 từ SB_DWH, CHUYỂN TỪ <code>FCT_RLOS_CUSTOMER</code> (review
+2026-09-26) — nguồn NG_SB_RLOS_APPLICANT_GENERAL.BUSINESS_MODEL</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>83</td>
+<td>KYC1</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Đơn vị/khối đang xử lý hồ sơ tại thời điểm ghi nhận (giá trị quan
+sát: Khối VHCN, Khối PDTD, ĐVKD) — kế thừa 1:1 từ SB_DWH, CHUYỂN TỪ
+<code>FCT_RLOS_CUSTOMER</code> (review 2026-09-26) — nguồn
+NG_SB_RLOS_APPLICANT_GENERAL.KYC1. ⚠️ Metadata đang ở trạng thái "Cần
+chỉnh sửa", đề xuất đổi tên "Luồng phê duyệt"/Approval Flow — cần BA xác
+nhận lại tên/ý nghĩa chuẩn trước khi sinh LLD</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>84</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>85</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bỏ 7 cột phái sinh (review 2026-09-26, theo yêu cầu người
+dùng):</strong> <code>BI_FLOW</code>, <code>DEVIATION_G3</code>,
+<code>REF_PRODUCT</code>, <code>SLA_CREDIT_OFFICER</code>,
+<code>SLA_MARKER</code>, <code>SLA_CHECKER</code>,
+<code>SLA_CREDIT_APPROVER</code> không còn ở bảng này — chuyển hẳn sang
+<code>FCT_RLOS_APPLICATION_DAILY</code> (xem
+<code>HLD_FCT_PDTD_DTM_review.md</code> mục 10). Bảng từ 92 cột xuống
+còn 85 cột, bê nguyên 1:1 từ SB_DWH — giống hệt cấu trúc
+<code>DIM_RLOS_APPLICATION</code> tại
+<code>HLD_DIM_SB_DWH_review.md</code> mục 10.</p>
+<p><strong>Ghi chú thiết kế:</strong></p>
+<ul>
+<li><code>CUS_SEGMENT</code>/<code>BI_CUS_SEGMENT</code> không có ở bảng
+này — thuộc tính khách hàng/cá nhân applicant, xem
+<code>FCT_RLOS_CUSTOMER</code> (<code>HLD_FCT_PDTD_DTM_review.md</code>
+mục 18).</li>
+<li><code>CHANGE_REQUEST</code>/<code>CHANGE_TYPE</code> không có ở bảng
+này — chuyển sang <code>FCT_RLOS_APPLICATION_DAILY</code> (SB_DWH). Khóa
+either/or <code>CHANGE_TYPE</code> để tra
+<code>REF_PRODUCT</code>/<code>SLA_*</code> (nay ở
+<code>FCT_RLOS_APPLICATION_DAILY</code>, PDTD_DTM) đọc trực tiếp trên
+chính bảng đó.</li>
+<li><code>APPROVED_AMT_FINAL</code>/<code>CURRENCY_CODE</code>/<code>APPROVED_TERM</code>
+không có ở bảng này — chuyển sang <code>FCT_RLOS_WORKSTEP_EVENT</code>
+(tính độc lập tại đó, cùng nguồn
+<code>NG_SB_RLOS_CREDIT_PROPOSAL</code>).</li>
+<li><code>DEVIATION_G3</code> tính report-time tại
+<code>FCT_RLOS_APPLICATION_DAILY</code> (PDTD_DTM, review 2026-09-26),
+không còn ở DIM này — nguồn <code>NG_SB_RLOS_MANUAL_DEVIATION</code> đi
+qua <code>FCT_RLOS_DEVIATION</code> (SB_DWH), cùng nguồn/công thức với
+<code>AGG_LOS_KPI_APPLICATION.DEVIATION_G3</code>, tránh 2 luồng tính
+song song cho cùng 1 khái niệm.</li>
+<li><code>PROOF_OF_INCOME</code>/<code>COLL_REQUIRE</code> (cột 9-10) là
+2 ngoại lệ trong nhóm cột "kế thừa 1:1" — SB_DWH chỉ lưu giá trị gốc,
+còn logic <code>CASE WHEN</code> map sang giá trị hiển thị đặt tại đây
+(PDTD_DTM), áp dụng ngay khi bê từ SB_DWH lên.</li>
+<li><strong>9 cột hồ sơ-scoped (73-83) nhận lại từ
+<code>FCT_RLOS_CUSTOMER</code> (review 2026-09-26):</strong> cùng thay
+đổi đã áp dụng ở SB_DWH (xem <code>HLD_DIM_SB_DWH_review.md</code> mục
+10) — kế thừa 1:1 lên đây, không biến đổi giá trị.</li>
+</ul>
+<h2 id="11-dim_rlos_card_promotion">11. DIM_RLOS_CARD_PROMOTION</h2>
+<h3 id="111-mục-đích-thiết-kế">11.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục chương trình ưu đãi phí thẻ
+tín dụng — sản phẩm đặc thù bán lẻ (RLOS), không có tương ứng phía CLOS.
+Là thông tin ít thay đổi theo cấu hình chương trình. Bê nguyên 1:1 từ
+SB_DWH, không bổ sung cột nào ở tầng PDTD_DTM.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (NK):</strong> <code>PROMOTION_CODE</code> —
+kế thừa nguyên văn từ SB_DWH</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng lưu lịch sử thay đổi
+của 1 chương trình ưu đãi theo thời gian (SCD Type 2).</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo RLOS APPLICATION (BC1)</li>
+</ul></li>
+</ul>
+<h3 id="112-sơ-đồ-lineage">11.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        D["DIM_RLOS_CARD_PROMOTION"]
+    end
+    subgraph PDTD_DTM
+        E["DIM_RLOS_CARD_PROMOTION"]
+    end
+    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E</pre>
+<h3 id="113-cấu-trúc-bảng">11.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_RLOS_CARD_PROMOTION, sinh bằng Oracle
+sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence
+mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật
+lý CLOS/RLOS</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>CARD_PROMOTION_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_RLOS_CARD_PROMOTION, bằng đúng
+giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng
+Unknown) nếu không có giá trị phù hợp</td>
+<td>Báo cáo RLOS APPLICATION (BC1) — khóa join qua
+FCT_RLOS_APPLICATION_DAILY.CARD_PROMOTION_SK</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>PROMOTION_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>100</td>
+<td>NK</td>
+<td>Mã chương trình ưu đãi phí thẻ — nguồn
+NG_SB_RLOS_MAS_CARD_PROMOTIO.PROMOTION_CODE. Nối với
+NG_SB_RLOS_CBS.PROMOTION_ID</td>
+<td>Báo cáo RLOS APPLICATION (BC1) — khóa tra CARD_PROMOTION_SK</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>PROMOTION_DESC</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>500</td>
+<td></td>
+<td>Tên chương trình ưu đãi phí thẻ — nguồn
+NG_SB_RLOS_MAS_CARD_PROMOTIO.DESCRIPTION (đổi tên để rõ đây là mô tả
+chương trình). Đây là giá trị BC1 hiển thị ở trường PROMOTION_ID</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>PROMOTION_ID (Ưu đãi phí)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>7</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="12-dim_rlos_change_type">12. DIM_RLOS_CHANGE_TYPE</h2>
+<h3 id="121-mục-đích-thiết-kế">12.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục loại và chi tiết loại thay
+đổi điều kiện phê duyệt của hồ sơ RLOS — là danh mục cấu hình gốc, thông
+tin ít thay đổi, bê nguyên 1:1 từ SB_DWH.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (BK):</strong> composite
+<code>CHANGE_TYPE_CODE</code> + <code>DETAIL_CHANGE_TYPE_CODE</code> —
+hash vào cột <code>CHANGE_TYPE_BK</code>, kế thừa nguyên văn từ SB_DWH
+(review 2026-09-26, đồng bộ pattern <code>EXCEPTION_BK</code>)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng lưu lịch sử thay đổi
+của 1 tổ hợp loại + chi tiết loại thay đổi theo thời gian (SCD Type
+2).</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo RLOS APPLICATION (BC1) — báo cáo duy nhất dùng bảng này</li>
+</ul></li>
+</ul>
+<h3 id="122-sơ-đồ-lineage">12.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        D["DIM_RLOS_CHANGE_TYPE"]
+    end
+    subgraph PDTD_DTM
+        E["DIM_RLOS_CHANGE_TYPE"]
+    end
+    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E</pre>
+<h3 id="123-cấu-trúc-bảng">12.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_RLOS_CHANGE_TYPE, sinh bằng Oracle
+sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence
+mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật
+lý CLOS/RLOS</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>CHANGE_TYPE_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_RLOS_CHANGE_TYPE, bằng đúng giá
+trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown)
+nếu không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>CHANGE_TYPE_BK</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>64</td>
+<td>BK</td>
+<td>Khóa nghiệp vụ hash của tổ hợp (loại thay đổi, chi tiết loại thay
+đổi) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH:
+STANDARD_HASH(CHANGE_TYPE_CODE || '~' || DETAIL_CHANGE_TYPE_CODE,
+'SHA256'). Bổ sung (review 2026-09-26, đồng bộ pattern EXCEPTION_BK) để
+composite key có 1 cột khóa duy nhất</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>CHANGE_TYPE_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>100</td>
+<td></td>
+<td>Mã loại thay đổi điều kiện phê duyệt — nguồn
+SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_CODE. Thành phần nguồn của
+CHANGE_TYPE_BK (không còn tự đánh dấu khóa, xem cột 4)</td>
+<td>Báo cáo RLOS APPLICATION (BC1) — khóa tra CHANGE_TYPE_SK</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6</td>
+<td>CHANGE_TYPE_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên loại thay đổi điều kiện phê duyệt — nguồn
+SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_NAME</td>
+<td>—</td>
+<td>Nguồn cho chỉ tiêu/trường CHANGE_TYPE_SK (ETL map
+NG_SB_RLOS_EXTTABLE.CHANGE_TYPE dạng tên sang CHANGE_TYPE_CODE trước khi
+tra khóa)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>DETAIL_CHANGE_TYPE_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã chi tiết loại thay đổi — nguồn
+SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_CODE</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>8</td>
+<td>DETAIL_CHANGE_TYPE_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>500</td>
+<td></td>
+<td>Tên chi tiết loại thay đổi — nguồn
+SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_NAME. BC1 dùng trường này làm
+CHANGE_TYPE_DETAIL</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>CHANGE_TYPE_DETAIL (Chi tiết loại thay đổi điều kiện)</td>
+</tr>
+<tr>
+<td>9</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>10</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="13-dim_rlos_workstep_decision">13.
+DIM_RLOS_WORKSTEP_DECISION</h2>
+<h3 id="131-mục-đích-thiết-kế">13.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục các cặp (bước xử lý, quyết
+định) hợp lệ trên workflow RLOS — đây là danh mục cấu hình gốc của BPM
+engine, không phải bảng sự kiện/giao dịch theo hồ sơ. Bê nguyên 1:1 từ
+SB_DWH, không có cột phái sinh nào ở tầng PDTD_DTM.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (BK):</strong> composite
+<code>WORKSTEP_CODE</code> + <code>DECISION_CODE</code> — hash vào cột
+<code>WORKSTEP_DECISION_BK</code>, kế thừa nguyên văn từ SB_DWH (review
+2026-09-26, đồng bộ pattern <code>EXCEPTION_BK</code>)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 cặp (WORKSTEP_CODE,
+DECISION_CODE) hợp lệ trên bảng nguồn.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo RLOS APPLICATION (BC1) — qua LAST_WORKSTEP_DECISION_SK trên
+FCT_RLOS_APPLICATION_DAILY</li>
+<li>Báo cáo Thông tin phê duyệt (BC3), Tuần Chuyên viên Thẩm định (BC4),
+SLA - TAT (BC5), RETURN (BC8) — qua WORKSTEP_DECISION_SK trên
+FCT_RLOS_WORKSTEP_EVENT</li>
+</ul></li>
+</ul>
+<h3 id="132-sơ-đồ-lineage">13.2 Sơ đồ lineage</h3>
+<p><strong>Gộp 2 DIM thành 1 (review 2026-09-24):</strong>
+<code>DIM_RLOS_WORKSTEP</code> và <code>DIM_RLOS_DECISION</code> (mục cũ
+#20) gộp thành 1 bảng — cùng lý do và quyết định đã áp dụng cho
+<code>DIM_CLOS_WORKSTEP_DECISION</code> (mục #6): mỗi cặp (WORKSTEP,
+DECISION) là duy nhất trên bảng nguồn
+<code>NG_SB_RLOS_MAS_DECISION</code>, tách 2 DIM riêng làm mất thông tin
+cặp hợp lệ.</p>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        D["DIM_RLOS_WORKSTEP_DECISION"]
+    end
+    subgraph PDTD_DTM
+        E["DIM_RLOS_WORKSTEP_DECISION"]
+    end
+    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E</pre>
+<h3 id="133-cấu-trúc-bảng">13.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_RLOS_WORKSTEP_DECISION, sinh bằng
+Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh
+sequence mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật
+lý CLOS/RLOS</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>WORKSTEP_DECISION_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_RLOS_WORKSTEP_DECISION, bằng đúng
+giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng
+Unknown) nếu không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>WORKSTEP_DECISION_BK</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>64</td>
+<td>BK</td>
+<td>Khóa nghiệp vụ hash của cặp (bước xử lý, quyết định) — kế thừa
+nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH:
+STANDARD_HASH(WORKSTEP_CODE || '~' || DECISION_CODE, 'SHA256'). Bổ sung
+(review 2026-09-26, đồng bộ pattern EXCEPTION_BK) để composite key có 1
+cột khóa duy nhất</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>WORKSTEP_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td></td>
+<td>Mã bước xử lý trên workflow RLOS — nguồn
+NG_SB_RLOS_MAS_DECISION.QUEUE_NAME. Cùng với DECISION_CODE là thành phần
+nguồn của WORKSTEP_DECISION_BK (review 2026-09-26, không còn tự đánh dấu
+khóa — xem cột 4)</td>
+<td>Báo cáo RLOS APPLICATION (BC1), Thông tin phê duyệt (BC3), Tuần
+Chuyên viên Thẩm định (BC4), SLA - TAT (BC5), RETURN (BC8)</td>
+<td>WORKSTEP (Bước hồ sơ) — giá trị đọc trực tiếp trên
+FCT_RLOS_WORKSTEP_EVENT.WORKSTEP_CODE, DIM này phục vụ làm danh mục đối
+chiếu/chuẩn hóa mã bước</td>
+</tr>
+<tr>
+<td>6</td>
+<td>DECISION_CODE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>200</td>
+<td></td>
+<td>Mã quyết định phát sinh tại bước xử lý trên — nguồn
+NG_SB_RLOS_MAS_DECISION.DECISION. UNIQUE (WORKSTEP_CODE, DECISION_CODE,
+EFF_DATE)</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>LAST_DECISION (Quyết định bước cuối)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL
+tính qua CDC khi phát hiện thay đổi trên MAS_DECISION</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>8</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="14-dim_rlos_exception">14. DIM_RLOS_EXCEPTION</h2>
+<h3 id="141-mục-đích-thiết-kế">14.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục các lý do ngoại lệ (nội dung
+cần làm rõ) được cấu hình cho từng tổ hợp bước xử lý + quyết định trên
+workflow RLOS — danh mục cấu hình gốc thật sự, không phải bảng sự
+kiện/giao dịch theo hồ sơ, bê nguyên 1:1 từ SB_DWH.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code></li>
+<li><strong>Khóa nghiệp vụ (BK):</strong> composite
+<code>ACTIVITYNAME</code> + <code>DECISION_CODE</code> +
+<code>EXCEPTION_CATEGORY</code> + <code>EXCEPTION_NAME</code> — hash vào
+cột <code>EXCEPTION_BK</code>, kế thừa nguyên văn từ SB_DWH</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 tổ hợp bước xử lý +
+quyết định + nhóm lý do + tên lý do, lưu lịch sử thay đổi theo thời gian
+(SCD Type 2).</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo EXCEPTION - FTR (BC7)</li>
+</ul></li>
+</ul>
+<h3 id="142-sơ-đồ-lineage">14.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        D["DIM_RLOS_EXCEPTION"]
+    end
+    subgraph PDTD_DTM
+        E["DIM_RLOS_EXCEPTION"]
+    end
+    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E</pre>
+<h3 id="143-cấu-trúc-bảng">14.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_RLOS_EXCEPTION, sinh bằng Oracle
+sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence
+mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật
+lý CLOS/RLOS</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>EXCEPTION_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_RLOS_EXCEPTION, bằng đúng giá trị
+DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu
+không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>EXCEPTION_BK</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>64</td>
+<td></td>
+<td>Khóa nghiệp vụ hash của tổ hợp (bước, quyết định, nhóm lý do, tên lý
+do) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH:
+STANDARD_HASH(ACTIVITYNAME || '~' || DECISION_CODE || '~' ||
+EXCEPTION_CATEGORY || '~' || EXCEPTION_NAME, 'SHA256'). Bổ sung (review
+2026-09-24, theo yêu cầu người dùng)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>ACTIVITYNAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td>NK</td>
+<td>Tên bước phát sinh nội dung cần làm rõ — nguồn
+NG_SB_RLOS_MAS_EXCEPTION.ACTIVITYNAME</td>
+<td>Báo cáo EXCEPTION - FTR (BC7)</td>
+<td>ACTIVITYNAME (Tên bước)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>DECISION_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td>NK</td>
+<td>Mã quyết định tại bước xử lý — nguồn
+NG_SB_RLOS_MAS_EXCEPTION.DECISION (đổi tên thêm hậu tố CODE cho thống
+nhất với DIM_RLOS_WORKSTEP_DECISION.DECISION_CODE)</td>
+<td>—</td>
+<td>Nguồn cho chỉ tiêu/trường EXCEPTION_SK (khóa join 2 bước của
+FCT_RLOS_EXCEPTION)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>EXCEPTION_CATEGORY</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>500</td>
+<td>NK</td>
+<td>Phân nhóm nội dung cần làm rõ — nguồn
+NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY</td>
+<td>Báo cáo EXCEPTION - FTR (BC7)</td>
+<td>EXCEPTION_CATEGORY (Nhóm lý do quyết định)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>EXCEPTION_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>500</td>
+<td>NK</td>
+<td>Tên nội dung cần làm rõ — nguồn
+NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_NAME</td>
+<td>Báo cáo EXCEPTION - FTR (BC7)</td>
+<td>EXCEPTION_NAME (Tên lý do)</td>
+</tr>
+<tr>
+<td>9</td>
+<td>EXCEPTION_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Mã nội dung cần làm rõ — PHÁI SINH: CASE WHEN
+INSTR(EXCEPTION_CATEGORY, ':') &gt; 0 THEN
+REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END</td>
+<td>Báo cáo EXCEPTION - FTR (BC7)</td>
+<td>EXCEPTION_CODE (Code lý do)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>RAISE_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>5</td>
+<td></td>
+<td>Cờ cho biết ngoại lệ này có được phép Raise (nêu lý do) tại tổ hợp
+bước/quyết định này hay không — nguồn NG_SB_RLOS_MAS_EXCEPTION.RAISE. Bổ
+sung (review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>11</td>
+<td>CLEAR_FLAG</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>5</td>
+<td></td>
+<td>Cờ cho biết ngoại lệ này có được phép Clear (trả lời làm rõ) tại tổ
+hợp bước/quyết định này hay không — nguồn
+NG_SB_RLOS_MAS_EXCEPTION.CLEAR. Bổ sung (review 2026-09-24) — thiết kế
+dư thừa cho thông tin nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>12</td>
+<td>SOURCE_ID</td>
+<td>NUMBER</td>
+<td>N</td>
+<td>18</td>
+<td></td>
+<td>Số định danh nội bộ của bản ghi danh mục trên bảng nguồn — kế thừa
+nguyên văn từ SB_DWH (nguồn gốc NG_SB_RLOS_MAS_EXCEPTION.ID, đổi tên
+thêm tiền tố SOURCE, tránh trùng khái niệm với DIMENSION_KEY — review
+2026-09-24). Bổ sung (review 2026-09-24) — thiết kế dư thừa cho thông
+tin nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>13</td>
+<td>EXCEPTION_SHORT_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>255</td>
+<td></td>
+<td>Mã viết tắt của tổ hợp ngoại lệ — kế thừa nguyên văn từ SB_DWH
+(nguồn gốc NG_SB_RLOS_MAS_EXCEPTION.CODE, đổi tên tránh trùng khái niệm
+với EXCEPTION_CODE phái sinh ở cột 9 — review 2026-09-24). Bổ sung
+(review 2026-09-24) — thiết kế dư thừa cho thông tin nguồn</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>14</td>
+<td>STATUS</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>50</td>
+<td></td>
+<td>Trạng thái bản ghi danh mục trên bảng nguồn — nguồn
+NG_SB_RLOS_MAS_EXCEPTION.STATUS, giữ nguyên tên nguồn. Bổ sung (review
+2026-09-24) — thiết kế dư thừa cho thông tin nguồn, đồng bộ với bản
+CLOS</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>15</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>16</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="15-dim_rlos_product">15. DIM_RLOS_PRODUCT</h2>
+<h3 id="151-mục-đích-thiết-kế">15.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục sản phẩm tín dụng RLOS (bán
+lẻ/cá nhân) — lưu dòng sản phẩm, sản phẩm nhánh, tên sản phẩm chi tiết
+và sản phẩm phụ đi kèm. Bản PDTD_DTM bê nguyên 1:1 từ SB_DWH, không có
+cột phái sinh hay bổ sung nào ở tầng này.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code> (giữ nguyên giá trị từ SB_DWH)</li>
+<li><strong>Khóa nghiệp vụ (BK):</strong> composite
+<code>PRODUCT_LINE_CODE</code> + <code>SUB_PRODUCT_CODE</code> +
+<code>PRODUCT_NAME</code> — hash vào cột <code>PRODUCT_BK</code>, kế
+thừa nguyên văn từ SB_DWH (review 2026-09-26, đồng bộ pattern
+<code>EXCEPTION_BK</code>)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng lưu lịch sử thông tin
+thay đổi theo thời gian (SCD Type 2, khóa tự nhiên
+<code>PRODUCT_LINE_CODE</code> + <code>SUB_PRODUCT_CODE</code> +
+<code>PRODUCT_NAME</code> + <code>EFF_DATE</code>).</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo RLOS APPLICATION (BC1)</li>
+<li>Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT</li>
+<li>Báo cáo KPI (BC9) — khóa tra điểm KPI, điều kiện lọc SEC/UNSEC</li>
+</ul></li>
+</ul>
+<h3 id="152-sơ-đồ-lineage">15.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH
+        D["DIM_RLOS_PRODUCT"]
+    end
+    subgraph PDTD_DTM
+        E["DIM_RLOS_PRODUCT"]
+    end
+    D -->|SCD2, giữ nguyên DIMENSION_KEY, bê 1:1| E</pre>
+<h3 id="153-cấu-trúc-bảng">15.3 Cấu trúc bảng</h3>
+<table>
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên cột</th>
+<th>Kiểu dữ liệu</th>
+<th>Bắt buộc</th>
+<th>Độ lớn</th>
+<th>Khóa</th>
+<th>Mô tả</th>
+<th>Báo cáo sử dụng</th>
+<th>Tên chỉ tiêu trên báo cáo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIMENSION_KEY</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td>PK</td>
+<td>Khóa chính của bảng chiều DIM_RLOS_PRODUCT, sinh bằng Oracle
+sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence
+mới</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>DATASOURCE</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>10</td>
+<td></td>
+<td>Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'RLOS' sau khi tách vật
+lý CLOS/RLOS</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>PRODUCT_SK</td>
+<td>NUMBER</td>
+<td>Y</td>
+<td>18</td>
+<td></td>
+<td>Khóa tham chiếu đến bảng chiều DIM_RLOS_PRODUCT, bằng đúng giá trị
+DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu
+không có giá trị phù hợp</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>PRODUCT_BK</td>
+<td>VARCHAR2</td>
+<td>Y</td>
+<td>64</td>
+<td>BK</td>
+<td>Khóa nghiệp vụ hash của tổ hợp (dòng sản phẩm, sản phẩm nhánh, tên
+sản phẩm) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH:
+STANDARD_HASH(PRODUCT_LINE_CODE || '~' || SUB_PRODUCT_CODE || '~' ||
+PRODUCT_NAME, 'SHA256'). Bổ sung (review 2026-09-26, đồng bộ pattern
+EXCEPTION_BK) để composite key có 1 cột khóa duy nhất</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>PRODUCT_LINE_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã dòng sản phẩm — nguồn MAS_PRODUCT_LINE.PRODUCTLINE_CODE. UNIQUE
+(PRODUCT_LINE_CODE, SUB_PRODUCT_CODE, PRODUCT_NAME, EFF_DATE). Thành
+phần nguồn của PRODUCT_BK (không còn tự đánh dấu khóa, xem cột 4)</td>
+<td>Báo cáo RLOS APPLICATION (BC1)</td>
+<td>PRODUCT_LINE (Dòng sản phẩm)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>PRODUCT_LINE_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>200</td>
+<td></td>
+<td>Tên dòng sản phẩm — nguồn MAS_PRODUCT_LINE.PRODUCT_LINE_NAME (mới,
+review 2026-09-18: bảng danh mục thật có cột tên riêng, khác giả định cũ
+"mã tự mang nghĩa tên")</td>
+<td>Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay
+PRODUCT_LINE_CODE<br>Báo cáo SLA - TAT (BC5) — khóa tra
+REF_SLA_NLTT<br>Báo cáo KPI (BC9) — khóa tra POINT
+(SLA_DE_TOTAL_RESULT)</td>
+<td>PRODUCT_LINE (Dòng sản phẩm); nguồn cho chỉ tiêu/trường POINT (Điểm
+KPI, BC9)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>SECONDARY_PRODUCT</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Sản phẩm phụ đi kèm (SeABuy/SeATeacher/SeAWoman/SeACivil/Thẻ tín
+dụng — không phải sản phẩm con của PRODUCT_LINE) — nguồn
+MAS_PRODUCT_LINE.SECONDARY_PRODUCT</td>
+<td>Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay
+SUB_PRODUCT_CODE</td>
+<td>SUB_PRODUCT (Sản phẩm nhánh)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>SUB_PRODUCT_CODE</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE</td>
+<td>Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc
+SEC/UNSEC</td>
+<td>SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường
+TAT_RLOS_SEC_<em>/TAT_RLOS_UNSEC_</em> (điều kiện lọc SEC/UNSEC trên
+AGG_LOS_KPI_YTD_DAILY)</td>
+</tr>
+<tr>
+<td>9</td>
+<td>PRODUCT_NAME</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>150</td>
+<td></td>
+<td>Tên sản phẩm tín dụng chi tiết — nguồn
+MAS_SUB_PRODUCT.SUB_PRODUCT_NAME</td>
+<td>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC</td>
+<td>Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_<em>/TAT_RLOS_UNSEC_</em>
+(điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>SCORE_REQUIRED</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>10</td>
+<td></td>
+<td>Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>11</td>
+<td>SCORE_MODEL</td>
+<td>VARCHAR2</td>
+<td>N</td>
+<td>100</td>
+<td></td>
+<td>Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL</td>
+<td>—</td>
+<td>Thiết kế dư thừa</td>
+</tr>
+<tr>
+<td>12</td>
+<td>EFF_DATE</td>
+<td>DATE</td>
+<td>Y</td>
+<td></td>
+<td></td>
+<td>Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do SB_DWH
+quản lý, bê nguyên qua tầng PDTD_DTM</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>13</td>
+<td>EXP_DATE</td>
+<td>DATE</td>
+<td>N</td>
+<td></td>
+<td></td>
+<td>Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện
+hành</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="16-dim_t24_company">16. DIM_T24_COMPANY</h2>
+<h3 id="161-mục-đích-thiết-kế">16.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> danh mục đơn vị kinh doanh (chi
+nhánh/phòng giao dịch) lõi T24 core banking — khác hẳn
+<code>DIM_LOS_COMPANY</code> (nguồn LOS, do
+<code>NG_SB_CLOS_CUST_INFO</code>/<code>NG_SB_RLOS_APPLICANT_GENERAL</code>
+cấp). Bảng phát sinh khi thiết kế
+<code>FCT_CLOS_LOAN_DISBURSEMENT</code>/<code>FCT_RLOS_LOAN_DISBURSEMENT</code>
+— tách riêng thành DIM có FK vật lý thay vì mô tả join-time bằng lời như
+tài liệu gốc. Chỉ tồn tại ở layer PDTD_DTM (không có bản SB_DWH), bê 1:1
+từ <code>SB_DWH.DIM_COMPANY</code> qua vùng chìa
+<code>STG_DTM.STG_DIM_COMPANY</code>, không đi qua CDC của LOS.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code> (giữ nguyên giá trị từ SB_DWH qua vùng chìa
+STG_DTM)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 đơn vị kinh doanh
+T24, lưu lịch sử thay đổi theo thời gian (SCD Type 2, khóa tự nhiên
+<code>COMPANY_CODE</code>) — bê nguyên toàn bộ lịch sử
+<code>EFF_DATE</code>/<code>EXP_DATE</code> từ nguồn, không tự tính SCD2
+tại PDTD_DTM.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — qua FK T24_COMPANY_SK trên
+FCT_RLOS_LOAN_DISBURSEMENT</li>
+<li>Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FK T24_COMPANY_SK trên
+FCT_CLOS_LOAN_DISBURSEMENT</li>
+</ul></li>
+</ul>
+<h3 id="162-sơ-đồ-lineage">16.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH_T24["SB_DWH (T24 core banking)"]
+        A(["DIM_COMPANY"])
+    end
+    subgraph STG_DTM["Vùng chìa STG_DTM"]
+        S(["STG_DIM_COMPANY"])
+    end
+    subgraph PDTD_DTM
+        D["DIM_T24_COMPANY"]
+    end
+    A --> S
+    S -->|1:1 COMPANY_CODE, BRANCH_NAME, COMPANY_NAME_VN| D</pre>
+<h3 id="163-cấu-trúc-bảng">16.3 Cấu trúc bảng</h3>
+<p>Lấy 1:1 từ bảng có sẵn trên <code>STG_DTM.STG_DIM_COMPANY</code>.</p>
+<h2 id="17-dim_t24_customer">17. DIM_T24_CUSTOMER</h2>
+<h3 id="171-mục-đích-thiết-kế">17.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> chiều khách hàng lõi T24 (core
+banking) — khác toàn bộ DIM/FCT còn lại của datamart này, bảng không có
+nguồn CLOS hay RLOS nào cả, đã tồn tại sẵn ở
+<code>SB_DWH.DIM_CUSTOMER</code>. Đây là chỗ DUY NHẤT nối được hồ sơ tín
+dụng LOS (CLOS/RLOS) sang khách hàng lõi T24 — join qua số giấy tờ định
+danh (<code>LEGAL_ID</code> + <code>LEGAL_DOC_NAME</code>, đã chuẩn hóa
+ở T24) khớp với <code>DIM_CLOS_CUSTOMER.ID_NUMBER</code> phía CLOS (⚠️
+review 2026-09-25: đổi tên từ <code>ORG_LEGAL_ID</code>, cùng giá
+trị/nguồn) và <code>ID_TYPE</code>/<code>ID_NUMBER</code> trên
+<code>FCT_RLOS_CUSTOMER</code> phía RLOS (⚠️ review 2026-09-26: đổi từ
+<code>DIM_RLOS_APPLICANT.ADD_ID</code>/<code>ADD_ID_OTHER</code> sau khi
+bảng đó đổi thành FACT, đổi grain sang giấy tờ — join trực tiếp theo cặp
+ID_TYPE/ID_NUMBER, không cần tách chuỗi). Giữ thành chiều riêng (không
+gộp vào từng fact) vì được nhiều báo cáo tham chiếu — gộp sẽ nhân bản dữ
+liệu và mất khả năng lọc theo phân khúc. Chỉ tồn tại ở layer PDTD_DTM,
+bê 1:1 từ SB_DWH qua vùng chìa STG_DTM, không đi qua CDC của LOS.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code> (giữ nguyên giá trị từ SB_DWH qua vùng chìa
+STG_DTM)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 khách hàng T24, lưu
+lịch sử thay đổi theo thời gian (SCD Type 2, khóa tự nhiên
+<code>CUSTOMER_ID</code>) — bê nguyên toàn bộ lịch sử, không tự tính
+SCD2 tại PDTD_DTM.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo RLOS APPLICATION (BC1) — qua
+FCT_RLOS_CUSTOMER.T24_CUSTOMER_SK (⚠️ review 2026-09-26: chuyển từ
+FCT_RLOS_APPLICATION_DAILY sau khi FCT_RLOS_CUSTOMER đổi grain sang giấy
+tờ định danh, xem HLD_FCT_SB_DWH_review.md mục 15)</li>
+<li>Báo cáo CLOS APPLICATION (BC2) — qua
+FCT_CLOS_APPLICATION_DAILY.T24_CUSTOMER_SK</li>
+<li>Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — qua
+FCT_RLOS_LOAN_DISBURSEMENT.CUSTOMER_SK, lọc SEAB_CU_SEGMENT IN
+('14','21')</li>
+<li>Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua
+FCT_CLOS_LOAN_DISBURSEMENT.CUSTOMER_SK, lọc SEAB_CU_SEGMENT NOT IN
+('14','21')</li>
+</ul></li>
+</ul>
+<h3 id="172-sơ-đồ-lineage">17.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH_T24["SB_DWH (T24 core banking)"]
+        A(["DIM_CUSTOMER"])
+    end
+    subgraph STG_DTM["Vùng chìa STG_DTM"]
+        S(["STG_DIM_CUSTOMER"])
+    end
+    subgraph PDTD_DTM
+        D["DIM_T24_CUSTOMER"]
+    end
+    A --> S
+    S -->|1:1 CUSTOMER_ID, LEGAL_ID, LEGAL_DOC_NAME, DATE_OF_BIRTH, GENDER, SHORT_NAME, SEAB_CU_SEGMENT| D</pre>
+<h3 id="173-cấu-trúc-bảng">17.3 Cấu trúc bảng</h3>
+<p>Lấy 1:1 từ bảng có sẵn trên
+<code>STG_DTM.STG_DIM_CUSTOMER</code>.</p>
+<h2 id="18-dim_t24_loan">18. DIM_T24_LOAN</h2>
+<h3 id="181-mục-đích-thiết-kế">18.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> chiều hợp đồng khoản vay lõi T24 —
+lineage doc gốc của <code>FCT_PDTD_DISBURSEMENT</code> từng denormalize
+5 cột này thẳng vào fact (1:1 từ <code>SB_DWH.DIM_LOAN</code>). Theo yêu
+cầu người dùng, tách hẳn thành DIM riêng để có FK vật lý
+(<code>CONTRACT_SK</code>) rõ ràng trên
+<code>FCT_CLOS_LOAN_DISBURSEMENT</code>/<code>FCT_RLOS_LOAN_DISBURSEMENT</code>
+thay vì lưu text/date thẳng trên fact. Chỉ tồn tại ở layer PDTD_DTM, bê
+1:1 từ SB_DWH qua vùng chìa STG_DTM, không đi qua CDC của LOS.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code> (giữ nguyên giá trị từ SB_DWH qua vùng chìa
+STG_DTM)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 hợp đồng T24 (theo
+phiên bản SCD2), khóa tự nhiên <code>CONTRACT</code>. Join key thật trên
+fact là <code>CONTRACT_SK</code> — surrogate có sẵn trên
+<code>STG_FCT_LOAN</code>, đã trỏ thẳng đúng phiên bản
+<code>DIMENSION_KEY</code> tại thời điểm giao dịch nên không cần thêm
+điều kiện <code>EXP_DATE IS NULL</code> như khi lookup qua business
+key.</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — qua FK CONTRACT_SK trên
+FCT_RLOS_LOAN_DISBURSEMENT</li>
+<li>Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FK CONTRACT_SK trên
+FCT_CLOS_LOAN_DISBURSEMENT</li>
+</ul></li>
+</ul>
+<h3 id="182-sơ-đồ-lineage">18.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH_T24["SB_DWH (T24 core banking)"]
+        A(["DIM_LOAN"])
+    end
+    subgraph STG_DTM["Vùng chìa STG_DTM"]
+        S(["STG_DIM_LOAN"])
+    end
+    subgraph PDTD_DTM
+        D["DIM_T24_LOAN"]
+    end
+    A --> S
+    S -->|1:1 CONTRACT, VALUE_DATE, MATURITY_DATE, REC_STATUS, CONTRACT_REF, REF_VALUE_DATE| D</pre>
+<h3 id="183-cấu-trúc-bảng">18.3 Cấu trúc bảng</h3>
+<p>Lấy 1:1 từ bảng có sẵn trên <code>STG_DTM.STG_DIM_LOAN</code>.</p>
+<h2 id="19-dim_t24_seab_products_de">19. DIM_T24_SEAB_PRODUCTS_DE</h2>
+<h3 id="191-mục-đích-thiết-kế">19.1 Mục đích thiết kế</h3>
+<ul>
+<li><strong>Ý nghĩa bảng:</strong> chiều sản phẩm giải ngân lõi T24 —
+lineage doc gốc denormalize cột <code>PRODUCT_T24</code> thẳng vào fact
+(1:1 từ <code>SB_DWH.DIM_SEAB_PRODUCTS_DE</code>). Theo yêu cầu người
+dùng, tách DIM riêng, đặt FK vật lý <code>SEAB_PRODUCTS_DE_SK</code>
+trên fact thay vì lưu cột text thẳng. Không có tài liệu nào xác nhận
+business key gốc của sản phẩm T24 (chỉ có surrogate) nên không thiết kế
+thêm cột NK nào ngoài tên sản phẩm. Chỉ tồn tại ở layer PDTD_DTM, bê 1:1
+từ SB_DWH qua vùng chìa STG_DTM, không đi qua CDC của LOS.</li>
+<li><strong>Khóa chính của bảng (PK):</strong>
+<code>DIMENSION_KEY</code> (giữ nguyên giá trị từ SB_DWH qua vùng chìa
+STG_DTM)</li>
+<li><strong>Độ chi tiết (grain):</strong> 1 dòng = 1 sản phẩm T24 (theo
+phiên bản SCD2). Join key trên fact là <code>SEAB_PRODUCTS_DE_SK</code>
+— surrogate có sẵn trên <code>STG_FCT_LOAN</code> (SRS ghi nguyên văn
+<code>SEAB_PRODUCTS_SK</code>, xác nhận là thiếu chính tả, dùng đúng tên
+khớp tên bảng đích).</li>
+<li><strong>Phục vụ báo cáo:</strong>
+<ul>
+<li>Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — qua FK SEAB_PRODUCTS_DE_SK
+trên FCT_RLOS_LOAN_DISBURSEMENT</li>
+<li>Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FK SEAB_PRODUCTS_DE_SK
+trên FCT_CLOS_LOAN_DISBURSEMENT</li>
+</ul></li>
+</ul>
+<h3 id="192-sơ-đồ-lineage">19.2 Sơ đồ lineage</h3>
+<pre class="mermaid">flowchart LR
+    subgraph SB_DWH_T24["SB_DWH (T24 core banking)"]
+        A(["DIM_SEAB_PRODUCTS_DE"])
+    end
+    subgraph STG_DTM["Vùng chìa STG_DTM"]
+        S(["STG_DIM_SEAB_PRODUCTS_DE"])
+    end
+    subgraph PDTD_DTM
+        D["DIM_T24_SEAB_PRODUCTS_DE"]
+    end
+    A --> S
+    S -->|1:1 SEAB_PRODUCTS_DE_NAME| D</pre>
+<h3 id="193-cấu-trúc-bảng">19.3 Cấu trúc bảng</h3>
+<p>Lấy 1:1 từ bảng có sẵn trên
+<code>STG_DTM.STG_DIM_SEAB_PRODUCTS_DE</code>.</p>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, securityLevel: "loose" });
+</script>
+</body>
+</html>

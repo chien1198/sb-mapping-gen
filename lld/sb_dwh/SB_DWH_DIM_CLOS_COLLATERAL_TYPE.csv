@@ -1,7 +1,0 @@
-﻿"target_table","target_column","nullable","data_type","key","description","etl_logic","etl_logic_type","source_table","source_column","note"
-"DIM_CLOS_COLLATERAL_TYPE","DIMENSION_KEY","false","number","PK","PK — Driving: NG_SB_CLOS_COLL_CD","","generated","","","Sinh bằng Oracle sequence tại SB_DWH"
-"DIM_CLOS_COLLATERAL_TYPE","DATASOURCE","false","string(10)","","Cột kỹ thuật đánh dấu nguồn hệ, luôn cố định 'CLOS'","'CLOS'","computed","","",""
-"DIM_CLOS_COLLATERAL_TYPE","COLLATERAL_TYPE_SK","false","number","","Bằng đúng DIMENSION_KEY cùng dòng — dùng để Fact lookup vào DIM này","= DIMENSION_KEY (cùng dòng)","generated","","","Mặc định -1 nếu không có giá trị phù hợp"
-"DIM_CLOS_COLLATERAL_TYPE","COLLATERAL_TYPE_CODE","false","string(100)","NK","Business key — mã loại tài sản bảo đảm","NG_SB_CLOS_COLL_CD.COLLTYPE","direct","NG_SB_CLOS_COLL_CD","COLLTYPE","Giữ nguyên giá trị gốc kể cả chuỗi tiếng Việt không dấu. BC2 tự tính 9 cờ TSDB_*/TIN_CHAP_TQD bằng CASE so sánh trực tiếp cột này"
-"DIM_CLOS_COLLATERAL_TYPE","EFF_DATE","false","date","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","CDC — so sánh bản ghi cũ/mới của NG_SB_CLOS_COLL_CD tại mỗi lần ETL chạy, gán = v_batch_date","scd2","NG_SB_CLOS_COLL_CD","","review 2026-09-22: đổi biến tham số ngày ETL từ :P_DATE sang v_batch_date cho khớp quy ước biến batch chuẩn"
-"DIM_CLOS_COLLATERAL_TYPE","EXP_DATE","true","date","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","NULL","scd2","","","Đóng bằng EFF_DATE(bản ghi mới) - 1 giây khi CDC phát hiện thay đổi"
