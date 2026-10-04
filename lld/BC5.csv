@@ -1,5 +1,5 @@
 stt,he_thong,truong_bao_cao,y_nghia,bang_dtm,cot_dtm,trang_thai,ghi_chu
-1,CLOS,SYSTEMNAME,Hệ thống (CLOS/RLOS),FCT_CLOS_APPLICATION,DATASOURCE,KHOP,"Đính chính (review 2026-09-21, người dùng chỉ ra qua BC4): không phải hằng số ngoài phạm vi — cột DATASOURCE có sẵn trên FCT_CLOS_APPLICATION (cột kỹ thuật, cột 3, luôn cố định 'CLOS' sau khi tách vật lý CLOS/RLOS)"
+1,CLOS,SYSTEMNAME,Hệ thống (CLOS/RLOS),FCT_CLOS_APPLICATION,—,KHOP,"Review 2026-10-04: cột DATASOURCE đã bị xóa khỏi FCT_CLOS_APPLICATION (không có trong HLD review) — PHÁI SINH tại tầng report bằng literal cố định 'CLOS' (khớp đúng nhánh CLOS của báo cáo, không cần đọc cột nào)"
 2,CLOS,PROCESSED_DATE,Ngày dữ liệu - Ngày mới nhất của dữ liệu,FCT_CLOS_APPLICATION,PROCESSED_DATE,KHOP,"Cột 22 — cùng công thức 3 mức ưu tiên, cùng cột đã dùng cho BC1/BC2/BC4.PROCESSED_DATE"
 3,CLOS,WINAME,Mã hồ sơ,FCT_CLOS_APPLICATION,WI_NAME,KHOP,Khóa chính (PK) của bảng
 4,CLOS,BI_APPSTATUS,Trạng thái hồ sơ,FCT_CLOS_APPLICATION,APPLICATION_STATUS,KHOP,"Cột 35 — Approved/Rejected/Cancelled/Processing, cùng cột đã dùng cho BC1/BC2"
@@ -48,7 +48,7 @@ stt,he_thong,truong_bao_cao,y_nghia,bang_dtm,cot_dtm,trang_thai,ghi_chu
 47,CLOS,SLA_DE_TOTAL_RESULT,Kết quả SLA của Nhập liệu tập trung,,so sánh (STEP02_DDE_TAT_CPC+STEP03_QUALITY_CHECKER_TAT_CPC) vs (SLA_DE+SLA_QC),KHOP,"PHÁI SINH ở tầng report, tổng hợp từ dòng 8,13,43,44"
 48,CLOS,QD_DDE,Điểm quy đổi bước DetailDataEntry,REF_SLA_NLTT,QD_DDE (SYSTEM_CODE='CLOS'),KHOP,"Cột 9 của REF_SLA_NLTT — dùng chung đúng 1 điều kiện JOIN report-time với SLA_DE_RESULT (dòng 43), không có điều kiện riêng. Đã đóng gap (review 2026-09-21) cùng lúc với SLA_DE/SLA_QC cho CLOS"
 49,CLOS,QD_QC,Điểm quy đổi bước DataInputerChecker,REF_SLA_NLTT,QD_QC (SYSTEM_CODE='CLOS'),KHOP,Cột 10 của REF_SLA_NLTT — cùng điều kiện JOIN report-time với dòng 48
-50,RLOS,SYSTEMNAME,Hệ thống (CLOS/RLOS),FCT_RLOS_APPLICATION,DATASOURCE,KHOP,"Đính chính cùng lý do với nhánh CLOS (review 2026-09-21) — cột DATASOURCE có sẵn trên FCT_RLOS_APPLICATION (cột kỹ thuật, cột 2, luôn cố định 'RLOS' sau khi tách vật lý CLOS/RLOS)"
+50,RLOS,SYSTEMNAME,Hệ thống (CLOS/RLOS),FCT_RLOS_APPLICATION,—,KHOP,"Review 2026-10-04: cột DATASOURCE đã bị xóa khỏi FCT_RLOS_APPLICATION (không có trong HLD review) — PHÁI SINH tại tầng report bằng literal cố định 'RLOS' (khớp đúng nhánh RLOS của báo cáo, không cần đọc cột nào)"
 51,RLOS,PROCESSED_DATE,Ngày dữ liệu - Ngày mới nhất của dữ liệu,FCT_RLOS_APPLICATION,PROCESSED_DATE,KHOP,Cột 24 — cùng cột đã dùng cho BC1.PROCESSED_DATE
 52,RLOS,WINAME,Mã hồ sơ,FCT_RLOS_APPLICATION,WI_NAME,KHOP,Khóa chính (PK) của bảng
 53,RLOS,BI_APPSTATUS,Trạng thái hồ sơ,FCT_RLOS_APPLICATION,APPLICATION_STATUS,KHOP,Cột 37 — cùng cột đã dùng cho BC1.BI_APPSTATUS

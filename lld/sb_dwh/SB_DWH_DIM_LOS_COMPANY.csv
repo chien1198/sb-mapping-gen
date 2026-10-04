@@ -1,6 +1,5 @@
-﻿"target_table","target_column","nullable","data_type","key","description","etl_logic","etl_logic_type","source_table","source_column","note"
+"target_table","target_column","nullable","data_type","key","description","etl_logic","etl_logic_type","source_table","source_column","note"
 "DIM_LOS_COMPANY","DIMENSION_KEY","false","number","PK","PK — Driving: NG_SB_RLOS_MAS_COMPANY","","generated","","","Sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới"
-"DIM_LOS_COMPANY","DATASOURCE","false","string(10)","","Nguồn hệ dùng chung cho cả hai hệ CLOS và RLOS — cột kỹ thuật","'LOS'","computed","","",""
 "DIM_LOS_COMPANY","COMPANY_SK","false","number","","Khóa tham chiếu đến bảng chiều DIM_LOS_COMPANY, bằng đúng DIMENSION_KEY cùng dòng","= DIMENSION_KEY (cùng dòng)","generated","","","Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp"
 "DIM_LOS_COMPANY","COMPANY_CODE","true","string(50)","","Business key — mã đơn vị kinh doanh (PGD/CN — mức chi tiết nhất), dùng làm join-anchor","NG_SB_RLOS_MAS_COMPANY.COMPANY_CODE","direct","NG_SB_RLOS_MAS_COMPANY","COMPANY_CODE","Review 2026-09-18: đổi nguồn từ hồ sơ LOS (NG_SB_CLOS_CUST_INFO/NG_SB_RLOS_APPLICANT_GENERAL) sang bảng danh mục thật — BI xác nhận nguồn cũ không tương ứng DIM_COMPANY (T24)"
 "DIM_LOS_COMPANY","COMPANY_NAME","true","string(200)","","Tên đơn vị kinh doanh","NG_SB_RLOS_MAS_COMPANY.COMPANY_NAME_VN","direct","NG_SB_RLOS_MAS_COMPANY","COMPANY_NAME_VN",""

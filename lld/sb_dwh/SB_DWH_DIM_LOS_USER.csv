@@ -1,6 +1,5 @@
-﻿"target_table","target_column","nullable","data_type","key","description","etl_logic","etl_logic_type","source_table","source_column","note"
+"target_table","target_column","nullable","data_type","key","description","etl_logic","etl_logic_type","source_table","source_column","note"
 "DIM_LOS_USER","DIMENSION_KEY","false","number","PK","PK — Driving: NG_SB_RLOS_MAS_USER","","generated","","","Sinh bằng Oracle sequence tại SB_DWH"
-"DIM_LOS_USER","DATASOURCE","false","string(10)","","Nguồn hệ dùng chung cho cả hai hệ CLOS và RLOS — cột kỹ thuật","'LOS'","computed","","","Luôn cố định giá trị 'LOS'"
 "DIM_LOS_USER","USER_SK","false","number","","Bằng đúng DIMENSION_KEY cùng dòng — dùng để Fact lookup vào DIM này","= DIMENSION_KEY (cùng dòng)","generated","","","Mặc định -1 (dòng Unknown) nếu không có giá trị phù hợp"
 "DIM_LOS_USER","USERNAME","false","string(100)","NK","Business key — tên tài khoản cán bộ xử lý hồ sơ trên ứng dụng LOS","NG_SB_RLOS_MAS_USER.LOGIN_ID","direct","NG_SB_RLOS_MAS_USER","LOGIN_ID","UNIQUE (USERNAME, EFF_DATE)"
 "DIM_LOS_USER","EMPLOYEE_NAME","true","string(200)","","Tên nhân viên","NG_SB_RLOS_MAS_USER.EMPLOYEE_NAME","direct","NG_SB_RLOS_MAS_USER","EMPLOYEE_NAME","Mới bổ sung review 2026-09-18 — thiết kế dư thừa ở Dimension"
