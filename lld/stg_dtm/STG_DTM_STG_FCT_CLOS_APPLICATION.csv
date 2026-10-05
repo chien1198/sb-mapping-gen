@@ -21,3 +21,5 @@
 "STG_FCT_CLOS_APPLICATION","LG_REQ","true","string(10)","","Cờ yêu cầu bảo lãnh (Letter of Guarantee) phát sinh theo hồ sơ (boolean true/false)","FCT_CLOS_APPLICATION.LG_REQ","direct","FCT_CLOS_APPLICATION","LG_REQ",""
 "STG_FCT_CLOS_APPLICATION","FI_REQ","true","string(10)","","Cờ yêu cầu (boolean true/false)","FCT_CLOS_APPLICATION.FI_REQ","direct","FCT_CLOS_APPLICATION","FI_REQ",""
 "STG_FCT_CLOS_APPLICATION","PHONE_REQ","true","string(10)","","Cờ yêu cầu xác minh điện thoại (boolean true/false)","FCT_CLOS_APPLICATION.PHONE_REQ","direct","FCT_CLOS_APPLICATION","PHONE_REQ",""
+"STG_FCT_CLOS_APPLICATION","CHANGE_REQUEST","true","string(200)","","Yêu cầu điều chỉnh hồ sơ — nguồn gốc xa NG_SB_CLOS_CHANGEREQ.CHANGE_REQUEST","FCT_CLOS_APPLICATION.CHANGE_REQUEST","direct","FCT_CLOS_APPLICATION","CHANGE_REQUEST","BỔ SUNG (review 2026-10-04, đồng bộ SB_DWH)"
+"STG_FCT_CLOS_APPLICATION","CHANGE_TYPE","true","string(500)","","Loại thay đổi điều kiện phê duyệt, chuỗi tự do đa giá trị nối bằng '~' — nguồn gốc xa NG_SB_CLOS_CHANGEREQ.CHANGE_TYPE","FCT_CLOS_APPLICATION.CHANGE_TYPE","direct","FCT_CLOS_APPLICATION","CHANGE_TYPE","BỔ SUNG (review 2026-10-04, đồng bộ SB_DWH)"
