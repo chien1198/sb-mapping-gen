@@ -194,7 +194,7 @@ SB_DWH mới giữ làm DIM; ở PDTD_DTM nó là `FCT_CLOS_LEGAL_PARTY` (xem
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_CUSTOMER, kế thừa nguyên giá trị từ SB_DWH | — | — |
 | 2 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_CUSTOMER, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 | — | — |
-| 3 | ID_NUMBER | VARCHAR2 | Y | 100 | BK | Số ĐKKD/CMND của khách hàng — định danh pháp lý ổn định, không đổi giữa các hồ sơ khác nhau — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG') | Báo cáo CLOS APPLICATION (BC2) | ID_NUMBER (Số ĐKKD / MST doanh nghiệp). ⚠️ Review 2026-10-04 (cross-check LLD/HLD): bổ sung BC2 — trước đây để '—', nhưng BC2.csv#14 đã dùng trực tiếp cột này (hiển thị + tự tra CUSTOMER_SK) từ trước, chỉ thiếu khai báo tại đây. Cũng là nguồn cho chỉ tiêu/trường CUSTOMER_SK (khóa join FCT_CLOS_APPLICATION, tra qua ID_NUMBER; FCT_CLOS_LEGAL_PARTY.CUSTOMER_SK) |
+| 3 | ID_NUMBER | VARCHAR2 | Y | 100 | BK | Số ĐKKD/CMND của khách hàng — định danh pháp lý ổn định, không đổi giữa các hồ sơ khác nhau — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG') | Báo cáo CLOS APPLICATION (BC2) | ID_NUMBER (Số ĐKKD / MST doanh nghiệp).|
 | 4 | FULL_NAME | VARCHAR2 | N | 200 |  | Tên doanh nghiệp khách hàng — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME, dòng đại diện đã chọn ở cột ID_NUMBER) | Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo Thông tin phê duyệt (BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) | CUSTOMER_NAME (Tên khách hàng) |
 | 5 | CUST_GROUP | VARCHAR2 | N | 100 |  | Phân khúc khách hàng doanh nghiệp (SME/MSME/USME/STR/JSC/SOC/BANK/FDI/NBFI) — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO.CUST_GROUP) | Báo cáo CLOS APPLICATION (BC2) | CUST_GROUP (Nhóm phân loại khách hàng) |
 | 6 | CUST_CATEGORY | VARCHAR2 | N | 200 |  | Phân loại khách hàng — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_CUST_INFO.CUST_CATEGORY) | — | Thiết kế dư thừa |
@@ -381,7 +381,7 @@ flowchart LR
     subgraph PDTD_DTM
         G["DIM_RLOS_APPLICATION"]
     end
-    F -->|"SCD2 cho cột nghiệp vụ gốc + SCD1 cho 24 cột bổ sung (review 2026-10-04) — giữ nguyên DIMENSION_KEY, bê 1:1, không còn cột phái sinh nào (đã gồm 10 cột hồ sơ-scoped ZONE/SALE_TYPE/BROKER_*/ACC_OFFICER/ACCOUNT_OFFICER_NAME/EXISTING_CUSTOMER/APPLICANT_CIF/KYC1)"| G
+    F -->|"SCD2 cho cột nghiệp vụ gốc + SCD1 cho 24 cột bổ sung — giữ nguyên DIMENSION_KEY, bê 1:1, không còn cột phái sinh nào (đã gồm 10 cột hồ sơ-scoped ZONE/SALE_TYPE/BROKER_*/ACC_OFFICER/ACCOUNT_OFFICER_NAME/EXISTING_CUSTOMER/APPLICANT_CIF/KYC1)"| G
 ```
 
 `BUSINESS_FLOW`/`DEVIATION_G3`/`REF_PRODUCT`/`SLA_*` (sơ đồ join
@@ -427,7 +427,7 @@ flowchart LR
 | 32 | EXISTING_CUSTOMER | VARCHAR2 | N | 10 |  | Cờ khách hàng hiện hữu tại thời điểm nộp hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.EXISTING_CUSTOMER.| — | Thiết kế dư thừa |
 | 33 | APPLICANT_CIF | VARCHAR2 | N | 50 |  | Mã CIF khách hàng (định danh ngân hàng lõi) tại thời điểm hồ sơ — kế thừa 1:1 từ SB_DWH — nguồn NG_SB_RLOS_APPLICANT_GENERAL.APPLICANTCIF| — | Thiết kế dư thừa |
 | 34 | KYC1 | VARCHAR2 | N | 50 |  | Đơn vị/khối đang xử lý hồ sơ tại thời điểm ghi nhận (giá trị quan sát: Khối VHCN, Khối PDTD, ĐVKD) — kế thừa 1:1 từ SB_DWH — nguồn NG_SB_RLOS_APPLICANT_GENERAL.KYC1| — | Thiết kế dư thừa |
-| 35 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%) — kế thừa 1:1 từ SB_DWH (cột bổ sung review 2026-10-04, lưu SCD1 — xem HLD_DIM_SB_DWH_review.md mục 8) — nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.CURRENT_RATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | INTEREST_RATE (Lãi suất phê duyệt, %/năm) |
+| 35 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%) — kế thừa 1:1 từ SB_DWH (lưu SCD1) — nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.CURRENT_RATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | INTEREST_RATE (Lãi suất phê duyệt, %/năm) |
 | 36 | LOAN_TO_VALUE | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị TSBĐ — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL(_APP).LOAN_TO_VALUE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LOAN_TO_VALUE (Tỷ lệ LTV, %) |
 | 37 | LOAN_OBJECTIVE | VARCHAR2 | N | 200 |  | Mục đích vay — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_OBJECTIVE (hồ sơ thẻ tín dụng: mang nghĩa loại thẻ) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | Loan Objective (Mục đích cho vay) |
 | 38 | TOTAL_INCOME | NUMBER | N | 20,2 |  | Tổng thu nhập khách hàng — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_REPAY_CALC.TOT_INC_CALC | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | TOTAL_INCOME (Tổng thu nhập phê duyệt) |
@@ -720,7 +720,7 @@ Lấy 1:1 từ bảng có sẵn trên `STG_DTM.STG_DIM_COMPANY`.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY` (giữ nguyên giá trị từ SB_DWH qua vùng chìa STG_DTM)
 - **Độ chi tiết (grain):** 1 dòng = 1 khách hàng T24, lưu lịch sử thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `CUSTOMER_ID`)
 - **Phục vụ báo cáo:**
-  - Báo cáo RLOS APPLICATION (BC1) — qua FCT_RLOS_CUSTOMER.T24_CUSTOMER_SK (xem HLD_FCT_SB_DWH_review.md mục 15)
+  - Báo cáo RLOS APPLICATION (BC1) — qua FCT_RLOS_CUSTOMER.T24_CUSTOMER_SK
   - Báo cáo CLOS APPLICATION (BC2) — qua FCT_CLOS_APPLICATION.T24_CUSTOMER_SK
   - Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — qua FCT_RLOS_LOAN_DISBURSEMENT.CUSTOMER_SK, lọc SEAB_CU_SEGMENT IN ('14','21')
   - Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FCT_CLOS_LOAN_DISBURSEMENT.CUSTOMER_SK, lọc SEAB_CU_SEGMENT NOT IN ('14','21')

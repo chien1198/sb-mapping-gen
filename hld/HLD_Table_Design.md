@@ -3107,11 +3107,12 @@ tiên trong năm user đó thỏa điều kiện; đã có thì bỏ qua, không
 ##### 2.1.8 AGG_LOS_KPI_YTD_DAILY — ĐỔI TIỀN TỐ FCT_ → AGG_ (review 2026-09-22)
 
 **Đổi tên `FCT_LOS_KPI_YTD_DAILY` → `AGG_LOS_KPI_YTD_DAILY`:** grain 1
-dòng/ngày (`DAYID`), toàn bộ 26 cột non-PK đều là SUM/COUNT/lũy kế từ
+dòng/ngày (`DAYID`), toàn bộ 65 cột non-PK đều là SUM/COUNT/lũy kế từ
 `AGG_LOS_KPI_APPLICATION` (không còn thuộc tính mô tả hay FK nào) — đúng
 định nghĩa bảng tổng hợp (summary/aggregate fact), không phải transaction
 fact. Đổi tiền tố để phân biệt rõ với các FCT_ grain giao dịch/hồ sơ còn
-lại trong tài liệu.
+lại trong tài liệu. (Số cột non-PK cập nhật 26→65 theo review 2026-10-05,
+xem đổi tên + bổ sung WTD/MTD/QTD ở Section 2 → 2.1.8.)
 
 ```mermaid
 flowchart LR
@@ -3123,13 +3124,13 @@ flowchart LR
         M["AGG_LOS_KPI_USER_YEAR"]
         F["AGG_LOS_KPI_YTD_DAILY"]
     end
-    A -->|"SUM QUY_DOI theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập, review 2026-09-27), loại IS_TEST_ACCOUNT='Y', tách RLOS/CLOS theo DATASOURCE — sinh QUY_DOI_*_DAY"| F
-    A -->|"COUNT hồ sơ theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập), loại IS_TEST_ACCOUNT='Y', CLOS thêm APPLICATION_LINK_INFO IS NOT NULL (đổi tên từ VAR_STR12, review 2026-10-04) — sinh SLHS_*_DAY, SLGN_*_DAY"| F
-    D1 -.->|"BUSINESS_FLOW IN ('BL','KHCN_HO'), lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
-    D2 -.->|"COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002'), lookup qua COMPANY_SK — điều kiện lọc riêng cho SLHS_RLOS_DAY/SLGN_RLOS_DAY"| F
-    D3 -.->|"STREAM = 'Phê duyệt tín dụng', lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY/TAT_CLOS_*_DAY (tương đương BUSINESS_FLOW của RLOS)"| F
-    A -->|"SUM/COUNT TAT_APPLICATION_HOUR theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập), loại IS_TEST_ACCOUNT='Y' — sinh TAT_*_SUM_HOUR_DAY, TAT_*_CASE_CNT_DAY"| F
-    M -->|"COUNT theo FIRST_ELIGIBLE_TS=DAYID (đã loại 2 tài khoản test tại nguồn) — sinh NEW_USER_CNT_DAY"| F
+    A -->|"SUM QUY_DOI theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập, review 2026-09-27), loại IS_TEST_ACCOUNT='Y', tách RLOS/CLOS theo DATASOURCE — sinh QUY_DOI_RLOS/CLOS (tại-ngày), lũy kế WTD/MTD/QTD/YTD song song (review 2026-10-05)"| F
+    A -->|"COUNT hồ sơ theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập), loại IS_TEST_ACCOUNT='Y', CLOS thêm APPLICATION_LINK_INFO IS NOT NULL (đổi tên từ VAR_STR12, review 2026-10-04) — sinh SLHS_*/SLGN_* (tại-ngày), lũy kế WTD/MTD/QTD/YTD song song (review 2026-10-05)"| F
+    D1 -.->|"BUSINESS_FLOW IN ('BL','KHCN_HO'), lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_RLOS/SLGN_RLOS"| F
+    D2 -.->|"COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002'), lookup qua COMPANY_SK — điều kiện lọc riêng cho SLHS_RLOS/SLGN_RLOS"| F
+    D3 -.->|"STREAM = 'Phê duyệt tín dụng', lookup qua APPLICATION_SK — điều kiện lọc riêng cho SLHS_CLOS/SLGN_CLOS/TAT_CLOS_* (tương đương BUSINESS_FLOW của RLOS)"| F
+    A -->|"SUM/COUNT TAT_APPLICATION_HOUR theo DAYID=v_batch_date VÀ PROCESSED_DATE=v_batch_date (2 điều kiện độc lập), loại IS_TEST_ACCOUNT='Y' — sinh TAT_*_SUM_HOUR, TAT_*_CASE_CNT (tại-ngày), lũy kế WTD/MTD/QTD/YTD song song (review 2026-10-05)"| F
+    M -->|"COUNT theo FIRST_ELIGIBLE_TS=DAYID (đã loại 2 tài khoản test tại nguồn) — sinh USER_CNT (tại-ngày, đổi tên từ NEW_USER_CNT_DAY), lũy kế WTD/MTD/QTD/YTD song song (review 2026-10-05)"| F
 ```
 
 **Ghi chú lineage — bỏ hẳn cơ chế milestone-per-day của tài liệu gốc:**
@@ -7257,9 +7258,9 @@ PENDING mới.
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | KPI_YEAR | NUMBER | Y | 4 | PK | Năm KPI — tập user reset vào 1/1 hằng năm |
 | 2 | USERNAME | VARCHAR2 | Y | 100 | PK | Tên tài khoản cán bộ xử lý hồ sơ — nguồn UNION FCT_CLOS_WORKSTEP_EVENT.USERNAME/FCT_RLOS_WORKSTEP_EVENT.USERNAME |
-| 3 | FIRST_ELIGIBLE_TS | TIMESTAMP | Y |  |  | Thời điểm đầu tiên trong năm user xử lý 1 bước thuộc phạm vi tính nhân sự (8 workstep) — quyết định user được tính vào năm nào và ngày nào trên AGG_LOS_KPI_YTD_DAILY.NEW_USER_CNT_DAY |
+| 3 | FIRST_ELIGIBLE_TS | TIMESTAMP | Y |  |  | Thời điểm đầu tiên trong năm user xử lý 1 bước thuộc phạm vi tính nhân sự (8 workstep) — quyết định user được tính vào năm nào và ngày nào trên AGG_LOS_KPI_YTD_DAILY.USER_CNT (đổi tên từ NEW_USER_CNT_DAY, review 2026-10-05) |
 
-- Bảng danh mục (registry) lưu tập user phân biệt đã tham gia xử lý hồ sơ, lũy kế theo năm — để `NHAN_SU` không phải đếm lại DISTINCT từ đầu năm mỗi ngày. Không phải bảng sự kiện đo lường theo `DAYID`. Phục vụ BC9 (đầu vào `NHAN_SU`/`NEW_USER_CNT_DAY` của `AGG_LOS_KPI_YTD_DAILY`, 2.1.8).
+- Bảng danh mục (registry) lưu tập user phân biệt đã tham gia xử lý hồ sơ, lũy kế theo năm — để `USER_CNT_YTD` (SRS gọi là `NHAN_SU`) không phải đếm lại DISTINCT từ đầu năm mỗi ngày. Không phải bảng sự kiện đo lường theo `DAYID`. Phục vụ BC9 (đầu vào `USER_CNT`/`USER_CNT_YTD` của `AGG_LOS_KPI_YTD_DAILY`, 2.1.8, đổi tên từ `NEW_USER_CNT_DAY`/`NHAN_SU` review 2026-10-05).
 - Khóa chính của bảng (PK): **KPI_YEAR, USERNAME**. UNIQUE tự nhiên (đúng bằng PK).
 
 **Đã bỏ `USER_SK` (review 2026-09-17):** người dùng xác nhận mục đích
@@ -7284,39 +7285,100 @@ xử lý").
 
 **Bảng cũ (trước tách):** `FCT_PDTD_KPI_YTD_DAILY` (36 cột, gồm 14 cột `_DAY` + 22 cột lũy kế/phái sinh) — đánh giá lại theo yêu cầu người dùng: chỉ giữ daily+lũy kế cho các chỉ tiêu đếm/tổng thật sự cần cộng dồn, bỏ hẳn cột đã là tỷ lệ/trung bình phái sinh (tính tại report), sửa lại nguồn `SLGN_CLOS`/`SLHS_*` theo đúng công thức SRS BC9 (không dùng cơ chế milestone-per-day của `FCT_PDTD_APPLICATION_MILESTONE` đã loại bỏ). Rà soát lại toàn bộ điều kiện lọc SRS BC9 (2026-09-15) phát hiện 2 điều kiện chưa đưa vào thiết kế trước đó — bổ sung `IS_TEST_ACCOUNT`/`VAR_STR12` (từ `AGG_LOS_KPI_APPLICATION`, 2.1.9) vào mọi công thức `_DAY` liên quan.
 
+**Đổi tên quy ước cột + bổ sung lũy kế WTD/MTD/QTD (review 2026-10-05,
+theo yêu cầu người dùng):** trước đây mỗi chỉ tiêu chỉ có 2 cột — `X_DAY`
+(phát sinh trong ngày) và `X` (lũy kế từ 1/1, không có hậu tố nên dễ
+nhầm là giá trị tại-ngày). Nay đổi quy ước cho rõ nghĩa và thêm 2 mốc
+lũy kế mới (tuần, tháng) cùng mốc quý vốn chưa có:
+- `X_DAY` → `X` (bỏ hậu tố `_DAY`, vẫn là giá trị phát sinh trong ngày, không đổi công thức)
+- `X` (lũy kế cũ) → `X_YTD` (lũy kế từ 1/1, reset hằng năm — không đổi công thức, chỉ đổi tên)
+- Thêm mới `X_WTD` (lũy kế từ đầu tuần, reset mỗi Thứ Hai — tuần ISO 8601), `X_MTD` (lũy kế từ đầu tháng, reset ngày 1 hằng tháng), `X_QTD` (lũy kế từ đầu quý, reset ngày 1 các tháng 1/4/7/10)
+- Riêng cột đếm nhân sự: đổi hẳn `NEW_USER_CNT_DAY`/`NHAN_SU` (tên cũ không nhất quán, không có hậu tố rõ nghĩa) thành `USER_CNT`/`USER_CNT_WTD`/`USER_CNT_MTD`/`USER_CNT_QTD`/`USER_CNT_YTD`, cùng quy ước với 12 nhóm còn lại
+
+Mốc reset WTD/MTD/QTD/YTD do ETL tự tính trực tiếp từ `v_batch_date`
+bằng `TRUNC(v_batch_date,'IW'/'MM'/'Q'/'YYYY')` so với mốc tương ứng của
+ngày hôm trước — không cần thêm cột mới trên `DIM_DATE` (theo xác nhận
+người dùng, 2026-10-05).
+
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
-| 2 | SLHS_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS được phê duyệt, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date (đọc đúng snapshot ngày đang chạy — bảng nguồn nay có DAYID riêng, review 2026-09-27, xem lưu ý bắt buộc tại Section 1 → 2.1.9) VÀ PROCESSED_DATE = v_batch_date (điều kiện nghiệp vụ "phát sinh trong ngày" — 2 điều kiện độc lập, không đối chiếu DAYID nguồn/đích), IS_TEST_ACCOUNT != 'Y', thỏa điều kiện DECISION đã phê duyệt, VÀ (join DIM_RLOS_APPLICATION qua APPLICATION_SK) BUSINESS_FLOW IN ('BL','KHCN_HO'), VÀ (join DIM_LOS_COMPANY qua COMPANY_SK) COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (theo đúng công thức SLHS_RLOS của SRS BC9 — SLHS(Nhóm 1)+SLHS(Nhóm 2), 2 nhóm bù trừ hoàn toàn theo SUB_PRODUCT/PRODUCT_NAME nên tổng bằng COUNT trên toàn bộ điều kiện lọc chung, không cần tách nhóm khi tính) |
-| 3 | SLHS_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_RLOS(D) = SLHS_RLOS(D-1) + SLHS_RLOS_DAY(D), reset vào 1/1. Trường SLHS_RLOS của BC9 |
-| 4 | SLGN_RLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS đã giải ngân (tồn tại hợp đồng trên STG_FCT_LOAN), phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, cùng cơ chế cột SLHS_RLOS_DAY), IS_TEST_ACCOUNT != 'Y', BUSINESS_FLOW IN ('BL','KHCN_HO'), COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (cùng 2 join như SLHS_RLOS_DAY), VÀ EXISTS hợp đồng STG_FCT_LOAN theo SEAB_LOS_ID |
-| 5 | SLGN_RLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_RLOS(D) = SLGN_RLOS(D-1) + SLGN_RLOS_DAY(D), reset vào 1/1. Trường SLGN_RLOS của BC9 |
-| 6 | SLHS_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS được phê duyệt, phát sinh trong ngày — cùng cách SLHS_RLOS_DAY (bao gồm AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, 2 điều kiện độc lập), DATASOURCE='CLOS', IS_TEST_ACCOUNT != 'Y' VÀ APPLICATION_LINK_INFO IS NOT NULL (đổi tên từ VAR_STR12, review 2026-10-04), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — điều kiện tương đương BUSINESS_FLOW của RLOS, SRS BC9 dùng STREAM trên NG_SB_CLOS_APPROVAL riêng cho CLOS), theo công thức SLHS_CLOS của SRS BC9 |
-| 7 | SLHS_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLHS_CLOS(D) = SLHS_CLOS(D-1) + SLHS_CLOS_DAY(D), reset vào 1/1. Trường SLHS_CLOS của BC9 |
-| 8 | SLGN_CLOS_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS đã giải ngân, phát sinh trong ngày — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='CLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, cùng cơ chế cột SLHS_CLOS_DAY), IS_TEST_ACCOUNT != 'Y', APPLICATION_LINK_INFO IS NOT NULL (đổi tên từ VAR_STR12, review 2026-10-04), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17, cùng lý do SLHS_CLOS_DAY), VÀ EXISTS hợp đồng trên STG_FCT_LOAN (nhánh LD, review 2026-09-18/2026-09-21: LISTAGG(CONTRACT) nhóm theo WFINSTRUMENTTABLE.APPLICATION_LINK_INFO (nguồn WFINSTRUMENTTABLE.VAR_STR12 — tên cột gốc trên bảng nguồn không đổi, chỉ đổi tên cột đích tại FCT_CLOS_APPLICATION), khóa JOIN vào STG_FCT_LOAN vẫn là SEAB_LOS_ID+CUSTOMER_CODE — xem đã giải quyết Section 1 → 2.1.8) HOẶC STG_DTM.STG_FCT_MD (nhánh MD, bảo lãnh) theo SEAB_LOS_ID+CUSTOMER — đúng công thức SLGN_CLOS của SRS BC9. Xem Section 3 dòng #18/#47 (đã giải quyết) |
-| 9 | SLGN_CLOS | NUMBER | N | 14 |  | Lũy kế từ 1/1: SLGN_CLOS(D) = SLGN_CLOS(D-1) + SLGN_CLOS_DAY(D), reset vào 1/1. Trường SLGN_CLOS của BC9 |
-| 10 | TAT_RLOS_SEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS CÓ tài sản bảo đảm, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, review 2026-09-27), IS_TEST_ACCOUNT != 'Y', lọc SEC theo COLLREQUIRE |
-| 11 | TAT_RLOS_SEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS có tài sản bảo đảm, phát sinh trong ngày — mẫu số của TAT_RLOS_SEC, cùng điều kiện lọc trên |
-| 12 | TAT_RLOS_SEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_SUM_HOUR_DAY(D), reset vào 1/1 |
-| 13 | TAT_RLOS_SEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1: (D) = (D-1) + TAT_RLOS_SEC_CASE_CNT_DAY(D), reset vào 1/1 |
-| 14 | TAT_RLOS_UNSEC_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS KHÔNG có tài sản bảo đảm, phát sinh trong ngày — cùng cách trên (AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, IS_TEST_ACCOUNT != 'Y'), lọc UNSEC |
-| 15 | TAT_RLOS_UNSEC_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ RLOS không có tài sản bảo đảm, phát sinh trong ngày |
-| 16 | TAT_RLOS_UNSEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 |
-| 17 | TAT_RLOS_UNSEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 |
-| 18 | TAT_CLOS_SUM_HOUR_DAY | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ CLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (DATASOURCE='CLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, review 2026-09-27), IS_TEST_ACCOUNT != 'Y' (không lọc APPLICATION_LINK_INFO, đổi tên từ VAR_STR12 — SRS không nhắc điều kiện này cho TAT_CLOS), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — SRS BC9 có điều kiện này riêng cho TAT_CLOS) |
-| 19 | TAT_CLOS_CASE_CNT_DAY | NUMBER | N | 12 |  | Số hồ sơ CLOS, phát sinh trong ngày — mẫu số của TAT_CLOS, cùng điều kiện lọc trên (bao gồm STREAM) |
-| 20 | TAT_CLOS_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 |
-| 21 | TAT_CLOS_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 |
-| 22 | QUY_DOI_RLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ RLOS, phát sinh trong ngày — SUM lại từ AGG_LOS_KPI_APPLICATION.QUY_DOI (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, review 2026-09-27), IS_TEST_ACCOUNT != 'Y', KHÔNG tính lại công thức POINT*8/VOLUME ở đây |
-| 23 | QUY_DOI_RLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_RLOS(D) = QUY_DOI_RLOS(D-1) + QUY_DOI_RLOS_DAY(D), reset vào 1/1. Trường QUY_DOI_RLOS của BC9 |
-| 24 | QUY_DOI_CLOS_DAY | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ CLOS, phát sinh trong ngày — cùng cách trên (AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, IS_TEST_ACCOUNT != 'Y'), DATASOURCE='CLOS' |
-| 25 | QUY_DOI_CLOS | NUMBER | N | 16,4 |  | Lũy kế từ 1/1: QUY_DOI_CLOS(D) = QUY_DOI_CLOS(D-1) + QUY_DOI_CLOS_DAY(D), reset vào 1/1. Trường QUY_DOI_CLOS của BC9 |
-| 26 | NEW_USER_CNT_DAY | NUMBER | N | 8 |  | Số USERNAME mới đủ điều kiện tính nhân sự trong ngày — PHÁI SINH: COUNT trên AGG_LOS_KPI_USER_YEAR (2.1.7) có KPI_YEAR = năm(DAYID) VÀ TRUNC(FIRST_ELIGIBLE_TS) = DAYID (2 tài khoản test đã bị loại tại nguồn AGG_LOS_KPI_USER_YEAR, không cần lọc lại ở đây) |
-| 27 | NHAN_SU | NUMBER | N | 8 |  | Lũy kế từ 1/1: NHAN_SU(D) = NHAN_SU(D-1) + NEW_USER_CNT_DAY(D), reset vào 1/1 — tương đương COUNT DISTINCT USERNAME lũy kế, không đếm trùng vì AGG_LOS_KPI_USER_YEAR chỉ INSERT 1 lần/user/năm. Trường NHAN_SU của BC9 |
+| 2 | SLHS_RLOS | NUMBER | N | 12 |  | Số hồ sơ RLOS được phê duyệt, phát sinh trong ngày (đổi tên từ `SLHS_RLOS_DAY`, review 2026-10-05, không đổi công thức) — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date (đọc đúng snapshot ngày đang chạy — bảng nguồn nay có DAYID riêng, review 2026-09-27, xem lưu ý bắt buộc tại Section 1 → 2.1.9) VÀ PROCESSED_DATE = v_batch_date (điều kiện nghiệp vụ "phát sinh trong ngày" — 2 điều kiện độc lập, không đối chiếu DAYID nguồn/đích), IS_TEST_ACCOUNT != 'Y', thỏa điều kiện DECISION đã phê duyệt, VÀ (join DIM_RLOS_APPLICATION qua APPLICATION_SK) BUSINESS_FLOW IN ('BL','KHCN_HO'), VÀ (join DIM_LOS_COMPANY qua COMPANY_SK) COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (theo đúng công thức SLHS_RLOS của SRS BC9 — SLHS(Nhóm 1)+SLHS(Nhóm 2), 2 nhóm bù trừ hoàn toàn theo SUB_PRODUCT/PRODUCT_NAME nên tổng bằng COUNT trên toàn bộ điều kiện lọc chung, không cần tách nhóm khi tính) |
+| 3 | SLHS_RLOS_WTD | NUMBER | N | 14 |  | Lũy kế từ đầu tuần (Thứ Hai): SLHS_RLOS_WTD(D) = CASE WHEN TRUNC(D,'IW')<>TRUNC(D-1,'IW') THEN SLHS_RLOS(D) ELSE SLHS_RLOS_WTD(D-1)+SLHS_RLOS(D) END, reset mỗi Thứ Hai (review 2026-10-05, cột mới) |
+| 4 | SLHS_RLOS_MTD | NUMBER | N | 14 |  | Lũy kế từ đầu tháng: cùng công thức WTD, mốc so sánh TRUNC(D,'MM'), reset ngày 1 hằng tháng (review 2026-10-05, cột mới) |
+| 5 | SLHS_RLOS_QTD | NUMBER | N | 14 |  | Lũy kế từ đầu quý: cùng công thức WTD, mốc so sánh TRUNC(D,'Q'), reset ngày 1 các tháng 1/4/7/10 (review 2026-10-05, cột mới) |
+| 6 | SLHS_RLOS_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1 (đổi tên từ `SLHS_RLOS`, review 2026-10-05, không đổi công thức): SLHS_RLOS_YTD(D) = SLHS_RLOS_YTD(D-1) + SLHS_RLOS(D), reset vào 1/1. Trường SLHS_RLOS của BC9 |
+| 7 | SLGN_RLOS | NUMBER | N | 12 |  | Số hồ sơ RLOS đã giải ngân (tồn tại hợp đồng trên STG_FCT_LOAN), phát sinh trong ngày (đổi tên từ `SLGN_RLOS_DAY`, review 2026-10-05, không đổi công thức) — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, cùng cơ chế cột SLHS_RLOS), IS_TEST_ACCOUNT != 'Y', BUSINESS_FLOW IN ('BL','KHCN_HO'), COMPANY_CODE NOT IN ('VN0010401','VN0010101','VN0010002') (cùng 2 join như SLHS_RLOS), VÀ EXISTS hợp đồng STG_FCT_LOAN theo SEAB_LOS_ID |
+| 8 | SLGN_RLOS_WTD | NUMBER | N | 14 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 9 | SLGN_RLOS_MTD | NUMBER | N | 14 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 10 | SLGN_RLOS_QTD | NUMBER | N | 14 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 11 | SLGN_RLOS_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1 (đổi tên từ `SLGN_RLOS`, review 2026-10-05): SLGN_RLOS_YTD(D) = SLGN_RLOS_YTD(D-1) + SLGN_RLOS(D), reset vào 1/1. Trường SLGN_RLOS của BC9 |
+| 12 | SLHS_CLOS | NUMBER | N | 12 |  | Số hồ sơ CLOS được phê duyệt, phát sinh trong ngày (đổi tên từ `SLHS_CLOS_DAY`, review 2026-10-05, không đổi công thức) — cùng cách SLHS_RLOS (bao gồm AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, 2 điều kiện độc lập), DATASOURCE='CLOS', IS_TEST_ACCOUNT != 'Y' VÀ APPLICATION_LINK_INFO IS NOT NULL (đổi tên từ VAR_STR12, review 2026-10-04), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — điều kiện tương đương BUSINESS_FLOW của RLOS, SRS BC9 dùng STREAM trên NG_SB_CLOS_APPROVAL riêng cho CLOS), theo công thức SLHS_CLOS của SRS BC9 |
+| 13 | SLHS_CLOS_WTD | NUMBER | N | 14 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 14 | SLHS_CLOS_MTD | NUMBER | N | 14 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 15 | SLHS_CLOS_QTD | NUMBER | N | 14 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 16 | SLHS_CLOS_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1 (đổi tên từ `SLHS_CLOS`, review 2026-10-05): SLHS_CLOS_YTD(D) = SLHS_CLOS_YTD(D-1) + SLHS_CLOS(D), reset vào 1/1. Trường SLHS_CLOS của BC9 |
+| 17 | SLGN_CLOS | NUMBER | N | 12 |  | Số hồ sơ CLOS đã giải ngân, phát sinh trong ngày (đổi tên từ `SLGN_CLOS_DAY`, review 2026-10-05, không đổi công thức) — PHÁI SINH: COUNT hồ sơ trên AGG_LOS_KPI_APPLICATION (DATASOURCE='CLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, cùng cơ chế cột SLHS_CLOS), IS_TEST_ACCOUNT != 'Y', APPLICATION_LINK_INFO IS NOT NULL (đổi tên từ VAR_STR12, review 2026-10-04), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17, cùng lý do SLHS_CLOS), VÀ EXISTS hợp đồng trên STG_FCT_LOAN (nhánh LD, review 2026-09-18/2026-09-21: LISTAGG(CONTRACT) nhóm theo WFINSTRUMENTTABLE.APPLICATION_LINK_INFO (nguồn WFINSTRUMENTTABLE.VAR_STR12 — tên cột gốc trên bảng nguồn không đổi, chỉ đổi tên cột đích tại FCT_CLOS_APPLICATION), khóa JOIN vào STG_FCT_LOAN vẫn là SEAB_LOS_ID+CUSTOMER_CODE — xem đã giải quyết Section 1 → 2.1.8) HOẶC STG_DTM.STG_FCT_MD (nhánh MD, bảo lãnh) theo SEAB_LOS_ID+CUSTOMER — đúng công thức SLGN_CLOS của SRS BC9. Xem Section 3 dòng #18/#47 (đã giải quyết) |
+| 18 | SLGN_CLOS_WTD | NUMBER | N | 14 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 19 | SLGN_CLOS_MTD | NUMBER | N | 14 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 20 | SLGN_CLOS_QTD | NUMBER | N | 14 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 21 | SLGN_CLOS_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1 (đổi tên từ `SLGN_CLOS`, review 2026-10-05): SLGN_CLOS_YTD(D) = SLGN_CLOS_YTD(D-1) + SLGN_CLOS(D), reset vào 1/1. Trường SLGN_CLOS của BC9 |
+| 22 | TAT_RLOS_SEC_SUM_HOUR | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS CÓ tài sản bảo đảm, phát sinh trong ngày (đổi tên từ `TAT_RLOS_SEC_SUM_HOUR_DAY`, review 2026-10-05, không đổi công thức) — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, review 2026-09-27), IS_TEST_ACCOUNT != 'Y', lọc SEC theo COLLREQUIRE |
+| 23 | TAT_RLOS_SEC_SUM_HOUR_WTD | NUMBER | N | 20,6 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 24 | TAT_RLOS_SEC_SUM_HOUR_MTD | NUMBER | N | 20,6 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 25 | TAT_RLOS_SEC_SUM_HOUR_QTD | NUMBER | N | 20,6 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 26 | TAT_RLOS_SEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1 (không đổi tên, đã có hậu tố YTD từ trước): (D) = (D-1) + TAT_RLOS_SEC_SUM_HOUR(D), reset vào 1/1 |
+| 27 | TAT_RLOS_SEC_CASE_CNT | NUMBER | N | 12 |  | Số hồ sơ RLOS có tài sản bảo đảm, phát sinh trong ngày (đổi tên từ `TAT_RLOS_SEC_CASE_CNT_DAY`, review 2026-10-05, không đổi công thức) — mẫu số của TAT_RLOS_SEC, cùng điều kiện lọc trên |
+| 28 | TAT_RLOS_SEC_CASE_CNT_WTD | NUMBER | N | 14 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 29 | TAT_RLOS_SEC_CASE_CNT_MTD | NUMBER | N | 14 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 30 | TAT_RLOS_SEC_CASE_CNT_QTD | NUMBER | N | 14 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 31 | TAT_RLOS_SEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1 (không đổi tên, đã có hậu tố YTD từ trước): (D) = (D-1) + TAT_RLOS_SEC_CASE_CNT(D), reset vào 1/1 |
+| 32 | TAT_RLOS_UNSEC_SUM_HOUR | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ RLOS KHÔNG có tài sản bảo đảm, phát sinh trong ngày (đổi tên từ `TAT_RLOS_UNSEC_SUM_HOUR_DAY`, review 2026-10-05, không đổi công thức) — cùng cách trên (AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, IS_TEST_ACCOUNT != 'Y'), lọc UNSEC |
+| 33 | TAT_RLOS_UNSEC_SUM_HOUR_WTD | NUMBER | N | 20,6 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 34 | TAT_RLOS_UNSEC_SUM_HOUR_MTD | NUMBER | N | 20,6 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 35 | TAT_RLOS_UNSEC_SUM_HOUR_QTD | NUMBER | N | 20,6 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 36 | TAT_RLOS_UNSEC_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 |
+| 37 | TAT_RLOS_UNSEC_CASE_CNT | NUMBER | N | 12 |  | Số hồ sơ RLOS không có tài sản bảo đảm, phát sinh trong ngày (đổi tên từ `TAT_RLOS_UNSEC_CASE_CNT_DAY`, review 2026-10-05, không đổi công thức) |
+| 38 | TAT_RLOS_UNSEC_CASE_CNT_WTD | NUMBER | N | 14 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 39 | TAT_RLOS_UNSEC_CASE_CNT_MTD | NUMBER | N | 14 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 40 | TAT_RLOS_UNSEC_CASE_CNT_QTD | NUMBER | N | 14 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 41 | TAT_RLOS_UNSEC_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 |
+| 42 | TAT_CLOS_SUM_HOUR | NUMBER | N | 18,6 |  | Tổng TAT_APPLICATION_HOUR của hồ sơ CLOS, phát sinh trong ngày (đổi tên từ `TAT_CLOS_SUM_HOUR_DAY`, review 2026-10-05, không đổi công thức) — SUM lại từ AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (DATASOURCE='CLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, review 2026-09-27), IS_TEST_ACCOUNT != 'Y' (không lọc APPLICATION_LINK_INFO, đổi tên từ VAR_STR12 — SRS không nhắc điều kiện này cho TAT_CLOS), VÀ (join DIM_CLOS_APPLICATION qua APPLICATION_SK) STREAM = 'Phê duyệt tín dụng' (review 2026-09-17 — SRS BC9 có điều kiện này riêng cho TAT_CLOS) |
+| 43 | TAT_CLOS_SUM_HOUR_WTD | NUMBER | N | 20,6 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 44 | TAT_CLOS_SUM_HOUR_MTD | NUMBER | N | 20,6 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 45 | TAT_CLOS_SUM_HOUR_QTD | NUMBER | N | 20,6 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 46 | TAT_CLOS_SUM_HOUR_YTD | NUMBER | N | 20,6 |  | Lũy kế từ 1/1, reset vào 1/1 |
+| 47 | TAT_CLOS_CASE_CNT | NUMBER | N | 12 |  | Số hồ sơ CLOS, phát sinh trong ngày (đổi tên từ `TAT_CLOS_CASE_CNT_DAY`, review 2026-10-05, không đổi công thức) — mẫu số của TAT_CLOS, cùng điều kiện lọc trên (bao gồm STREAM) |
+| 48 | TAT_CLOS_CASE_CNT_WTD | NUMBER | N | 14 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 49 | TAT_CLOS_CASE_CNT_MTD | NUMBER | N | 14 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 50 | TAT_CLOS_CASE_CNT_QTD | NUMBER | N | 14 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 51 | TAT_CLOS_CASE_CNT_YTD | NUMBER | N | 14 |  | Lũy kế từ 1/1, reset vào 1/1 |
+| 52 | QUY_DOI_RLOS | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ RLOS, phát sinh trong ngày (đổi tên từ `QUY_DOI_RLOS_DAY`, review 2026-10-05, không đổi công thức) — SUM lại từ AGG_LOS_KPI_APPLICATION.QUY_DOI (DATASOURCE='RLOS') có AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date (2 điều kiện độc lập, review 2026-09-27), IS_TEST_ACCOUNT != 'Y', KHÔNG tính lại công thức POINT*8/VOLUME ở đây |
+| 53 | QUY_DOI_RLOS_WTD | NUMBER | N | 16,4 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 54 | QUY_DOI_RLOS_MTD | NUMBER | N | 16,4 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 55 | QUY_DOI_RLOS_QTD | NUMBER | N | 16,4 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 56 | QUY_DOI_RLOS_YTD | NUMBER | N | 16,4 |  | Lũy kế từ 1/1 (đổi tên từ `QUY_DOI_RLOS`, review 2026-10-05): QUY_DOI_RLOS_YTD(D) = QUY_DOI_RLOS_YTD(D-1) + QUY_DOI_RLOS(D), reset vào 1/1. Trường QUY_DOI_RLOS của BC9 |
+| 57 | QUY_DOI_CLOS | NUMBER | N | 14,4 |  | Tổng QUY_DOI của hồ sơ CLOS, phát sinh trong ngày (đổi tên từ `QUY_DOI_CLOS_DAY`, review 2026-10-05, không đổi công thức) — cùng cách trên (AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date VÀ PROCESSED_DATE = v_batch_date, IS_TEST_ACCOUNT != 'Y'), DATASOURCE='CLOS' |
+| 58 | QUY_DOI_CLOS_WTD | NUMBER | N | 16,4 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 59 | QUY_DOI_CLOS_MTD | NUMBER | N | 16,4 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 60 | QUY_DOI_CLOS_QTD | NUMBER | N | 16,4 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 61 | QUY_DOI_CLOS_YTD | NUMBER | N | 16,4 |  | Lũy kế từ 1/1 (đổi tên từ `QUY_DOI_CLOS`, review 2026-10-05): QUY_DOI_CLOS_YTD(D) = QUY_DOI_CLOS_YTD(D-1) + QUY_DOI_CLOS(D), reset vào 1/1. Trường QUY_DOI_CLOS của BC9 |
+| 62 | USER_CNT | NUMBER | N | 8 |  | Số USERNAME mới đủ điều kiện tính nhân sự trong ngày (đổi tên từ `NEW_USER_CNT_DAY`, review 2026-10-05, không đổi công thức) — PHÁI SINH: COUNT trên AGG_LOS_KPI_USER_YEAR (2.1.7) có KPI_YEAR = năm(DAYID) VÀ TRUNC(FIRST_ELIGIBLE_TS) = DAYID (2 tài khoản test đã bị loại tại nguồn AGG_LOS_KPI_USER_YEAR, không cần lọc lại ở đây) |
+| 63 | USER_CNT_WTD | NUMBER | N | 8 |  | Lũy kế từ đầu tuần, cùng công thức reset tại cột 3 (review 2026-10-05, cột mới) |
+| 64 | USER_CNT_MTD | NUMBER | N | 8 |  | Lũy kế từ đầu tháng, cùng công thức reset tại cột 4 (review 2026-10-05, cột mới) |
+| 65 | USER_CNT_QTD | NUMBER | N | 8 |  | Lũy kế từ đầu quý, cùng công thức reset tại cột 5 (review 2026-10-05, cột mới) |
+| 66 | USER_CNT_YTD | NUMBER | N | 8 |  | Lũy kế từ 1/1 (đổi tên từ `NHAN_SU`, review 2026-10-05, không đổi công thức): USER_CNT_YTD(D) = USER_CNT_YTD(D-1) + USER_CNT(D), reset vào 1/1 — tương đương COUNT DISTINCT USERNAME lũy kế, không đếm trùng vì AGG_LOS_KPI_USER_YEAR chỉ INSERT 1 lần/user/năm. Trường NHAN_SU của BC9 |
 
 - Bảng FACT lũy kế theo ngày, lưu chỉ số KPI toàn khối PDTD phục vụ phần "KPI Khối" của BC9. Grain: 1 dòng = 1 ngày dữ liệu, cho toàn khối (RLOS và CLOS là các nhóm cột song song trên cùng 1 dòng, không tách bảng).
 - Khóa chính của bảng (PK): **DAYID**.
-- Quy tắc load: chỉ tiêu cộng được thì `TRƯỜNG(D) = TRƯỜNG(D-1) + TRƯỜNG_DAY(D)`, reset vào 1/1 hằng năm. Sửa dữ liệu ngày quá khứ thì chạy lại tuần tự đến ngày cuối đã load trong cùng năm.
+- Quy tắc load (review 2026-10-05): mỗi chỉ tiêu cộng được `X` có đúng 4 cột lũy kế song song `X_WTD`/`X_MTD`/`X_QTD`/`X_YTD`, mỗi cột tự reset theo mốc riêng khi so với ngày hôm trước:
+  ```
+  X_WTD(D) = CASE WHEN TRUNC(D,'IW')   <> TRUNC(D-1,'IW')   THEN X(D) ELSE X_WTD(D-1) + X(D) END
+  X_MTD(D) = CASE WHEN TRUNC(D,'MM')   <> TRUNC(D-1,'MM')   THEN X(D) ELSE X_MTD(D-1) + X(D) END
+  X_QTD(D) = CASE WHEN TRUNC(D,'Q')    <> TRUNC(D-1,'Q')    THEN X(D) ELSE X_QTD(D-1) + X(D) END
+  X_YTD(D) = CASE WHEN TRUNC(D,'YYYY') <> TRUNC(D-1,'YYYY') THEN X(D) ELSE X_YTD(D-1) + X(D) END
+  ```
+  Tuần dùng chuẩn ISO 8601 (bắt đầu Thứ Hai). Sửa dữ liệu ngày quá khứ thì chạy lại tuần tự đến ngày cuối đã load trong cùng kỳ (tuần/tháng/quý/năm) bị ảnh hưởng.
 
 **So với thiết kế cũ (`FCT_PDTD_KPI_YTD_DAILY`, 36 cột):** bỏ 9 cột đã
 là tỷ lệ/trung bình/tổng phái sinh đơn giản — `TAT_RLOS`, `TAT_CLOS`,
@@ -7327,8 +7389,11 @@ với `AVG_SEC = TAT_RLOS_SEC_SUM_HOUR_YTD/TAT_RLOS_SEC_CASE_CNT_YTD`;
 `TY_LE_GN_CLOS = SLGN_CLOS/SLHS_CLOS`; `SLHS_TONG = SLHS_RLOS+
 SLHS_CLOS`; `NSLD = (QUY_DOI_RLOS+QUY_DOI_CLOS)/NHAN_SU`), tính tại
 tầng report (OAS) thay vì lưu vật lý — tránh trùng dữ liệu suy ra được.
-Giữ nguyên 27 cột còn lại (14 `_DAY` + 13 lũy kế, gộp `NHAN_SU`/
-`NEW_USER_CNT_DAY` không tách SEC/UNSEC).
+Giữ nguyên 13 nhóm chỉ tiêu còn lại (gộp `USER_CNT` không tách SEC/
+UNSEC). **Đổi quy ước tên + bổ sung WTD/MTD/QTD (review 2026-10-05):**
+mỗi nhóm nay có 5 cột thay vì 2 (`X` tại-ngày + `X_WTD`+`X_MTD`+`X_QTD`+
+`X_YTD`, xem bảng cột 2.1.8 ở trên) — tổng 65 cột non-PK (13 nhóm × 5),
+thay vì 26 cột cũ (13 nhóm × 2).
 
 **Xác nhận giữ nguyên công thức `TAT_RLOS = (AVG_SEC+AVG_UNSEC)/2`
 (review 2026-09-27, đối chiếu lại SRS):** SRS BC9 nguyên văn ghi công
@@ -7339,9 +7404,10 @@ nguyên** công thức `(AVG_SEC+AVG_UNSEC)/2` như đã thiết kế, không s�
 theo literal SRS.
 
 **Bổ sung điều kiện `AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date` vào
-12 cột `_DAY` đọc từ `AGG_LOS_KPI_APPLICATION` (review 2026-09-27, sau
-khi bảng đó đổi grain thêm DAYID — xem Section 1 → 2.1.9):** trước đây
-các cột `_DAY` chỉ ghi điều kiện `PROCESSED_DATE=DAYID`, đủ đúng khi
+12 cột tại-ngày đọc từ `AGG_LOS_KPI_APPLICATION` (review 2026-09-27, sau
+khi bảng đó đổi grain thêm DAYID — xem Section 1 → 2.1.9; tên cột đã
+đổi theo quy ước mới ở review 2026-10-05, bỏ hậu tố `_DAY`):** trước đây
+các cột này chỉ ghi điều kiện `PROCESSED_DATE=DAYID`, đủ đúng khi
 `AGG_LOS_KPI_APPLICATION` còn grain 1 dòng/hồ sơ (không có DAYID). Sau
 khi bảng đó đổi thành N dòng/hồ sơ (1 dòng/DAYID), nếu ETL chỉ lọc
 `PROCESSED_DATE = v_batch_date` mà bỏ qua `DAYID` nguồn sẽ vẫn đúng về
@@ -7351,12 +7417,12 @@ theo `DAYID` snapshot) — nhưng để tránh rủi ro đọc nhầm/quét th�
 liệu khi viết SQL thực tế (và làm rõ ý định thiết kế cho người viết LLD/
 ETL), đã bổ sung tường minh **cả 2 điều kiện độc lập**
 (`AGG_LOS_KPI_APPLICATION.DAYID = v_batch_date` VÀ `PROCESSED_DATE =
-v_batch_date`) vào mô tả của: `SLHS_RLOS_DAY`, `SLGN_RLOS_DAY`,
-`SLHS_CLOS_DAY`, `SLGN_CLOS_DAY`, `TAT_RLOS_SEC_SUM_HOUR_DAY`,
-`TAT_RLOS_UNSEC_SUM_HOUR_DAY`, `TAT_CLOS_SUM_HOUR_DAY`,
-`QUY_DOI_RLOS_DAY`, `QUY_DOI_CLOS_DAY` (9 cột ghi trực tiếp; 3 cột
-`*_CASE_CNT_DAY` kế thừa qua "cùng điều kiện lọc trên"). `NEW_USER_
-CNT_DAY` KHÔNG áp dụng (nguồn là `AGG_LOS_KPI_USER_YEAR`, không phải
+v_batch_date`) vào mô tả của: `SLHS_RLOS`, `SLGN_RLOS`,
+`SLHS_CLOS`, `SLGN_CLOS`, `TAT_RLOS_SEC_SUM_HOUR`,
+`TAT_RLOS_UNSEC_SUM_HOUR`, `TAT_CLOS_SUM_HOUR`,
+`QUY_DOI_RLOS`, `QUY_DOI_CLOS` (9 cột ghi trực tiếp; 3 cột
+`*_CASE_CNT` kế thừa qua "cùng điều kiện lọc trên"). `USER_CNT`
+KHÔNG áp dụng (nguồn là `AGG_LOS_KPI_USER_YEAR`, không phải
 `AGG_LOS_KPI_APPLICATION`, không có khái niệm DAYID snapshot này).
 
 **Đánh giá — thay thế `FCT_LOS_APPLICATION_MILESTONE` đã loại bỏ (đóng
@@ -7433,15 +7499,15 @@ không xuất phát từ SRS — xem Section 1 → 2.1.9).
 | 7 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — nguồn FCT_CLOS_APPLICATION.PROCESSED_DATE/FCT_RLOS_APPLICATION.PROCESSED_DATE (cùng DAYID=v_batch_date đã lọc). Là THUỘC TÍNH CỐ ĐỊNH của hồ sơ (ngày hồ sơ thực sự chốt/hủy, KHÁC DAYID — không đổi ngược theo thời gian một khi hồ sơ đã chốt), là mốc để AGG_LOS_KPI_YTD_DAILY (2.1.8) xếp hồ sơ vào đúng ngày phát sinh khi SUM/COUNT lên grain ngày |
 | 8 | VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH POINT-IN-TIME (review 2026-09-27, đổi từ "toàn bộ lịch sử" sang tính đến v_batch_date): theo DECISION nếu đã phê duyệt/từ chối (EXITDATE<=v_batch_date) = 1.0; nếu đã CancelRevoke/CancelPermanent (EXITDATE<=v_batch_date) thì lấy theo bước xa nhất đã đạt (CreditApproval=0.8, UnderwriterChecker=0.6, UnderwriterMaker=0.5, DetailDataEntry=0.2); còn lại (hồ sơ chưa kết thúc tính đến v_batch_date) NULL — đúng nguyên văn nhánh else SRS. Tính từ UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT, lọc ENTRYDATE/EXITDATE<=v_batch_date |
 | 9 | POINT | NUMBER | N | 12,4 |  | Điểm KPI — RLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCT_LINE_NAME qua DIM_RLOS_PRODUCT + SYSTEM_CODE='RLOS') + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER (từ RLOS_REF_SLA_TDKHCN, qua DIM_RLOS_APPLICATION); CLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCT_LINE_NAME+PRODUCT_NAME qua DIM_CLOS_PRODUCT+CHANGE_REQUEST qua DIM_CLOS_APPLICATION + SYSTEM_CODE='CLOS') + NVL(SLA_CREDIT_OFFICER theo CLOS_REF_SLA_TDKHDN/TDKHDNL) + NVL(SLA_CREDIT_APPROVER...), riêng APP_GRP='C1' cộng thêm hằng số 4 giờ (xem 2.4.7). Không phụ thuộc DAYID — khóa tra (PRODUCT_LINE_NAME/APP_GRP) ổn định theo hồ sơ, không đổi theo point-in-time |
-| 10 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi — PHÁI SINH: POINT*8/VOLUME, NULL nếu VOLUME NULL (hồ sơ chưa kết thúc tính đến v_batch_date). Là đầu vào duy nhất của QUY_DOI_RLOS_DAY/QUY_DOI_CLOS_DAY ở AGG_LOS_KPI_YTD_DAILY (2.1.8) |
+| 10 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi — PHÁI SINH: POINT*8/VOLUME, NULL nếu VOLUME NULL (hồ sơ chưa kết thúc tính đến v_batch_date). Là đầu vào duy nhất của QUY_DOI_RLOS/QUY_DOI_CLOS (tại-ngày, đổi tên từ QUY_DOI_RLOS_DAY/QUY_DOI_CLOS_DAY review 2026-10-05) ở AGG_LOS_KPI_YTD_DAILY (2.1.8) |
 | 11 | TAT_APPLICATION_HOUR | NUMBER | N | 18,6 |  | Tổng thời gian xử lý của hồ sơ, đơn vị giờ, POINT-IN-TIME tính đến v_batch_date (review 2026-09-27) — RLOS = DDE+QC+UWM+UWC+APPROVER; CLOS = như RLOS cộng thêm COMMITTEE. Loại trừ ngày nghỉ/giờ ngoài hành chính (get_business_minute). CHỈ tính các sự kiện có `APPROVAL_FLAG = 'First Approval'` VÀ `EXITDATE <= v_batch_date` trên `FCT_CLOS/RLOS_WORKSTEP_EVENT` (đúng công thức "chỉ lấy hồ sơ được phê duyệt lần đầu" của SRS BC9) — NULL nếu hồ sơ chưa có sự kiện nào thỏa điều kiện tính đến v_batch_date |
 | 12 | TSBD_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 2 tài sản bảo đảm trở lên (RLOS-only — SRS BC9 chỉ định nghĩa field này trong khối "Nguồn RLOS", không có bản sao ở khối "Nguồn CLOS", để NULL nhánh CLOS) — PHÁI SINH POINT-IN-TIME (review 2026-09-27, đổi cơ chế lọc DAYID): đọc trực tiếp FCT_RLOS_COLLATERAL lọc `DAYID = v_batch_date` (đúng DAYID đang nạp — KHÔNG còn MAX(DAYID) toàn lịch sử như thiết kế cũ, vì bảng nguồn đã là full-snapshot-mỗi-ngày, chỉ cần lọc đúng ngày là đủ có ảnh chụp tại đúng thời điểm), COUNT(*) theo WI_NAME, >= 2 thì 'YES' |
 | 13 | INCOM_3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 nguồn thu trở lên (RLOS-only — SRS không định nghĩa cho CLOS, để NULL nhánh CLOS) — đếm cờ REPAYFLAGS (nguồn FCT_RLOS_APPLICATION đã lọc DAYID=v_batch_date) >= 3 thì 'YES' |
 | 14 | BUSINESS_INCOM | VARCHAR2 | N | 10 |  | Hồ sơ có nguồn thu từ kinh doanh, không áp dụng SeAPro/SeALand (RLOS-only — để NULL nhánh CLOS) — PHÁI SINH đúng nguyên văn SRS BC9: 'YES' nếu (`UPPER(NG_SB_RLOS_EXTTABLE.PRODUCT_NAME) NOT LIKE '%SEAPRO%' AND NOT LIKE '%SEALAND%'`) AND (`NVL(NG_SB_RLOS_REPAYFLAGS.FAIMILYFLAG,'No')='Yes' OR NVL(.ENTERPRISSEFLAG,'No')='Yes' OR NVL(.NONLICFLAG,'No')='Yes'`); còn lại 'NO'. Cùng công thức với FCT_RLOS_APPLICATION.FLAG_BUSINESS_INCOME (1.3.2.1) |
 | 15 | DEVIATION_G2 | VARCHAR2 | N | 10 |  | Hồ sơ có đúng 2 ngoại lệ — PHÁI SINH POINT-IN-TIME (review 2026-09-27, đổi cơ chế lọc DAYID): đếm dòng trên bảng ngoại lệ tương ứng (FCT_CLOS_DEVIATION/FCT_RLOS_DEVIATION) lọc `DAYID = v_batch_date` (đúng DAYID đang nạp, không còn MAX(DAYID) toàn lịch sử), COUNT(*) theo WI_NAME, = 2 thì 'YES' |
 | 16 | DEVIATION_G3 | VARCHAR2 | N | 10 |  | Hồ sơ có từ 3 ngoại lệ trở lên — cùng cách lọc `DAYID = v_batch_date` + COUNT(*) theo WI_NAME, >= 3 thì 'YES' |
-| 17 | IS_TEST_ACCOUNT | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có tồn tại (bất kỳ dòng lịch sử nào TÍNH ĐẾN v_batch_date) USERNAME thuộc 2 tài khoản test/kỹ thuật ('hanh.nh2','hai.bt2') — EXISTS trên UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT, lọc ENTRYDATE<=v_batch_date (point-in-time, review 2026-09-27). AGG_LOS_KPI_YTD_DAILY (2.1.8) loại các hồ sơ IS_TEST_ACCOUNT='Y' khỏi MỌI phép COUNT/SUM _DAY (SLHS/SLGN/TAT/QUY_DOI) |
-| 18 | APPLICATION_LINK_INFO | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE (CLOS-only, RLOS luôn NULL) — nguồn FCT_CLOS_APPLICATION.APPLICATION_LINK_INFO (1.2.2.1, đổi tên từ VAR_STR12, review 2026-10-04), đã lọc DAYID=v_batch_date. Dùng làm điều kiện lọc IS NOT NULL riêng cho SLHS_CLOS_DAY/SLGN_CLOS_DAY tại AGG_LOS_KPI_YTD_DAILY — KHÔNG áp dụng cho TAT_CLOS_DAY/QUY_DOI_CLOS_DAY |
+| 17 | IS_TEST_ACCOUNT | VARCHAR2 | Y | 1 |  | 'Y' nếu hồ sơ có tồn tại (bất kỳ dòng lịch sử nào TÍNH ĐẾN v_batch_date) USERNAME thuộc 2 tài khoản test/kỹ thuật ('hanh.nh2','hai.bt2') — EXISTS trên UNION FCT_CLOS_WORKSTEP_EVENT/FCT_RLOS_WORKSTEP_EVENT, lọc ENTRYDATE<=v_batch_date (point-in-time, review 2026-09-27). AGG_LOS_KPI_YTD_DAILY (2.1.8) loại các hồ sơ IS_TEST_ACCOUNT='Y' khỏi MỌI phép COUNT/SUM tại-ngày (SLHS/SLGN/TAT/QUY_DOI, đổi tên bỏ hậu tố _DAY review 2026-10-05) |
+| 18 | APPLICATION_LINK_INFO | VARCHAR2 | N | 200 |  | Cột generic của WFINSTRUMENTTABLE (CLOS-only, RLOS luôn NULL) — nguồn FCT_CLOS_APPLICATION.APPLICATION_LINK_INFO (1.2.2.1, đổi tên từ VAR_STR12, review 2026-10-04), đã lọc DAYID=v_batch_date. Dùng làm điều kiện lọc IS NOT NULL riêng cho SLHS_CLOS/SLGN_CLOS (đổi tên từ SLHS_CLOS_DAY/SLGN_CLOS_DAY review 2026-10-05) tại AGG_LOS_KPI_YTD_DAILY — KHÔNG áp dụng cho TAT_CLOS_SUM_HOUR/QUY_DOI_CLOS (tại-ngày) |
 
 - Bảng FACT chấm điểm KPI theo ngày, lưu điểm KPI point-in-time của từng hồ sơ tại mỗi DAYID, phục vụ BC9 (là input pre-aggregate duy nhất cho `AGG_LOS_KPI_YTD_DAILY`, 2.1.8, không tự thân hiển thị lũy kế). Grain: 1 dòng = 1 hồ sơ (WI_NAME) × 1 hệ nguồn (DATASOURCE) × 1 ngày (DAYID).
 - Khóa chính của bảng (PK): **DAYID, WI_NAME, DATASOURCE**.
