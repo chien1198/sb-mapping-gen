@@ -77,7 +77,7 @@ create index SB_DWH.DIM_CLOS_APPLICATION_EFF_DATE_IDX_1 on SB_DWH.DIM_CLOS_APPLI
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.DIM_CLOS_APPLICATION_EXP_DATE_IDX_1 on SB_DWH.DIM_CLOS_APPLICATION (EXP_DATE, 1)
+create index SB_DWH.DIM_CLOS_APPLICATION_EXP_DATE_IDX_1 on SB_DWH.DIM_CLOS_APPLICATION (EXP_DATE)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2

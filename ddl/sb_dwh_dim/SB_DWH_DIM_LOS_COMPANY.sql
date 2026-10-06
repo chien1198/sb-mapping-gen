@@ -71,7 +71,7 @@ create index SB_DWH.DIM_LOS_COMPANY_EFF_DATE_IDX_1 on SB_DWH.DIM_LOS_COMPANY (EF
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.DIM_LOS_COMPANY_EXP_DATE_IDX_1 on SB_DWH.DIM_LOS_COMPANY (EXP_DATE, 1)
+create index SB_DWH.DIM_LOS_COMPANY_EXP_DATE_IDX_1 on SB_DWH.DIM_LOS_COMPANY (EXP_DATE)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
