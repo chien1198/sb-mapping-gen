@@ -7,7 +7,7 @@ create table SB_DWH.DIM_CLOS_PRODUCT
   product_line_code      VARCHAR2(100) not null,
   product_line_name      VARCHAR2(200) not null,
   sub_product_code       VARCHAR2(100) not null,
-  product_name           VARCHAR2(150),
+  sub_product_name           VARCHAR2(150),
   eff_date               DATE not null,
   exp_date               DATE
 )
