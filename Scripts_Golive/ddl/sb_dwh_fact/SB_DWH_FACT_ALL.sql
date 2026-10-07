@@ -70,11 +70,6 @@ COMMIT;
 -- ============================================================
 -- SB_DWH_FCT_CLOS_DEVIATION.sql
 -- ============================================================
--- ===========================================================================
--- NOTE - CAN CHECK LAI: PK co 3 cot, nhieu hon mau <bang>_BK + DAYID
---
--- PK hien tai : (DEVIATION_BK, WI_NAME, DAYID)
---===========================================================================
 CREATE TABLE SB_DWH.FCT_CLOS_DEVIATION (
     DAYID                         DATE                NOT NULL,
     DEVIATION_BK                  VARCHAR2(64)        NOT NULL,
@@ -85,7 +80,7 @@ CREATE TABLE SB_DWH.FCT_CLOS_DEVIATION (
     AS_REGULAR                    VARCHAR2(4000)      ,
     PROCESSED_DATE                DATE                ,
 
-	CONSTRAINT FCT_CLOS_DEVIATION_PK PRIMARY KEY (DEVIATION_BK, WI_NAME, DAYID) USING INDEX LOCAL
+	CONSTRAINT FCT_CLOS_DEVIATION_PK PRIMARY KEY (DEVIATION_BK, DAYID) USING INDEX LOCAL
 )
 PARTITION BY RANGE (DAYID)
 INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
