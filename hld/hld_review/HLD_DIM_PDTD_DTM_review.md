@@ -323,7 +323,7 @@ Lấy 1:1 từ bảng có sẵn trên `STG_DTM.DIM_DATE`.
 ### 8.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục sản phẩm tín dụng CLOS (doanh nghiệp) — gồm dòng sản phẩm và sản phẩm nhánh chi tiết, là thông tin ít thay đổi theo bộ mã ổn định.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** composite `PRODUCT_LINE_CODE` + `PRODUCT_LINE_NAME` + `SUB_PRODUCT_CODE` + `PRODUCT_NAME` — hash vào cột `PRODUCT_BK`
+- **Khóa nghiệp vụ (BK):** composite `PRODUCT_LINE_CODE` + `PRODUCT_LINE_NAME` + `SUB_PRODUCT_CODE` + `SUB_PRODUCT_NAME` — hash vào cột `PRODUCT_BK`
 - **Độ chi tiết (grain):** 1 dòng lưu lịch sử thay đổi của 1 tổ hợp dòng sản phẩm + sản phẩm nhánh theo thời gian (SCD Type 2, do ETL tính qua CDC).
 - **Phục vụ báo cáo:**
   - Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp dòng sản phẩm/sản phẩm nhánh, khóa join qua `FCT_CLOS_APPLICATION.PRODUCT_SK`
@@ -348,11 +348,11 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_PRODUCT, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
 | 2 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_PRODUCT, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 3 | PRODUCT_BK | VARCHAR2 | Y | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (dòng sản phẩm, tên dòng, sản phẩm nhánh, tên sản phẩm) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(PRODUCT_LINE_CODE \|\| '~' \|\| PRODUCT_LINE_NAME \|\| '~' \|\| SUB_PRODUCT_CODE \|\| '~' \|\| PRODUCT_NAME, 'SHA256') | — | — |
+| 3 | PRODUCT_BK | VARCHAR2 | Y | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (dòng sản phẩm, tên dòng, sản phẩm nhánh, tên sản phẩm) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(PRODUCT_LINE_CODE \|\| '~' \|\| PRODUCT_LINE_NAME \|\| '~' \|\| SUB_PRODUCT_CODE \|\| '~' \|\| SUB_PRODUCT_NAME, 'SHA256') | — | — |
 | 4 | PRODUCT_LINE_CODE | VARCHAR2 | N | 100 |  | Mã dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_CODE. UNIQUE (PRODUCT_LINE_CODE, PRODUCT_LINE_NAME, SUB_PRODUCT_CODE, EFF_DATE). Thành phần nguồn của PRODUCT_BK (không còn tự đánh dấu khóa, xem 3) | Báo cáo CLOS APPLICATION (BC2) — khóa join qua FCT_CLOS_APPLICATION.PRODUCT_SK | PRODUCT_LINE (Dòng sản phẩm) |
 | 5 | PRODUCT_LINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_NAME | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Product Line trên REF_SLA_NLTT) |
 | 6 | SUB_PRODUCT_CODE | VARCHAR2 | N | 100 |  | Mã sản phẩm nhánh — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_CODE | Báo cáo CLOS APPLICATION (BC2) — khóa join qua FCT_CLOS_APPLICATION.PRODUCT_SK | SUB_PRODUCT (Sản phẩm nhánh) |
-| 7 | PRODUCT_NAME | VARCHAR2 | N | 150 |  | Tên sản phẩm nhánh chi tiết — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_NAME | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Sub Product trên REF_SLA_NLTT) |
+| 7 | SUB_PRODUCT_NAME | VARCHAR2 | N | 150 |  | Tên sản phẩm nhánh chi tiết — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_NAME (đổi tên từ PRODUCT_NAME, review 2026-10-06, đồng nhất với SUB_PRODUCT_CODE) | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Sub Product trên REF_SLA_NLTT) |
 | 8 | EFF_DATE | DATE | Y |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_PRO_LINE/MAS_SUB_PROD | — | — |
 | 9 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
