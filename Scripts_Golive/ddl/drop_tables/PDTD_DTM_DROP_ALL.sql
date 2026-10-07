@@ -1,7 +1,9 @@
 -- ============================================================
--- DDL_PDTD_DTM_DROP_ALL.sql
--- Drop tat ca cac bang duoc tao trong DDL_PDTD_DTM.sql
+-- PDTD_DTM_DROP_ALL.sql
+-- Drop tat ca cac bang vung PDTD_DTM (thu tu: AGG + FACT)
 -- ============================================================
+
+-- AGG + FACT (19 bang)
 DROP TABLE PDTD_DTM.AGG_LOS_KPI_APPLICATION PURGE;
 DROP TABLE PDTD_DTM.AGG_LOS_KPI_USER_YEAR PURGE;
 DROP TABLE PDTD_DTM.AGG_LOS_KPI_YTD_DAILY PURGE;

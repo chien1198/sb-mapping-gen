@@ -1,4 +1,4 @@
--- SB_DWH: tao 11 bang WRK_DIM_* (DROP + CREATE). Chay 1 lan trong SQL Window (F8).
+-- SB_DWH: tao 14 bang WRK_DIM_* (DROP + CREATE). Chay 1 lan trong SQL Window (F8).
 -- Tam thoi chua GRANT cho FSS_STG_LOS, CIC_FSS (se bo sung sau).
 -- Luu y: DROP se xoa du lieu WRK cu.
 
@@ -240,6 +240,133 @@ BEGIN
       channel                  VARCHAR2(200),
       eff_date                 DATE,
       exp_date                 DATE
+   ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
+
+   -- ============================================================
+   -- 12. WRK_DIM_CLOS_APPLICATION
+   -- ============================================================
+   BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_CLOS_APPLICATION CASCADE CONSTRAINTS';
+   EXCEPTION
+      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+   END;
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_APPLICATION (
+      application_sk           NUMBER,
+      wi_name                  VARCHAR2(100),
+      loancaseid               VARCHAR2(100),
+      stream                   VARCHAR2(200),
+      credit_profile           VARCHAR2(50),
+      create_employee_code     VARCHAR2(100),
+      create_employee_name     VARCHAR2(225),
+      creation_date            DATE,
+      app_grp                  VARCHAR2(50),
+      have_any_deviation       VARCHAR2(10),
+      zone                     VARCHAR2(200),
+      loan_purpose             VARCHAR2(200),
+      email                    VARCHAR2(200),
+      distance_branch_customer VARCHAR2(100),
+      product_line             VARCHAR2(200),
+      sub_product              VARCHAR2(255),
+      id_number                VARCHAR2(100),
+      channel                  VARCHAR2(200),
+      eff_date                 DATE,
+      exp_date                 DATE
+   ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
+
+   -- ============================================================
+   -- 13. WRK_DIM_CLOS_CUSTOMER
+   -- ============================================================
+   BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_CLOS_CUSTOMER CASCADE CONSTRAINTS';
+   EXCEPTION
+      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+   END;
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_CUSTOMER (
+      customer_sk        NUMBER,
+      id_number          VARCHAR2(100),
+      full_name          VARCHAR2(200),
+      cust_group         VARCHAR2(100),
+      cust_category      VARCHAR2(200),
+      precustgroup       VARCHAR2(100),
+      industry_lvl1_code VARCHAR2(200),
+      industry_lvl2_code VARCHAR2(200),
+      industry_lvl3_code VARCHAR2(200),
+      eff_date           DATE,
+      exp_date           DATE
+   ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
+
+   -- ============================================================
+   -- 14. WRK_DIM_RLOS_APPLICATION
+   -- ============================================================
+   BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_RLOS_APPLICATION CASCADE CONSTRAINTS';
+   EXCEPTION
+      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+   END;
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_APPLICATION (
+      application_sk       NUMBER,
+      wi_name              VARCHAR2(100),
+      loancaseid           VARCHAR2(100),
+      stream               VARCHAR2(200),
+      policy               VARCHAR2(200),
+      campaign             VARCHAR2(200),
+      proof_of_income      VARCHAR2(200),
+      coll_require         VARCHAR2(10),
+      is_sec_product       VARCHAR2(10),
+      deviation_flag       VARCHAR2(10),
+      create_employee_code VARCHAR2(50),
+      create_employee_name VARCHAR2(200),
+      creation_date        DATE,
+      application_date     DATE,
+      result_main_card_id  VARCHAR2(100),
+      app_grp              VARCHAR2(50),
+      last_approval_date   DATE,
+      customer_name        VARCHAR2(150),
+      approval_condition   VARCHAR2(50),
+      approver_type        VARCHAR2(100),
+      app_status           VARCHAR2(100),
+      rmemailid            VARCHAR2(250),
+      remarks              VARCHAR2(4000),
+      zone                 VARCHAR2(50),
+      sale_type            VARCHAR2(100),
+      broker_type          VARCHAR2(100),
+      broker_id            VARCHAR2(100),
+      broker_name          VARCHAR2(200),
+      acc_officer          VARCHAR2(100),
+      account_officer_name VARCHAR2(200),
+      existing_customer    VARCHAR2(10),
+      applicant_cif        VARCHAR2(50),
+      kyc1                 VARCHAR2(50),
+      interest_rate_pct    NUMBER(8,4),
+      loan_to_value        NUMBER(5,2),
+      loan_objective       VARCHAR2(200),
+      total_income         NUMBER(20,2),
+      salaryflag           VARCHAR2(10),
+      carflag              VARCHAR2(10),
+      houseflag            VARCHAR2(10),
+      enterprisseflag      VARCHAR2(10),
+      divingflag           VARCHAR2(10),
+      faimilyflag          VARCHAR2(10),
+      nonlicflag           VARCHAR2(10),
+      wagesflag            VARCHAR2(10),
+      pensionflag          VARCHAR2(10),
+      otherflag            VARCHAR2(10),
+      product_name         VARCHAR2(200),
+      c_phone_create_flag  VARCHAR2(20),
+      c_phone_delete_flag  VARCHAR2(10),
+      c_fi_create_flag     VARCHAR2(20),
+      c_fi_delete_flag     VARCHAR2(10),
+      c_legal_create_flag  VARCHAR2(20),
+      c_legal_delete_flag  VARCHAR2(10),
+      reinitiate           VARCHAR2(5),
+      normalbrhold         VARCHAR2(10),
+      regbrhold            VARCHAR2(10),
+      stp_flag             VARCHAR2(50),
+      eligible             VARCHAR2(100),
+      totalnoneligible     VARCHAR2(5),
+      cancel_reason        VARCHAR2(500),
+      eff_date             DATE,
+      exp_date             DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
 END;

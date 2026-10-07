@@ -2,7 +2,7 @@
 create table SB_DWH.DIM_CLOS_CUSTOMER
 (
   dimension_key        NUMBER not null,
-  customer_sk          NUMBER,
+  customer_sk          NUMBER not null,
   id_number            VARCHAR2(100) not null,
   full_name            VARCHAR2(200),
   cust_group           VARCHAR2(100),
