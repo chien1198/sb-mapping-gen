@@ -118,8 +118,8 @@ BEGIN
    END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_CARD_PROMOTION (
       card_promotion_sk    NUMBER,
-      promotion_code       VARCHAR2(100),
-      promotion_desc       VARCHAR2(500),
+      promotion_code       NVARCHAR2(255),
+      promotion_desc       NVARCHAR2(255),
       eff_date             DATE,
       exp_date             DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';

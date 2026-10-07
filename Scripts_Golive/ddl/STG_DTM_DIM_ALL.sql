@@ -902,8 +902,8 @@ BEGIN
       (
         dimension_key     NUMBER not null,
         card_promotion_sk NUMBER not null,
-        promotion_code    VARCHAR2(100) not null,
-        promotion_desc    VARCHAR2(500),
+        promotion_code    NVARCHAR2(255) not null,
+        promotion_desc    NVARCHAR2(255),
         eff_date          DATE not null,
         exp_date          DATE
       )
