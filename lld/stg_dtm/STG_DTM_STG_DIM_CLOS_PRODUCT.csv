@@ -5,6 +5,6 @@
 "STG_DIM_CLOS_PRODUCT","PRODUCT_LINE_CODE","false","string(100)","","Business key — mã dòng sản phẩm","DIM_CLOS_PRODUCT.PRODUCT_LINE_CODE","direct","DIM_CLOS_PRODUCT","PRODUCT_LINE_CODE",""
 "STG_DIM_CLOS_PRODUCT","PRODUCT_LINE_NAME","false","string(200)","","Tên dòng sản phẩm","DIM_CLOS_PRODUCT.PRODUCT_LINE_NAME","direct","DIM_CLOS_PRODUCT","PRODUCT_LINE_NAME",""
 "STG_DIM_CLOS_PRODUCT","SUB_PRODUCT_CODE","false","string(100)","","Mã sản phẩm nhánh","DIM_CLOS_PRODUCT.SUB_PRODUCT_CODE","direct","DIM_CLOS_PRODUCT","SUB_PRODUCT_CODE",""
-"STG_DIM_CLOS_PRODUCT","PRODUCT_NAME","true","string(150)","","Tên sản phẩm nhánh chi tiết","DIM_CLOS_PRODUCT.PRODUCT_NAME","direct","DIM_CLOS_PRODUCT","PRODUCT_NAME",""
+"STG_DIM_CLOS_PRODUCT","SUB_PRODUCT_NAME","true","string(150)","","Tên sản phẩm nhánh chi tiết","DIM_CLOS_PRODUCT.SUB_PRODUCT_NAME","direct","DIM_CLOS_PRODUCT","SUB_PRODUCT_NAME",""
 "STG_DIM_CLOS_PRODUCT","EFF_DATE","false","date","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","DIM_CLOS_PRODUCT.EFF_DATE","direct","DIM_CLOS_PRODUCT","EFF_DATE",""
 "STG_DIM_CLOS_PRODUCT","EXP_DATE","true","date","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","DIM_CLOS_PRODUCT.EXP_DATE","direct","DIM_CLOS_PRODUCT","EXP_DATE",""
