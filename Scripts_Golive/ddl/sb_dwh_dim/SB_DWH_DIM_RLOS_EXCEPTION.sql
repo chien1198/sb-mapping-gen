@@ -1,12 +1,19 @@
 -- Create table
-create table SB_DWH.DIM_RLOS_SECONDPRODUCT
+create table SB_DWH.DIM_RLOS_EXCEPTION
 (
   dimension_key        NUMBER not null,
-  secondproduct_sk       NUMBER not null,
-  secondproduct_bk       VARCHAR2(64) not null,
-  productline_code       VARCHAR2(200) not null,
-  productline_name       VARCHAR2(200),
-  secondary_product      VARCHAR2(200),
+  exception_sk          NUMBER not null,
+  exception_bk          VARCHAR2(64) not null,
+  activityname          VARCHAR2(200) not null,
+  decision_code          VARCHAR2(200) not null,
+  exception_category    VARCHAR2(500) not null,
+  exception_name        VARCHAR2(500) not null,
+  exception_code        VARCHAR2(50),
+  raise_flag            VARCHAR2(5),
+  clear_flag            VARCHAR2(5),
+  id_source             NUMBER,
+  code_source            VARCHAR2(255),
+  status                VARCHAR2(50),
   eff_date              DATE not null,
   exp_date              DATE
 )
@@ -22,8 +29,8 @@ tablespace SB_DWH_TBS
     maxextents unlimited
   );
 -- Create/Recreate primary, unique key constraints
-alter table SB_DWH.DIM_RLOS_SECONDPRODUCT
-  add constraint DIM_RLOS_SECONDPRODUCT_PK primary key (DIMENSION_KEY)
+alter table SB_DWH.DIM_RLOS_EXCEPTION
+  add constraint DIM_RLOS_EXCEPTION_PK primary key (DIMENSION_KEY)
   using index
   tablespace SB_DWH_TBS
   pctfree 10
@@ -36,9 +43,9 @@ alter table SB_DWH.DIM_RLOS_SECONDPRODUCT
     minextents 1
     maxextents unlimited
   );
-alter index SB_DWH.DIM_RLOS_SECONDPRODUCT_PK nologging;
+alter index SB_DWH.DIM_RLOS_EXCEPTION_PK nologging;
 -- Create/Recreate indexes
-create index SB_DWH.SECONDPRODUCT_BK_IDX_1 on SB_DWH.DIM_RLOS_SECONDPRODUCT (SECONDPRODUCT_BK)
+create index SB_DWH.RLOS_EXCEPTION_BK_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTION (EXCEPTION_BK)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
@@ -51,7 +58,7 @@ create index SB_DWH.SECONDPRODUCT_BK_IDX_1 on SB_DWH.DIM_RLOS_SECONDPRODUCT (SEC
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.DIM_RLOS_SECONDPRODUCT_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_SECONDPRODUCT (EFF_DATE)
+create index SB_DWH.DIM_RLOS_EXCEPTION_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTION (EFF_DATE)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
@@ -64,7 +71,7 @@ create index SB_DWH.DIM_RLOS_SECONDPRODUCT_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_SEC
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.DIM_RLOS_SECONDPRODUCT_EXP_DATE_IDX_1 on SB_DWH.DIM_RLOS_SECONDPRODUCT (EXP_DATE, 1)
+create index SB_DWH.DIM_RLOS_EXCEPTION_EXP_DATE_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTION (EXP_DATE)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
@@ -77,7 +84,7 @@ create index SB_DWH.DIM_RLOS_SECONDPRODUCT_EXP_DATE_IDX_1 on SB_DWH.DIM_RLOS_SEC
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.I_DIM_RLOS_SECONDPRODUCT_SK on SB_DWH.DIM_RLOS_SECONDPRODUCT (SECONDPRODUCT_SK)
+create index SB_DWH.I_DIM_RLOS_EXCEPTION_EXCEPTION_SK on SB_DWH.DIM_RLOS_EXCEPTION (EXCEPTION_SK)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2

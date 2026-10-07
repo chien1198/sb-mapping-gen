@@ -1,18 +1,15 @@
 -- Create table
-create table SB_DWH.DIM_CLOS_CUSTOMER
+create table SB_DWH.DIM_RLOS_CHANGE_TYPE
 (
-  dimension_key        NUMBER not null,
-  customer_sk          NUMBER,
-  id_number            VARCHAR2(100) not null,
-  full_name            VARCHAR2(200),
-  cust_group           VARCHAR2(100),
-  cust_category        VARCHAR2(200),
-  precustgroup         VARCHAR2(100),
-  industry_lvl1_code   VARCHAR2(200),
-  industry_lvl2_code   VARCHAR2(200),
-  industry_lvl3_code   VARCHAR2(200),
-  eff_date             DATE not null,
-  exp_date             DATE
+  dimension_key               NUMBER not null,
+  change_type_sk               NUMBER not null,
+  change_type_bk               VARCHAR2(64) not null,
+  change_type_code             VARCHAR2(100) not null,
+  change_type_name             VARCHAR2(200),
+  detail_change_type_code      VARCHAR2(100) not null,
+  detail_change_type_name      VARCHAR2(500),
+  eff_date                    DATE not null,
+  exp_date                    DATE
 )
 tablespace SB_DWH_TBS
   pctfree 10
@@ -26,8 +23,8 @@ tablespace SB_DWH_TBS
     maxextents unlimited
   );
 -- Create/Recreate primary, unique key constraints
-alter table SB_DWH.DIM_CLOS_CUSTOMER
-  add constraint DIM_CLOS_CUSTOMER_PK primary key (DIMENSION_KEY)
+alter table SB_DWH.DIM_RLOS_CHANGE_TYPE
+  add constraint DIM_RLOS_CHANGE_TYPE_PK primary key (DIMENSION_KEY)
   using index
   tablespace SB_DWH_TBS
   pctfree 10
@@ -40,9 +37,9 @@ alter table SB_DWH.DIM_CLOS_CUSTOMER
     minextents 1
     maxextents unlimited
   );
-alter index SB_DWH.DIM_CLOS_CUSTOMER_PK nologging;
+alter index SB_DWH.DIM_RLOS_CHANGE_TYPE_PK nologging;
 -- Create/Recreate indexes
-create index SB_DWH.ID_NUMBER_IDX_1 on SB_DWH.DIM_CLOS_CUSTOMER (ID_NUMBER)
+create index SB_DWH.CHANGE_TYPE_BK_IDX_1 on SB_DWH.DIM_RLOS_CHANGE_TYPE (CHANGE_TYPE_BK)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
@@ -55,7 +52,7 @@ create index SB_DWH.ID_NUMBER_IDX_1 on SB_DWH.DIM_CLOS_CUSTOMER (ID_NUMBER)
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.DIM_CLOS_CUSTOMER_EFF_DATE_IDX_1 on SB_DWH.DIM_CLOS_CUSTOMER (EFF_DATE)
+create index SB_DWH.DIM_RLOS_CHANGE_TYPE_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_CHANGE_TYPE (EFF_DATE)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
@@ -68,7 +65,7 @@ create index SB_DWH.DIM_CLOS_CUSTOMER_EFF_DATE_IDX_1 on SB_DWH.DIM_CLOS_CUSTOMER
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.DIM_CLOS_CUSTOMER_EXP_DATE_IDX_1 on SB_DWH.DIM_CLOS_CUSTOMER (EXP_DATE, 1)
+create index SB_DWH.DIM_RLOS_CHANGE_TYPE_EXP_DATE_IDX_1 on SB_DWH.DIM_RLOS_CHANGE_TYPE (EXP_DATE)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
@@ -81,7 +78,7 @@ create index SB_DWH.DIM_CLOS_CUSTOMER_EXP_DATE_IDX_1 on SB_DWH.DIM_CLOS_CUSTOMER
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.I_DIM_CLOS_CUSTOMER_CUSTOMER_SK on SB_DWH.DIM_CLOS_CUSTOMER (CUSTOMER_SK)
+create index SB_DWH.I_DIM_RLOS_CHANGE_TYPE_SK on SB_DWH.DIM_RLOS_CHANGE_TYPE (CHANGE_TYPE_SK)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2

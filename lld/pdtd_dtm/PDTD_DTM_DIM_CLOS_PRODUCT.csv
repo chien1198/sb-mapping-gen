@@ -5,6 +5,6 @@
 "DIM_CLOS_PRODUCT","PRODUCT_LINE_CODE","false","string(100)","NK","Business key — mã dòng sản phẩm","STG_DIM_CLOS_PRODUCT.PRODUCT_LINE_CODE","direct","STG_DIM_CLOS_PRODUCT","PRODUCT_LINE_CODE",""
 "DIM_CLOS_PRODUCT","PRODUCT_LINE_NAME","false","string(200)","NK","Tên dòng sản phẩm","STG_DIM_CLOS_PRODUCT.PRODUCT_LINE_NAME","direct","STG_DIM_CLOS_PRODUCT","PRODUCT_LINE_NAME",""
 "DIM_CLOS_PRODUCT","SUB_PRODUCT_CODE","false","string(100)","NK","Mã sản phẩm nhánh","STG_DIM_CLOS_PRODUCT.SUB_PRODUCT_CODE","direct","STG_DIM_CLOS_PRODUCT","SUB_PRODUCT_CODE",""
-"DIM_CLOS_PRODUCT","PRODUCT_NAME","true","string(150)","NK","Tên sản phẩm nhánh chi tiết","STG_DIM_CLOS_PRODUCT.PRODUCT_NAME","direct","STG_DIM_CLOS_PRODUCT","PRODUCT_NAME",""
+"DIM_CLOS_PRODUCT","SUB_PRODUCT_NAME","true","string(150)","NK","Tên sản phẩm nhánh chi tiết","STG_DIM_CLOS_PRODUCT.SUB_PRODUCT_NAME","direct","STG_DIM_CLOS_PRODUCT","SUB_PRODUCT_NAME",""
 "DIM_CLOS_PRODUCT","EFF_DATE","false","date","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","STG_DIM_CLOS_PRODUCT.EFF_DATE","direct","STG_DIM_CLOS_PRODUCT","EFF_DATE",""
 "DIM_CLOS_PRODUCT","EXP_DATE","true","date","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","STG_DIM_CLOS_PRODUCT.EXP_DATE","direct","STG_DIM_CLOS_PRODUCT","EXP_DATE",""

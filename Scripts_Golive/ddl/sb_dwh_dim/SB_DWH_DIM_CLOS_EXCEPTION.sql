@@ -1,5 +1,5 @@
 -- Create table
-create table SB_DWH.DIM_RLOS_EXCEPTION
+create table SB_DWH.DIM_CLOS_EXCEPTION
 (
   dimension_key        NUMBER not null,
   exception_sk          NUMBER not null,
@@ -29,8 +29,8 @@ tablespace SB_DWH_TBS
     maxextents unlimited
   );
 -- Create/Recreate primary, unique key constraints
-alter table SB_DWH.DIM_RLOS_EXCEPTION
-  add constraint DIM_RLOS_EXCEPTION_PK primary key (DIMENSION_KEY)
+alter table SB_DWH.DIM_CLOS_EXCEPTION
+  add constraint DIM_CLOS_EXCEPTION_PK primary key (DIMENSION_KEY)
   using index
   tablespace SB_DWH_TBS
   pctfree 10
@@ -43,9 +43,9 @@ alter table SB_DWH.DIM_RLOS_EXCEPTION
     minextents 1
     maxextents unlimited
   );
-alter index SB_DWH.DIM_RLOS_EXCEPTION_PK nologging;
+alter index SB_DWH.DIM_CLOS_EXCEPTION_PK nologging;
 -- Create/Recreate indexes
-create index SB_DWH.RLOS_EXCEPTION_BK_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTION (EXCEPTION_BK)
+create index SB_DWH.EXCEPTION_BK_IDX_1 on SB_DWH.DIM_CLOS_EXCEPTION (EXCEPTION_BK)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
@@ -58,7 +58,7 @@ create index SB_DWH.RLOS_EXCEPTION_BK_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTION (EXCEPT
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.DIM_RLOS_EXCEPTION_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTION (EFF_DATE)
+create index SB_DWH.DIM_CLOS_EXCEPTION_EFF_DATE_IDX_1 on SB_DWH.DIM_CLOS_EXCEPTION (EFF_DATE)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
@@ -71,7 +71,7 @@ create index SB_DWH.DIM_RLOS_EXCEPTION_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTI
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.DIM_RLOS_EXCEPTION_EXP_DATE_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTION (EXP_DATE, 1)
+create index SB_DWH.DIM_CLOS_EXCEPTION_EXP_DATE_IDX_1 on SB_DWH.DIM_CLOS_EXCEPTION (EXP_DATE)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
@@ -84,7 +84,7 @@ create index SB_DWH.DIM_RLOS_EXCEPTION_EXP_DATE_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTI
     maxextents unlimited
   )
   nologging;
-create index SB_DWH.I_DIM_RLOS_EXCEPTION_EXCEPTION_SK on SB_DWH.DIM_RLOS_EXCEPTION (EXCEPTION_SK)
+create index SB_DWH.I_DIM_CLOS_EXCEPTION_EXCEPTION_SK on SB_DWH.DIM_CLOS_EXCEPTION (EXCEPTION_SK)
   tablespace SB_DWH_TBS
   pctfree 10
   initrans 2
