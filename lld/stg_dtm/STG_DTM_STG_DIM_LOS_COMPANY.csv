@@ -12,5 +12,5 @@
 "STG_DIM_LOS_COMPANY","DISTRICT","true","string(200)","","Mã quận/huyện của chi nhánh","DIM_LOS_COMPANY.DISTRICT","direct","DIM_LOS_COMPANY","DISTRICT",""
 "STG_DIM_LOS_COMPANY","REGION_CODE","true","number","","Mã khu vực địa lý","DIM_LOS_COMPANY.REGION_CODE","direct","DIM_LOS_COMPANY","REGION_CODE",""
 "STG_DIM_LOS_COMPANY","REGION_NAME","true","string(200)","","Tên khu vực địa lý","DIM_LOS_COMPANY.REGION_NAME","direct","DIM_LOS_COMPANY","REGION_NAME",""
-"STG_DIM_LOS_COMPANY","EFF_DATE","false","date","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","DIM_LOS_COMPANY.EFF_DATE","direct","DIM_LOS_COMPANY","EFF_DATE",""
+"STG_DIM_LOS_COMPANY","EFF_DATE","true","date","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","DIM_LOS_COMPANY.EFF_DATE","direct","DIM_LOS_COMPANY","EFF_DATE",""
 "STG_DIM_LOS_COMPANY","EXP_DATE","true","date","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","DIM_LOS_COMPANY.EXP_DATE","direct","DIM_LOS_COMPANY","EXP_DATE",""

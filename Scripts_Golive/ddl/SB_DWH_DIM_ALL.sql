@@ -14,7 +14,7 @@ BEGIN
       (
         dimension_key               NUMBER not null,
         application_sk               NUMBER not null,
-        wi_name                      VARCHAR2(100) not null,
+        wi_name                      VARCHAR2(100),
         loancaseid                   VARCHAR2(100),
         stream                       VARCHAR2(200),
         credit_profile                VARCHAR2(50),
@@ -31,7 +31,7 @@ BEGIN
         sub_product                  VARCHAR2(255),
         id_number                    VARCHAR2(100),
         channel                      VARCHAR2(200),
-        eff_date                     DATE not null,
+        eff_date                     DATE,
         exp_date                     DATE
       )
       tablespace SB_DWH_TBS
@@ -153,7 +153,7 @@ BEGIN
       (
         dimension_key        NUMBER not null,
         customer_sk          NUMBER not null,
-        id_number            VARCHAR2(100) not null,
+        id_number            VARCHAR2(100),
         full_name            VARCHAR2(200),
         cust_group           VARCHAR2(100),
         cust_category        VARCHAR2(200),
@@ -161,7 +161,7 @@ BEGIN
         industry_lvl1_code   VARCHAR2(200),
         industry_lvl2_code   VARCHAR2(200),
         industry_lvl3_code   VARCHAR2(200),
-        eff_date             DATE not null,
+        eff_date             DATE,
         exp_date             DATE
       )
       tablespace SB_DWH_TBS
@@ -283,18 +283,18 @@ BEGIN
       (
         dimension_key        NUMBER not null,
         exception_sk          NUMBER not null,
-        exception_bk          VARCHAR2(64) not null,
-        activityname          VARCHAR2(200) not null,
-        decision_code          VARCHAR2(200) not null,
-        exception_category    VARCHAR2(500) not null,
-        exception_name        VARCHAR2(500) not null,
+        exception_bk          VARCHAR2(64),
+        activityname          VARCHAR2(200),
+        decision_code          VARCHAR2(200),
+        exception_category    VARCHAR2(500),
+        exception_name        VARCHAR2(500),
         exception_code        VARCHAR2(50),
         raise_flag            VARCHAR2(5),
         clear_flag            VARCHAR2(5),
         id_source             NUMBER,
         code_source            VARCHAR2(255),
         status                VARCHAR2(50),
-        eff_date              DATE not null,
+        eff_date              DATE,
         exp_date              DATE
       )
       tablespace SB_DWH_TBS
@@ -416,12 +416,12 @@ BEGIN
       (
         dimension_key         NUMBER not null,
         product_sk             NUMBER not null,
-        product_bk             VARCHAR2(64) not null,
-        product_line_code      VARCHAR2(100) not null,
-        product_line_name      VARCHAR2(200) not null,
-        sub_product_code       VARCHAR2(100) not null,
+        product_bk             VARCHAR2(64),
+        product_line_code      VARCHAR2(100),
+        product_line_name      VARCHAR2(200),
+        sub_product_code       VARCHAR2(100),
         sub_product_name           VARCHAR2(150),
-        eff_date               DATE not null,
+        eff_date               DATE,
         exp_date               DATE
       )
       tablespace SB_DWH_TBS
@@ -543,11 +543,11 @@ BEGIN
       (
         dimension_key            NUMBER not null,
         workstep_decision_sk      NUMBER not null,
-        workstep_decision_bk      VARCHAR2(64) not null,
-        workstep_code            VARCHAR2(200) not null,
-        decision_code             VARCHAR2(200) not null,
+        workstep_decision_bk      VARCHAR2(64),
+        workstep_code            VARCHAR2(200),
+        decision_code             VARCHAR2(200),
         channel                  VARCHAR2(200),
-        eff_date                 DATE not null,
+        eff_date                 DATE,
         exp_date                 DATE
       )
       tablespace SB_DWH_TBS
@@ -680,7 +680,7 @@ BEGIN
         district          VARCHAR2(100),
         region_code       NUMBER,
         region_name       VARCHAR2(200),
-        eff_date         DATE not null,
+        eff_date         DATE,
         exp_date         DATE
       )
       tablespace SB_DWH_TBS
@@ -802,7 +802,7 @@ BEGIN
       (
         dimension_key           NUMBER not null,
         user_sk                  NUMBER not null,
-        username                 VARCHAR2(100) not null,
+        username                 VARCHAR2(100),
         employee_name            VARCHAR2(200),
         employee_status          VARCHAR2(50),
         email                    VARCHAR2(200),
@@ -823,7 +823,7 @@ BEGIN
         disb_checker_group       VARCHAR2(100),
         hub                      VARCHAR2(100),
         branch_manager_email     VARCHAR2(200),
-        eff_date                DATE not null,
+        eff_date                DATE,
         exp_date                DATE
       )
       tablespace SB_DWH_TBS
@@ -945,7 +945,7 @@ BEGIN
       (
         dimension_key               NUMBER not null,
         application_sk               NUMBER not null,
-        wi_name                      VARCHAR2(100) not null,
+        wi_name                      VARCHAR2(100),
         loancaseid                   VARCHAR2(100),
         stream                       VARCHAR2(200),
         policy                       VARCHAR2(200),
@@ -1005,7 +1005,7 @@ BEGIN
         eligible                     VARCHAR2(100),
         totalnoneligible              VARCHAR2(5),
         cancel_reason                 VARCHAR2(500),
-        eff_date                     DATE not null,
+        eff_date                     DATE,
         exp_date                     DATE
       )
       tablespace SB_DWH_TBS
@@ -1127,9 +1127,9 @@ BEGIN
       (
         dimension_key       NUMBER not null,
         card_promotion_sk     NUMBER not null,
-        promotion_code       NVARCHAR2(255) not null,
+        promotion_code       NVARCHAR2(255),
         promotion_desc       NVARCHAR2(255),
-        eff_date            DATE not null,
+        eff_date            DATE,
         exp_date            DATE
       )
       tablespace SB_DWH_TBS
@@ -1251,12 +1251,12 @@ BEGIN
       (
         dimension_key               NUMBER not null,
         change_type_sk               NUMBER not null,
-        change_type_bk               VARCHAR2(64) not null,
-        change_type_code             VARCHAR2(100) not null,
+        change_type_bk               VARCHAR2(64),
+        change_type_code             VARCHAR2(100),
         change_type_name             VARCHAR2(200),
-        detail_change_type_code      VARCHAR2(100) not null,
+        detail_change_type_code      VARCHAR2(100),
         detail_change_type_name      VARCHAR2(500),
-        eff_date                    DATE not null,
+        eff_date                    DATE,
         exp_date                    DATE
       )
       tablespace SB_DWH_TBS
@@ -1378,18 +1378,18 @@ BEGIN
       (
         dimension_key        NUMBER not null,
         exception_sk          NUMBER not null,
-        exception_bk          VARCHAR2(64) not null,
-        activityname          VARCHAR2(200) not null,
-        decision_code          VARCHAR2(200) not null,
-        exception_category    VARCHAR2(500) not null,
-        exception_name        VARCHAR2(500) not null,
+        exception_bk          VARCHAR2(64),
+        activityname          VARCHAR2(200),
+        decision_code          VARCHAR2(200),
+        exception_category    VARCHAR2(500),
+        exception_name        VARCHAR2(500),
         exception_code        VARCHAR2(50),
         raise_flag            VARCHAR2(5),
         clear_flag            VARCHAR2(5),
         id_source             NUMBER,
         code_source            VARCHAR2(255),
         status                VARCHAR2(50),
-        eff_date              DATE not null,
+        eff_date              DATE,
         exp_date              DATE
       )
       tablespace SB_DWH_TBS
@@ -1511,14 +1511,14 @@ BEGIN
       (
         dimension_key       NUMBER not null,
         product_sk           NUMBER not null,
-        product_bk           VARCHAR2(64) not null,
+        product_bk           VARCHAR2(64),
         productline_code     VARCHAR2(100),
         productline_name     VARCHAR2(200),
         sub_product_code     VARCHAR2(100),
         sub_product_name     VARCHAR2(150),
         score_required       VARCHAR2(10),
         score_model          VARCHAR2(100),
-        eff_date            DATE not null,
+        eff_date            DATE,
         exp_date            DATE
       )
       tablespace SB_DWH_TBS
@@ -1640,11 +1640,11 @@ BEGIN
       (
         dimension_key        NUMBER not null,
         secondproduct_sk       NUMBER not null,
-        secondproduct_bk       VARCHAR2(64) not null,
-        productline_code       VARCHAR2(200) not null,
+        secondproduct_bk       VARCHAR2(64),
+        productline_code       VARCHAR2(200),
         productline_name       VARCHAR2(200),
         secondary_product      VARCHAR2(200),
-        eff_date              DATE not null,
+        eff_date              DATE,
         exp_date              DATE
       )
       tablespace SB_DWH_TBS
@@ -1766,10 +1766,10 @@ BEGIN
       (
         dimension_key            NUMBER not null,
         workstep_decision_sk      NUMBER not null,
-        workstep_decision_bk      VARCHAR2(64) not null,
-        workstep_code            VARCHAR2(200) not null,
-        decision_code             VARCHAR2(200) not null,
-        eff_date                 DATE not null,
+        workstep_decision_bk      VARCHAR2(64),
+        workstep_code            VARCHAR2(200),
+        decision_code             VARCHAR2(200),
+        eff_date                 DATE,
         exp_date                 DATE
       )
       tablespace SB_DWH_TBS
