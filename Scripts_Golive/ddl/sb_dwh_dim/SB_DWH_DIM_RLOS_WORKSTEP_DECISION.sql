@@ -4,8 +4,9 @@ create table SB_DWH.DIM_RLOS_WORKSTEP_DECISION
   dimension_key            NUMBER not null,
   workstep_decision_sk      NUMBER not null,
   workstep_decision_bk      VARCHAR2(64) not null,
-  workstep_code            VARCHAR2(200) not null,
-  decision_code             VARCHAR2(200) not null,
+  workstep_code            NVARCHAR2(255) not null,
+  decision_code             NVARCHAR2(255) not null,
+  req_type                  NVARCHAR2(255),
   eff_date                 DATE not null,
   exp_date                 DATE
 )

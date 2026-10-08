@@ -4,9 +4,9 @@ create table PDTD_DTM.DIM_CLOS_WORKSTEP_DECISION
   dimension_key        NUMBER not null,
   workstep_decision_sk NUMBER not null,
   workstep_decision_bk VARCHAR2(64) not null,
-  workstep_code        VARCHAR2(200) not null,
-  decision_code        VARCHAR2(200) not null,
-  channel              VARCHAR2(200),
+  workstep_code        NVARCHAR2(255) not null,
+  decision_code        NVARCHAR2(255) not null,
+  channel              NVARCHAR2(255),
   eff_date             DATE not null,
   exp_date             DATE
 )

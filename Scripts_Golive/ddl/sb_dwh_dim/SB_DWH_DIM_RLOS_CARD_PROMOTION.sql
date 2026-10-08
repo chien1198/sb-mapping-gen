@@ -5,6 +5,9 @@ create table SB_DWH.DIM_RLOS_CARD_PROMOTION
   card_promotion_sk     NUMBER not null,
   promotion_code       NVARCHAR2(255) not null,
   promotion_desc       NVARCHAR2(255),
+  pro_trans            NVARCHAR2(255),
+  pro_valid            NVARCHAR2(255),
+  order_promotion      NVARCHAR2(255),
   eff_date            DATE not null,
   exp_date            DATE
 )

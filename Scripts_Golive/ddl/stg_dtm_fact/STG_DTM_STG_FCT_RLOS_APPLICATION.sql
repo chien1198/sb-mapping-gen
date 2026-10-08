@@ -26,17 +26,17 @@ CREATE TABLE STG_DTM.STG_FCT_RLOS_APPLICATION (
     COMPANY_SK                    NUMBER              NOT NULL,
     CHANGE_TYPE_SK                NUMBER              NOT NULL,
     CARD_PROMOTION_SK             NUMBER              NOT NULL,
-    WI_NAME                       VARCHAR2(100)       NOT NULL,
+    WI_NAME                       NVARCHAR2(70)       NOT NULL,
     PROCESSED_DATE                DATE                ,
     CREATION_DATE                 DATE                ,
     APPROVED_AMT_FINAL            NUMBER(20,2)        ,
     APPROVED_TERM                 NUMBER(5)           ,
-    CURRENCY_CODE                 VARCHAR2(10)        ,
+    CURRENCY_CODE                 NVARCHAR2(100)        ,
     UNDERWRITERMAKER_USERMAKE     VARCHAR2(100)       ,
     UNDERWRITERCHECKER_USERMAKE   VARCHAR2(100)       ,
     APPROVAL_USERMAKE             VARCHAR2(100)       ,
-    CHANGE_REQUEST                VARCHAR2(200)       ,
-    CHANGE_TYPE                   VARCHAR2(500)       ,
+    CHANGE_REQUEST                NVARCHAR2(50)       ,
+    CHANGE_TYPE                   NVARCHAR2(255)       ,
 
   CONSTRAINT STG_FCT_RLOS_APPLICATION_PK PRIMARY KEY (WI_NAME, DAYID) USING INDEX LOCAL
 )

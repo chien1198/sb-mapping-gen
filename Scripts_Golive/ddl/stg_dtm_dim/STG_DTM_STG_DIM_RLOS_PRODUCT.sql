@@ -4,12 +4,12 @@ create table STG_DTM.STG_DIM_RLOS_PRODUCT
   dimension_key    NUMBER not null,
   product_sk       NUMBER not null,
   product_bk       VARCHAR2(64) not null,
-  productline_code VARCHAR2(100),
+  productline_code VARCHAR2(200),
   productline_name VARCHAR2(200),
-  sub_product_code VARCHAR2(100),
-  sub_product_name VARCHAR2(150),
-  score_required   VARCHAR2(10),
-  score_model      VARCHAR2(100),
+  sub_product_code VARCHAR2(200),
+  sub_product_name NVARCHAR2(200),
+  score_required   VARCHAR2(200),
+  score_model      VARCHAR2(200),
   eff_date         DATE not null,
   exp_date         DATE
 )

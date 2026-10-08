@@ -6,10 +6,10 @@ CREATE TABLE STG_DTM.STG_FCT_RLOS_DEVIATION (
     DAYID                         DATE                NOT NULL,
     DEVIATION_BK                  VARCHAR2(64)        NOT NULL,
     APPLICATION_SK                NUMBER              NOT NULL,
-    WI_NAME                       VARCHAR2(100)       NOT NULL,
-    CHECKING_CONDITION            VARCHAR2(500)       ,
-    CHECKING_RESULT               VARCHAR2(200)       ,
-    DEVIATION_REASON              VARCHAR2(4000)      ,
+    WI_NAME                       NVARCHAR2(100)       NOT NULL,
+    CHECKING_CONDITION            NVARCHAR2(200)       ,
+    CHECKING_RESULT               NVARCHAR2(200)       ,
+    DEVIATION_REASON              CLOB      ,
     PROCESSED_DATE                DATE      ,          
 
   CONSTRAINT STG_FCT_RLOS_DEVIATION_PK PRIMARY KEY (DEVIATION_BK, DAYID) USING INDEX LOCAL

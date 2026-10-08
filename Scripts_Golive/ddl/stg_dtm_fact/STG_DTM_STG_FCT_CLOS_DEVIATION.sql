@@ -5,10 +5,10 @@ CREATE TABLE STG_DTM.STG_FCT_CLOS_DEVIATION (
     DAYID                         DATE                NOT NULL,
     DEVIATION_BK                  VARCHAR2(64)        NOT NULL,
     APPLICATION_SK                NUMBER              NOT NULL,
-    WI_NAME                       VARCHAR2(100)       NOT NULL,
-    DEVIATION_TYPE_CODE           VARCHAR2(300)       ,
-    DEV_PROPOSAL                  VARCHAR2(4000)      ,
-    AS_REGULAR                    VARCHAR2(4000)      ,
+    WI_NAME                       NVARCHAR2(63)       NOT NULL,
+    DEVIATION_TYPE_CODE           NVARCHAR2(100)       ,
+    DEV_PROPOSAL                  CLOB      ,
+    AS_REGULAR                    CLOB      ,
     PROCESSED_DATE                DATE                ,
 
   CONSTRAINT STG_FCT_CLOS_DEVIATION_PK PRIMARY KEY (DEVIATION_BK, DAYID) USING INDEX LOCAL

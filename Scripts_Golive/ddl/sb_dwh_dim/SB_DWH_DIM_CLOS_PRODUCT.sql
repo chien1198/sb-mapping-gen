@@ -4,10 +4,11 @@ create table SB_DWH.DIM_CLOS_PRODUCT
   dimension_key         NUMBER not null,
   product_sk             NUMBER not null,
   product_bk             VARCHAR2(64) not null,
-  product_line_code      VARCHAR2(100) not null,
-  product_line_name      VARCHAR2(200) not null,
-  sub_product_code       VARCHAR2(100) not null,
-  sub_product_name           VARCHAR2(150),
+  product_line_code      NVARCHAR2(100) not null,
+  product_line_name      NVARCHAR2(100) not null,
+  sub_product_code       NVARCHAR2(255) not null,
+  sub_product_name           NVARCHAR2(255),
+  sub_prod_active        VARCHAR2(100),
   eff_date               DATE not null,
   exp_date               DATE
 )

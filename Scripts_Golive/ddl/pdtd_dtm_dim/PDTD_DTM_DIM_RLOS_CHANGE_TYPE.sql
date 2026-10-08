@@ -4,10 +4,11 @@ create table PDTD_DTM.DIM_RLOS_CHANGE_TYPE
   dimension_key           NUMBER not null,
   change_type_sk          NUMBER not null,
   change_type_bk          VARCHAR2(64) not null,
-  change_type_code        VARCHAR2(100) not null,
-  change_type_name        VARCHAR2(200),
-  detail_change_type_code VARCHAR2(100) not null,
-  detail_change_type_name VARCHAR2(500),
+  change_type_code        NVARCHAR2(200) not null,
+  change_type_name        NVARCHAR2(200),
+  detail_change_type_code NVARCHAR2(200) not null,
+  detail_change_type_name NVARCHAR2(200),
+  is_active               NVARCHAR2(1),
   eff_date                DATE not null,
   exp_date                DATE
 )

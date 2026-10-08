@@ -8,13 +8,13 @@ CREATE TABLE STG_DTM.STG_FCT_CLOS_EXCEPTION (
     EXCEPTION_SK                  NUMBER              NOT NULL,
     USER_SK                       NUMBER              NOT NULL,
     CUSTOMER_SK                   NUMBER              NOT NULL,
-    WI_NAME                       VARCHAR2(100)       NOT NULL,
-    EXCEPTION_CATEGORY            VARCHAR2(500)       NOT NULL,
-    RAISED_BY                     VARCHAR2(100)       NOT NULL,
+    WI_NAME                       NVARCHAR2(256)       NOT NULL,
+    EXCEPTION_CATEGORY            NVARCHAR2(200)       NOT NULL,
+    RAISED_BY                     NVARCHAR2(200)       NOT NULL,
     RAISED_DATE_TIME              TIMESTAMP           NOT NULL,
-    EXCEPTION_NAME                VARCHAR2(500)       ,
-    EXCEPTION_REMARKS             VARCHAR2(4000)      ,
-    RCTYPE                        VARCHAR2(20)        ,
+    EXCEPTION_NAME                NVARCHAR2(200)       ,
+    EXCEPTION_REMARKS             NVARCHAR2(200)      ,
+    RCTYPE                        NVARCHAR2(100)        ,
 
   CONSTRAINT STG_FCT_CLOS_EXCEPTION_PK PRIMARY KEY (EXCEPTION_BK, DAYID) USING INDEX LOCAL
 )

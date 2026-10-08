@@ -6,11 +6,11 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_LEGAL_PARTY (
     LEGAL_PARTY_BK                VARCHAR2(64)        NOT NULL,
     CUSTOMER_SK                   NUMBER              NOT NULL,
     APPLICATION_SK                NUMBER              NOT NULL,
-    WI_NAME                       VARCHAR2(100)       NOT NULL,
-    ID_NUMBER                     VARCHAR2(100)       NOT NULL,
-    FULL_NAME                     VARCHAR2(200)       ,
-    OBJ_TYPE                      VARCHAR2(100)       ,
-    LEGAL_DOC                     VARCHAR2(100)       ,
+    WI_NAME                       NVARCHAR2(100)       NOT NULL,
+    ID_NUMBER                     NVARCHAR2(100)       NOT NULL,
+    FULL_NAME                     NVARCHAR2(200)       ,
+    OBJ_TYPE                      NVARCHAR2(100)       ,
+    LEGAL_DOC                     NVARCHAR2(100)       ,
     LEGAL_TYPE                    VARCHAR2(50)        ,
 
 	CONSTRAINT FCT_CLOS_LEGAL_PARTY_PK PRIMARY KEY (LEGAL_PARTY_BK, DAYID) USING INDEX LOCAL

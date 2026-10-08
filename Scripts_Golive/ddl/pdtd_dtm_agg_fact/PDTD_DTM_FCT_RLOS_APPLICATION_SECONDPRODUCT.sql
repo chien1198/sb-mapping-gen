@@ -6,11 +6,11 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_APPLICATION_SECONDPRODUCT (
     SUB_PRODUCT_BK                VARCHAR2(64)        NOT NULL,
     APPLICATION_SK                NUMBER              NOT NULL,
     SECONDPRODUCT_SK              NUMBER              NOT NULL,
-    WI_NAME                       VARCHAR2(100)       ,
-    SUB_PRODUCT_LINE              VARCHAR2(200)       ,
+    WI_NAME                       NVARCHAR2(100)       ,
+    SUB_PRODUCT_LINE              NVARCHAR2(100)       ,
     SPP_AMOUNT                    NUMBER(20,2)        ,
     SPP_TERM                      NUMBER(5)           ,
-    CARD_TYPE_CODE                VARCHAR2(100)       ,
+    CARD_TYPE_CODE                NVARCHAR2(100)       ,
 
 	CONSTRAINT FCT_RLOS_APPLICATION_SECONDPRODUCT_PK PRIMARY KEY (SUB_PRODUCT_BK, DAYID) USING INDEX LOCAL
 )
