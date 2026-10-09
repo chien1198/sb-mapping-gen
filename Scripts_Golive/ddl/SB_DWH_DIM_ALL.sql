@@ -403,6 +403,7 @@ BEGIN
       WHEN OTHERS THEN IF SQLCODE NOT IN (-955, -2260) THEN RAISE; END IF;
    END;
 
+/*
    -- ============================================================
    -- DIM_CLOS_PRODUCT
    -- ============================================================
@@ -529,7 +530,7 @@ BEGIN
    EXCEPTION
       WHEN OTHERS THEN IF SQLCODE NOT IN (-955, -2260) THEN RAISE; END IF;
    END;
-
+*/
    -- ============================================================
    -- DIM_CLOS_WORKSTEP_DECISION
    -- ============================================================
@@ -1497,7 +1498,7 @@ BEGIN
    EXCEPTION
       WHEN OTHERS THEN IF SQLCODE NOT IN (-955, -2260) THEN RAISE; END IF;
    END;
-
+/*
    -- ============================================================
    -- DIM_RLOS_PRODUCT
    -- ============================================================
@@ -1752,7 +1753,7 @@ BEGIN
    EXCEPTION
       WHEN OTHERS THEN IF SQLCODE NOT IN (-955, -2260) THEN RAISE; END IF;
    END;
-
+*/
    -- ============================================================
    -- DIM_RLOS_WORKSTEP_DECISION
    -- ============================================================

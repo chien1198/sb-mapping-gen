@@ -38,7 +38,7 @@ BEGIN
       eff_date                 DATE,
       exp_date                 DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
-
+/*
    -- ============================================================
    -- 2. WRK_DIM_CLOS_PRODUCT
    -- ============================================================
@@ -57,7 +57,7 @@ BEGIN
       eff_date               DATE,
       exp_date               DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
-
+*/
    -- ============================================================
    -- 3. WRK_DIM_CLOS_EXCEPTION
    -- ============================================================
@@ -167,7 +167,7 @@ BEGIN
       eff_date              DATE,
       exp_date              DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
-
+/*
    -- ============================================================
    -- 8. WRK_DIM_RLOS_SECONDPRODUCT
    -- ============================================================
@@ -206,7 +206,7 @@ BEGIN
       eff_date            DATE,
       exp_date            DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
-
+*/
    -- ============================================================
    -- 10. WRK_DIM_RLOS_WORKSTEP_DECISION
    -- ============================================================
