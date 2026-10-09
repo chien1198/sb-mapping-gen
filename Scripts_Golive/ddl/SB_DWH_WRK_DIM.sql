@@ -1,17 +1,9 @@
--- SB_DWH: tao 14 bang WRK_DIM_* (DROP + CREATE). Chay 1 lan trong SQL Window (F8).
+-- SB_DWH: tao 14 bang WRK_DIM_* (CREATE). Chay 1 lan trong SQL Window (F8).
 -- Tam thoi chua GRANT cho FSS_STG_LOS, CIC_FSS (se bo sung sau).
--- Luu y: DROP se xoa du lieu WRK cu.
-
-
 BEGIN
    -- ============================================================
    -- 1. WRK_DIM_LOS_USER
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_LOS_USER CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_LOS_USER (
       user_sk                  NUMBER,
       username                 VARCHAR2(100),
@@ -42,11 +34,6 @@ BEGIN
    -- ============================================================
    -- 2. WRK_DIM_CLOS_PRODUCT
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_CLOS_PRODUCT CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_PRODUCT (
       product_sk             NUMBER,
       product_bk             VARCHAR2(64),
@@ -61,11 +48,6 @@ BEGIN
    -- ============================================================
    -- 3. WRK_DIM_CLOS_EXCEPTION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_CLOS_EXCEPTION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_EXCEPTION (
       exception_sk          NUMBER,
       exception_bk          VARCHAR2(64),
@@ -86,11 +68,6 @@ BEGIN
    -- ============================================================
    -- 4. WRK_DIM_LOS_COMPANY
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_LOS_COMPANY CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_LOS_COMPANY (
       company_sk       NUMBER,
       company_code     VARCHAR2(50),
@@ -111,11 +88,6 @@ BEGIN
    -- ============================================================
    -- 5. WRK_DIM_RLOS_CARD_PROMOTION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_RLOS_CARD_PROMOTION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_CARD_PROMOTION (
       card_promotion_sk    NUMBER,
       promotion_code       NVARCHAR2(255),
@@ -127,11 +99,6 @@ BEGIN
    -- ============================================================
    -- 6. WRK_DIM_RLOS_CHANGE_TYPE
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_RLOS_CHANGE_TYPE CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_CHANGE_TYPE (
       change_type_sk              NUMBER,
       change_type_bk              VARCHAR2(64),
@@ -146,11 +113,6 @@ BEGIN
    -- ============================================================
    -- 7. WRK_DIM_RLOS_EXCEPTION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_RLOS_EXCEPTION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_EXCEPTION (
       exception_sk          NUMBER,
       exception_bk          VARCHAR2(64),
@@ -171,11 +133,6 @@ BEGIN
    -- ============================================================
    -- 8. WRK_DIM_RLOS_SECONDPRODUCT
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_RLOS_SECONDPRODUCT CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_SECONDPRODUCT (
       secondproduct_sk       NUMBER,
       secondproduct_bk       VARCHAR2(64),
@@ -189,11 +146,6 @@ BEGIN
    -- ============================================================
    -- 9. WRK_DIM_RLOS_PRODUCT
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_RLOS_PRODUCT CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_PRODUCT (
       product_sk          NUMBER,
       product_bk          VARCHAR2(64),
@@ -210,11 +162,6 @@ BEGIN
    -- ============================================================
    -- 10. WRK_DIM_RLOS_WORKSTEP_DECISION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_RLOS_WORKSTEP_DECISION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_WORKSTEP_DECISION (
       workstep_decision_sk     NUMBER,
       workstep_decision_bk     VARCHAR2(64),
@@ -227,11 +174,6 @@ BEGIN
    -- ============================================================
    -- 11. WRK_DIM_CLOS_WORKSTEP_DECISION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_CLOS_WORKSTEP_DECISION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_WORKSTEP_DECISION (
       workstep_decision_sk     NUMBER,
       workstep_decision_bk     VARCHAR2(64),
@@ -245,11 +187,6 @@ BEGIN
    -- ============================================================
    -- 12. WRK_DIM_CLOS_APPLICATION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_CLOS_APPLICATION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_APPLICATION (
       application_sk           NUMBER,
       wi_name                  VARCHAR2(100),
@@ -276,11 +213,6 @@ BEGIN
    -- ============================================================
    -- 13. WRK_DIM_CLOS_CUSTOMER
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_CLOS_CUSTOMER CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_CUSTOMER (
       customer_sk        NUMBER,
       id_number          VARCHAR2(100),
@@ -298,11 +230,6 @@ BEGIN
    -- ============================================================
    -- 14. WRK_DIM_RLOS_APPLICATION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE SB_DWH.WRK_DIM_RLOS_APPLICATION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_APPLICATION (
       application_sk       NUMBER,
       wi_name              VARCHAR2(100),

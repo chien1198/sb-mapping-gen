@@ -1,14 +1,8 @@
 -- STG_DTM: tao 14 bang STG_DIM_* (bang + PK + index). Chay 1 lan trong SQL Window (F8).
--- CANH BAO: DROP TABLE ... CASCADE CONSTRAINTS truoc khi tao => XOA SACH du lieu STG cu.
 BEGIN
    -- ============================================================
    -- STG_DIM_CLOS_APPLICATION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_CLOS_APPLICATION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_APPLICATION
       (
         dimension_key            NUMBER not null,
@@ -115,11 +109,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_CLOS_CUSTOMER
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_CLOS_CUSTOMER CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_CUSTOMER
       (
         dimension_key      NUMBER not null,
@@ -217,11 +206,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_CLOS_EXCEPTION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_CLOS_EXCEPTION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_EXCEPTION
       (
         dimension_key      NUMBER not null,
@@ -322,11 +306,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_CLOS_PRODUCT
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_CLOS_PRODUCT CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_PRODUCT
       (
         dimension_key     NUMBER not null,
@@ -421,11 +400,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_CLOS_WORKSTEP_DECISION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_CLOS_WORKSTEP_DECISION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_WORKSTEP_DECISION
       (
         dimension_key        NUMBER not null,
@@ -519,11 +493,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_LOS_COMPANY
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_LOS_COMPANY CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_LOS_COMPANY
       (
         dimension_key   NUMBER not null,
@@ -624,11 +593,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_LOS_USER
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_LOS_USER CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_LOS_USER
       (
         dimension_key        NUMBER not null,
@@ -739,11 +703,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_RLOS_APPLICATION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_RLOS_APPLICATION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_APPLICATION
       (
         dimension_key        NUMBER not null,
@@ -893,11 +852,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_RLOS_CARD_PROMOTION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_RLOS_CARD_PROMOTION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_CARD_PROMOTION
       (
         dimension_key     NUMBER not null,
@@ -989,11 +943,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_RLOS_CHANGE_TYPE
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_RLOS_CHANGE_TYPE CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_CHANGE_TYPE
       (
         dimension_key           NUMBER not null,
@@ -1088,11 +1037,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_RLOS_EXCEPTION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_RLOS_EXCEPTION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_EXCEPTION
       (
         dimension_key      NUMBER not null,
@@ -1193,11 +1137,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_RLOS_PRODUCT
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_RLOS_PRODUCT CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_PRODUCT
       (
         dimension_key    NUMBER not null,
@@ -1294,11 +1233,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_RLOS_SECONDPRODUCT
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_RLOS_SECONDPRODUCT CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_SECONDPRODUCT
       (
         dimension_key     NUMBER not null,
@@ -1392,11 +1326,6 @@ BEGIN
    -- ============================================================
    -- STG_DIM_RLOS_WORKSTEP_DECISION
    -- ============================================================
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE STG_DTM.STG_DIM_RLOS_WORKSTEP_DECISION CASCADE CONSTRAINTS';
-   EXCEPTION
-      WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
-   END;
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_WORKSTEP_DECISION
       (
         dimension_key        NUMBER not null,
