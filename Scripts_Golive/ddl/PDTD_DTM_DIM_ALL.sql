@@ -857,8 +857,8 @@ BEGIN
       (
         dimension_key     NUMBER not null,
         card_promotion_sk NUMBER not null,
-        promotion_code    VARCHAR2(100),
-        promotion_desc    VARCHAR2(500),
+        promotion_code    NVARCHAR2(255),
+        promotion_desc    NVARCHAR2(255),
         eff_date          DATE,
         exp_date          DATE
       )
