@@ -411,13 +411,20 @@ hẳn khỏi thiết kế vì bảng này tự đủ `WI_NAME`/`CUSTOMER_SK`/
 ### 6.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** bảng FACT lưu người/đối tượng liên quan vai trò pháp
   lý của hồ sơ CLOS (bao gồm cả giấy tờ định danh)
-- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_NUMBER` — hash vào
-  cột `LEGAL_PARTY_BK`
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_NUMBER`+`OBJ_TYPE` —
+  hash vào cột `LEGAL_PARTY_BK`. Bổ sung `OBJ_TYPE` (review 2026-10-12):
+  "Khóa nghiệp vụ" ghi trong `CLOS - Metadata.xlsx` chỉ nêu
+  (WI_NAME, ID_NUMBER), nhưng chính grain bảng này (xem 6.1) xác nhận 1
+  người (cùng ID_NUMBER) có thể giữ NHIỀU vai trò (OBJ_TYPE) khác nhau
+  trên cùng 1 hồ sơ — nếu BK chỉ gồm (WI_NAME, ID_NUMBER) thì 2 dòng
+  khác OBJ_TYPE của cùng người/hồ sơ sẽ bị hash trùng, vi phạm PK
+  (DAYID, LEGAL_PARTY_BK). Phải thêm OBJ_TYPE để BK phản ánh đúng grain.
 - **Khóa chính của bảng (PK):** DAYID, LEGAL_PARTY_BK — `LEGAL_PARTY_BK`
-  gộp 2 cột PK tự nhiên cũ (WI_NAME, ID_NUMBER, theo đúng "Khóa nghiệp
-  vụ" ghi trong `CLOS - Metadata.xlsx` sheet "2. Table Review" dòng
-  `NG_SB_CLOS_CUST_INFO_LEGAL`) thành 1 khóa hash duy nhất:
-  `STANDARD_HASH(WI_NAME||ID_NUMBER, 'MD5')`.
+  gộp 3 cột PK tự nhiên (WI_NAME, ID_NUMBER theo đúng "Khóa nghiệp vụ"
+  ghi trong `CLOS - Metadata.xlsx` sheet "2. Table Review" dòng
+  `NG_SB_CLOS_CUST_INFO_LEGAL`, + `OBJ_TYPE` để khớp grain nhiều vai trò)
+  thành 1 khóa hash duy nhất:
+  `STANDARD_HASH(WI_NAME||ID_NUMBER||OBJ_TYPE, 'MD5')`.
   Bổ sung `DAYID` vào PK để bảng đổi sang snapshot theo ngày (khớp bản
   PDTD_DTM tương ứng, mục 10, vốn đã có DAYID từ khi hấp thụ vai trò cầu
   nối của `FCT_CLOS_APPLICATION_PARTY` đã xóa) — không còn `DIMENSION_KEY`
@@ -476,7 +483,7 @@ flowchart LR
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — CỘT MỚI: thêm để bảng đổi sang snapshot theo ngày | — (cột kỹ thuật) | — |
-| 2 | LEGAL_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng vai trò pháp lý — PHÁI SINH: STANDARD_HASH(WI_NAME \|\| ID_NUMBER, 'MD5') — gộp 2 cột PK tự nhiên cũ (WI_NAME, ID_NUMBER) thành 1 khóa đơn | — (cột kỹ thuật, một phần khóa chính) | — |
+| 2 | LEGAL_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng vai trò pháp lý — PHÁI SINH: STANDARD_HASH(WI_NAME \|\| ID_NUMBER \|\| OBJ_TYPE, 'MD5') — gộp 3 cột PK tự nhiên (WI_NAME, ID_NUMBER, OBJ_TYPE) thành 1 khóa đơn. Bổ sung OBJ_TYPE (review 2026-10-12) vì 1 người/hồ sơ có thể giữ nhiều vai trò (nhiều OBJ_TYPE) — thiếu OBJ_TYPE sẽ trùng BK giữa các vai trò khác nhau | — (cột kỹ thuật, một phần khóa chính) | — |
 | 3 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — khách hàng CHÍNH của hồ sơ (MỌI dòng đều có, không chỉ dòng OBJ_TYPE='Khách hàng'). Cách lấy: tìm dòng khác cùng WI_NAME có UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, lấy ID_NUMBER của dòng đó, lookup DIM_CLOS_CUSTOMER.DIMENSION_KEY theo ID_NUMBER (NK, tái sử dụng đúng logic dựng DIM_CLOS_CUSTOMER). Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ, không xuất trực tiếp lên báo cáo) | — |
 | 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION — join theo WI_NAME. Quan hệ N:1 (nhiều dòng vai trò pháp lý cùng WI_NAME trỏ về đúng 1 hồ sơ). Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ, không xuất trực tiếp lên báo cáo) | — |
 | 5 | WI_NAME | NVARCHAR2 | Y | 100 |  | Mã hồ sơ CLOS — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.WI_NAME. Quan hệ 1:N với hồ sơ, N không giới hạn (1 người có thể giữ nhiều vai trò, xác nhận qua CLOS Metadata) | Báo cáo CLOS APPLICATION (BC2) — nguồn gián tiếp qua DIM_CLOS_CUSTOMER.ID_NUMBER/LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE (LEFT JOIN theo WI_NAME + LEGAL_TYPE) | — |
@@ -604,12 +611,12 @@ flowchart LR
         D["DIM_RLOS_APPLICATION"]
         C["FCT_RLOS_COLLATERAL"]
     end
-    A1 -->|1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = REALESTATE| C
-    A2 -->|1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = TRANSPORT| C
-    A3 -->|1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = VALPAPER| C
-    A4 -->|1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = OTHER| C
-    A5 -.->|1:1 THEO TÀI SẢN, CERTIFICATE_NO cho khối TRANSPORT/OTHER (VALPAPER lấy thẳng NUMBERSIGN)| C
-    D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
+    A1 -->|"1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = REALESTATE"| C
+    A2 -->|"1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = TRANSPORT"| C
+    A3 -->|"1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = VALPAPER"| C
+    A4 -->|"1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = OTHER"| C
+    A5 -.->|"1:1 THEO TÀI SẢN, CERTIFICATE_NO cho khối TRANSPORT/OTHER (VALPAPER lấy thẳng NUMBERSIGN)"| C
+    D -.->|"APPLICATION_SK, theo phiên bản hiệu lực tại DAYID"| C
     P1 --> D
     P2 --> D
     P3 --> D

@@ -629,8 +629,10 @@ flowchart LR
   CDC key ổn định, xem SB_DWH mục 6).
   — không cần bảng trung gian riêng vì `CUSTOMER_SK`/`APPLICATION_SK` đã
   có sẵn ngay trên bảng này.
-- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_NUMBER` — hash vào
-  cột `LEGAL_PARTY_BK`, bê 1:1 từ SB_DWH
+- **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_NUMBER`+`OBJ_TYPE` —
+  hash vào cột `LEGAL_PARTY_BK`, bê 1:1 từ SB_DWH (review 2026-10-12: bổ
+  sung `OBJ_TYPE` ở SB_DWH, xem SB_DWH mục 6.1, vì 1 người có thể giữ
+  nhiều vai trò trên cùng hồ sơ — xem grain ở dưới)
 - **Khóa chính của bảng (PK):** DAYID, LEGAL_PARTY_BK — bê 1:1 từ SB_DWH.
 - **Độ chi tiết (grain):** 1 dòng = 1 người × 1 vai trò × 1 hồ sơ × 1
   ngày dữ liệu (N dòng/hồ sơ/ngày không giới hạn — 1 người có thể giữ
@@ -662,7 +664,7 @@ flowchart LR
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.DAYID | — (cột kỹ thuật, một phần khóa chính) | — |
-| 2 | LEGAL_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng vai trò pháp lý — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.LEGAL_PARTY_BK: STANDARD_HASH(WI_NAME \|\| ID_NUMBER, 'MD5') — gộp 2 cột PK tự nhiên cũ (WI_NAME, ID_NUMBER) thành 1 khóa đơn | — (cột kỹ thuật, một phần khóa chính) | — |
+| 2 | LEGAL_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng vai trò pháp lý — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.LEGAL_PARTY_BK: STANDARD_HASH(WI_NAME \|\| ID_NUMBER \|\| OBJ_TYPE, 'MD5') — gộp 3 cột PK tự nhiên (WI_NAME, ID_NUMBER, OBJ_TYPE) thành 1 khóa đơn. OBJ_TYPE bổ sung review 2026-10-12 (xem SB_DWH mục 6.1) | — (cột kỹ thuật, một phần khóa chính) | — |
 | 3 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — khách hàng CHÍNH của hồ sơ (MỌI dòng đều có). Bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.CUSTOMER_SK. Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ — cũng là 1 trong 3 khóa mà FCT_CLOS_APPLICATION_PARTY cũ từng cung cấp, trước khi xóa hẳn khỏi thiết kế) | — |
 | 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION — join theo WI_NAME. Bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.APPLICATION_SK. Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ — cũng là 1 trong 3 khóa mà FCT_CLOS_APPLICATION_PARTY cũ từng cung cấp, trước khi xóa hẳn khỏi thiết kế) | — |
 | 5 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ CLOS — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.WI_NAME (nguồn gốc xa: NG_SB_CLOS_CUST_INFO_LEGAL.WI_NAME). Quan hệ 1:N với hồ sơ, N không giới hạn | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN report-time để tra ID_NUMBER (LEGAL_TYPE='CUSTOMER') khi cần đối chiếu; nguồn ETL cho FCT_CLOS_APPLICATION.LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE thực chất đi qua bản SB_DWH của bảng này, không phải qua bản PDTD_DTM này | — |
