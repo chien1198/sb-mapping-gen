@@ -1974,7 +1974,6 @@ flowchart LR
         A3(["NG_SB_RLOS_COL_VALPAPER"])
         A4(["NG_SB_RLOS_COL_OTHER"])
         A5(["NG_SB_RLOS_COLL_CERTIGRD"])
-        A6(["NG_SB_RLOS_DISB_COL_GRID"])
         P1(["NG_SB_RLOS_APPLICANT_GENERAL"])
         P2(["NG_SB_RLOS_APPLICANT_DETAIL"])
         P3(["NG_SB_RLOS_APPROVAL"])
@@ -1992,7 +1991,6 @@ flowchart LR
     A3 -->|1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = VALPAPER| C
     A4 -->|1:1 + PHÁI SINH COLLATERAL_BK bằng hash toàn bộ cột + COLLATERAL_TYPE_CODE = OTHER| C
     A5 -.->|1:1 THEO TÀI SẢN, CERTIFICATE_NO cho tài sản không phải BĐS| C
-    A6 -.->|1:1 THEO TÀI SẢN nối theo tài sản tương ứng, IS_FORMED_FROM_LOAN| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
     P1 -->|1:1 WI_NAME, POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG| D
     P2 -->|1:1 CUS_SEGMENT| D
@@ -2009,26 +2007,53 @@ bảng grid tài sản RLOS (`COL_REALESTATE`, `COL_TRANSPORT`, `COL_VALPAPER`,
 `COL_OTHER`) và `NG_SB_RLOS_COLL_CERTIGRD` đều **không khai khóa CDC** (LOẠI
 2, đã xác nhận qua `input/DS_BANG_202608.xlsx`), nên `COLLATERAL_BK` phải là
 hash toàn bộ cột không phải CLOB của đúng bảng nguồn sinh ra dòng đó, cộng
-tên bảng nguồn để 5 nguồn không đụng khóa — cùng quy tắc
+tên bảng nguồn để các nguồn không đụng khóa — cùng quy tắc
 đã áp dụng cho `FCT_CLOS_COLLATERAL` (xem 1.2.2.3). Ảnh chụp đầy đủ theo
 ngày dựng theo quy trình A2, PK = `DAYID + WI_NAME + COLLATERAL_BK`.
 `NG_SB_RLOS_COLL_CERTIGRD` là bảng 1:1 theo tài sản (không phải theo hồ sơ)
-bổ sung `CERTIFICATE_NO` cho tài sản không phải bất động sản (BĐS lấy thẳng
-từ `COL_REALESTATE.NO_CERTI`); `NG_SB_RLOS_DISB_COL_GRID` cũng 1:1 theo tài
-sản, chỉ bổ sung `IS_FORMED_FROM_LOAN` (review 2026-09-17: theo đúng nguyên
-văn SRS BC1, giá trị lấy từ cột `COL_TYPE` của dòng thỏa điều kiện lọc
-`PROPERTY_FORMED='YES'`, không phải cờ Y/N passthrough của `PROPERTY_FORMED`
-như bản cũ) — ETL phải nối đúng dòng của 2 bảng phụ này vào đúng tài sản
-tương ứng trong 4 bảng grid chính, không sinh fact riêng.
+bổ sung `CERTIFICATE_NO` cho khối TRANSPORT/OTHER (BĐS lấy thẳng từ
+`COL_REALESTATE.NO_CERTI`; khối VALPAPER lấy thẳng `COL_VALPAPER.NUMBERSIGN`
+của chính bảng nguồn, không qua `COLL_CERTIGRD` — xem ghi chú review
+2026-10-12 bên dưới) — ETL phải nối đúng dòng của bảng phụ này vào đúng
+tài sản tương ứng trong 4 bảng grid chính, không sinh fact riêng.
+
+**Sửa nguồn `CERTIFICATE_NO` khối VALPAPER (review 2026-10-12, theo yêu cầu
+người dùng):** đọc lại nguyên văn SRS BC1 (`extract/srs_report/BC1.md`
+dòng 124, trường `GCN_OTHER`) xác nhận công thức thật là UNION 3 nguồn —
+`j1.CERTIFICATENO` (TRANSPORT, qua `COLL_CERTIGRD`), `r.NUMBERSIGN`
+(VALPAPER, **trực tiếp từ chính bảng** `COL_VALPAPER`, không qua
+`COLL_CERTIGRD`), `j2.CERTIFICATENO` (OTHER, qua `COLL_CERTIGRD`) — khác
+thiết kế cũ (join `COLL_CERTIGRD` cho cả 3 khối TRANSPORT/VALPAPER/OTHER
+giống nhau). Đã sửa khối VALPAPER sang đọc thẳng
+`NG_SB_RLOS_COL_VALPAPER.NUMBERSIGN`; khối TRANSPORT/OTHER giữ nguyên join
+`COLL_CERTIGRD` (không có cột số giấy chứng nhận trên chính bảng nguồn).
+
+**Xóa `IS_FORMED_FROM_LOAN` (review 2026-10-12, theo yêu cầu người dùng):**
+SRS BC1 mới nhất (`extract/srs_report/BC1.md`, trích từ
+`input/srs_report/BC1_PDTD_DTM_SRS_v1.0.docx`) không còn trường
+`PROPERTY_FORMED` trong danh sách báo cáo — chỉ tiêu này đã bị bỏ khỏi
+BC1. Xóa hẳn cột `IS_FORMED_FROM_LOAN` khỏi `FCT_RLOS_COLLATERAL` (không
+còn báo cáo nào dùng) và loại `NG_SB_RLOS_DISB_COL_GRID` khỏi lineage của
+bảng này.
+
+**Xóa `IS_ASSET_FORMED` (review 2026-10-12, theo yêu cầu người dùng):**
+thiết kế cũ ghi "Phục vụ BC1.TSBD_BDS, BC1.TSBD_PTVT" nhưng rà soát lại
+nguyên văn SRS BC1 (`extract/srs_report/BC1.md` dòng 120-121) xác nhận
+`TSBD_BDS`/`TSBD_PTVT` thực chất dùng `NG_SB_RLOS_DISB_COL_GRID.COL_TYPE`
+(CASE theo loại tài sản), **không phải** `PROPERTY` của
+`COL_REALESTATE`/`COL_TRANSPORT` — ghi chú "phục vụ" sai căn cứ. Rà soát
+toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào dùng `PROPERTY`/
+`IS_ASSET_FORMED`. Xóa hẳn cột này khỏi `FCT_RLOS_COLLATERAL`.
 
 Áp dụng **column-optimization rule**: loại khỏi bản RLOS cột
 `COLL_MGMT_METHOD` (chỉ có nguồn CLOS, `NG_SB_CLOS_COLL_CD.COLL_MGMT_APP`)
 — RLOS không có khái niệm "phương thức quản lý tài sản" tương đương trên 4
-bảng grid của mình. Giữ toàn bộ 9 cột chỉ có ở RLOS
-(`REL_TO_CUSTOMER`, `USING_PURPOSE`, `VEHICLE_TYPE`, `BRAND`,
-`CONTROL_POSTER`, `VALPAPER_TYPE`, `NUMBERSIGN`, `IS_ASSET_FORMED`,
-`IS_FORMED_FROM_LOAN`) và bỏ hẳn cột kỹ thuật `DATASOURCE` — không còn
-mang thông tin phân biệt sau khi tách vật lý CLOS/RLOS.
+bảng grid của mình. Giữ 7 cột chỉ có ở RLOS (`REL_TO_CUSTOMER`,
+`USING_PURPOSE`, `VEHICLE_TYPE`, `BRAND`, `CONTROL_POSTER`,
+`VALPAPER_TYPE`, `NUMBERSIGN`) và bỏ hẳn cột kỹ thuật `DATASOURCE` — không
+còn mang thông tin phân biệt sau khi tách vật lý CLOS/RLOS. (Review
+2026-10-12: đã xóa tiếp `IS_FORMED_FROM_LOAN` và `IS_ASSET_FORMED` khỏi 9
+cột RLOS-only ban đầu — xem ghi chú review bên dưới.)
 
 **Ghi chú thiết kế — vì sao KHÔNG tách thành DIM:** cùng lý do và kết luận
 đã trình bày đầy đủ tại `FCT_CLOS_COLLATERAL` (1.2.2.3) — nguồn không khai
@@ -6643,7 +6668,7 @@ khác trong nhóm RLOS.
 | 3 | COLLATERAL_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng tài sản — PHÁI SINH: STANDARD_HASH(..., 'SHA256') trên toàn bộ cột không phải CLOB của đúng bảng grid tài sản (COL_REALESTATE/COL_TRANSPORT/COL_VALPAPER/COL_OTHER) sinh ra dòng đó, cộng tên bảng nguồn. Chuẩn hóa trước khi hash: TRIM chuỗi, NULL quy về '<NULL>', DATE/NUMBER dùng format cố định không phụ thuộc NLS |
 | 4 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
 | 5 | COLLATERAL_TYPE_CODE | VARCHAR2 | N | 100 |  | Nhãn phân loại nguồn của tài sản bảo đảm — gán cố định theo bảng grid mà bản ghi đến từ đó (REALESTATE/TRANSPORT/VALPAPER/OTHER). Dùng để CASE chọn đúng cột chi tiết khi dựng TYPES_OF_COLLATERALS (cột 21) — không phải dữ liệu mô tả tài sản |
-| 6 | CERTIFICATE_NO | VARCHAR2 | N | 500 |  | Số giấy chứng nhận tài sản — BĐS lấy NG_SB_RLOS_COL_REALESTATE.NO_CERTI; các tài sản khác lấy NG_SB_RLOS_COLL_CERTIGRD.CERTIFICATENO (nối theo tài sản, không phải theo hồ sơ). Phục vụ BC1.GCN_REAL_ESTATE, BC1.GCN_OTHER — đúng nguyên văn SRS BC1 là 2 field đầu ra riêng biệt, tách lại khi dựng BC1 bằng WHERE COLLATERAL_TYPE_CODE='REALESTATE' → GCN_REAL_ESTATE, còn lại → GCN_OTHER (gộp 1 cột vật lý vì cùng ý nghĩa "số giấy chứng nhận", grain đã phân biệt sẵn theo COLLATERAL_TYPE_CODE) |
+| 6 | CERTIFICATE_NO | VARCHAR2 | N | 500 |  | Số giấy chứng nhận tài sản — BĐS lấy NG_SB_RLOS_COL_REALESTATE.NO_CERTI; khối VALPAPER lấy thẳng NG_SB_RLOS_COL_VALPAPER.NUMBERSIGN (review 2026-10-12: sửa lại đúng SRS, không qua CERTIGRD); khối TRANSPORT/OTHER lấy NG_SB_RLOS_COLL_CERTIGRD.CERTIFICATENO (nối theo tài sản, không phải theo hồ sơ). Phục vụ BC1.GCN_REAL_ESTATE, BC1.GCN_OTHER — đúng nguyên văn SRS BC1 là 2 field đầu ra riêng biệt, tách lại khi dựng BC1 bằng WHERE COLLATERAL_TYPE_CODE='REALESTATE' → GCN_REAL_ESTATE, còn lại → GCN_OTHER (gộp 1 cột vật lý vì cùng ý nghĩa "số giấy chứng nhận", grain đã phân biệt sẵn theo COLLATERAL_TYPE_CODE) |
 | 7 | DESCRIPTION | VARCHAR2 | N | 4000 |  | Mô tả tài sản bảo đảm (BC3.DESCRIPTION) — PHÁI SINH đúng nguyên văn SRS BC3: UNION theo loại tài sản — BĐS: NO_CERTI \|\| ', ' \|\| USING_PURPOSE; PTVT: BRAND \|\| ', ' \|\| CONTROL_POSTER; GTCG: NUMBERSIGN; Khác: DESCRIBE. Không dùng REMARKS (không có trong SRS) |
 | 8 | OWNER_NAME | VARCHAR2 | N | 200 |  | Chủ sở hữu tài sản — nguồn OWNER của 4 bảng grid tài sản RLOS. Cũng là trường OWNERSHIP của BC1 |
 | 9 | REL_TO_CUSTOMER | VARCHAR2 | N | 200 |  | Quan hệ giữa chủ tài sản và khách hàng — UNION REL_CUSTOMER/RELATION_CUSTOMER của 4 bảng grid tài sản. Phục vụ BC1.TSBD_RELATIONSHIP |
@@ -6653,13 +6678,11 @@ khác trong nhóm RLOS.
 | 13 | CONTROL_POSTER | VARCHAR2 | N | 100 |  | Biển số kiểm soát của phương tiện — nguồn NG_SB_RLOS_COL_TRANSPORT.CONTROL_POSTER |
 | 14 | VALPAPER_TYPE | VARCHAR2 | N | 100 |  | Loại giấy tờ có giá — nguồn NG_SB_RLOS_COL_VALPAPER.TYPE1 |
 | 15 | NUMBERSIGN | VARCHAR2 | N | 200 |  | Số hiệu giấy tờ có giá — nguồn NG_SB_RLOS_COL_VALPAPER.NUMBERSIGN. Cũng là căn cứ cho cờ BC1.TSBD_GTCG (NUMBERSIGN IS NOT NULL → 'YES') |
-| 16 | IS_ASSET_FORMED | VARCHAR2 | N | 10 |  | Tài sản đã hình thành hay chưa — nguồn PROPERTY của COL_REALESTATE/COL_TRANSPORT. Phục vụ BC1.TSBD_BDS, BC1.TSBD_PTVT (PROPERTY='YES' → 'YES') |
-| 17 | IS_FORMED_FROM_LOAN | VARCHAR2 | N | 100 |  | Loại tài sản hình thành từ vốn vay — PHÁI SINH đúng nguyên văn SRS BC1.PROPERTY_FORMED: giá trị trả về là NG_SB_RLOS_DISB_COL_GRID.COL_TYPE của dòng nối theo tài sản tương ứng có điều kiện lọc NG_SB_RLOS_DISB_COL_GRID.PROPERTY_FORMED='YES' (cột filter, không phải giá trị trả về); NULL nếu không có dòng nào thỏa điều kiện (review 2026-09-17: sửa lại đúng SRS — bản cũ hiểu nhầm PROPERTY_FORMED là passthrough thành cờ Y/N, thực chất PROPERTY_FORMED chỉ là điều kiện WHERE, giá trị thật trả về là COL_TYPE). Cần BA/DEV xác nhận bộ cột join ổn định (NG_SB_RLOS_DISB_COL_GRID không có trong Metadata để đối chiếu cấu trúc bảng nguồn) |
-| 18 | APPRAISED_VALUE | NUMBER | N | 20,2 |  | Giá trị định giá của tài sản — PRICING_VALUE (COL_REALESTATE) hoặc PRICINGVALUE (3 bảng còn lại). Ép kiểu số từ text định dạng Việt Nam, DEFAULT NULL ON CONVERSION ERROR |
-| 19 | LOAN_RATE_LTV | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị tài sản — LOANRATE của 4 bảng grid tài sản. Cùng quy tắc ép kiểu, đơn vị phần trăm |
-| 20 | TYPES_OF_COLLATERALS | VARCHAR2 | N | 500 |  | PHÁI SINH — phục vụ trực tiếp BC3.TYPES_OF_COLLATERALS: CASE theo COLLATERAL_TYPE_CODE chọn đúng 1 cột chi tiết tương ứng — REALESTATE→CERTIFICATE_NO, TRANSPORT→VEHICLE_TYPE, VALPAPER→VALPAPER_TYPE, OTHER→DESCRIPTION. Đúng nguyên văn SRS BC3 (UNION NO_CERTI/TYPE_VEHICLE/TYPE1/DESCRIBE của 4 bảng grid) — dựng sẵn tại ETL để tránh report phải tự xử lý NULL rải rác trên 4 cột nguồn (mỗi dòng chỉ 1 trong 4 cột có giá trị, 3 cột còn lại luôn NULL do chỉ đến từ 1 bảng grid) |
+| 16 | APPRAISED_VALUE | NUMBER | N | 20,2 |  | Giá trị định giá của tài sản — PRICING_VALUE (COL_REALESTATE) hoặc PRICINGVALUE (3 bảng còn lại). Ép kiểu số từ text định dạng Việt Nam, DEFAULT NULL ON CONVERSION ERROR |
+| 17 | LOAN_RATE_LTV | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị tài sản — LOANRATE của 4 bảng grid tài sản. Cùng quy tắc ép kiểu, đơn vị phần trăm |
+| 18 | TYPES_OF_COLLATERALS | VARCHAR2 | N | 500 |  | PHÁI SINH — phục vụ trực tiếp BC3.TYPES_OF_COLLATERALS: CASE theo COLLATERAL_TYPE_CODE chọn đúng 1 cột chi tiết tương ứng — REALESTATE→CERTIFICATE_NO, TRANSPORT→VEHICLE_TYPE, VALPAPER→VALPAPER_TYPE, OTHER→DESCRIPTION. Đúng nguyên văn SRS BC3 (UNION NO_CERTI/TYPE_VEHICLE/TYPE1/DESCRIBE của 4 bảng grid) — dựng sẵn tại ETL để tránh report phải tự xử lý NULL rải rác trên 4 cột nguồn (mỗi dòng chỉ 1 trong 4 cột có giá trị, 3 cột còn lại luôn NULL do chỉ đến từ 1 bảng grid) |
 
-- Bảng FACT chi tiết (nhân dòng), lưu ảnh số liệu thay đổi theo ngày của từng tài sản bảo đảm thuộc hồ sơ RLOS. Không có chiều tài sản riêng — toàn bộ thuộc tính lưu thẳng trên fact vì nguồn không khai khóa CDC. Phục vụ BC1, BC2, BC3, BC9.
+- Bảng FACT chi tiết (nhân dòng), lưu ảnh số liệu thay đổi theo ngày của từng tài sản bảo đảm thuộc hồ sơ RLOS. Không có chiều tài sản riêng — toàn bộ thuộc tính lưu thẳng trên fact vì nguồn không khai khóa CDC. Phục vụ BC1, BC2, BC3, BC9. ⚠️ Review 2026-10-12 (theo yêu cầu người dùng): (1) xóa `IS_FORMED_FROM_LOAN` — SRS BC1 mới nhất không còn trường `PROPERTY_FORMED`, không còn báo cáo nào dùng cột này; loại `NG_SB_RLOS_DISB_COL_GRID` khỏi lineage. (2) xóa `IS_ASSET_FORMED` — ghi chú cũ "phục vụ BC1.TSBD_BDS/TSBD_PTVT" sai căn cứ (2 field đó thực dùng `NG_SB_RLOS_DISB_COL_GRID.COL_TYPE`, không phải `PROPERTY`), rà soát SRS xác nhận không báo cáo nào dùng cột này — nay 18 cột (trước 20 cột).
 - Khóa chính của bảng (PK): **DAYID, COLLATERAL_BK** (⚠️ review 2026-10-04, theo yêu cầu người dùng: rút gọn từ `DAYID, WI_NAME, COLLATERAL_BK` — `COLLATERAL_BK` đã hash sẵn `WI_NAME` bên trong nên tự nó đủ đảm bảo duy nhất cùng `DAYID`, không cần `WI_NAME` làm thành phần PK riêng).
 
 **Đối chiếu SRS (BC1, BC2, BC3, BC9):** BC1 dùng các cột chi tiết trực
@@ -8564,8 +8587,9 @@ rỗng trỏ chuyển tiếp.
 **Bảng cũ (trước tách):** `FCT_PDTD_COLLATERAL` → tách phần RLOS thành `FCT_RLOS_COLLATERAL` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH →
-1.3 Bộ bảng RLOS → 1.3.2.3 FCT_RLOS_COLLATERAL — 21 cột, đã gồm `DATASOURCE`) — không thêm/bớt
-cột nào ở layer này, không có REF_ nào join thêm.
+1.3 Bộ bảng RLOS → 1.3.2.3 FCT_RLOS_COLLATERAL — 18 cột, review 2026-10-12
+đã xóa `IS_FORMED_FROM_LOAN` và `IS_ASSET_FORMED`) — không thêm/bớt cột
+nào ở layer này, không có REF_ nào join thêm.
 
 - Bảng FACT chi tiết (nhân dòng), bê nguyên 1:1 từ SB_DWH.
 - Khóa chính của bảng (PK): **DAYID, COLLATERAL_BK** (giữ nguyên như SB_DWH — ⚠️ review 2026-10-04, rút gọn từ `DAYID, WI_NAME, COLLATERAL_BK`).
@@ -9037,6 +9061,9 @@ tương ứng ở Section 1/2 của bảng đó.
 | 44 | `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (SB_DWH, 1.2.2.1/1.3.2.1) — review 2026-09-17 | Bảng xương sống có `APPLICATION_SK` và `T24_CUSTOMER_SK` (chân T24) nhưng KHÔNG có FK nào trỏ tới `DIM_CLOS_CUSTOMER`/`DIM_RLOS_APPLICANT` (chân khách hàng LOS) — khác `FCT_*_APPLICATION_PARTY` (đã có đủ 3 chân). Tra cứu xác nhận: `DIM_CLOS_CUSTOMER`/`DIM_RLOS_APPLICANT` có NK=WI_NAME (quan hệ 1:1 với hồ sơ), SRS BC1 gốc join tới IDGRID (chứa ADD_ID) bằng business key `WI_NAME` thuần, không qua surrogate — nên về mặt kỹ thuật join qua WI_NAME+SCD2 time-window vẫn hợp lệ, không bắt buộc phải có FK riêng | Theo quyết định người dùng: vì đã tách thành DIM riêng có DIMENSION_KEY sinh sequence, nên vẫn link qua khóa surrogate cho nhất quán với mọi FK khác trong tài liệu, thay vì join business key trực tiếp. Đã bổ sung `CUSTOMER_SK` (cột 66, → DIM_CLOS_CUSTOMER) trên FCT_CLOS_APPLICATION và `APPLICANT_SK` (cột 79, → DIM_RLOS_APPLICANT) trên FCT_RLOS_APPLICATION, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID (quan hệ 1:1 nên không fan-out). Đã đánh số lại các cột PDTD_DTM bổ sung sau đó (T24_CUSTOMER_SK/LAST_WORKSTEP) và cập nhật mermaid Section 1 của cả 2 bảng | ĐÃ GIẢI QUYẾT |
 | 45 | `DIM_CLOS_APPLICATION` (PDTD_DTM, 2.2.1.1) — cột `FLAG_APP_GRP`/`REF_PRODUCT` — review 2026-09-18, đối chiếu SRS BC5 cập nhật | (a) Công thức quy đổi `APP_GRP`→`FLAG_APP_GRP` trước đây ghi tạm `('BOD','CC')`→`'BOD/CC'`, chưa xác nhận đủ mọi giá trị `APP_GRP` (còn `SCC`, `RCC` chưa rõ nhóm). (b) Điều kiện `SUB_PRODUCT` khi tra `CLOS_REF_SLA_TDKHDNL`/`TDKHDN`/sheet luồng 1 trước đây gắn với `CHANGE_REQUEST <> 'Change Request'` | Đối chiếu SRS BC5 bản cập nhật (BR 1.2, nested table) xác nhận: (a) `APP_GRP IN ('BOD','CC','SCC','RCC')` nay map thành `FLAG_APP_GRP='HDTD'` (đổi nhãn từ `'BOD/CC'`, mở rộng thêm `SCC`/`RCC` vào nhóm này). (b) SRS mới đã bỏ hẳn điều kiện `CHANGE_REQUEST` cho `SUB_PRODUCT` — nay luôn so khớp trực tiếp (chỉ bỏ qua nếu giá trị REF là NULL). Đã sửa cả 2 điểm tại `DIM_CLOS_APPLICATION` (2.2.1.1) | ĐÃ GIẢI QUYẾT |
 | 46 | `REF_SLA_NLTT` (2.4.8) — điều kiện JOIN nhánh RLOS, review 2026-09-21 với dữ liệu seed thật | Rủi ro JOIN 1:N nếu 1 `PRODUCT_LINE` khớp nhiều dòng seed — nghi vấn treo từ review 2026-09-18 vì SRS không đề cập cách xử lý trùng | Đã có dữ liệu seed thật (`input/BC5TAT(REF_SLA).xlsx`, sheet "cam kết SLA NLTT", 28 dòng nhánh RLOS) — xác nhận mỗi `Product Line` xuất hiện đúng 1 lần, unique thật theo đúng khóa `PRODUCT_LINE`+`SYSTEM_CODE='RLOS'`. Không còn rủi ro 1:N | ĐÃ GIẢI QUYẾT |
+| 47 | `FCT_RLOS_COLLATERAL` (SB_DWH + PDTD_DTM, 1.3.2.3 / 2.3.2.3) — review 2026-10-12, theo yêu cầu người dùng | SRS BC1 mới nhất (`extract/srs_report/BC1.md`, trích từ `input/srs_report/BC1_PDTD_DTM_SRS_v1.0.docx`) không còn trường `PROPERTY_FORMED` — đối chiếu toàn bộ 86 trường BC1 xác nhận chỉ tiêu này đã bị bỏ khỏi báo cáo; rà soát `lld/BC*.csv` xác nhận không còn báo cáo nào khác dùng `IS_FORMED_FROM_LOAN` | Xóa hẳn cột `IS_FORMED_FROM_LOAN` khỏi `FCT_RLOS_COLLATERAL` (SB_DWH/STG_DTM/PDTD_DTM, Section 1+2), loại `NG_SB_RLOS_DISB_COL_GRID` khỏi lineage (không còn cột nào tiêu thụ bảng nguồn này), xóa dòng tương ứng trong `lld/BC1.csv`. SB_DWH giảm từ 20 xuống 19 cột, PDTD_DTM đồng bộ theo | ĐÃ GIẢI QUYẾT |
+| 48 | `FCT_RLOS_COLLATERAL` (SB_DWH, 1.3.2.3) — cột `CERTIFICATE_NO` khối VALPAPER — review 2026-10-12, theo yêu cầu người dùng | Thiết kế cũ cho khối VALPAPER join `NG_SB_RLOS_COLL_CERTIGRD.CERTIFICATENO` giống hệt khối TRANSPORT/OTHER. Đọc lại nguyên văn SRS BC1 (`extract/srs_report/BC1.md` dòng 124, trường `GCN_OTHER`, đối chiếu alias map dòng 45-48) xác nhận công thức thật là UNION 3 nguồn khác nhau theo loại tài sản: TRANSPORT → `j1.CERTIFICATENO` (qua CERTIGRD), VALPAPER → `r.NUMBERSIGN` (**trực tiếp từ chính bảng `NG_SB_RLOS_COL_VALPAPER`**, không qua CERTIGRD), OTHER → `j2.CERTIFICATENO` (qua CERTIGRD, alias `j2` join theo `r`/VALPAPER trong SRS nhưng người dùng xác nhận đây là nhánh nghiệp vụ cho khối OTHER, không đi qua `NG_SB_RLOS_DISB_COL_GRID` trung gian) | Đã sửa khối VALPAPER đọc thẳng `NG_SB_RLOS_COL_VALPAPER.NUMBERSIGN` thay vì join `COLL_CERTIGRD`. Khối TRANSPORT/OTHER giữ nguyên join `COLL_CERTIGRD` theo xác nhận của người dùng | ĐÃ GIẢI QUYẾT |
+| 49 | `FCT_RLOS_COLLATERAL` (SB_DWH + PDTD_DTM, 1.3.2.3 / 2.3.2.3) — cột `IS_ASSET_FORMED` — review 2026-10-12, theo yêu cầu người dùng (người dùng nhận xét cột có vẻ thừa vì có thể suy luận từ `COLLATERAL_TYPE_CODE`) | Rà soát sâu hơn phát hiện vấn đề nặng hơn nhận định ban đầu: ghi chú cũ "Phục vụ BC1.TSBD_BDS, BC1.TSBD_PTVT" SAI CĂN CỨ — đọc nguyên văn SRS BC1 (`extract/srs_report/BC1.md` dòng 120-121) xác nhận `TSBD_BDS`/`TSBD_PTVT` thực chất dùng `NG_SB_RLOS_DISB_COL_GRID.COL_TYPE` (CASE theo loại tài sản), không phải `PROPERTY` của `COL_REALESTATE`/`COL_TRANSPORT`. Rà soát toàn bộ SRS BC1-BC11 xác nhận không báo cáo nào dùng trường `PROPERTY`/`IS_ASSET_FORMED` | Xóa hẳn cột `IS_ASSET_FORMED` khỏi `FCT_RLOS_COLLATERAL` (SB_DWH/STG_DTM/PDTD_DTM, Section 1+2) — SB_DWH giảm từ 19 xuống 18 cột, PDTD_DTM đồng bộ theo; nhóm "9 cột RLOS-only" ban đầu (1.3.2.3) nay còn 7 cột sau khi xóa cả `IS_FORMED_FROM_LOAN` (#47) và `IS_ASSET_FORMED` | ĐÃ GIẢI QUYẾT |
 | 47 | `AGG_LOS_KPI_YTD_DAILY.SLGN_CLOS_DAY` (PDTD_DTM, 2.1.8) — nhánh LD — review 2026-09-18, đối chiếu SRS BC9 cập nhật, làm rõ thêm 2026-09-18 lần 2 | Nhánh giải ngân LD trước đây kiểm tra tồn tại hợp đồng trên `STG_FCT_LOAN` theo `SEAB_LOS_ID`+`CUSTOMER_CODE` | SRS BC9 bản cập nhật đổi công thức `LISTAGG(g.CONTRACT)` từ nhóm theo `SEAB_LOS_ID`+`CUSTOMER_CODE` sang nhóm theo `c.VAR_STR12` (`c`=`WFINSTRUMENTTABLE`). **Làm rõ lần 2 (2026-09-18):** đọc lại chi tiết mục "Các bảng sử dụng" xác nhận đây KHÔNG phải đổi điều kiện JOIN giữa `WFINSTRUMENTTABLE` và `STG_FCT_LOAN` (2 bảng này không join trực tiếp với nhau, mỗi bảng join độc lập vào `NG_SB_CLOS_ENTRY_EXIT`/`NG_SB_CLOS_APPROVAL`) — khóa JOIN `SEAB_LOS_ID`+`CUSTOMER_CODE` giữa hồ sơ và `STG_FCT_LOAN` vẫn giữ nguyên không đổi; thay đổi thực sự chỉ nằm ở bước GROUP BY sau khi đã JOIN xong (đổi cách gộp danh sách CONTRACT thành 1 nhóm khi đếm). Đã cập nhật ghi chú đầy đủ tại Section 1 → 2.1.8. **✅ ĐÃ GIẢI QUYẾT (review 2026-09-21):** `VAR_STR12` là cột generic trên `WFINSTRUMENTTABLE`, SRS không có định nghĩa ý nghĩa nghiệp vụ, nhưng người dùng xác nhận trực tiếp cột này tồn tại thật trên `WFINSTRUMENTTABLE` (khớp metadata `VAR_STR1`-`VAR_STR20`) — theo quyết định người dùng, bám sát đúng nguyên văn công thức SRS BC9 là đủ căn cứ để viết ETL, không cần biết ý nghĩa nghiệp vụ cụ thể mới viết được SQL. Đã chính thức đổi `SLGN_CLOS_DAY` sang `LISTAGG(CONTRACT)` nhóm theo `VAR_STR12` (khóa JOIN vào `STG_FCT_LOAN` vẫn giữ `SEAB_LOS_ID`+`CUSTOMER_CODE`, không đổi) | ĐÃ GIẢI QUYẾT |
 | 48 | `AGG_LOS_KPI_APPLICATION` (PDTD_DTM, 2.1.9) — tập hồ sơ nền (`WI_NAME`) — review 2026-09-18, đối chiếu SRS BC9 cập nhật | Trước đây bảng nhận MỌI hồ sơ có trên `FCT_CLOS/RLOS_APPLICATION_DAILY` (kể cả đang xử lý dở dang, chưa tới quyết định cuối) — không có điều kiện lọc loại trừ theo trạng thái xử lý | SRS BC9 bản cập nhật đổi bước dựng nguồn cơ sở ("Nguồn RLOS"/"Nguồn CLOS") từ `LEFT JOIN EXTTABLE-ENTRY_EXIT` thành `INNER JOIN ... AND (DECISION IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport','Reject') OR WORKSTEP IN ('CancelRevoke','CancelPermanent'))` — chỉ hồ sơ đã đến quyết định cuối/đã hủy mới được tính KPI, hồ sơ đang xử lý dở dang bị loại khỏi bảng. Đã xác nhận đây là thay đổi có chủ ý của SRS (không phải sơ suất) — đã bổ sung điều kiện lọc tương ứng vào ghi chú thiết kế tại Section 1 → 2.1.9 | ĐÃ GIẢI QUYẾT |
 | 49 | `DIM_LOS_COMPANY`, `DIM_LOS_USER`, `DIM_CLOS/RLOS_PRODUCT`, `DIM_CLOS/RLOS_WORKSTEP`, `DIM_CLOS/RLOS_DECISION` (SB_DWH, 1.1.1/1.1.2/1.2.1.2-4/1.3.1.2-4) — review 2026-09-18, theo `input/DS Bảng danh mục.xlsx` + `Meeting_note_20260909.xlsx` mục #1-#3, #5 | Các DIM này trước đây dùng bảng khai báo thủ công (`MAP_LOS_USER`, `MAP_CLOS/RLOS_PRODUCT`, `MAP_CLOS/RLOS_WORKSTEP`, `MAP_CLOS/RLOS_DECISION`) hoặc nguồn hồ sơ LOS (`DIM_LOS_COMPANY`) làm giải pháp tạm vì chưa có danh mục gốc thật | BA LOS đã xác nhận (16/09) các bảng danh mục thật sẵn có ở STG_LOS: `NG_SB_RLOS_MAS_COMPANY`/`MAS_BRANCH`/`MAS_REGION` (ORG_UNIT), `NG_SB_RLOS_MAS_USER` (USER), `NG_SB_CLOS_MAS_PRO_LINE`/`MAS_SUB_PROD` + `NG_SB_RLOS_MAS_PRODUCT_LINE`/`MAS_SUB_PRODUCT` (PRODUCT), `NG_SB_CLOS/RLOS_MAS_DECISION` (WORKSTEP+DECISION, DISTINCT theo từng cột) — đã đổi toàn bộ nguồn nạp sang các bảng này, loại bỏ hoàn toàn 7 bảng `MAP_` cùng mọi mô tả liên quan (đã xóa khỏi tài liệu, không còn tồn tại ở bất kỳ đâu — xem nguồn mới tại Section 1/2 → SB_DWH → từng DIM tương ứng trong `hld/HLD_DIM_SB_DWH.md`). `DIM_LOS_COMPANY` đổi cấu trúc: denormalize thêm cột từ MAS_BRANCH/MAS_REGION (10→16 cột), `DIM_LOS_USER` thiết kế dư thừa đầy đủ 25 cột nguồn theo yêu cầu người dùng (6→26 cột), `DIM_RLOS_PRODUCT` thêm PRODUCT_LINE_NAME/SECONDARY_PRODUCT/SCORE_REQUIRED/SCORE_MODEL (8→12 cột). SCD2 đổi cơ chế: EFF_DATE nay do ETL tính qua CDC (so sánh bản ghi cũ/mới của bảng nguồn), không còn khai báo tay như MAP_* | ĐÃ GIẢI QUYẾT |

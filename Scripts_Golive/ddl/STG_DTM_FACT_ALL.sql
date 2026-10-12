@@ -286,11 +286,9 @@ CREATE TABLE STG_DTM.STG_FCT_RLOS_COLLATERAL (
     CONTROL_POSTER                VARCHAR2(100)       ,
     VALPAPER_TYPE                 VARCHAR2(100)       ,
     NUMBERSIGN                    VARCHAR2(200)       ,
-    IS_ASSET_FORMED               VARCHAR2(10)        ,
-    IS_FORMED_FROM_LOAN           VARCHAR2(100)       ,
     APPRAISED_VALUE               NUMBER(20,2)        ,
     LOAN_RATE_LTV                 NUMBER(5,2)         ,
-    TYPES_OF_COLLATERALS          VARCHAR2(500)       , 
+    TYPES_OF_COLLATERALS          VARCHAR2(500)       ,
 
   CONSTRAINT STG_FCT_RLOS_COLLATERAL_PK PRIMARY KEY (COLLATERAL_BK, DAYID) USING INDEX LOCAL
 )

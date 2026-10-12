@@ -36,11 +36,11 @@ flowchart LR
 | 5 | COMPANY_ADDRESS | NVARCHAR2 | N | 200 |  | Địa chỉ đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_ADDRESS_VN | — | Thiết kế dư thừa |
 | 6 | COMPANY_EMAIL | VARCHAR2 | N | 200 |  | Email đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_EMAIL | — | Thiết kế dư thừa |
 | 7 | ZONE | NUMBER | N | 18 |  | Mã khu vực nội bộ theo LOS (khác REGION_CODE của MAS_REGION) — nguồn MAS_COMPANY.ZONE | — | Thiết kế dư thừa |
-| 8 | BRANCH_CODE | VARCHAR2 | N | 200 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH.BRANCH_ID | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | MÃ CHI NHÁNH |
-| 9 | BRANCH_NAME | NVARCHAR2 | N | 200 |  | Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | TÊN CHI NHÁNH |
-| 10 | CITY | VARCHAR2 | N | 200 |  | Mã tỉnh/thành phố của chi nhánh — nguồn MAS_BRANCH.CITY | — | Thiết kế dư thừa |
-| 11 | DISTRICT | VARCHAR2 | N | 200 |  | Mã quận/huyện của chi nhánh — nguồn MAS_BRANCH.DISTRICT | — | Thiết kế dư thừa |
-| 12 | REGION_CODE | NUMBER | N | 18 |  | Mã khu vực địa lý — nguồn MAS_BRANCH.REGION, LEFT JOIN MAS_REGION.REGION_CODE | — | Thiết kế dư thừa |
+| 8 | BRANCH_CODE | VARCHAR2 | N | 200 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH đã dedup về 1 dòng/BRANCH_ID tại SB_DWH (review 2026-10-12, xem HLD_DIM_SB_DWH_review.md mục 1) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | MÃ CHI NHÁNH |
+| 9 | BRANCH_NAME | NVARCHAR2 | N | 200 |  | Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN (sau dedup) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | TÊN CHI NHÁNH |
+| 10 | CITY | VARCHAR2 | N | 200 |  | Mã tỉnh/thành phố của chi nhánh — nguồn MAS_BRANCH.CITY (sau dedup) | — | Thiết kế dư thừa |
+| 11 | DISTRICT | VARCHAR2 | N | 200 |  | Mã quận/huyện của chi nhánh — nguồn MAS_BRANCH.DISTRICT (sau dedup) | — | Thiết kế dư thừa |
+| 12 | REGION_CODE | NUMBER | N | 18 |  | Mã khu vực địa lý — nguồn MAS_BRANCH.REGION (sau dedup), LEFT JOIN MAS_REGION.REGION_CODE | — | Thiết kế dư thừa |
 | 13 | REGION_NAME | NVARCHAR2 | N | 200 |  | Tên khu vực địa lý — nguồn MAS_REGION.REGION_NAME_VN. Lưu ý: khái niệm khu vực này KHÁC với khu vực chuẩn hóa dùng cho BC10/BC11 (qua `TMP_REF_COMPANY_REGION_KHCN`/`KHDN`) — 2 nguồn khác nhau (LOS vs T24-side mapping riêng), không hợp nhất | — | Thiết kế dư thừa |
 | 14 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do SB_DWH quản lý, bê nguyên qua vùng chìa, không tính lại SCD2 ở DTM | — | — |
 | 15 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành — do SB_DWH quản lý, bê nguyên qua vùng chìa | — | — |

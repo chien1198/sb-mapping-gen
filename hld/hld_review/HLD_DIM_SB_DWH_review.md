@@ -25,9 +25,18 @@ flowchart LR
         C["DIM_LOS_COMPANY"]
     end
     A -->|"grain — 1 dòng/COMPANY_CODE (PGD/CN nhỏ nhất)"| C
-    B -->|"LEFT JOIN theo BRANCH_ID — bổ sung tên/địa bàn Chi nhánh"| C
+    B -->|"LEFT JOIN theo BRANCH_ID, đã dedup về 1 dòng/BRANCH_ID — bổ sung tên/địa bàn Chi nhánh"| C
     R -->|"LEFT JOIN theo REGION_CODE (=BRANCH.REGION) — bổ sung tên Khu vực"| C
 ```
+
+**Dedup `NG_SB_RLOS_MAS_BRANCH` trước khi JOIN (review 2026-10-12):** grain
+thật của `MAS_BRANCH` là `TRANSACTION_OFF_ID` (chi tiết hơn `BRANCH_ID` —
+1 `BRANCH_ID` có nhiều `TRANSACTION_OFF_ID`, chưa được khai thác ở model
+này). Join trực tiếp theo `BRANCH_ID` sẽ fan-out `DIM_LOS_COMPANY`. ETL
+dedup `MAS_BRANCH` về 1 dòng/`BRANCH_ID` bằng `ROW_NUMBER() OVER
+(PARTITION BY BRANCH_ID ORDER BY TRANSACTION_OFF_ID) = 1` trước khi LEFT
+JOIN — áp dụng cho cả bước MAS_COMPANY→MAS_BRANCH và multi-hop
+MAS_BRANCH→MAS_REGION. Xem `lld/sb_dwh/SB_DWH_DIM_LOS_COMPANY.csv`.
 
 ### 1.3 Cấu trúc bảng
 
@@ -40,11 +49,11 @@ flowchart LR
 | 5 | COMPANY_ADDRESS | NVARCHAR2 | N | 200 |  | Địa chỉ đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_ADDRESS_VN | — | Thiết kế dư thừa |
 | 6 | COMPANY_EMAIL | VARCHAR2 | N | 200 |  | Email đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_EMAIL | — | Thiết kế dư thừa |
 | 7 | ZONE | NUMBER | N | 18 |  | Mã khu vực nội bộ theo LOS (khác REGION_CODE của MAS_REGION) — nguồn MAS_COMPANY.ZONE | — | Thiết kế dư thừa |
-| 8 | BRANCH_CODE | VARCHAR2 | N | 200 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH.BRANCH_ID | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | MÃ CHI NHÁNH |
-| 9 | BRANCH_NAME | NVARCHAR2 | N | 200 |  | Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | TÊN CHI NHÁNH |
-| 10 | CITY | VARCHAR2 | N | 200 |  | Mã tỉnh/thành phố của chi nhánh — nguồn MAS_BRANCH.CITY | — | Thiết kế dư thừa |
-| 11 | DISTRICT | VARCHAR2 | N | 200 |  | Mã quận/huyện của chi nhánh — nguồn MAS_BRANCH.DISTRICT | — | Thiết kế dư thừa |
-| 12 | REGION_CODE | NUMBER | N | 18 |  | Mã khu vực địa lý — nguồn MAS_BRANCH.REGION, LEFT JOIN MAS_REGION.REGION_CODE | — | Thiết kế dư thừa |
+| 8 | BRANCH_CODE | VARCHAR2 | N | 200 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH đã dedup về 1 dòng/BRANCH_ID (review 2026-10-12) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | MÃ CHI NHÁNH |
+| 9 | BRANCH_NAME | NVARCHAR2 | N | 200 |  | Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN (sau dedup) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | TÊN CHI NHÁNH |
+| 10 | CITY | VARCHAR2 | N | 200 |  | Mã tỉnh/thành phố của chi nhánh — nguồn MAS_BRANCH.CITY (sau dedup) | — | Thiết kế dư thừa |
+| 11 | DISTRICT | VARCHAR2 | N | 200 |  | Mã quận/huyện của chi nhánh — nguồn MAS_BRANCH.DISTRICT (sau dedup) | — | Thiết kế dư thừa |
+| 12 | REGION_CODE | NUMBER | N | 18 |  | Mã khu vực địa lý — nguồn MAS_BRANCH.REGION (sau dedup), LEFT JOIN MAS_REGION.REGION_CODE | — | Thiết kế dư thừa |
 | 13 | REGION_NAME | NVARCHAR2 | N | 200 |  | Tên khu vực địa lý — nguồn MAS_REGION.REGION_NAME_VN | — | Thiết kế dư thừa |
 | 14 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_COMPANY/MAS_BRANCH/MAS_REGION | — | — |
 | 15 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
