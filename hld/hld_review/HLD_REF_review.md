@@ -162,10 +162,15 @@ báo cáo (BC5, và `POINT` của BC9 tại `AGG_LOS_KPI_APPLICATION`) tự
 từ dữ liệu seed thật (`input/BC5TAT(REF_SLA).xlsx`, sheet "cam kết SLA
 NLTT"):
 
-- **Nhánh RLOS:** `PRODUCT_LINE = DIM_RLOS_PRODUCT.PRODUCT_LINE_NAME`
-  (qua `FCT_RLOS_APPLICATION.PRODUCT_SK`) + `SYSTEM_CODE='RLOS'`.
-  Seed thật xác nhận unique theo đúng `PRODUCT_LINE` (28 dòng, mỗi
-  `Product Line` xuất hiện đúng 1 lần) — không rủi ro 1:N.
+- **Nhánh RLOS:** `PRODUCT_LINE = DIM_RLOS_PRODUCT.PRODUCTLINE_NAME`
+  (qua `FCT_RLOS_APPLICATION.SUB_PRODUCT_SK` → `DIM_RLOS_PRODUCT.
+  PRODUCTLINE_SK` → layer Product Line — ⚠️ review 2026-10-13: đổi từ
+  `PRODUCT_SK` cũ do `DIM_RLOS_PRODUCT` tách layer `PRODUCTLINE_SK`
+  theo pattern T24, xem `HLD_DIM_SB_DWH_review.md` mục 13; chỉ cần
+  đúng 1 khóa `PRODUCTLINE_NAME`, không cần `SUB_PRODUCT`) +
+  `SYSTEM_CODE='RLOS'`. Seed thật xác nhận unique theo đúng
+  `PRODUCT_LINE` (28 dòng, mỗi `Product Line` xuất hiện đúng 1 lần) —
+  không rủi ro 1:N.
 - **Nhánh CLOS:** `PRODUCT_LINE = DIM_CLOS_PRODUCT.PRODUCT_LINE_NAME`
   + `(SUB_PRODUCT IS NULL OR SUB_PRODUCT = DIM_CLOS_PRODUCT.PRODUCT_
   NAME)` (qua `FCT_CLOS_APPLICATION.PRODUCT_SK`) + `NEW_CHANGE_

@@ -1,4 +1,10 @@
--- SB_DWH: tao 14 bang WRK_DIM_* (CREATE). Chay 1 lan trong SQL Window (F8).
+-- SB_DWH: tao 17 bang WRK_DIM_* (CREATE). Chay 1 lan trong SQL Window (F8).
+-- Review 2026-10-12: WRK_DIM_LOS_COMPANY (1 bang) tach thanh 3 bang rieng
+-- theo layer SCD2 doc lap cua DIM_LOS_COMPANY — WRK_DIM_LOS_COMPANY_REGION,
+-- WRK_DIM_LOS_COMPANY_BRANCH, WRK_DIM_LOS_COMPANY_COMPANY (14 -> 16 bang).
+-- WRK_DIM_CLOS_PRODUCT (1 bang) tach thanh 2 bang rieng theo layer SCD2
+-- doc lap cua DIM_CLOS_PRODUCT — WRK_DIM_CLOS_PRODUCT_LINE,
+-- WRK_DIM_CLOS_PRODUCT_SUB (16 -> 17 bang).
 -- Tam thoi chua GRANT cho FSS_STG_LOS, CIC_FSS (se bo sung sau).
 BEGIN
    -- ============================================================
@@ -31,18 +37,32 @@ BEGIN
       exp_date                 DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
    -- ============================================================
-   -- 2. WRK_DIM_CLOS_PRODUCT
+   -- 2a. WRK_DIM_CLOS_PRODUCT_LINE (layer Product Line — CDC độc lập từ NG_SB_CLOS_MAS_PRO_LINE)
    -- ============================================================
-   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_PRODUCT (
-      product_sk             NUMBER,
-      product_bk             VARCHAR2(64),
-      product_line_code      VARCHAR2(100),
-      product_line_name      VARCHAR2(200),
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_PRODUCT_LINE (
+      productline_sk         NUMBER,
+      productline_code       VARCHAR2(100),
+      productline_name       VARCHAR2(200),
+      productline_eff_date   DATE,
+      productline_exp_date   DATE
+   ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
+
+   -- ============================================================
+   -- 2b. WRK_DIM_CLOS_PRODUCT_SUB (layer Sub Product — CDC độc lập từ NG_SB_CLOS_MAS_SUB_PROD,
+   --     denormalize sẵn layer Product Line tương ứng để phục vụ MERGE vào DIM_CLOS_PRODUCT)
+   -- ============================================================
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_PRODUCT_SUB (
+      sub_product_sk         NUMBER,
       sub_product_code       VARCHAR2(100),
       sub_product_name       VARCHAR2(150),
-      sub_prod_active        VARCHAR2(100),
-      eff_date               DATE,
-      exp_date               DATE
+      sub_product_active     VARCHAR2(100),
+      sub_product_eff_date   DATE,
+      sub_product_exp_date   DATE,
+      productline_sk         NUMBER,
+      productline_code       VARCHAR2(100),
+      productline_name       VARCHAR2(200),
+      productline_eff_date   DATE,
+      productline_exp_date   DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
    -- ============================================================
    -- 3. WRK_DIM_CLOS_EXCEPTION
@@ -65,23 +85,56 @@ BEGIN
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
-   -- 4. WRK_DIM_LOS_COMPANY
+   -- 4a. WRK_DIM_LOS_COMPANY_REGION (layer Region — CDC độc lập từ NG_SB_RLOS_MAS_REGION)
    -- ============================================================
-   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_LOS_COMPANY (
-      company_sk       NUMBER,
-      company_code     VARCHAR2(50),
-      company_name     VARCHAR2(200),
-      company_address  VARCHAR2(500),
-      company_email    VARCHAR2(200),
-      zone             NUMBER,
-      branch_code      VARCHAR2(50),
-      branch_name      VARCHAR2(200),
-      city             VARCHAR2(100),
-      district         VARCHAR2(100),
-      region_code      NUMBER,
-      region_name      VARCHAR2(200),
-      eff_date         DATE,
-      exp_date         DATE
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_LOS_COMPANY_REGION (
+      region_sk          NUMBER,
+      region_code        NUMBER,
+      region_name        VARCHAR2(200),
+      region_eff_date    DATE,
+      region_exp_date    DATE
+   ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
+
+   -- ============================================================
+   -- 4b. WRK_DIM_LOS_COMPANY_BRANCH (layer Branch — CDC độc lập từ NG_SB_RLOS_MAS_BRANCH,
+   --     denormalize sẵn layer Region tương ứng để phục vụ MERGE vào DIM_LOS_COMPANY)
+   -- ============================================================
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_LOS_COMPANY_BRANCH (
+      branch_sk          NUMBER,
+      branch_code        VARCHAR2(50),
+      branch_name        VARCHAR2(200),
+      branch_eff_date    DATE,
+      branch_exp_date    DATE,
+      region_sk          NUMBER,
+      region_code        NUMBER,
+      region_name        VARCHAR2(200),
+      region_eff_date    DATE,
+      region_exp_date    DATE
+   ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
+
+   -- ============================================================
+   -- 4c. WRK_DIM_LOS_COMPANY_COMPANY (layer Company — CDC độc lập từ NG_SB_RLOS_MAS_COMPANY,
+   --     denormalize sẵn layer Branch+Region tương ứng — đây là bảng dùng để MERGE vào DIM_LOS_COMPANY thật)
+   -- ============================================================
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_LOS_COMPANY_COMPANY (
+      company_sk         NUMBER,
+      company_code       VARCHAR2(50),
+      company_name       VARCHAR2(200),
+      company_address    VARCHAR2(500),
+      company_email      VARCHAR2(200),
+      zone               NUMBER,
+      company_eff_date   DATE,
+      company_exp_date   DATE,
+      branch_sk          NUMBER,
+      branch_code        VARCHAR2(50),
+      branch_name        VARCHAR2(200),
+      branch_eff_date    DATE,
+      branch_exp_date    DATE,
+      region_sk          NUMBER,
+      region_code        NUMBER,
+      region_name        VARCHAR2(200),
+      region_eff_date    DATE,
+      region_exp_date    DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -150,10 +203,10 @@ BEGIN
    -- 9. WRK_DIM_RLOS_PRODUCT
    -- ============================================================
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_PRODUCT (
-      product_sk          NUMBER,
-      product_bk          VARCHAR2(64),
+      productline_sk      NUMBER,
       productline_code    VARCHAR2(100),
       productline_name    VARCHAR2(200),
+      sub_product_sk      NUMBER,
       sub_product_code    VARCHAR2(100),
       sub_product_name    VARCHAR2(150),
       score_required      VARCHAR2(10),

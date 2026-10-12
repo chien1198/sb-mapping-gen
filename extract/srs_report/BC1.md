@@ -14,7 +14,9 @@
 ## Business Rules
 
 - **Hoạt động**: Mã BR | Mô tả
-- ****: BR 1.1 | Đầu vào: Ngày báo cáo: Cho phép chọn Ngày báo cáo (PROCESSED_DATE). Mặc định hiển thị là ngày dữ liệu hiện tại (T-1) Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
+- ****: BR 1.1 | Đầu vào: 
+Ngày báo cáo: Cho phép chọn Ngày báo cáo (PROCESSED_DATE). Mặc định hiển thị là ngày dữ liệu hiện tại (T-1)
+Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
 - ****: BR 1.2 | Các bảng sử dụng:
 - ****: BR 1.3 | Đầu ra: Báo cáo hiển thị các trường thông tin sau:
 
@@ -45,13 +47,13 @@
 | q | SBLOS2.NG_SB_RLOS_COL_TRANSPORT | LEFT JOIN với điều kiện: z.WI_NAME = q.WI_NAME AND UPPER(z.COL_TYPE) = 'TRANSPORT' AND UPPER(z.OWNER) = UPPER(q.OWNER) AND UPPER(z.RELATION) = UPPER(q.RELATION_CUSTOMER) |
 | r | SBLOS2.NG_SB_RLOS_COL_VALPAPER | LEFT JOIN với điều kiện: z.WI_NAME = r.WI_NAME AND UPPER(z.COL_TYPE) = 'VALPAPER' AND UPPER(z.OWNER) = UPPER(r.OWNER) AND UPPER(z.RELATION) = UPPER(r.RELATION_CUSTOMER) |
 | j1 | SBLOS2.NG_SB_RLOS_COLL_CERTIGRD | LEFT JOIN với điều kiện: q.WI_NAME = j1.WI_NAME AND UPPER(q.OWNER) = UPPER(j1.OWNER) AND UPPER(q.RELATION_CUSTOMER) = UPPER(j1.RELATIONSHIP) |
-| j2 | SBLOS2.NG_SB_RLOS_COLL_CERTIGRD | LEFT JOIN với điều kiện: r.WI_NAME = j2.WI_NAME AND UPPER(r.OWNER) = UPPER(j2.OWNER) AND UPPER(r.RELATION_CUSTOMER) = UPPER(j2.RELATIONSHIP) |
+| j2 | SBLOS2.NG_SB_RLOS_COLL_CERTIGRD | LEFT JOIN với điều kiện: i.WI_NAME = j2.WI_NAME AND UPPER(i.OWNER) = UPPER(j2.OWNER) AND UPPER(r.RELATION_CUSTOMER) = UPPER(j2.RELATIONSHIP) |
 | s | SBLOS2.NG_SB_RLOS_MAS_CITY | LEFT JOIN với điều kiện: c.CITY_CURR_RES = s.CITY_CODE |
 | t | SBLOS2.NG_SB_RLOS_MAS_DISTRICT | LEFT JOIN với điều kiện: c.DISTRICT_CURR_RES = t.DISTRICT_CODE |
 | u | SBLOS2.NG_SB_RLOS_APPLICANT_IDGRID | LEFT JOIN với điều kiện: a.WINAME = u.WI_NAME |
 | w | SBLOS2.NG_SB_RLOS_CBS | LEFT JOIN với điều kiện: a.WINAME = w.WI_NAME |
 | x | SBLOS2.Q_RLOS_REF_WORKSTEP_2SYSTEMS | LEFT JOIN với điều kiện: a.WORKSTEP = x.WORKSTEP |
-| y | SBLOS2.SB_RLOS_MAS_CHANGE_TYPE | LEFT JOIN với điều kiện: g.CHANGE_TYPE = y.CHANGE_TYPE_NAME |
+| y | SBLOS2.SB_RLOS_MAS_CHANGE_TYPE | LEFT JOIN với điều kiện: g.CHANGE_TYPE = y.CHANGE_TYPE_NAME |
 | aa | SBLOS2.NG_SB_RLOS_MAS_CARD_PROMOTIO | LEFT JOIN với điều kiện: w.PROMOTION_ID = aa.PROMOTION_CODE |
 | ac | STG_DTM.STG_DIM_CUSTOMER | LEFT JOIN với điều kiện: u.ID_NUMBER = ac.LEGAL_ID and u.ID_TYPE = ac.LEGAL_DOC_NAME |
 | ad | STG_DTM.STG_DIM_CARD | LEFT JOIN với điều kiện: n.RESULT_SEAB_MAIN_CARD_ID = ad.MAIN_ID |
@@ -76,7 +78,7 @@
 |  | WINAME | Mã hồ sơ vay | NG_SB_RLOS_ENTRY_EXIT> WINAME |
 |  | PROCESSED_DATE | Ngày dữ liệu báo cáo | NG_SB_RLOS_ENTRY_EXIT Lấy ngày dữ liệu của mã hồ sơ theo thứ tự ưu tiên sau: Ngày phê duyệt cuối cùng đối với các hồ sơ đã được phê duyệt: Lấy Max(EXITDATE) với điều kiện WORKSTEP in ('CreditCommittee', 'CreditApproval') và DECISION in ('Send To HOSupport', 'Reject', 'Submit', 'Send To PostSanction', 'Submit To DisbursementMaker') Ngày hồ sơ bị Cancel: Lấy NVL( EXITDATE, ENTRYDATE) với điều kiện WORKSTEP = 'CancelRevoke' Ngày thoát bước cuối cùng của các hồ sơ chưa đến bước Phê duyệt và không ở CancelRevoke: Lấy giá trị Max(EXITDATE) |
 |  | CREATION_DATE | Ngày khởi tạo hồ sơ | NG_SB_RLOS_ENTRY_EXIT> ENTRYDATE Lấy giá trị Min(ENTRYDATE) của mã hồ sơ |
-|  | BI_APPSTATUS | Trạng thái cuối của hồ sơ | NG_SB_RLOS_ENTRY_EXIT> DECISION, WORKSTEP + Nếu DECISION IN ('Submit', 'Send To PostSanction','Submit To DisbursementMaker', 'Send To HOSupport') gán giá trị 'Approved' + Nếu DECISION = 'Reject' gán giá trị 'Rejected' + Nếu WORKSTEP IN ('CancelRevoke','CancelPermanent') gán giá trị 'Cancelled' + Trường hợp còn lại gán giá trị 'Processing' |
+|  | BI_APPSTATUS | Trạng thái cuối của hồ sơ | NG_SB_RLOS_ENTRY_EXIT> DECISION, WORKSTEP + Nếu WORKSTEP in ('CreditCommittee', 'CreditApproval') and DECISION IN ('Submit', 'Send To PostSanction','Submit To DisbursementMaker', 'Send To HOSupport') gán giá trị 'Approved' + Nếu WORKSTEP in ('CreditCommittee', 'CreditApproval') and DECISION = 'Reject' gán giá trị 'Rejected' + Nếu WORKSTEP IN ('CancelRevoke','CancelPermanent') gán giá trị 'Cancelled' + Trường hợp còn lại gán giá trị 'Processing' |
 |  | CUSTOMER_NAME | Tên khách hàng | NG_SB_RLOS_APPLICANT_GENERAL> FULL_NAME |
 |  | ADD_ID | Số "TCC", Số "CC" | NG_SB_RLOS_APPLICANT_IDGRID> ID_NUMBER, với điều kiện ID_TYPE in ('TCC','CC') |
 |  | ADD_ID_OTHER | Số GTTT khác | NG_SB_RLOS_APPLICANT_IDGRID> ID_NUMBER, với điều kiện ID_TYPE not in ('TCC','CC') |
@@ -87,7 +89,7 @@
 |  | CURRENT_RESIDENTIAL_CITY | Địa chỉ hiện tại (Tỉnh/TP) | NG_SB_RLOS_MAS_CITY> CITY_NAME |
 |  | CURRENT_RESIDENTIAL_DISTRICT | Địa chỉ hiện tại (Quận/Huyện) | NG_SB_RLOS_MAS_DISTRICT> DISTRICT_NAME |
 |  | CURRENT_RESIDENTIAL_WARD | Địa chỉ hiện tại (Phường/Xã) | NG_SB_RLOS_APPLICANT_DETAIL> WARD_CURR_RES |
-|  | CURRENT_RESIDENTIAL_ADDRESS | Địa chỉ hiện tại chi tiết | NG_SB_RLOS_MAS_CITY> CITY_NAME NG_SB_RLOS_MAS_DISTRICT> DISTRICT_NAME NG_SB_RLOS_APPLICANT_DETAIL> WARD_CURR_RES NG_SB_RLOS_APPLICANT_DETAIL> HOUSNO_CURR_RES Ghép chuỗi: HOUSNO_CURR_RES // ', ' // WARD_CURR_RES // ', ' // DISTRICT_NAME // ', ' // CITY_NAME |
+|  | CURRENT_RESIDENTIAL_ADDRESS | Địa chỉ hiện tại chi tiết | NG_SB_RLOS_MAS_CITY> CITY_NAME NG_SB_RLOS_MAS_DISTRICT> DISTRICT_NAME NG_SB_RLOS_APPLICANT_DETAIL> WARD_CURR_RES NG_SB_RLOS_APPLICANT_DETAIL> HOUSNO_CURR_RES Ghép chuỗi: HOUSNO_CURR_RES \|\| ', ' \|\| WARD_CURR_RES \|\| ', ' \|\| DISTRICT_NAME \|\| ', ' \|\| CITY_NAME |
 |  | MARRIAGE_STATUS | Tình trạng hôn nhân | NG_SB_RLOS_APPLICANT_DETAIL> MARR_STATUS |
 |  | EDUCATION_LEVEL | Trình độ học vấn | NG_SB_RLOS_APPLICANT_DETAIL> EDU_LEVEL |
 |  | VEHICLES | Phương tiện đi lại | NG_SB_RLOS_APPLICANT_DETAIL> VEHICLE |
@@ -111,12 +113,12 @@
 |  | PRE_WORKSTEP | Bước hồ sơ trước đó | NG_SB_RLOS_ENTRY_EXIT> WORKSTEP Lấy WORKSTEP tại dòng có giá trị ENTRYDATE lớn thứ hai của mã hồ sơ |
 |  | LAST_ENTRYDATE | Thời gian vào bước cuối | NG_SB_RLOS_ENTRY_EXIT> ENTRYDATE Lấy Max(ENTRYDATE) của mã hồ sơ |
 |  | LAST_EXITDATE | Thời gian kết thúc bước cuối | NG_SB_RLOS_ENTRY_EXIT> EXITDATE Lấy EXITDATE tại dòng có giá trị ENTRYDATE lớn nhất của mã hồ sơ |
-|  | LAST_REMARKS | Ghi chú ý kiến bước cuối | NG_SB_RLOS_ENTRY_EXIT> REMARK Lấy REMARK tại dòng có giá trị ENTRYDATE lớn nhất của mã hồ sơ |
-|  | LAST_REMARK_DDE | Ghi chú tại bước nhập liệu DDE | NG_SB_RLOS_ENTRY_EXIT> REMARK Lấy REMARKS tại bước có WORKSTEP = 'DetailDataEntry' |
+|  | LAST_REMARKS | Ghi chú ý kiến bước cuối | NG_SB_RLOS_ENTRY_EXIT> REMARKS Lấy REMARKS tại dòng có giá trị ENTRYDATE lớn nhất của mã hồ sơ |
+|  | LAST_REMARK_DDE | Ghi chú tại bước nhập liệu DDE | NG_SB_RLOS_ENTRY_EXIT> REMARKS Lấy REMARKS tại bước có WORKSTEP = 'DetailDataEntry' |
 |  | LAST_DECISION | Quyết định tại bước cuối | NG_SB_RLOS_ENTRY_EXIT> DECISION Lấy DECISION tại dòng có giá trị ENTRYDATE lớn nhất của mã hồ sơ |
 |  | UNDERWRITERMAKER_TAKERESPON | CV Thẩm định chịu trách nhiệm | NG_SB_RLOS_EXTTABLE g> NG_SB_RLOS_USER_MAKE_WORK_STEP ak> COALESCE(CASE WHEN ak.WORK_STEP = 'UnderwriterMaker' THEN ak.USER_MAKE END, g.UWMAKERUSER) |
 |  | UNDERWRITERCHECKER_TAKERESPON | Kiểm soát thẩm định chịu trách nhiệm | NG_SB_RLOS_EXTTABLE g> NG_SB_RLOS_USER_MAKE_WORK_STEP ak> COALESCE(CASE WHEN ak.WORK_STEP = 'UnderwriterChecker' THEN ak.USER_MAKE END, g.UWCHKRUSER) |
-|  | APPROVAL_TAKERESPON | Chuyên gia phê duyệt chịu trách nhiệm | NG_SB_RLOS_EXTTABLE g> NG_SB_RLOS_USER_MAKE_WORK_STEP ak> COALESCE(CASE WHEN ak.WORK_STEP in ('CreditCommittee', ' CreditApproval') THEN ak.USER_MAKE END, g.CREDAPPRUSER, g.CCOMMITUSER) |
+|  | APPROVAL_TAKERESPON | Chuyên gia phê duyệt chịu trách nhiệm | NG_SB_RLOS_EXTTABLE g> NG_SB_RLOS_USER_MAKE_WORK_STEP ak> COALESCE(CASE WHEN ak.WORK_STEP in ('CreditCommittee', 'CreditApproval') THEN ak.USER_MAKE END, g.CREDAPPRUSER, g.CCOMMITUSER) |
 |  | TSBD_BDS | Hồ sơ có TSBĐ là BĐS (YES/NO) | NG_SB_RLOS_DISB_COL_GRID z> CASE WHEN UPPER(z.COL_TYPE) = 'REALSTATE' THEN 'YES' ELSE 'NO' END |
 |  | TSBD_PTVT | Hồ sơ có TSBĐ là PTVT (YES/NO) | NG_SB_RLOS_DISB_COL_GRID z> CASE WHEN UPPER(z.COL_TYPE) = 'TRANSPORT' THEN 'YES' ELSE 'NO' END |
 |  | TSBD_GTCG | Hồ sơ có TSBĐ là GTCG (YES/NO) | NG_SB_RLOS_DISB_COL_GRID z> CASE WHEN UPPER(z.COL_TYPE) = 'VALPAPER' THEN 'YES' ELSE 'NO' END |
@@ -127,7 +129,7 @@
 |  | POLICY | Chính sách áp dụng | NG_SB_RLOS_APPLICANT_GENERAL> POLICY |
 |  | CAMPAIGN | Mã chương trình tiếp thị | NG_SB_RLOS_APPLICANT_GENERAL> CAMPAIGN |
 |  | PROOF_OF_INCOME | Nguồn thu nhập | NG_SB_RLOS_APPLICANT_GENERAL> PROOF_OF_INCOME + Nếu PROOF_OF_INCOME = 'proofincome01' gán giá trị 'CHUNGTU_CHUNGMINH_THUNHAP' + Nếu PROOF_OF_INCOME = 'proofincome02' gán giá trị 'BANGKE_THUNHAP' |
-|  | REPAYMENT_SOURCE | Loại nguồn thu | NG_SB_RLOS_REPAYFLAGS> Lấy SUBSTR(REGEXP_REPLACE( CASE WHEN SALARYFLAG = 'Yes' THEN 'Lương / ' END // CASE WHEN CARFLAG = 'Yes' THEN 'Cho thuê phương tiện / ' END // CASE WHEN HOUSEFLAG = 'Yes' THEN 'Cho thuê nhà / ' END // CASE WHEN ENTERPRISSEFLAG = 'Yes' THEN 'Lợi nhuận doanh nghiệp / ' END // CASE WHEN DIVINGFLAG = 'Yes' THEN 'Cổ tức / ' END // CASE WHEN FAIMILYFLAG = 'Yes' THEN 'Kinh doanh hộ gia đình / ' END // CASE WHEN NONLICFLAG = 'Yes' THEN 'Kinh doanh không ĐKKD / ' END // CASE WHEN WAGESFLAG = 'Yes' THEN 'Tiền công / ' END // CASE WHEN PENSIONFLAG = 'Yes' THEN 'Lương hưu/phụ cấp / ' END // CASE WHEN OTHERFLAG = 'Yes' THEN 'Nguồn thu khác / ' END, ' / $', ''), 1, 200) |
+|  | REPAYMENT_SOURCE | Loại nguồn thu | NG_SB_RLOS_REPAYFLAGS> Lấy SUBSTR(REGEXP_REPLACE( CASE WHEN SALARYFLAG = 'Yes' THEN 'Lương / ' END \|\| CASE WHEN CARFLAG = 'Yes' THEN 'Cho thuê phương tiện / ' END \|\| CASE WHEN HOUSEFLAG = 'Yes' THEN 'Cho thuê nhà / ' END \|\| CASE WHEN ENTERPRISSEFLAG = 'Yes' THEN 'Lợi nhuận doanh nghiệp / ' END \|\| CASE WHEN DIVINGFLAG = 'Yes' THEN 'Cổ tức / ' END \|\| CASE WHEN FAIMILYFLAG = 'Yes' THEN 'Kinh doanh hộ gia đình / ' END \|\| CASE WHEN NONLICFLAG = 'Yes' THEN 'Kinh doanh không ĐKKD / ' END \|\| CASE WHEN WAGESFLAG = 'Yes' THEN 'Tiền công / ' END \|\| CASE WHEN PENSIONFLAG = 'Yes' THEN 'Lương hưu/phụ cấp / ' END \|\| CASE WHEN OTHERFLAG = 'Yes' THEN 'Nguồn thu khác / ' END, ' / $', ''), 1, 200) |
 |  | TOTAL_INCOME | Tổng thu nhập phê duyệt | NG_SB_RLOS_REPAY_CALC> TOT_INC_CALC |
 |  | LOAN_TO_VALUE | Tỷ lệ LTV (%) | NG_SB_RLOS_CREDIT_PROPOSAL> LOAN_TO_VALUE |
 |  | K_TYPE | Loại thẻ tín dụng | STG_DIM_CARD> K_TYPE |
@@ -140,16 +142,16 @@
 |  | MIN_APP | Thời gian hồ sơ lên CG phê duyệt | NG_SB_RLOS_ENTRY_EXIT> ENTRY_DATE Lấy giá trị MIN(ENTRYDATE), với điều kiện WORKSTEP in ('CreditApproval', 'CreditCommittee') |
 |  | LAST_APPROVAL_DATE | Thời gian phê duyệt cuối cùng | NG_SB_RLOS_ENTRY_EXIT> EXITDATE Lấy giá trị Max(EXITDATE), với điều kiện WORKSTEP in ('CreditApproval', 'CreditCommittee') |
 |  | CAN_USER_DATE | Thời gian cancel do NSD | NG_SB_RLOS_ENTRY_EXIT> EXITDATE Lấy giá trị EXITDATE với điều kiện DECISION = 'Cancel' AND USERNAME IS NOT NULL |
-|  | AUTO_CAN_DATE | Thời gian cancel tự động | Lấy thời gian hệ thống tự động chuyển hồ sơ sang bước CancelRevoke (do quá 5 ngày làm việc hồ sơ ở bước ĐVKD không bổ sung): Lấy Min(ENTRYDATE) Với điều kiện: + WORKSTEP = 'CancelRevoke' and USERNAME IS NULL and EXITDATE IS NULL and DECISION IS NULL + Hồ sơ từng bị treo tại BranchSupport quá 5 ngày làm việc (2400 phút): WORKSTEP = 'BranchSupport' and (ENTRYDATE tại WORKSTEP = 'BranchSupport' < ENTRYDATE tại WORKSTEP = 'CancelRevoke') and EXITDATE IS NULL and DECISION IS NULL and get_business_minute( (ENTRYDATE tại WORKSTEP = 'BranchSupport'), (ENTRYDATE tại WORKSTEP = 'CancelRevoke')) >= 2400 Trong đó: get_business_minute tính thời gian loại trừ holidays, chiều Thứ 7, cả ngày Chủ nhật; thời gian tính từ 8-12 và 13-17 + Hồ sơ không tồn tại bước hủy thủ công trước hoặc cùng thời điểm vào bước CancelRevoke: Không tồn tại dòng thỏa mãn điều kiện DECISION = 'Cancel' and (ENTRYDATE tại DECISION = 'Cancel' < = ENTRYDATE tại WORKSTEP = 'CancelRevoke') |
+|  | AUTO_CAN_DATE | Thời gian cancel tự động | Lấy thời gian hệ thống tự động chuyển hồ sơ sang bước CancelRevoke (do quá 5 ngày làm việc hồ sơ ở bước ĐVKD không bổ sung): Lấy Min(ENTRYDATE) Với điều kiện: + WORKSTEP = 'CancelRevoke' and USERNAME IS NULL and EXITDATE IS NULL and DECISION IS NULL + Hồ sơ từng bị treo tại BranchSupport quá 5 ngày làm việc (2400 phút): WORKSTEP = 'BranchSupport' and (ENTRYDATE tại WORKSTEP = 'BranchSupport' < ENTRYDATE tại WORKSTEP = 'CancelRevoke') and EXITDATE IS NULL and DECISION IS NULL and get_business_minute( (ENTRYDATE tại WORKSTEP = 'BranchSupport'), (ENTRYDATE tại WORKSTEP = 'CancelRevoke')) >= 2400 Trong đó: get_business_minute tính thời gian loại trừ holidays, chiều Thứ 7, cả ngày Chủ nhật; thời gian tính từ 8-12 và 13-17 + Hồ sơ không tồn tại bước hủy thủ công trước hoặc cùng thời điểm vào bước CancelRevoke: Không tồn tại dòng thỏa mãn điều kiện DECISION = 'Cancel' and (ENTRYDATE tại DECISION = 'Cancel' <= ENTRYDATE tại WORKSTEP = 'CancelRevoke') |
 |  | FLAG_AUTO_CAN | Hồ sơ cancel tự động (YES/NO) | + Nếu AUTO_CAN_DATE IS NOT NULL gán giá trị 'YES' + Trường hợp còn lại gán giá trị 'NO' |
 |  | LAST_CAN_REMARKS | Ghi chú hủy hồ sơ | NG_SB_RLOS_ENTRY_EXIT> Lấy REMARKS với điều kiện DECISION = 'Cancel' |
 |  | BRANCH_USER | User Chi nhánh | NG_SB_RLOS_ENTRY_EXIT a> Q_RLOS_REF_WORKSTEP_2SYSTEMS x> Lấy a.USERNAME, với điều kiện x.BI_WORKSTEP = '01.Branch' và x.System = 'OF' |
 |  | DDE_USER | User Chuyên viên nhập liệu | NG_SB_RLOS_ENTRY_EXIT a> Q_RLOS_REF_WORKSTEP_2SYSTEMS x> Lấy a.USERNAME, với điều kiện x.BI_WORKSTEP = '02.DDE' và x.System = 'OF' |
 |  | QUALITY_CHECKER | User Kiểm soát nhập liệu | NG_SB_RLOS_ENTRY_EXIT a> Q_RLOS_REF_WORKSTEP_2SYSTEMS x> Lấy a.USERNAME, với điều kiện x.BI_WORKSTEP = '03.Data Quality check' và x.System = 'OF' |
 |  | UND_MAKER | User Chuyên viên thẩm định | NG_SB_RLOS_ENTRY_EXIT> USERNAME, với điều kiện WORKSTEP = 'UnderwriterMaker' |
-|  | UND_CHECKER | User Kiểm soát thẩm định | NG_SB_RLOS_ENTRY_EXIT> USERNAME, với điều kiện WORKSTEP = 'UnderwriterCheker' |
+|  | UND_CHECKER | User Kiểm soát thẩm định | NG_SB_RLOS_ENTRY_EXIT> USERNAME, với điều kiện WORKSTEP = 'UnderwriterChecker' |
 |  | PHV_USER | User Chuyên viên Thẩm định điện thoại | NG_SB_RLOS_ENTRY_EXIT> USERNAME, với điều kiện WORKSTEP = 'PhoneVerification' |
-|  | BI_APPROVER | User Chuyên gia phê duyệt | NG_SB_RLOS_ENTRY_EXIT> USERNAME, với điều kiện WORKSTEP in ('CreditCommittee', ' CreditApproval') |
+|  | BI_APPROVER | User Chuyên gia phê duyệt | NG_SB_RLOS_ENTRY_EXIT> USERNAME, với điều kiện WORKSTEP in ('CreditCommittee', 'CreditApproval') |
 |  | LOAN_OBJECTIVE | Mục đích cho vay | NG_SB_RLOS_CREDIT_PROPOSAL > LOAN_OBJECTIVE |
 |  | SPP_AMOUNT | Giá trị của sản phẩm phụ | NG_SB_RLOS_CREDIT_CARD_APP af> NG_SB_RLOS_SEABUY_APP ag> NG_SB_RLOS_CIVIL_APP ah> NG_SB_RLOS_TEACHER_APP ai> NG_SB_RLOS_WOMAN_APP aj> Lấy UNION giá trị LIMIT_NO của 5 bảng |
 |  | SPP_TERM | Thời hạn của sản phẩm phụ | NG_SB_RLOS_CREDIT_CARD_APP af> NG_SB_RLOS_SEABUY_APP ag> NG_SB_RLOS_CIVIL_APP ah> NG_SB_RLOS_TEACHER_APP ai> NG_SB_RLOS_WOMAN_APP aj> Lấy UNION các giá trị của 5 bảng: af.TERM; ag.TIME_VALID ah.TIME_VALID ai.TIME_VALID aj.TIME_VALID |

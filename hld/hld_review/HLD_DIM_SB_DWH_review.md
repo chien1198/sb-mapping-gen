@@ -6,7 +6,7 @@
 - **Ý nghĩa bảng:** danh mục đơn vị kinh doanh (phòng giao dịch/chi nhánh/khu vực) khởi tạo hồ sơ, dùng chung cho cả hai hệ CLOS và RLOS — một đơn vị kinh doanh vật lý xử lý cả hồ sơ CLOS lẫn RLOS nên không tách theo hệ.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
 - **Khóa nghiệp vụ (BK):** `COMPANY_CODE`
-- **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `COMPANY_CODE` — mức PGD/CN nhỏ nhất); thông tin Chi nhánh/Khu vực được gộp vào cùng dòng (không tách DIM phân cấp riêng) vì đây là quan hệ vị trí địa lý cố định.
+- **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `COMPANY_CODE` — mức PGD/CN nhỏ nhất) × phiên bản `DIMENSION_KEY`. Thông tin Chi nhánh/Khu vực vẫn gộp vào cùng dòng (không tách thành 3 bảng vật lý riêng), nhưng ⚠️ review 2026-10-12 (theo yêu cầu người dùng, đảo ngược quyết định trước đó): mỗi layer (Company/Branch/Region) nay tự quản lý **SK + EFF_DATE/EXP_DATE riêng** — `DIMENSION_KEY` vẫn phát sinh phiên bản mới khi bất kỳ layer nào đổi, nhưng layer không đổi thì copy nguyên SK+EFF/EXP từ phiên bản liền trước (không đóng EXP_DATE của layer đó). Lý do: thuộc tính mô tả của từng cấp (vd tên Khu vực) có thể đổi độc lập theo thời gian dù quan hệ phân cấp PGD→Chi nhánh→Khu vực vẫn cố định.
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
   - Báo cáo CLOS APPLICATION (BC2)
@@ -25,7 +25,7 @@ flowchart LR
         C["DIM_LOS_COMPANY"]
     end
     A -->|"grain — 1 dòng/COMPANY_CODE (PGD/CN nhỏ nhất)"| C
-    B -->|"LEFT JOIN theo BRANCH_ID, đã dedup về 1 dòng/BRANCH_ID — bổ sung tên/địa bàn Chi nhánh"| C
+    B -->|"LEFT JOIN theo BRANCH_ID, đã dedup về 1 dòng/BRANCH_ID — bổ sung tên Chi nhánh"| C
     R -->|"LEFT JOIN theo REGION_CODE (=BRANCH.REGION) — bổ sung tên Khu vực"| C
 ```
 
@@ -38,25 +38,59 @@ dedup `MAS_BRANCH` về 1 dòng/`BRANCH_ID` bằng `ROW_NUMBER() OVER
 JOIN — áp dụng cho cả bước MAS_COMPANY→MAS_BRANCH và multi-hop
 MAS_BRANCH→MAS_REGION. Xem `lld/sb_dwh/SB_DWH_DIM_LOS_COMPANY.csv`.
 
+**⚠️ Review 2026-10-12 (theo yêu cầu người dùng): tách 3 layer SCD2 độc
+lập (Company/Branch/Region), bỏ CITY/DISTRICT.** Mỗi layer có bộ 3 cột
+riêng (`<LAYER>_SK`, `<LAYER>_EFF_DATE`, `<LAYER>_EXP_DATE`) thay cho 1
+cặp `EFF_DATE`/`EXP_DATE` dùng chung cho cả 3 bảng nguồn như trước.
+`DIMENSION_KEY` vẫn phát sinh phiên bản mới khi **bất kỳ layer nào đổi**;
+layer không đổi thì copy nguyên `<LAYER>_SK`+`<LAYER>_EFF/EXP_DATE` từ
+phiên bản liền trước. CDC chạy độc lập theo từng layer (so sánh toàn bộ
+cột non-key của đúng bảng nguồn layer đó, không có KEY CDC khai báo tay
+trong `DS_BANG_202608.xlsx` cho 3 bảng này). `CITY`/`DISTRICT` (nguồn
+`MAS_BRANCH.CITY`/`DISTRICT`) bị loại do không còn sử dụng. Chi tiết
+rationale: `hld/HLD_Table_Design.md` Section 1 → 1.1.1.
+
+**FK từ FCT (COMPANY_SK) vẫn lookup theo layer Company, đọc Branch/Region
+cùng dòng:** `COMPANY_SK`=`DIMENSION_KEY` trên FCT lookup theo
+`COMPANY_CODE` + `COMPANY_EFF_DATE<=DAYID<COMPANY_EXP_DATE` (hoặc
+`COMPANY_EXP_DATE IS NULL`), sau đó đọc thẳng `BRANCH_CODE`/`BRANCH_NAME`/
+`REGION_CODE`/`REGION_NAME` từ cùng dòng DIM — không kiểm tra riêng
+`BRANCH_EFF/EXP_DATE`, `REGION_EFF/EXP_DATE` khi đọc gián tiếp qua
+Company. Khớp đúng cách SRS BC1/BC2 đang dùng (1 lần join duy nhất, đọc
+mọi cột cùng dòng — xác nhận qua `extract/Report/BC1.md`/`BC2.md`, không
+có join riêng theo BRANCH_CODE độc lập). Xem
+`hld/hld_review/HLD_FCT_SB_DWH_review.md` mục COMPANY_SK trên
+FCT_CLOS/RLOS_APPLICATION.
+
 ### 1.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_LOS_COMPANY, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_LOS_COMPANY, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới. Phát sinh phiên bản mới khi bất kỳ layer nào (Company/Branch/Region) đổi | — | — |
 | 2 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_LOS_COMPANY, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
 | 3 | COMPANY_CODE | VARCHAR2 | N | 200 | BK | Mã đơn vị kinh doanh (PGD/CN — mức chi tiết nhất) — nguồn NG_SB_RLOS_MAS_COMPANY.COMPANY_CODE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo KPI (BC9) — điều kiện lọc chi nhánh loại trừ | MÃ PGD (Mã đơn vị kinh doanh); nguồn cho chỉ tiêu SLHS_RLOS_*/SLGN_RLOS_* (điều kiện lọc chi nhánh trên AGG_LOS_KPI_YTD_DAILY) |
-| 4 | COMPANY_NAME | NVARCHAR2 | N | 200 |  | Tên đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_NAME_VN | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | TÊN PGD (Tên đơn vị kinh doanh) |
-| 5 | COMPANY_ADDRESS | NVARCHAR2 | N | 200 |  | Địa chỉ đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_ADDRESS_VN | — | Thiết kế dư thừa |
-| 6 | COMPANY_EMAIL | VARCHAR2 | N | 200 |  | Email đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_EMAIL | — | Thiết kế dư thừa |
-| 7 | ZONE | NUMBER | N | 18 |  | Mã khu vực nội bộ theo LOS (khác REGION_CODE của MAS_REGION) — nguồn MAS_COMPANY.ZONE | — | Thiết kế dư thừa |
-| 8 | BRANCH_CODE | VARCHAR2 | N | 200 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH đã dedup về 1 dòng/BRANCH_ID (review 2026-10-12) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | MÃ CHI NHÁNH |
-| 9 | BRANCH_NAME | NVARCHAR2 | N | 200 |  | Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN (sau dedup) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | TÊN CHI NHÁNH |
-| 10 | CITY | VARCHAR2 | N | 200 |  | Mã tỉnh/thành phố của chi nhánh — nguồn MAS_BRANCH.CITY (sau dedup) | — | Thiết kế dư thừa |
-| 11 | DISTRICT | VARCHAR2 | N | 200 |  | Mã quận/huyện của chi nhánh — nguồn MAS_BRANCH.DISTRICT (sau dedup) | — | Thiết kế dư thừa |
-| 12 | REGION_CODE | NUMBER | N | 18 |  | Mã khu vực địa lý — nguồn MAS_BRANCH.REGION (sau dedup), LEFT JOIN MAS_REGION.REGION_CODE | — | Thiết kế dư thừa |
-| 13 | REGION_NAME | NVARCHAR2 | N | 200 |  | Tên khu vực địa lý — nguồn MAS_REGION.REGION_NAME_VN | — | Thiết kế dư thừa |
-| 14 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_COMPANY/MAS_BRANCH/MAS_REGION | — | — |
-| 15 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 4 | COMPANY_NAME | NVARCHAR2 | N | 200 |  | Tên đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_NAME_VN. Layer Company | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | TÊN PGD (Tên đơn vị kinh doanh) |
+| 5 | COMPANY_ADDRESS | NVARCHAR2 | N | 200 |  | Địa chỉ đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_ADDRESS_VN. Layer Company | — | Thiết kế dư thừa |
+| 6 | COMPANY_EMAIL | VARCHAR2 | N | 200 |  | Email đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_EMAIL. Layer Company | — | Thiết kế dư thừa |
+| 7 | ZONE | NUMBER | N | 18 |  | Mã khu vực nội bộ theo LOS (khác REGION_CODE của MAS_REGION) — nguồn MAS_COMPANY.ZONE. Layer Company | — | Thiết kế dư thừa |
+| 8 | COMPANY_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Company (COMPANY_NAME/COMPANY_ADDRESS/COMPANY_EMAIL/ZONE) — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_COMPANY, review 2026-10-12) | — | — |
+| 9 | COMPANY_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Company; NULL = đang hiệu lực | — | — |
+| 10 | BRANCH_SK | NUMBER | N | 18 |  | Surrogate key riêng của layer Branch — mới, review 2026-10-12 | — | — |
+| 11 | BRANCH_CODE | VARCHAR2 | N | 200 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH đã dedup về 1 dòng/BRANCH_ID (review 2026-10-12). Layer Branch | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | MÃ CHI NHÁNH |
+| 12 | BRANCH_NAME | NVARCHAR2 | N | 200 |  | Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN (sau dedup). Layer Branch | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | TÊN CHI NHÁNH |
+| 13 | BRANCH_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Branch (BRANCH_CODE/BRANCH_NAME) — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_BRANCH sau dedup, review 2026-10-12) | — | — |
+| 14 | BRANCH_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Branch; NULL = đang hiệu lực | — | — |
+| 15 | REGION_SK | NUMBER | N | 18 |  | Surrogate key riêng của layer Region — mới, review 2026-10-12 | — | — |
+| 16 | REGION_CODE | NUMBER | N | 18 |  | Mã khu vực địa lý — nguồn MAS_BRANCH.REGION (sau dedup), LEFT JOIN MAS_REGION.REGION_CODE. Layer Region | — | Thiết kế dư thừa |
+| 17 | REGION_NAME | NVARCHAR2 | N | 200 |  | Tên khu vực địa lý — nguồn MAS_REGION.REGION_NAME_VN. Layer Region | — | Thiết kế dư thừa |
+| 18 | REGION_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Region (REGION_CODE/REGION_NAME) — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_REGION, review 2026-10-12) | — | — |
+| 19 | REGION_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Region; NULL = đang hiệu lực | — | — |
+
+**Tổng 19 cột** (từ 15 cột trước đó, review 2026-10-12): bỏ `CITY`/
+`DISTRICT` (2 cột); tách `EFF_DATE`/`EXP_DATE` dùng chung thành 3 cặp
+riêng theo layer (+4 cột ròng: `COMPANY_EFF/EXP_DATE`,
+`BRANCH_EFF/EXP_DATE`, `REGION_EFF/EXP_DATE` thay cho 1 cặp cũ); thêm
+`BRANCH_SK`/`REGION_SK` (+2 cột).
 
 ## 2. DIM_LOS_USER
 
@@ -311,8 +345,8 @@ flowchart LR
 ### 7.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục sản phẩm tín dụng CLOS (doanh nghiệp) — gồm dòng sản phẩm và sản phẩm nhánh chi tiết, là thông tin ít thay đổi theo bộ mã ổn định.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** composite `PRODUCT_LINE_CODE` + `PRODUCT_LINE_NAME` + `SUB_PRODUCT_CODE` + `SUB_PRODUCT_NAME` — hash vào cột `PRODUCT_BK`
-- **Độ chi tiết (grain):** 1 dòng lưu lịch sử thay đổi của 1 tổ hợp dòng sản phẩm + sản phẩm nhánh theo thời gian (SCD Type 2, do ETL tính qua CDC).
+- **Khóa nghiệp vụ (BK):** mỗi layer có NK riêng — `PRODUCTLINE_CODE` (layer Product Line), `SUB_PRODUCT_CODE` (layer Sub Product, unique toàn cục) — ⚠️ review 2026-10-12: thay cho composite PRODUCT_BK cũ
+- **Độ chi tiết (grain):** 1 dòng lưu lịch sử thay đổi của 1 tổ hợp (Product Line, Sub Product) × phiên bản `DIMENSION_KEY`. ⚠️ Review 2026-10-12 (theo yêu cầu người dùng): Product Line và Sub Product nay là **2 layer SCD2 độc lập** trong cùng 1 dòng, mỗi layer tự quản lý SK + EFF_DATE/EXP_DATE riêng — `DIMENSION_KEY` vẫn phát sinh phiên bản mới khi bất kỳ layer nào đổi, layer không đổi copy nguyên SK+EFF/EXP từ phiên bản liền trước (cùng pattern đã áp dụng cho `DIM_LOS_COMPANY`, mục 1). Không có use-case nghiệp vụ bắt buộc phải tách (khác DIM_LOS_COMPANY) — là quyết định kiến trúc chuẩn hóa theo yêu cầu người dùng, rà soát SRS xác nhận Product Line/Sub Product hiện luôn lookup cùng lúc.
 - **Phục vụ báo cáo:**
   - Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp dòng sản phẩm/sản phẩm nhánh
   - Báo cáo SLA - TAT (BC5) — khóa tra cam kết SLA nhập liệu tập trung REF_SLA_NLTT
@@ -329,24 +363,50 @@ flowchart LR
     subgraph SB_DWH
         D["DIM_CLOS_PRODUCT"]
     end
-    A -->|"grain — 1 dòng/PRODUCT_LINE_CODE"| D
-    B -->|"LEFT JOIN theo PRODUCTLINE_CODE — bổ sung sản phẩm nhánh"| D
+    A -->|"grain — 1 dòng/PRODUCTLINE_CODE, layer Product Line, CDC riêng"| D
+    B -->|"LEFT JOIN theo PRODUCTLINE_CODE — layer Sub Product, CDC riêng, denormalize sẵn Product Line"| D
 ```
+
+**⚠️ Review 2026-10-12 (theo yêu cầu người dùng): tách 2 layer SCD2 độc
+lập (Product Line/Sub Product), bỏ PRODUCT_BK.** Mỗi layer có bộ 3 cột
+riêng (`<LAYER>_SK`, `<LAYER>_EFF_DATE`, `<LAYER>_EXP_DATE`) thay cho 1
+cặp `EFF_DATE`/`EXP_DATE` dùng chung. `DIMENSION_KEY` vẫn phát sinh
+phiên bản mới khi **bất kỳ layer nào đổi**; layer không đổi thì copy
+nguyên `<LAYER>_SK`+`<LAYER>_EFF/EXP_DATE` từ phiên bản liền trước. CDC
+chạy độc lập theo từng layer (so sánh toàn bộ cột non-key của đúng bảng
+nguồn layer đó). Bỏ `PRODUCT_BK` (hash MD5 gộp 4 cột CODE+NAME, thêm ở
+review 2026-10-02) — mỗi layer đã có NK riêng đủ để UNIQUE/CDC.
+
+**FK từ FCT (khác DIM_LOS_COMPANY):** `FCT_CLOS_APPLICATION` đổi từ 1 FK
+`PRODUCT_SK` sang 2 FK riêng `PRODUCTLINE_SK`+`SUB_PRODUCT_SK` (xem
+`HLD_FCT_SB_DWH_review.md` mục 1) — theo yêu cầu người dùng, khác với
+`DIM_LOS_COMPANY` (giữ 1 FK, đọc Branch/Region "ké" cùng dòng).
 
 ### 7.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_PRODUCT, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
-| 2 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_PRODUCT, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 3 | PRODUCT_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (dòng sản phẩm, tên dòng, sản phẩm nhánh, tên sản phẩm) — PHÁI SINH: STANDARD_HASH(PRODUCT_LINE_CODE \|\| PRODUCT_LINE_NAME \|\| SUB_PRODUCT_CODE \|\| SUB_PRODUCT_NAME, 'MD5')| — | — |
-| 4 | PRODUCT_LINE_CODE | NVARCHAR2 | N | 100 |  | Mã dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_CODE. UNIQUE (PRODUCT_LINE_CODE, PRODUCT_LINE_NAME, SUB_PRODUCT_CODE, EFF_DATE). Thành phần nguồn của PRODUCT_BK (không còn tự đánh dấu khóa, xem cột 4) | Báo cáo CLOS APPLICATION (BC2) | PRODUCT_LINE (Dòng sản phẩm) |
-| 5 | PRODUCT_LINE_NAME | NVARCHAR2 | N | 100 |  | Tên dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_NAME | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Product Line trên REF_SLA_NLTT) |
-| 6 | SUB_PRODUCT_CODE | NVARCHAR2 | N | 255 |  | Mã sản phẩm nhánh — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_CODE | Báo cáo CLOS APPLICATION (BC2) | SUB_PRODUCT (Sản phẩm nhánh) |
-| 7 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 255 |  | Tên sản phẩm nhánh chi tiết — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_NAME (đổi tên từ PRODUCT_NAME, review 2026-10-06, đồng nhất với SUB_PRODUCT_CODE) | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Sub Product trên REF_SLA_NLTT) |
-| 8 | SUB_PROD_ACTIVE | VARCHAR2 | N | 100 |  | Trạng thái hiệu lực của sản phẩm nhánh — nguồn NG_SB_CLOS_MAS_SUB_PROD.ACTIVE | — | — |
-| 9 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_PRO_LINE/MAS_SUB_PROD (không có cột khai báo tay như MAP_CLOS_PRODUCT trước đây) | — | — |
-| 10 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_PRODUCT, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới. Phát sinh phiên bản mới khi bất kỳ layer nào (Product Line/Sub Product) đổi | — | — |
+| 2 | PRODUCTLINE_SK | NUMBER | Y | 18 |  | Surrogate key riêng của layer Product Line — mới, review 2026-10-12 | — | — |
+| 3 | PRODUCTLINE_CODE | NVARCHAR2 | N | 100 | NK | Mã dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_CODE (đổi tên từ PRODUCT_LINE_CODE, review 2026-10-12). Layer Product Line | Báo cáo CLOS APPLICATION (BC2) | PRODUCT_LINE (Dòng sản phẩm) |
+| 4 | PRODUCTLINE_NAME | NVARCHAR2 | N | 100 |  | Tên dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_NAME (đổi tên từ PRODUCT_LINE_NAME, review 2026-10-12). Layer Product Line | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Product Line trên REF_SLA_NLTT) |
+| 5 | PRODUCTLINE_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Product Line — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_PRO_LINE, review 2026-10-12) | — | — |
+| 6 | PRODUCTLINE_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Product Line; NULL = đang hiệu lực | — | — |
+| 7 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | Surrogate key riêng của layer Sub Product — mới, review 2026-10-12 | — | — |
+| 8 | SUB_PRODUCT_CODE | NVARCHAR2 | N | 255 | NK | Mã sản phẩm nhánh — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_CODE, unique toàn cục. Layer Sub Product | Báo cáo CLOS APPLICATION (BC2) | SUB_PRODUCT (Sản phẩm nhánh) |
+| 9 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 255 |  | Tên sản phẩm nhánh chi tiết — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_NAME (đổi tên từ PRODUCT_NAME, review 2026-10-06, đồng nhất với SUB_PRODUCT_CODE). Layer Sub Product | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Sub Product trên REF_SLA_NLTT) |
+| 10 | SUB_PRODUCT_ACTIVE | VARCHAR2 | N | 100 |  | Trạng thái hiệu lực của sản phẩm nhánh — nguồn NG_SB_CLOS_MAS_SUB_PROD.ACTIVE (đổi tên từ SUB_PROD_ACTIVE, review 2026-10-12). Layer Sub Product | — | — |
+| 11 | SUB_PRODUCT_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Sub Product — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_SUB_PROD, review 2026-10-12) | — | — |
+| 12 | SUB_PRODUCT_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Sub Product; NULL = đang hiệu lực | — | — |
+
+**Tổng 12 cột** (từ 10 cột trước đó, review 2026-10-12): bỏ `PRODUCT_BK`
+(1 cột); bỏ `PRODUCT_SK` (⚠️ review 2026-10-12, theo yêu cầu người dùng:
+khác bản chất với `COMPANY_SK` trên `DIM_LOS_COMPANY` — `COMPANY_SK` đại
+diện layer chi tiết nhất/grain thấp nhất của bảng, trong khi
+`DIM_CLOS_PRODUCT` có 2 layer đồng cấp, không layer nào đại diện được
+cho cả dòng, nên giữ 1 cột `*_SK` chung là sai thiết kế) (1 cột); tách
+`EFF_DATE`/`EXP_DATE` dùng chung thành 2 cặp riêng theo layer (+2 cột
+ròng); thêm `PRODUCTLINE_SK`/`SUB_PRODUCT_SK` (+2 cột).
 
 ## 8. DIM_RLOS_APPLICATION
 
@@ -639,9 +699,12 @@ flowchart LR
 
 - **Ý nghĩa bảng:** danh mục sản phẩm tín dụng RLOS (bán lẻ/cá nhân) — lưu
   dòng sản phẩm chính (`PRODUCTLINE_CODE`) và sản phẩm nhánh (`SUB_PRODUCT_CODE`,
-  con của sản phẩm chính).
+  con của sản phẩm chính). ⚠️ review 2026-10-13 (theo yêu cầu người dùng,
+  tham khảo cấu trúc DIM_PRODUCT nguồn T24): tách `PRODUCTLINE_SK` riêng
+  cho layer cha (Product Line) dù cùng nguồn với layer con — chỉ layer
+  nhỏ nhất (Sub Product) mới quản lý SCD2 (EFF_DATE/EXP_DATE riêng).
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** composite `PRODUCTLINE_CODE` + `SUB_PRODUCT_CODE` — hash vào cột `PRODUCT_BK`.
+- **Khóa nghiệp vụ (NK) theo layer:** `PRODUCTLINE_CODE` (layer Product Line), `SUB_PRODUCT_CODE` (layer Sub Product) — ⚠️ review 2026-10-13: bỏ `PRODUCT_BK` (hash composite), mỗi layer đã có NK riêng.
 - **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời
   gian (SCD Type 2, khóa tự nhiên `PRODUCTLINE_CODE` + `SUB_PRODUCT_CODE` +
   `EFF_DATE`).
@@ -667,16 +730,16 @@ flowchart LR
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_PRODUCT, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
-| 2 | PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_PRODUCT, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 3 | PRODUCT_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (dòng sản phẩm chính, sản phẩm nhánh) — PHÁI SINH: STANDARD_HASH(PRODUCTLINE_CODE \|\| SUB_PRODUCT_CODE, 'MD5') | — | — |
-| 4 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 |  | Mã dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_CODE (= PRODUCTLINE_CODE của MAS_PRODUCT_LINE, cùng khái niệm).| Báo cáo RLOS APPLICATION (BC1) | PRODUCT_LINE (Dòng sản phẩm) |
-| 5 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_NAME.| Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay PRODUCTLINE_CODE | PRODUCT_LINE (Dòng sản phẩm) |
-| 6 | SUB_PRODUCT_CODE | VARCHAR2 | N | 200 |  | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
-| 7 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 200 |  | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME.| Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_PRODUCT, sinh bằng Oracle sequence tại SB_DWH (SEQ_DIM_RLOS_PRODUCT); PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
+| 2 | PRODUCTLINE_SK | NUMBER | Y | 18 |  | ⚠️ review 2026-10-13: layer cha (Product Line), KHÔNG tự quản lý SCD2 riêng (không có EFF/EXP riêng, theo pattern T24) — sinh cùng sequence SEQ_DIM_RLOS_PRODUCT với DIMENSION_KEY/SUB_PRODUCT_SK, không phải sequence riêng | — | — |
+| 3 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 | NK | Mã dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_CODE (= PRODUCTLINE_CODE của MAS_PRODUCT_LINE, cùng khái niệm).| Báo cáo RLOS APPLICATION (BC1) | PRODUCT_LINE (Dòng sản phẩm) |
+| 4 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_NAME.| Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay PRODUCTLINE_CODE | PRODUCT_LINE (Dòng sản phẩm) |
+| 5 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | ⚠️ review 2026-10-13: đổi tên từ PRODUCT_SK — layer nhỏ nhất/đại diện của cả dòng (grain chính của DIM), FK duy nhất mà FCT_RLOS_APPLICATION dùng. Bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
+| 6 | SUB_PRODUCT_CODE | VARCHAR2 | N | 200 | NK | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
+| 7 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 200 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME.| Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
 | 8 | SCORE_REQUIRED | VARCHAR2 | N | 200 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED | — | Thiết kế dư thừa |
 | 9 | SCORE_MODEL | VARCHAR2 | N | 200 |  | Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL | — | Thiết kế dư thừa |
-| 10 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_SUB_PRODUCT | — | — |
+| 10 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — CHỈ 1 cặp cho layer nhỏ nhất (Sub Product), do ETL tính qua CDC so toàn bộ cột non-key của MAS_SUB_PRODUCT (⚠️ review 2026-10-13: layer cha PRODUCTLINE đổi cũng kéo theo version mới của cả dòng, dù không có EFF/EXP riêng) | — | — |
 | 11 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 13A. DIM_RLOS_SECONDPRODUCT

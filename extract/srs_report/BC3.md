@@ -14,7 +14,9 @@
 ## Business Rules
 
 - **Hoạt động**: Mã BR | Mô tả
-- ****: BR 1.1 | Đầu vào: Ngày báo cáo: Cho phép chọn Ngày báo cáo (EXITDATE). Mặc định hiển thị là ngày dữ liệu hiện tại (T-1) Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
+- ****: BR 1.1 | Đầu vào: 
+Ngày báo cáo: Cho phép chọn Ngày báo cáo (EXITDATE). Mặc định hiển thị là ngày dữ liệu hiện tại (T-1)
+Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
 - ****: BR 1.2 | Các bảng sử dụng:
 - ****: BR 1.3 | Đầu ra: Báo cáo hiển thị các trường thông tin sau:
 
@@ -26,7 +28,7 @@
 
 | Alias | Bảng nguồn | Điều kiện Join |
 |---|---|---|
-| a | SBLOS2.NG_SB_CLOS_ENTRY_EXIT | WHERE a.WORKSTEP in ('CreditApproval',CreditCommittee') AND a.DECISION in ('Submit','Reject','Send to HOSupport,'Send to PostSanction') |
+| a | SBLOS2.NG_SB_CLOS_ENTRY_EXIT | WHERE a.WORKSTEP in ('CreditApproval',CreditCommittee') AND a.DECISION in ('Submit','Reject','Send to HOSupport','Send to PostSanction') |
 | b | SBLOS2.NG_SB_CLOS_APPROVAL | LEFT JOIN với điều kiện: a.WINAME = b.WI_NAME |
 | c | SBLOS2.NG_SB_CLOS_CUST_INFO | LEFT JOIN với điều kiện: a.WINAME = c.WI_NAME |
 | d | SBLOS2.NG_SB_CLOS_EXTTABLE | LEFT JOIN với điều kiện: a.WINAME = d.WI_NAME |
@@ -37,7 +39,7 @@
 
 | Alias | Bảng nguồn | Điều kiện Join |
 |---|---|---|
-| a | SBLOS2.NG_SB_RLOS_ENTRY_EXIT | WHERE a.WORKSTEP in ('CreditApproval',CreditCommittee') AND a.DECISION in ('Submit','Reject','Send to HOSupport,'Send to PostSanction') |
+| a | SBLOS2.NG_SB_RLOS_ENTRY_EXIT | WHERE a.WORKSTEP in ('CreditApproval', 'CreditCommittee') AND a.DECISION in ('Submit','Reject','Send to HOSupport','Send to PostSanction') |
 | b | SBLOS2.NG_SB_RLOS_APPROVAL | LEFT JOIN với điều kiện: a.WINAME = b.WI_NAME |
 | c | SBLOS2.NG_SB_RLOS_APPLICANT_GENERAL | LEFT JOIN với điều kiện: a.WINAME = c.WI_NAME |
 | d | SBLOS2.NG_SB_RLOS_EXTTABLE | LEFT JOIN với điều kiện: a.WINAME = d.WI_NAME |
@@ -49,9 +51,10 @@
 
 ## Danh sách trường báo cáo & logic lấy dữ liệu
 
+### Nguồn CLOS
+
 | STT | Trường | Ý nghĩa | Cách lấy dữ liệu |
 |---|---|---|---|
-| Nguồn CLOS | Nguồn CLOS | Nguồn CLOS | Nguồn CLOS |
 |  | SYSTEMNAME | Hệ thống (CLOS/RLOS) | 'CLOS' |
 |  | STREAM | Luồng hồ sơ | NG_SB_CLOS_APPROVAL> STREAM |
 |  | WINAME | Mã hồ sơ | NG_SB_CLOS_ENTRY_EXIT> WINAME |
@@ -72,9 +75,13 @@
 |  | OWNER | Chủ TSBĐ | NG_SB_CLOS_COLL_CD> COLL_OWNER |
 |  | LTV | Tỷ lệ cho vay của TSBĐ | NG_SB_CLOS_COLL_CD> LTV |
 |  | COLLATERA_MANAGEMENT | Phương thức quản lý TSBĐ | NG_SB_CLOS_COLL_CD> COLL_MGMT_APP |
-| Nguồn RLOS | Nguồn RLOS | Nguồn RLOS | Nguồn RLOS |
+
+### Nguồn RLOS
+
+| STT | Trường | Ý nghĩa | Cách lấy dữ liệu |
+|---|---|---|---|
 |  | SYSTEMNAME | Hệ thống (CLOS/RLOS) | 'RLOS' |
-|  | STREAM | Luồng hồ sơ | NG_SB_RLOS_APPROVAL> STEAM |
+|  | STREAM | Luồng hồ sơ | NG_SB_RLOS_APPROVAL> STREAM |
 |  | WINAME | Mã hồ sơ | NG_SB_RLOS_ENTRY_EXIT> WINAME |
 |  | CUSTOMER_NAME | Tên khách hàng | NG_SB_RLOS_APPLICANT_GENERAL> FULL_NAME |
 |  | WORKSTEP | Bước hồ sơ | NG_SB_RLOS_ENTRY_EXIT> WORKSTEP |
@@ -87,8 +94,8 @@
 |  | CREDIT_LIMIT | Số tiền phê duyệt | NG_SB_RLOS_CREDIT_PROPOSAL> LOAN_AMOUNT |
 |  | CURRENCY | Đơn vị tiền tệ | NG_SB_RLOS_CREDIT_PROPOSAL> LOAN_CURRENCY |
 |  | CREDIT_TERM | Thời hạn phê duyệt | NG_SB_RLOS_CREDIT_PROPOSAL> LOAN_TERM |
-|  | TYPES_OF_COLLATERALS | Loại TSBĐ | NG_SB_RLOS_COL_REALESTATE f> NG_SB_RLOS_COL_TRANSPORT g > NG_SB_RLOS_COL_VALPAPER h > NG_SB_RLOS_COL_OTHER i > Lấy UNION các giá trị của 4 bảng f.NO_CERTI; g.TYPE_VEHICLE;; h.TYPE1; i.DESCRIBE; |
+|  | TYPES_OF_COLLATERALS | Loại TSBĐ | NG_SB_RLOS_COL_REALESTATE f> NG_SB_RLOS_COL_TRANSPORT g > NG_SB_RLOS_COL_VALPAPER h > NG_SB_RLOS_COL_OTHER i > Lấy UNION các giá trị của 4 bảng f.NO_CERTI; g.TYPE_VEHICLE; h.TYPE1; i.DESCRIBE; |
 |  | APPRAISED_VALUE | Giá trị định giá | NG_SB_RLOS_COL_REALESTATE f > NG_SB_RLOS_COL_TRANSPORT g > NG_SB_RLOS_COL_VALPAPER h > NG_SB_RLOS_COL_OTHER i > Lấy UNION giá trị trường PRICINGVALUE của 4 bảng |
-|  | DESCRIPTION | Mô tả TSBĐ | NG_SB_RLOS_COL_REALESTATE f > NG_SB_RLOS_COL_TRANSPORT g > NG_SB_RLOS_COL_VALPAPER h > NG_SB_RLOS_COL_OTHER i > Lấy UNION các giá trị của 4 bảng: f.NO_CERTI // ', ' // f.USING_PURPOSE; g.BRAND // ', ' // g.CONTROL_POSTER; h.NUMBERSIGN; i.DESCRIBE; |
+|  | DESCRIPTION | Mô tả TSBĐ | NG_SB_RLOS_COL_REALESTATE f > NG_SB_RLOS_COL_TRANSPORT g > NG_SB_RLOS_COL_VALPAPER h > NG_SB_RLOS_COL_OTHER i > Lấy UNION các giá trị của 4 bảng: f.NO_CERTI \|\| ', ' \|\| f.USING_PURPOSE; g.BRAND \|\| ', ' \|\| g.CONTROL_POSTER; h.NUMBERSIGN; i.DESCRIBE; |
 |  | OWNER | Chủ TSBĐ | NG_SB_RLOS_COL_REALESTATE f > NG_SB_RLOS_COL_TRANSPORT g > NG_SB_RLOS_COL_VALPAPER h > NG_SB_RLOS_COL_OTHER i > Lấy UNION giá trị trường OWNER của 4 bảng |
 |  | LTV | Tỷ lệ cho vay của TSBĐ | NG_SB_RLOS_COL_REALESTATE f > NG_SB_RLOS_COL_TRANSPORT g > NG_SB_RLOS_COL_VALPAPER h > NG_SB_RLOS_COL_OTHER i > Lấy UNION giá trị trường LOANRATE của 4 bảng |

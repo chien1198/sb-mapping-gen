@@ -308,16 +308,18 @@ BEGIN
    -- ============================================================
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_PRODUCT
       (
-        dimension_key     NUMBER not null,
-        product_sk        NUMBER not null,
-        product_bk        VARCHAR2(64),
-        product_line_code VARCHAR2(100),
-        product_line_name VARCHAR2(200),
-        sub_product_code  VARCHAR2(100),
-        sub_product_name  VARCHAR2(150),
-        sub_prod_active   VARCHAR2(100),
-        eff_date          DATE,
-        exp_date          DATE
+        dimension_key          NUMBER not null,
+        productline_sk          NUMBER not null,
+        productline_code        VARCHAR2(100),
+        productline_name        VARCHAR2(200),
+        productline_eff_date    DATE,
+        productline_exp_date    DATE,
+        sub_product_sk           NUMBER not null,
+        sub_product_code         VARCHAR2(100),
+        sub_product_name         VARCHAR2(150),
+        sub_product_active       VARCHAR2(100),
+        sub_product_eff_date     DATE,
+        sub_product_exp_date     DATE
       )
       tablespace STG_DTM_TBS
         pctfree 10
@@ -345,7 +347,7 @@ BEGIN
           maxextents unlimited
         )';
    EXECUTE IMMEDIATE 'alter index STG_DTM.STG_DIM_CLOS_PRODUCT_PK nologging';
-   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_PRODUCT_BK_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (PRODUCT_BK)
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_PRODUCTLINE_CODE_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (PRODUCTLINE_CODE)
         tablespace STG_DTM_TBS
         pctfree 10
         initrans 2
@@ -358,7 +360,7 @@ BEGIN
           maxextents unlimited
         )
         nologging';
-   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_EFF_DATE_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (EFF_DATE)
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_PRODUCTLINE_EFF_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (PRODUCTLINE_EFF_DATE)
         tablespace STG_DTM_TBS
         pctfree 10
         initrans 2
@@ -371,7 +373,7 @@ BEGIN
           maxextents unlimited
         )
         nologging';
-   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_EXP_DATE_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (EXP_DATE)
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_PRODUCTLINE_EXP_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (PRODUCTLINE_EXP_DATE)
         tablespace STG_DTM_TBS
         pctfree 10
         initrans 2
@@ -384,7 +386,33 @@ BEGIN
           maxextents unlimited
         )
         nologging';
-   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_PRODUCT_SK_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (PRODUCT_SK)
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_SUB_PRODUCT_CODE_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (SUB_PRODUCT_CODE)
+        tablespace STG_DTM_TBS
+        pctfree 10
+        initrans 2
+        maxtrans 255
+        storage
+        (
+          initial 64K
+          next 1M
+          minextents 1
+          maxextents unlimited
+        )
+        nologging';
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_SUB_PRODUCT_EFF_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (SUB_PRODUCT_EFF_DATE)
+        tablespace STG_DTM_TBS
+        pctfree 10
+        initrans 2
+        maxtrans 255
+        storage
+        (
+          initial 64K
+          next 1M
+          minextents 1
+          maxextents unlimited
+        )
+        nologging';
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_PRODUCT_SUB_PRODUCT_EXP_IDX on STG_DTM.STG_DIM_CLOS_PRODUCT (SUB_PRODUCT_EXP_DATE)
         tablespace STG_DTM_TBS
         pctfree 10
         initrans 2
@@ -496,21 +524,25 @@ BEGIN
    -- ============================================================
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_LOS_COMPANY
       (
-        dimension_key   NUMBER not null,
-        company_sk      NUMBER not null,
-        company_code    VARCHAR2(50),
-        company_name    VARCHAR2(200),
-        company_address VARCHAR2(500),
-        company_email   VARCHAR2(200),
-        zone            NUMBER,
-        branch_code     VARCHAR2(50),
-        branch_name     VARCHAR2(200),
-        city            VARCHAR2(100),
-        district        VARCHAR2(100),
-        region_code     NUMBER,
-        region_name     VARCHAR2(200),
-        eff_date        DATE,
-        exp_date        DATE
+        dimension_key     NUMBER not null,
+        company_sk        NUMBER not null,
+        company_code      VARCHAR2(50),
+        company_name      VARCHAR2(200),
+        company_address   VARCHAR2(500),
+        company_email     VARCHAR2(200),
+        zone              NUMBER,
+        company_eff_date  DATE,
+        company_exp_date  DATE,
+        branch_sk         NUMBER,
+        branch_code       VARCHAR2(50),
+        branch_name       VARCHAR2(200),
+        branch_eff_date   DATE,
+        branch_exp_date   DATE,
+        region_sk         NUMBER,
+        region_code       NUMBER,
+        region_name       VARCHAR2(200),
+        region_eff_date   DATE,
+        region_exp_date   DATE
       )
       tablespace STG_DTM_TBS
         pctfree 10
@@ -551,7 +583,7 @@ BEGIN
           maxextents unlimited
         )
         nologging';
-   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_LOS_COMPANY_EFF_DATE_IDX on STG_DTM.STG_DIM_LOS_COMPANY (EFF_DATE)
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_LOS_COMPANY_COMPANY_EFF_IDX on STG_DTM.STG_DIM_LOS_COMPANY (COMPANY_EFF_DATE)
         tablespace STG_DTM_TBS
         pctfree 10
         initrans 2
@@ -564,7 +596,33 @@ BEGIN
           maxextents unlimited
         )
         nologging';
-   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_LOS_COMPANY_EXP_DATE_IDX on STG_DTM.STG_DIM_LOS_COMPANY (EXP_DATE)
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_LOS_COMPANY_COMPANY_EXP_IDX on STG_DTM.STG_DIM_LOS_COMPANY (COMPANY_EXP_DATE)
+        tablespace STG_DTM_TBS
+        pctfree 10
+        initrans 2
+        maxtrans 255
+        storage
+        (
+          initial 64K
+          next 1M
+          minextents 1
+          maxextents unlimited
+        )
+        nologging';
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_LOS_COMPANY_BRANCH_EXP_IDX on STG_DTM.STG_DIM_LOS_COMPANY (BRANCH_EXP_DATE)
+        tablespace STG_DTM_TBS
+        pctfree 10
+        initrans 2
+        maxtrans 255
+        storage
+        (
+          initial 64K
+          next 1M
+          minextents 1
+          maxextents unlimited
+        )
+        nologging';
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_LOS_COMPANY_REGION_EXP_IDX on STG_DTM.STG_DIM_LOS_COMPANY (REGION_EXP_DATE)
         tablespace STG_DTM_TBS
         pctfree 10
         initrans 2
@@ -1145,10 +1203,10 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_PRODUCT
       (
         dimension_key    NUMBER not null,
-        product_sk       NUMBER not null,
-        product_bk       VARCHAR2(64),
+        productline_sk    NUMBER not null,
         productline_code VARCHAR2(100),
         productline_name VARCHAR2(200),
+        sub_product_sk    NUMBER not null,
         sub_product_code VARCHAR2(100),
         sub_product_name VARCHAR2(150),
         score_required   VARCHAR2(10),
@@ -1182,19 +1240,6 @@ BEGIN
           maxextents unlimited
         )';
    EXECUTE IMMEDIATE 'alter index STG_DTM.STG_DIM_RLOS_PRODUCT_PK nologging';
-   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_RLOS_PRODUCT_PRODUCT_BK_IDX on STG_DTM.STG_DIM_RLOS_PRODUCT (PRODUCT_BK)
-        tablespace STG_DTM_TBS
-        pctfree 10
-        initrans 2
-        maxtrans 255
-        storage
-        (
-          initial 64K
-          next 1M
-          minextents 1
-          maxextents unlimited
-        )
-        nologging';
    EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_RLOS_PRODUCT_EFF_DATE_IDX on STG_DTM.STG_DIM_RLOS_PRODUCT (EFF_DATE)
         tablespace STG_DTM_TBS
         pctfree 10
@@ -1221,7 +1266,20 @@ BEGIN
           maxextents unlimited
         )
         nologging';
-   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_RLOS_PRODUCT_PRODUCT_SK_IDX on STG_DTM.STG_DIM_RLOS_PRODUCT (PRODUCT_SK)
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_RLOS_PRODUCT_PRODUCTLINE_SK_IDX on STG_DTM.STG_DIM_RLOS_PRODUCT (PRODUCTLINE_SK)
+        tablespace STG_DTM_TBS
+        pctfree 10
+        initrans 2
+        maxtrans 255
+        storage
+        (
+          initial 64K
+          next 1M
+          minextents 1
+          maxextents unlimited
+        )
+        nologging';
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_RLOS_PRODUCT_SUB_PRODUCT_SK_IDX on STG_DTM.STG_DIM_RLOS_PRODUCT (SUB_PRODUCT_SK)
         tablespace STG_DTM_TBS
         pctfree 10
         initrans 2

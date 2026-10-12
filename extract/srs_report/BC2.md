@@ -14,7 +14,9 @@
 ## Business Rules
 
 - **Hoạt động**: Mã BR | Mô tả
-- ****: BR 1.1 | Đầu vào: Ngày báo cáo: Cho phép chọn Ngày báo cáo (PROCESSED_DATE). Mặc định hiển thị là ngày dữ liệu hiện tại (T-1) Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
+- ****: BR 1.1 | Đầu vào: 
+Ngày báo cáo: Cho phép chọn Ngày báo cáo (PROCESSED_DATE). Mặc định hiển thị là ngày dữ liệu hiện tại (T-1)
+Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
 - ****: BR 1.2 | Các bảng sử dụng:
 - ****: BR 1.3 | Đầu ra: Báo cáo hiển thị các trường thông tin sau:
 
@@ -51,7 +53,7 @@
 |  | WINAME | Mã hồ sơ | NG_SB_CLOS_ENTRY_EXIT> WINAME |
 |  | PROCESSED_DATE | Ngày dữ liệu báo cáo | NG_SB_CLOS_ENTRY_EXIT> Lấy ngày dữ liệu của mã hồ sơ theo thứ tự ưu tiên sau: Ngày phê duyệt cuối cùng đối với các hồ sơ đã được phê duyệt: Lấy Max(EXITDATE) với điều kiện WORKSTEP in ('CreditCommittee', 'CreditApproval') và DECISION in ('Send To HOSupport', 'Reject', 'Submit', 'Send To PostSanction', 'Submit To DisbursementMaker') Ngày hồ sơ bị Cancel: Lấy NVL( EXITDATE, ENTRYDATE) với điều kiện WORKSTEP = 'CancelRevoke' Ngày thoát bước cuối cùng của các hồ sơ chưa đến bước Phê duyệt và không ở CancelRevoke: Lấy giá trị Max(EXITDATE) |
 |  | CREATION_DATE | Ngày hồ sơ khởi tạo | NG_SB_CLOS_ENTRY_EXIT> ENTRYDATE Lấy giá trị Min(ENTRYDATE) của mã hồ sơ |
-|  | BI_APPSTATUS | Trạng thái cuối của hồ sơ | NG_SB_CLOS_ENTRY_EXIT> + Nếu DECISION IN ('Submit', 'Send To PostSanction','Submit To DisbursementMaker', 'Send To HOSupport') gán giá trị 'Approved' + Nếu DECISION = 'Reject' gán giá trị 'Rejected' + Nếu WORKSTEP IN ('CancelRevoke','CancelPermanent') gán giá trị 'Cancelled' + Trường hợp còn lại gán giá trị 'Processing' |
+|  | BI_APPSTATUS | Trạng thái cuối của hồ sơ | NG_SB_CLOS_ENTRY_EXIT> + Nếu WORKSTEP in ('CreditCommittee', 'CreditApproval') and DECISION IN ('Submit', 'Send To PostSanction','Submit To DisbursementMaker', 'Send To HOSupport') gán giá trị 'Approved' + Nếu WORKSTEP in ('CreditCommittee', 'CreditApproval') and DECISION = 'Reject' gán giá trị 'Rejected' + Nếu WORKSTEP IN ('CancelRevoke','CancelPermanent') gán giá trị 'Cancelled' + Trường hợp còn lại gán giá trị 'Processing' |
 |  | INDUSTRY_GROUP | Ngành kinh doanh cấp 1 | NG_SB_CLOS_CUST_INFO> INDUSTRY_CODE_LEVEL_1 |
 |  | INDUSTRY_CLASS | Ngành kinh doanh cấp 2 | NG_SB_CLOS_CUST_INFO> INDUSTRY_CODE_LEVEL_2 |
 |  | INDUSTRY | Ngành kinh doanh cấp 3 | NG_SB_CLOS_CUST_INFO> INDUSTRY_CODE_LEVEL_3 |
@@ -80,7 +82,7 @@
 |  | LAST_DECISION | Quyết định bước cuối | NG_SB_CLOS_ENTRY_EXIT> DECISION Lấy DECISION tại dòng có giá trị ENTRYDATE lớn nhất của mã hồ sơ |
 |  | UNDERWRITERMAKER_TAKERESPON | CV Thẩm định chịu trách nhiệm | NG_SB_CLOS_EXTTABLE i> NG_SB_CLOS_USER_MAKE_WORK_STEP m> COALESCE(CASE WHEN m.WORK_STEP = 'UnderwriterMaker' THEN m.USER_MAKE END, i.UWMAKERUSER) |
 |  | UNDERWRITERCHECKER_TAKERESPON | Kiểm soát thẩm định chịu trách nhiệm | NG_SB_CLOS_EXTTABLE i> NG_SB_CLOS_USER_MAKE_WORK_STEP m> COALESCE(CASE WHEN m.WORK_STEP = 'UnderwriterChecker' THEN m.USER_MAKE END, i.UWCHKRUSER) |
-|  | APPROVAL_TAKERESPON | Chuyên gia phê duyệt chịu trách nhiệm | NG_SB_CLOS_APPROVAL e> NG_SB_CLOS_USER_MAKE_WORK_STEP m> COALESCE(m.USER_MAKE, CASE e.APP_GRP WHEN 'A1' THEN 'long.lq' WHEN 'CC' THEN 'UBTD' WHEN 'BOD' THEN 'HDQT' END) |
+|  | APPROVAL_TAKERESPON | Chuyên gia phê duyệt chịu trách nhiệm | NG_SB_CLOS_APPROVAL e> NG_SB_CLOS_USER_MAKE_WORK_STEP m> COALESCE(CASE WHEN m.WORK_STEP = 'CreditApproval' THEN m.USER_MAKE END, CASE e.APP_GRP WHEN 'A1' THEN 'long.lq' WHEN 'CC' THEN 'UBTD' WHEN 'BOD' THEN 'HDQT' END) |
 |  | ST_YEUCAU | Số tiền đề xuất vay | NG_SB_CLOS_CREDITINFO_COMM> PRECREDITLIMIT |
 |  | ST_PHEDUYET | Số tiền phê duyệt chính thức | NG_SB_CLOS_CREDITINFO_CD> CREDIT_LIMIT |
 |  | CURRENCY | Loại tiền tệ áp dụng | NG_SB_CLOS_CREDITINFO_COMM> CURRENCY |
@@ -97,8 +99,8 @@
 |  | TSDB_CP_TP | TSBĐ là Cổ phiếu/Trái phiếu (YES/NO) | NG_SB_CLOS_COLL_CD> + Nếu COLLTYPE = 'TR.PHIEU TIN PH' gán giá trị 'YES' + Trường hợp còn lại gán giá trị 'NO' |
 |  | DEV_PROPOSAL | Hồ sơ có ngoại lệ (YES/NO) | NG_SB_CLOS_CONDITON_CDGRID> DEV_PROPOSAL |
 |  | MIN_UWM | Thời gian hồ sơ lên CV thẩm định | NG_SB_CLOS_ENTRY_EXIT> Lấy giá trị MIN(ENTRYDATE), với điều kiện WORKSTEP = 'UnderwriterMaker' |
-|  | MIN_APP | Thời gian hồ sơ lên cấp phê duyệt | NG_SB_CLOS_ENTRY_EXIT> EXITDATE Lấy giá trị Min(ENTRYDATE), với điều kiện WORKSTEP in ('CreditApproval', 'CreditCommittee') |
-|  | FLAG_AUTO_CAN | Hồ sơ bị tự động hủy (YES/NO) | + Nếu BI_CAN_DATE (STT 59) IS NOT NULL and LAST_DECISION (STT 36) = 'Auto-Cancel' gán giá trị 'YES' + Trường hợp còn lại gán giá trị 'NO' |
+|  | MIN_APP | Thời gian hồ sơ lên cấp phê duyệt | NG_SB_CLOS_ENTRY_EXIT> Lấy giá trị Min(ENTRYDATE), với điều kiện WORKSTEP in ('CreditApproval', 'CreditCommittee') |
+|  | FLAG_AUTO_CAN | Hồ sơ bị tự động hủy (YES/NO) | + Nếu BI_CAN_DATE IS NOT NULL and LAST_DECISION = 'Auto-Cancel' gán giá trị 'YES' + Trường hợp còn lại gán giá trị 'NO' |
 |  | LAST_APPROVAL_DATE | Thời gian phê duyệt cuối cùng | NG_SB_CLOS_ENTRY_EXIT> EXITDATE Lấy giá trị Max(EXITDATE), với điều kiện WORKSTEP in ('CreditApproval', 'CreditCommittee') |
 |  | BI_CAN_DATE | Thời gian hồ sơ vào vùng CancelRevoke | NG_SB_CLOS_ENTRY_EXIT> ENTRYDATE Với điều kiện WORKSTEP = 'CancelRevoke' |
 |  | RI_USER | User khởi tạo hồ sơ | NG_SB_CLOS_ENTRY_EXIT> USERNAME Với điều kiện WORKSTEP = 'RequestInitiate' |

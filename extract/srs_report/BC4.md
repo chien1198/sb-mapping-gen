@@ -14,7 +14,9 @@
 ## Business Rules
 
 - **Hoạt động**: Mã BR | Mô tả
-- ****: BR 1.1 | Đầu vào: Ngày báo cáo: Cho phép chọn Ngày báo cáo (REPORT_DATE). Mặc định hiển thị là ngày dữ liệu hiện tại (T-1) Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
+- ****: BR 1.1 | Đầu vào: 
+Ngày báo cáo: Cho phép chọn Ngày báo cáo (REPORT_DATE). Mặc định hiển thị là ngày dữ liệu hiện tại (T-1)
+Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
 - ****: BR 1.2 | Các bảng sử dụng:
 - ****: BR 1.3 | Đầu ra: Báo cáo hiển thị các trường thông tin sau:
 
@@ -28,7 +30,7 @@
 |---|---|---|
 | a | SBLOS2.NG_SB_CLOS_ENTRY_EXIT |  |
 | b | SBLOS2.NG_SB_CLOS_CUST_INFO | LEFT JOIN với điều kiện: a.WINAME = b.WI_NAME |
-| c | SBLOS2.WFINSTRUMENTTABLE | LEFT JOIN với điều kiện: a.WINAME = c.PROCESSINSTANCEIDand c.CREATEDBY not in ('10000380','10000020','10000420','10000140', '10000100') |
+| c | SBLOS2.WFINSTRUMENTTABLE | LEFT JOIN với điều kiện: a.WINAME = c.PROCESSINSTANCEID and c.CREATEDBY not in ('10000380','10000020','10000420','10000140', '10000100') |
 
 ### Nguồn RLOS
 
@@ -36,13 +38,14 @@
 |---|---|---|
 | a | SBLOS2.NG_SB_RLOS_ENTRY_EXIT |  |
 | b | SBLOS2.NG_SB_RLOS_APPLICANT_GENERAL | LEFT JOIN với điều kiện: a.WINAME = b.WI_NAME |
-| c | SBLOS2.WFINSTRUMENTTABLE | LEFT JOIN với điều kiện: a.WINAME = c.PROCESSINSTANCEIDand c.CREATEDBY not in ('10000380','10000020','10000420','10000140', '10000100') |
+| c | SBLOS2.WFINSTRUMENTTABLE | LEFT JOIN với điều kiện: a.WINAME = c.PROCESSINSTANCEID and c.CREATEDBY not in ('10000380','10000020','10000420','10000140', '10000100') |
 
 ## Danh sách trường báo cáo & logic lấy dữ liệu
 
+### Nguồn CLOS
+
 | STT | Trường | Ý nghĩa | Cách lấy dữ liệu |
 |---|---|---|---|
-| Nguồn CLOS | Nguồn CLOS | Nguồn CLOS | Nguồn CLOS |
 |  | REPORT_WEEK | Tuần báo cáo | Tuần tương ứng với ngày báo cáo: Từ Thứ 2 đến Chủ nhật, định dạng YYYMMDD-YYMMDD |
 |  | REPORT_DATE | Ngày báo cáo | NG_SB_CLOS_ENTRY_EXIT> Lấy ngày dữ liệu của mã hồ sơ theo thứ tự ưu tiên sau: Ngày phê duyệt cuối cùng đối với các hồ sơ đã được phê duyệt: Lấy Max(EXITDATE) với điều kiện WORKSTEP in ('CreditCommittee', 'CreditApproval') và DECISION in ('Send To HOSupport', 'Reject', 'Submit', 'Send To PostSanction', 'Submit To DisbursementMaker') Ngày hồ sơ bị Cancel tại bước UnderwriterMaker: Lấy EXITDATE với điều kiện WORKSTEP = 'UnderwriterMaker' và Decision = 'Cancel' Các hồ sơ đã hoặc đang ở bước UnderwriterMaker và chưa được Phê duyệt/Cancel Lấy ngày dữ liệu của hệ thống |
 |  | SYSTEMNAME | Hệ thống (CLOS/RLOS) | 'CLOS' |
@@ -54,7 +57,11 @@
 |  | EXITDATE | Ngày báo cáo/Thời gian kết thúc bước thẩm định | NG_SB_CLOS_ENTRY_EXIT> EXITDATE Lấy MAX(EXITDATE) với điều kiện WORKSTEP IN ('UnderwriterMaker', 'UnderwriterChecker') |
 |  | FLAG | Trạng thái | NG_SB_CLOS_ENTRY_EXIT a> WFINSTRUMENTTABLE c > Nếu a.WORKSTEP IN ('CreditApproval','CreditCommittee') và a.DECISION IN ('Send To HOSupport','Reject','Submit','Send To PostSanction') thì gán giá trị 'Hồ sơ đã chuyển sang bước cấp PD và đã được phê duyệt' Nếu c.PROCESSNAME = 'CLOS' và c.ACTIVITYNAME IN ('CreditApproval','CreditCommittee') gán giá trị 'Hồ sơ đã chuyển sang bước của cấp phê duyệt nhưng chưa PD' Nếu a.WORKSTEP = 'UnderwriterMaker' và a.DECISION = 'Cancel' gán giá trị 'Hồ sơ CVTĐ đã xử lý và chốt trạng thái tại bước của CVTĐ' Nếu c.PROCESSNAME = 'CLOS' và c.ACTIVITYNAME = 'UnderwriterMaker' gán giá trị 'Hồ sơ CVTĐ đang/phải xử lý' Nếu a.WORKSTEP = 'UnderwriterMaker' và a.DECISION IN ('Send_Back to DDE','Additional_Doc_Required','Send_Back to BranchSupport','Send Back DataInputerChecker','Send To Legal or FI or Phone Verification') gán giá trị 'Hồ sơ CVTĐ đã xử lý nhưng chuyển/trả lại các bộ phận để bổ sung/làm rõ' |
 |  | REMARKS | Ghi chú | NG_SB_CLOS_ENTRY_EXIT> REMARKS |
-| Nguồn RLOS | Nguồn RLOS | Nguồn RLOS | Nguồn RLOS |
+
+### Nguồn RLOS
+
+| STT | Trường | Ý nghĩa | Cách lấy dữ liệu |
+|---|---|---|---|
 |  | REPORT_WEEK | Tuần báo cáo | Tuần tương ứng với ngày báo cáo: Từ Thứ 2 đến Chủ nhật, định dạng YYYMMDD-YYMMDD |
 |  | REPORT_DATE | Ngày báo cáo | NG_SB_RLOS_ENTRY_EXIT> Lấy ngày dữ liệu của mã hồ sơ theo thứ tự ưu tiên sau: Ngày phê duyệt cuối cùng đối với các hồ sơ đã được phê duyệt: Lấy Max(EXITDATE) với điều kiện WORKSTEP in ('CreditCommittee', 'CreditApproval') và DECISION in ('Send To HOSupport', 'Reject', 'Submit', 'Send To PostSanction', 'Submit To DisbursementMaker') Ngày hồ sơ bị Cancel tại bước UnderwriterMaker: Lấy EXITDATE với điều kiện WORKSTEP = 'UnderwriterMaker' và Decision = 'Cancel' Các hồ sơ đã hoặc đang ở bước UnderwriterMaker và chưa được Phê duyệt/Cancel Lấy ngày dữ liệu của hệ thống |
 |  | SYSTEMNAME | Hệ thống (CLOS/RLOS) | 'RLOS' |

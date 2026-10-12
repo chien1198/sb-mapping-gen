@@ -14,7 +14,9 @@
 ## Business Rules
 
 - **Hoạt động**: Mã BR | Mô tả
-- ****: BR 1.1 | Đầu vào: Ngày báo cáo: PROCESSED_DATE, cho phép chọn Ngày báo cáo. Mặc định hiển thị là ngày dữ liệu hiện tại (T-1) Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
+- ****: BR 1.1 | Đầu vào: 
+Ngày báo cáo: PROCESSED_DATE, cho phép chọn Ngày báo cáo. Mặc định hiển thị là ngày dữ liệu hiện tại (T-1)
+Chi nhánh: Cho phép chọn mã chi nhánh (Không bắt buộc). Mặc định hiển thị là Tất cả chi nhánh
 - ****: BR 1.2 | Các bảng sử dụng:
 - ****: BR 1.3 | Đầu ra: Báo cáo hiển thị các trường thông tin sau:
 
@@ -27,7 +29,7 @@
 | Alias | Bảng nguồn | Điều kiện Join |
 |---|---|---|
 | a | SBLOS2.NG_SB_CLOS_CONDITON_CDGRID |  |
-| b | SBLOS2.NG_SB_RLOS_ENTRY_EXIT | JOIN với điều kiện a.WI_NAME = b.WINAME |
+| b | SBLOS2.NG_SB_CLOS_ENTRY_EXIT | JOIN với điều kiện a.WI_NAME = b.WINAME |
 
 ### Nguồn RLOS
 
@@ -38,14 +40,19 @@
 
 ## Danh sách trường báo cáo & logic lấy dữ liệu
 
+### Nguồn CLOS
+
 | STT | Trường | Ý nghĩa | Cách lấy dữ liệu |
 |---|---|---|---|
-| Nguồn CLOS | Nguồn CLOS | Nguồn CLOS | Nguồn CLOS |
 |  | WI_NAME | Mã hồ sơ | NG_SB_CLOS_CONDITON_CDGRID> WI_NAME |
 |  | DEVIATION_TYPE | Loại ngoại lệ | NG_SB_CLOS_CONDITON_CDGRID> DEVIATION_TYPE |
 |  | DEV_PROPOSAL | Nội dung ngoại lệ | NG_SB_CLOS_CONDITON_CDGRID> DEV_PROPOSAL |
 |  | PROCESSED_DATE | Ngày dữ liệu báo cáo | NG_SB_CLOS_ENTRY_EXIT> Lấy ngày dữ liệu của mã hồ sơ theo thứ tự ưu tiên sau: Ngày phê duyệt cuối cùng đối với các hồ sơ đã được phê duyệt: Lấy Max(EXITDATE) với điều kiện WORKSTEP in ('CreditCommittee', 'CreditApproval') và DECISION in ('Send To HOSupport', 'Reject', 'Submit', 'Send To PostSanction', 'Submit To DisbursementMaker') Ngày hồ sơ bị Cancel: Lấy NVL( EXITDATE, ENTRYDATE) với điều kiện WORKSTEP = 'CancelRevoke' Ngày thoát bước cuối cùng của các hồ sơ chưa đến bước Phê duyệt và không ở CancelRevoke: Lấy giá trị Max(EXITDATE) |
-| Nguồn RLOS | Nguồn RLOS | Nguồn RLOS | Nguồn RLOS |
+
+### Nguồn RLOS
+
+| STT | Trường | Ý nghĩa | Cách lấy dữ liệu |
+|---|---|---|---|
 |  | WI_NAME | Mã hồ sơ | NG_SB_RLOS_MANUAL_DEVIATION> WI_NAME |
 |  | CHECKING_RESULT | Loại ngoại lệ | NG_SB_RLOS_MANUAL_DEVIATION> CHECKING_RESULT |
 |  | CHECKING_CONDITION | Tiêu chí ngoại lệ | NG_SB_RLOS_MANUAL_DEVIATION> CHECKING_CONDITION |

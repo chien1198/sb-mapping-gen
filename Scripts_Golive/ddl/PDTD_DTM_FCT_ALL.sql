@@ -402,7 +402,7 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT (
     WF_PROCESSNAME                VARCHAR2(50)        ,
     WF_ACTIVITYNAME               VARCHAR2(200)       ,
     WF_CREATEDBY                  VARCHAR2(50)        ,
-    FIRST_APPROVED_DATE           DATE                ,
+    APPROVED_DATE           DATE                ,
     APPROVAL_FLAG                 VARCHAR2(50)        ,
     WORKSTEP_FLAG                 VARCHAR2(200)       ,
 
