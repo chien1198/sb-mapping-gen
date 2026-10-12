@@ -316,6 +316,7 @@ BEGIN
         product_line_name VARCHAR2(200),
         sub_product_code  VARCHAR2(100),
         sub_product_name  VARCHAR2(150),
+        sub_prod_active   VARCHAR2(100),
         eff_date          DATE,
         exp_date          DATE
       )
@@ -859,6 +860,9 @@ BEGIN
         card_promotion_sk NUMBER not null,
         promotion_code    NVARCHAR2(255),
         promotion_desc    NVARCHAR2(255),
+        pro_trans         NVARCHAR2(255),
+        pro_valid         NVARCHAR2(255),
+        order_promotion   NVARCHAR2(255),
         eff_date          DATE,
         exp_date          DATE
       )
@@ -953,6 +957,7 @@ BEGIN
         change_type_name        VARCHAR2(200),
         detail_change_type_code VARCHAR2(100),
         detail_change_type_name VARCHAR2(500),
+        is_active               VARCHAR2(1),
         eff_date                DATE,
         exp_date                DATE
       )
@@ -1334,6 +1339,7 @@ BEGIN
         workstep_decision_bk VARCHAR2(64),
         workstep_code        VARCHAR2(200),
         decision_code        VARCHAR2(200),
+        req_type             VARCHAR2(255),
         eff_date             DATE,
         exp_date             DATE
       )
