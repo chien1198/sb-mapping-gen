@@ -505,7 +505,7 @@ flowchart LR
         E["DIM_CLOS_CUSTOMER"]
     end
     A -->|1:1 CUSTOMER_NAME → FULL_NAME, CUST_GROUP, CUST_CATEGORY, PRECUSTGROUP, INDUSTRY_CODE_LEVEL_1/2/3| E
-    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER làm NK; ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME)=1 khi 1 khách hàng có nhiều hồ sơ"| E
+    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER làm NK; ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME DESC)=1 khi 1 khách hàng có nhiều hồ sơ — lấy hồ sơ mới nhất"| E
 ```
 
 **Ghi chú lineage — đổi khóa nghiệp vụ (review 2026-09-25, theo yêu cầu
@@ -521,11 +521,18 @@ trước đây, xem `FCT_CLOS_LEGAL_PARTY`, 1.2.1.7). `WI_NAME` **không còn l�
 cột lưu trữ trên bảng này** — chỉ là điều kiện join lúc ETL, không đại
 diện cho grain nữa.
 
-**Dedupe khi 1 `ID_NUMBER` xuất hiện ở nhiều `WI_NAME`:** dữ liệu thuộc
-tính giống nhau giữa các hồ sơ của cùng khách hàng trên thực tế (xác nhận
-người dùng) — chỉ cần lấy 1 dòng đại diện bằng `ROW_NUMBER() OVER
-(PARTITION BY ID_NUMBER ORDER BY WI_NAME) = 1`, không cần logic "mới
-nhất" phức tạp.
+**Dedupe khi 1 `ID_NUMBER` xuất hiện ở nhiều `WI_NAME` (⚠️ review
+2026-10-12, sửa lại logic chọn dòng đại diện):** `NG_SB_CLOS_CUST_INFO`
+và `NG_SB_CLOS_CUST_INFO_LEGAL` đều grain "n hồ sơ x 1 khách hàng" — một
+khách hàng nộp nhiều hồ sơ (nhiều `WI_NAME`) sẽ sinh nhiều dòng cho cùng
+`ID_NUMBER` sau khi lookup qua `WI_NAME`, cần dedupe còn lại đúng 1 dòng.
+Lấy 1 dòng đại diện bằng `ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER
+BY WI_NAME DESC) = 1` — tức lấy thông tin khách hàng tại **hồ sơ cuối
+cùng** (`WI_NAME` lớn nhất). `WI_NAME` có cấu trúc `SB-<số tự tăng 10
+chữ số>-CLOS` (xác nhận `CLOS - Metadata.xlsx`, sheet "3. Column Review",
+giá trị mẫu `SB-0000000001-CLOS`, đã "Đã xác nhận") nên tăng dần đúng
+theo thứ tự tạo hồ sơ — `ORDER BY WI_NAME DESC` tương đương lấy hồ sơ mới
+nhất, phản ánh thông tin khách hàng cập nhật gần nhất.
 
 **Lịch sử kiến trúc trước 2026-09-25 (để tham khảo):** bảng này vốn tách
 từ `FCT_LOS_APPLICATION_PARTY` (áp dụng column-optimization rule: bỏ
