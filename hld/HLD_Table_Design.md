@@ -4821,17 +4821,30 @@ COREPAYER_BK`). Không có cột phái sinh nào ở tầng này, không có b�
 | 5 | COMPANY_ADDRESS | VARCHAR2 | N | 500 |  | Địa chỉ đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_ADDRESS_VN (mới, review 2026-09-18) |
 | 6 | COMPANY_EMAIL | VARCHAR2 | N | 200 |  | Email đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_EMAIL (mới, review 2026-09-18) |
 | 7 | ZONE | NUMBER | N | 18 |  | Mã khu vực nội bộ theo LOS (khác REGION_CODE của MAS_REGION) — nguồn MAS_COMPANY.ZONE (mới, review 2026-09-18) |
-| 8 | BRANCH_CODE | VARCHAR2 | N | 50 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH.BRANCH_ID (review 2026-09-18) |
-| 9 | BRANCH_NAME | VARCHAR2 | N | 200 |  | Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN |
-| 10 | CITY | VARCHAR2 | N | 100 |  | Mã tỉnh/thành phố của chi nhánh — nguồn MAS_BRANCH.CITY (mới, review 2026-09-18) |
-| 11 | DISTRICT | VARCHAR2 | N | 100 |  | Mã quận/huyện của chi nhánh — nguồn MAS_BRANCH.DISTRICT (mới, review 2026-09-18) |
-| 12 | REGION_CODE | NUMBER | N | 18 |  | Mã khu vực địa lý — nguồn MAS_BRANCH.REGION, LEFT JOIN MAS_REGION.REGION_CODE (mới, review 2026-09-18) |
+| 8 | BRANCH_CODE | VARCHAR2 | N | 50 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH đã dedup về 1 dòng/BRANCH_ID (review 2026-10-12, xem ghi chú dedup bên dưới) |
+| 9 | BRANCH_NAME | VARCHAR2 | N | 200 |  | Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN (sau dedup) |
+| 10 | CITY | VARCHAR2 | N | 100 |  | Mã tỉnh/thành phố của chi nhánh — nguồn MAS_BRANCH.CITY (sau dedup, mới review 2026-09-18) |
+| 11 | DISTRICT | VARCHAR2 | N | 100 |  | Mã quận/huyện của chi nhánh — nguồn MAS_BRANCH.DISTRICT (sau dedup, mới review 2026-09-18) |
+| 12 | REGION_CODE | NUMBER | N | 18 |  | Mã khu vực địa lý — nguồn MAS_BRANCH.REGION (sau dedup), LEFT JOIN MAS_REGION.REGION_CODE (mới, review 2026-09-18) |
 | 13 | REGION_NAME | VARCHAR2 | N | 200 |  | Tên khu vực địa lý — nguồn MAS_REGION.REGION_NAME_VN (mới, review 2026-09-18) |
 | 14 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_COMPANY/MAS_BRANCH/MAS_REGION (không có cột khai báo tay như MAP_*, xem Section 3) |
 | 15 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
 - Bảng DIM lưu danh mục đơn vị kinh doanh (phòng giao dịch/chi nhánh/khu vực) khởi tạo hồ sơ, dùng chung cho cả hai hệ CLOS và RLOS — một đơn vị kinh doanh vật lý xử lý cả hồ sơ CLOS lẫn RLOS nên không tách theo hệ. Grain = 1 dòng/`COMPANY_CODE` (PGD/CN nhỏ nhất); thông tin Chi nhánh/Khu vực được denormalize vào cùng dòng (không tách DIM phân cấp riêng) vì đây là quan hệ vị trí địa lý cố định.
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
+
+**Dedup NG_SB_RLOS_MAS_BRANCH trước khi JOIN (review 2026-10-12):**
+grain thật của `NG_SB_RLOS_MAS_BRANCH` là `TRANSACTION_OFF_ID` (chi tiết
+hơn `BRANCH_ID` — 1 `BRANCH_ID` có nhiều `TRANSACTION_OFF_ID`, thông tin
+này chưa được khai thác/sử dụng ở model hiện tại). Join trực tiếp theo
+`BRANCH_ID` sẽ làm nhân bản dòng (fan-out) trên `DIM_LOS_COMPANY`. ETL
+phải dedup `MAS_BRANCH` về đúng 1 dòng/`BRANCH_ID` trước khi LEFT JOIN,
+dùng `ROW_NUMBER() OVER (PARTITION BY BRANCH_ID ORDER BY
+TRANSACTION_OFF_ID) = 1`. Áp dụng cho cả 2 bước join: MAS_COMPANY→
+MAS_BRANCH (lấy BRANCH_CODE/BRANCH_NAME/CITY/DISTRICT) và multi-hop
+MAS_BRANCH→MAS_REGION (REGION_CODE/REGION_NAME, join theo `REGION` của
+dòng MAS_BRANCH đã dedup). Xem etl_logic chi tiết tại
+`lld/sb_dwh/SB_DWH_DIM_LOS_COMPANY.csv`.
 
 **Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #5):**
 9 cột nghiệp vụ gốc bị thay thế hoàn toàn về nguồn: `COMPANY_CODE/NAME`,
