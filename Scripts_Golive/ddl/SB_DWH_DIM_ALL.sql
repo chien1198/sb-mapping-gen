@@ -303,7 +303,6 @@ BEGIN
      )
      nologging';
 
-/*
    -- ============================================================
    -- DIM_CLOS_PRODUCT
    -- ============================================================
@@ -316,6 +315,7 @@ BEGIN
      product_line_name      VARCHAR2(200),
      sub_product_code       VARCHAR2(100),
      sub_product_name           VARCHAR2(150),
+     sub_prod_active        VARCHAR2(100),
      eff_date               DATE,
      exp_date               DATE
    )
@@ -397,7 +397,6 @@ BEGIN
        maxextents unlimited
      )
      nologging';
-*/
    -- ============================================================
    -- DIM_CLOS_WORKSTEP_DECISION
    -- ============================================================

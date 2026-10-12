@@ -30,7 +30,6 @@ BEGIN
       eff_date                 DATE,
       exp_date                 DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
-/*
    -- ============================================================
    -- 2. WRK_DIM_CLOS_PRODUCT
    -- ============================================================
@@ -40,11 +39,11 @@ BEGIN
       product_line_code      VARCHAR2(100),
       product_line_name      VARCHAR2(200),
       sub_product_code       VARCHAR2(100),
-      product_name           VARCHAR2(150),
+      sub_product_name       VARCHAR2(150),
+      sub_prod_active        VARCHAR2(100),
       eff_date               DATE,
       exp_date               DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
-*/
    -- ============================================================
    -- 3. WRK_DIM_CLOS_EXCEPTION
    -- ============================================================
