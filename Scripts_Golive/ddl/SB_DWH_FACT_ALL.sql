@@ -38,7 +38,7 @@ INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
 );
 
 COMMIT;
-
+/*
 -- ============================================================
 -- SB_DWH_FCT_CLOS_COLLATERAL.sql
 -- ============================================================
@@ -91,7 +91,7 @@ INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
 );
 
 COMMIT;
-
+*/
 -- ============================================================
 -- SB_DWH_FCT_CLOS_EXCEPTION.sql
 -- ============================================================
@@ -270,7 +270,7 @@ CREATE TABLE SB_DWH.FCT_RLOS_COLLATERAL (
     NUMBERSIGN                    VARCHAR2(200)       ,
     APPRAISED_VALUE               NUMBER(20,2)        ,
     LOAN_RATE_LTV                 NUMBER(5,2)         ,
-    TYPES_OF_COLLATERALS          VARCHAR2(500)
+    TYPES_OF_COLLATERALS          VARCHAR2(500)      ,
 
 	CONSTRAINT FCT_RLOS_COLLATERAL_PK PRIMARY KEY (COLLATERAL_BK, DAYID) USING INDEX LOCAL
 )

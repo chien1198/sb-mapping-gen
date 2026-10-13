@@ -6,7 +6,7 @@
 - **Ý nghĩa bảng:** danh mục đơn vị kinh doanh (phòng giao dịch/chi nhánh/khu vực) khởi tạo hồ sơ, dùng chung cho cả hai hệ CLOS và RLOS — một đơn vị kinh doanh vật lý xử lý cả hồ sơ CLOS lẫn RLOS nên không tách theo hệ.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY` (giữ nguyên giá trị từ SB_DWH, không sinh sequence mới)
 - **Khóa nghiệp vụ (BK):** `COMPANY_CODE` — kế thừa nguyên văn từ SB_DWH, mức PGD/CN nhỏ nhất
-- **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `COMPANY_CODE` — mức PGD/CN nhỏ nhất) × phiên bản `DIMENSION_KEY`. ⚠️ Review 2026-10-12: mỗi layer (Company/Branch/Region) tự quản lý SK + EFF_DATE/EXP_DATE riêng (bê 1:1 từ SB_DWH qua vùng chìa) — xem `HLD_DIM_SB_DWH_review.md` mục 1.
+- **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `COMPANY_CODE` — mức PGD/CN nhỏ nhất) × phiên bản `DIMENSION_KEY`. Mỗi layer (Company/Branch/Region) tự quản lý SK + EFF_DATE/EXP_DATE riêng (bê 1:1 từ SB_DWH qua vùng chìa) — xem `HLD_DIM_SB_DWH_review.md` mục 1.
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
   - Báo cáo CLOS APPLICATION (BC2)
@@ -330,10 +330,10 @@ Lấy 1:1 từ bảng có sẵn trên `STG_DTM.DIM_DATE`.
 ### 8.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục sản phẩm tín dụng CLOS (doanh nghiệp) — gồm dòng sản phẩm và sản phẩm nhánh chi tiết, là thông tin ít thay đổi theo bộ mã ổn định.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** mỗi layer có NK riêng — `PRODUCTLINE_CODE` (layer Product Line), `SUB_PRODUCT_CODE` (layer Sub Product) — ⚠️ review 2026-10-12: thay cho composite PRODUCT_BK cũ, kế thừa từ SB_DWH
-- **Độ chi tiết (grain):** 1 dòng lưu lịch sử thay đổi của 1 tổ hợp (Product Line, Sub Product) × phiên bản `DIMENSION_KEY`. ⚠️ Review 2026-10-12: Product Line và Sub Product nay là 2 layer SCD2 độc lập, mỗi layer tự quản lý SK + EFF_DATE/EXP_DATE riêng (bê 1:1 từ SB_DWH qua vùng chìa) — xem `HLD_DIM_SB_DWH_review.md` mục 7.
+- **Khóa nghiệp vụ (BK):** mỗi layer có NK riêng — `PRODUCTLINE_CODE` (layer Product Line), `SUB_PRODUCT_CODE` (layer Sub Product) — kế thừa từ SB_DWH
+- **Độ chi tiết (grain):** 1 dòng lưu lịch sử thay đổi của 1 tổ hợp (Product Line, Sub Product) × phiên bản `DIMENSION_KEY`. Product Line và Sub Product là 2 layer SCD2 độc lập, mỗi layer tự quản lý SK + EFF_DATE/EXP_DATE riêng (bê 1:1 từ SB_DWH qua vùng chìa) — xem `HLD_DIM_SB_DWH_review.md` mục 7.
 - **Phục vụ báo cáo:**
-  - Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp dòng sản phẩm/sản phẩm nhánh, khóa join qua `FCT_CLOS_APPLICATION.PRODUCTLINE_SK`/`SUB_PRODUCT_SK` (⚠️ review 2026-10-12: 2 FK, thay PRODUCT_SK cũ)
+  - Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp dòng sản phẩm/sản phẩm nhánh, khóa join qua `FCT_CLOS_APPLICATION.PRODUCTLINE_SK`/`SUB_PRODUCT_SK`
   - Báo cáo SLA - TAT (BC5) — khóa tra cam kết SLA nhập liệu tập trung REF_SLA_NLTT
   - Báo cáo KPI (BC9) — qua công thức điểm KPI nhánh CLOS (SLA_DE_TOTAL_RESULT)
 
@@ -424,7 +424,7 @@ flowchart LR
 | 16 | RESULT_MAIN_CARD_ID | VARCHAR2 | N | 200 |  | Mã thẻ chính do hệ thẻ (T24) trả về — nguồn NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID, lấy dòng mới nhất STATUS='OK' | Báo cáo RLOS APPLICATION (BC1) | K_TYPE (Loại thẻ tín dụng); HOME_ADDRESS (Địa chỉ nhận Pin/Thẻ) — cả 2 phái sinh từ lookup RESULT_MAIN_CARD_ID → STG_DIM_CARD |
 | 17 | APP_GRP | NVARCHAR2 | N | 200 |  | Cấp thẩm quyền phê duyệt của hồ sơ — nguồn NG_SB_RLOS_APPROVAL.APP_GRP. BC1/BC2 hiển thị trực tiếp; BC9 dùng làm khóa tra điểm KPI; dùng làm khóa tra cam kết SLA ở PDTD_DTM | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) — khóa tra REF_PRODUCT/SLA_*<br>Báo cáo KPI (BC9) — khóa tra điểm KPI | APP_GRP (Cấp phân quyền phê duyệt) |
 | 18 | LAST_APPROVAL_DATE | DATE | N |  |  | Ngày phê duyệt gần nhất của hồ sơ — PHÁI SINH: MAX(EXITDATE) trên NG_SB_RLOS_ENTRY_EXIT tại WORKSTEP/DECISION theo SRS BC10 | Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — qua FCT_RLOS_LOAN_DISBURSEMENT | APPROVAL_DATE (Ngày phê duyệt) |
-| 19 | CUSTOMER_NAME | VARCHAR2 | N | 150 |  | Tên khách hàng đứng tên vay chính của hồ sơ — kế thừa 1:1 từ SB_DWH| Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp (cột dư thừa có sẵn, dùng thay FCT_RLOS_CUSTOMER.FULL_NAME để tránh rủi ro fan-out)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp, cùng lý do BC3 | CUSTOMER_NAME (Tên khách hàng, BC3/BC4). ⚠️ Review 2026-10-04 (cross-check LLD/HLD): bổ sung BC3+BC4 — BC3.csv#24/BC4.csv#16 đã dùng cột này từ trước, chỉ thiếu khai báo tại đây |
+| 19 | CUSTOMER_NAME | VARCHAR2 | N | 150 |  | Tên khách hàng đứng tên vay chính của hồ sơ — kế thừa 1:1 từ SB_DWH| Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp (cột dư thừa có sẵn, dùng thay FCT_RLOS_CUSTOMER.FULL_NAME để tránh rủi ro fan-out)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp, cùng lý do BC3 | CUSTOMER_NAME (Tên khách hàng, BC3/BC4) |
 | 20 | APPROVAL_CONDITION | NVARCHAR2 | N | 50 |  | Nhóm/cấp phê duyệt áp dụng cho hồ sơ, cùng bộ mã với APP_GRP (cột 17) — nguồn NG_SB_RLOS_EXTTABLE.APPROVAL_CONDITION | — | Thiết kế dư thừa |
 | 21 | APPROVER_TYPE | NVARCHAR2 | N | 100 |  | Loại cấp phê duyệt xử lý hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.APPROVER_TYPE | — | Thiết kế dư thừa |
 | 22 | APP_STATUS | NVARCHAR2 | N | 100 |  | Trạng thái hồ sơ (giá trị mẫu quan sát được là lý do từ chối theo câu hỏi Knock-out) — nguồn NG_SB_RLOS_EXTTABLE.APP_STATUS | — | Thiết kế dư thừa |
@@ -440,10 +440,10 @@ flowchart LR
 | 32 | EXISTING_CUSTOMER | NVARCHAR2 | N | 100 |  | Cờ khách hàng hiện hữu tại thời điểm nộp hồ sơ — nguồn NG_SB_RLOS_APPLICANT_GENERAL.EXISTING_CUSTOMER.| — | Thiết kế dư thừa |
 | 33 | APPLICANT_CIF | NVARCHAR2 | N | 100 |  | Mã CIF khách hàng (định danh ngân hàng lõi) tại thời điểm hồ sơ — kế thừa 1:1 từ SB_DWH — nguồn NG_SB_RLOS_APPLICANT_GENERAL.APPLICANTCIF| — | Thiết kế dư thừa |
 | 34 | KYC1 | NVARCHAR2 | N | 20 |  | Đơn vị/khối đang xử lý hồ sơ tại thời điểm ghi nhận (giá trị quan sát: Khối VHCN, Khối PDTD, ĐVKD) — kế thừa 1:1 từ SB_DWH — nguồn NG_SB_RLOS_APPLICANT_GENERAL.KYC1| — | Thiết kế dư thừa |
-| 35 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%) — kế thừa 1:1 từ SB_DWH (lưu SCD1) — nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.CURRENT_RATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | INTEREST_RATE (Lãi suất phê duyệt, %/năm) |
+| 35 | INTEREST_RATE_PCT | NUMBER | N | 12,4 |  | Lãi suất phê duyệt (%) — kế thừa 1:1 từ SB_DWH (lưu SCD1) — nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.CURRENT_RATE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | INTEREST_RATE (Lãi suất phê duyệt, %/năm) |
 | 36 | LOAN_TO_VALUE | NUMBER | N | 5,2 |  | Tỷ lệ cho vay trên giá trị TSBĐ — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL(_APP).LOAN_TO_VALUE | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LOAN_TO_VALUE (Tỷ lệ LTV, %) |
 | 37 | LOAN_OBJECTIVE | VARCHAR2 | N | 200 |  | Mục đích vay — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_OBJECTIVE (hồ sơ thẻ tín dụng: mang nghĩa loại thẻ) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | Loan Objective (Mục đích cho vay) |
-| 38 | TOTAL_INCOME | NUMBER | N | 20,2 |  | Tổng thu nhập khách hàng — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_REPAY_CALC.TOT_INC_CALC | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | TOTAL_INCOME (Tổng thu nhập phê duyệt) |
+| 38 | TOTAL_INCOME | NUMBER | N | 25,2 |  | Tổng thu nhập khách hàng — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_REPAY_CALC.TOT_INC_CALC | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | TOTAL_INCOME (Tổng thu nhập phê duyệt) |
 | 39 | SALARYFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ lương hay không — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.SALARYFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE/INCOM_3 (tính tại AGG_LOS_KPI_APPLICATION, mục 3, tra qua APPLICATION_SK) | — |
 | 40 | CARFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê phương tiện hay không — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.CARFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE/INCOM_3 (tính tại AGG_LOS_KPI_APPLICATION) | — |
 | 41 | HOUSEFLAG | VARCHAR2 | N | 10 |  | Có nguồn thu từ cho thuê nhà hay không — kế thừa 1:1 từ SB_DWH, lưu SCD1 — nguồn gốc xa: NG_SB_RLOS_REPAYFLAGS.HOUSEFLAG | Nguồn cho chỉ tiêu/trường REPAYMENT_SOURCE/INCOM_3 (tính tại AGG_LOS_KPI_APPLICATION) | — |
@@ -629,9 +629,9 @@ flowchart LR
 ## 14. DIM_RLOS_PRODUCT
 
 ### 14.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** danh mục sản phẩm tín dụng RLOS (bán lẻ/cá nhân) — lưu dòng sản phẩm chính (`PRODUCTLINE_CODE`) và sản phẩm nhánh (`SUB_PRODUCT_CODE`, con của sản phẩm chính). ⚠️ review 2026-10-13: tách `PRODUCTLINE_SK` riêng cho layer cha (theo pattern T24, xem SB_DWH mục 13), chỉ layer Sub Product quản lý SCD2.
+- **Ý nghĩa bảng:** danh mục sản phẩm tín dụng RLOS (bán lẻ/cá nhân) — lưu dòng sản phẩm chính (`PRODUCTLINE_CODE`) và sản phẩm nhánh (`SUB_PRODUCT_CODE`, con của sản phẩm chính). `PRODUCTLINE_SK` tách riêng cho layer cha (theo pattern T24, xem SB_DWH mục 13), chỉ layer Sub Product quản lý SCD2.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY` (giữ nguyên giá trị từ SB_DWH)
-- **Khóa nghiệp vụ (NK) theo layer:** `PRODUCTLINE_CODE` (Product Line), `SUB_PRODUCT_CODE` (Sub Product) — ⚠️ review 2026-10-13: bỏ `PRODUCT_BK`.
+- **Khóa nghiệp vụ (NK) theo layer:** `PRODUCTLINE_CODE` (Product Line), `SUB_PRODUCT_CODE` (Sub Product).
 - **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `PRODUCTLINE_CODE` + `SUB_PRODUCT_CODE` + `EFF_DATE`).
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
@@ -655,10 +655,10 @@ flowchart LR
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_PRODUCT, sinh bằng Oracle sequence tại SB_DWH (SEQ_DIM_RLOS_PRODUCT); PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
-| 2 | PRODUCTLINE_SK | NUMBER | Y | 18 |  | ⚠️ review 2026-10-13: layer cha (Product Line), KHÔNG tự quản lý SCD2 riêng — sinh cùng sequence SEQ_DIM_RLOS_PRODUCT với DIMENSION_KEY/SUB_PRODUCT_SK, không phải sequence riêng | — | — |
+| 2 | PRODUCTLINE_SK | NUMBER | Y | 18 |  | Layer cha (Product Line), KHÔNG tự quản lý SCD2 riêng — sinh cùng sequence SEQ_DIM_RLOS_PRODUCT với DIMENSION_KEY/SUB_PRODUCT_SK, không phải sequence riêng | — | — |
 | 3 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 | NK | Mã dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_CODE (= PRODUCTLINE_CODE của MAS_PRODUCT_LINE, cùng khái niệm).| Báo cáo RLOS APPLICATION (BC1) | PRODUCT_LINE (Dòng sản phẩm) |
 | 4 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_NAME.| Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay PRODUCTLINE_CODE | PRODUCT_LINE (Dòng sản phẩm) |
-| 5 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | ⚠️ review 2026-10-13: đổi tên từ PRODUCT_SK — layer nhỏ nhất/đại diện của cả dòng, FK duy nhất mà FCT_RLOS_APPLICATION dùng. Bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
+| 5 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | Layer nhỏ nhất/đại diện của cả dòng, FK duy nhất mà FCT_RLOS_APPLICATION dùng. Bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
 | 6 | SUB_PRODUCT_CODE | VARCHAR2 | N | 200 | NK | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
 | 7 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 200 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME| Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
 | 8 | SCORE_REQUIRED | VARCHAR2 | N | 200 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED | — | Thiết kế dư thừa |
