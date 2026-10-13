@@ -200,19 +200,29 @@ BEGIN
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
-   -- 9. WRK_DIM_RLOS_PRODUCT
+   -- 9a. WRK_DIM_RLOS_PRODUCT_LINE (layer Product Line - layer cha, khong SCD2 rieng)
    -- ============================================================
-   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_PRODUCT (
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_PRODUCT_LINE (
       productline_sk      NUMBER,
       productline_code    VARCHAR2(100),
-      productline_name    VARCHAR2(200),
+      productline_name    VARCHAR2(200)
+   ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
+
+   -- ============================================================
+   -- 9b. WRK_DIM_RLOS_PRODUCT_SUB (layer Sub Product - CDC tu NG_SB_RLOS_MAS_SUB_PRODUCT,
+   --     denormalize san layer Product Line cha de phuc vu MERGE vao DIM_RLOS_PRODUCT)
+   -- ============================================================
+   EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_PRODUCT_SUB (
       sub_product_sk      NUMBER,
       sub_product_code    VARCHAR2(100),
       sub_product_name    VARCHAR2(150),
       score_required      VARCHAR2(10),
       score_model         VARCHAR2(100),
       eff_date            DATE,
-      exp_date            DATE
+      exp_date            DATE,
+      productline_sk      NUMBER,
+      productline_code    VARCHAR2(100),
+      productline_name    VARCHAR2(200)
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 */
    -- ============================================================
