@@ -1205,7 +1205,7 @@ BEGIN
      productline_sk       NUMBER not null,
      productline_code     VARCHAR2(100),
      productline_name     VARCHAR2(200),
-     sub_product_sk       NUMBER not null,
+     sub_product_sk       NUMBER,
      sub_product_code     VARCHAR2(100),
      sub_product_name     VARCHAR2(150),
      score_required       VARCHAR2(10),
