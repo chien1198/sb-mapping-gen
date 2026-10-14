@@ -15,5 +15,5 @@
 "STG_FCT_RLOS_COLLATERAL","VALPAPER_TYPE","true","string(200)","","Loại giấy tờ có giá. Chỉ có ở khối VALPAPER — NULL ở 3 khối còn lại","FCT_RLOS_COLLATERAL.VALPAPER_TYPE","direct","FCT_RLOS_COLLATERAL","VALPAPER_TYPE",""
 "STG_FCT_RLOS_COLLATERAL","NUMBERSIGN","true","string(256)","","Số hiệu giấy tờ có giá. Chỉ có ở khối VALPAPER — NULL ở 3 khối còn lại","FCT_RLOS_COLLATERAL.NUMBERSIGN","direct","FCT_RLOS_COLLATERAL","NUMBERSIGN",""
 "STG_FCT_RLOS_COLLATERAL","APPRAISED_VALUE","true","number(20,2)","","Giá trị định giá của tài sản","FCT_RLOS_COLLATERAL.APPRAISED_VALUE","direct","FCT_RLOS_COLLATERAL","APPRAISED_VALUE",""
-"STG_FCT_RLOS_COLLATERAL","LOAN_RATE_LTV","true","number(5,2)","","Tỷ lệ cho vay trên giá trị tài sản, đơn vị phần trăm","FCT_RLOS_COLLATERAL.LOAN_RATE_LTV","direct","FCT_RLOS_COLLATERAL","LOAN_RATE_LTV",""
+"STG_FCT_RLOS_COLLATERAL","LOAN_RATE_LTV","true","number(10,2)","","Tỷ lệ cho vay trên giá trị tài sản, đơn vị phần trăm","FCT_RLOS_COLLATERAL.LOAN_RATE_LTV","direct","FCT_RLOS_COLLATERAL","LOAN_RATE_LTV",""
 "STG_FCT_RLOS_COLLATERAL","TYPES_OF_COLLATERALS","true","string(500)","","Phục vụ trực tiếp BC3.TYPES_OF_COLLATERALS","FCT_RLOS_COLLATERAL.TYPES_OF_COLLATERALS","direct","FCT_RLOS_COLLATERAL","TYPES_OF_COLLATERALS",""

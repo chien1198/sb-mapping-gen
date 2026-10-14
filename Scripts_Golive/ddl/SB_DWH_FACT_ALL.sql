@@ -53,7 +53,7 @@ CREATE TABLE SB_DWH.FCT_CLOS_COLLATERAL (
     OWNER_NAME                    VARCHAR2(200)       ,
     COLL_MGMT_METHOD              CLOB                ,
     APPRAISED_VALUE               NUMBER(20,2)        ,
-    LOAN_RATE_LTV                 NUMBER(5,2)         ,
+    LOAN_RATE_LTV                 NVARCHAR2(100)      ,
 
 	CONSTRAINT FCT_CLOS_COLLATERAL_PK PRIMARY KEY (COLLATERAL_BK, DAYID) USING INDEX LOCAL
 )
@@ -269,7 +269,7 @@ CREATE TABLE SB_DWH.FCT_RLOS_COLLATERAL (
     VALPAPER_TYPE                 VARCHAR2(100)       ,
     NUMBERSIGN                    VARCHAR2(200)       ,
     APPRAISED_VALUE               NUMBER(20,2)        ,
-    LOAN_RATE_LTV                 NUMBER(5,2)         ,
+    LOAN_RATE_LTV                 NUMBER(10,2)        ,
     TYPES_OF_COLLATERALS          VARCHAR2(500)      ,
 
 	CONSTRAINT FCT_RLOS_COLLATERAL_PK PRIMARY KEY (COLLATERAL_BK, DAYID) USING INDEX LOCAL

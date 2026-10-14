@@ -8,4 +8,4 @@
 "STG_FCT_CLOS_COLLATERAL","OWNER_NAME","true","string(100)","","Chủ sở hữu tài sản","FCT_CLOS_COLLATERAL.OWNER_NAME","direct","FCT_CLOS_COLLATERAL","OWNER_NAME",""
 "STG_FCT_CLOS_COLLATERAL","COLL_MGMT_METHOD","true","clob","","Phương thức quản lý tài sản","FCT_CLOS_COLLATERAL.COLL_MGMT_METHOD","direct","FCT_CLOS_COLLATERAL","COLL_MGMT_METHOD",""
 "STG_FCT_CLOS_COLLATERAL","APPRAISED_VALUE","true","number(20,2)","","Giá trị định giá của tài sản","FCT_CLOS_COLLATERAL.APPRAISED_VALUE","direct","FCT_CLOS_COLLATERAL","APPRAISED_VALUE",""
-"STG_FCT_CLOS_COLLATERAL","LOAN_RATE_LTV","true","number(5,2)","","Tỷ lệ cho vay trên giá trị tài sản","FCT_CLOS_COLLATERAL.LOAN_RATE_LTV","direct","FCT_CLOS_COLLATERAL","LOAN_RATE_LTV",""
+"STG_FCT_CLOS_COLLATERAL","LOAN_RATE_LTV","true","nvarchar(100)","","Tỷ lệ cho vay trên giá trị tài sản","FCT_CLOS_COLLATERAL.LOAN_RATE_LTV","direct","FCT_CLOS_COLLATERAL","LOAN_RATE_LTV",""
