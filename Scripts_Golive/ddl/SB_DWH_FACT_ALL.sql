@@ -49,9 +49,9 @@ CREATE TABLE SB_DWH.FCT_CLOS_COLLATERAL (
     APPLICATION_SK                NUMBER              NOT NULL,
     COLLATERAL_TYPE_CODE          VARCHAR2(500)       NOT NULL,
     WI_NAME                       VARCHAR2(100)       NOT NULL,
-    DESCRIPTION                   VARCHAR2(4000)      ,
+    DESCRIPTION                   CLOB                ,
     OWNER_NAME                    VARCHAR2(200)       ,
-    COLL_MGMT_METHOD              VARCHAR2(4000)      ,
+    COLL_MGMT_METHOD              CLOB                ,
     APPRAISED_VALUE               NUMBER(20,2)        ,
     LOAN_RATE_LTV                 NUMBER(5,2)         ,
 
@@ -76,8 +76,8 @@ CREATE TABLE SB_DWH.FCT_CLOS_DEVIATION (
     APPLICATION_SK                NUMBER              NOT NULL,
     WI_NAME                       VARCHAR2(100)       NOT NULL,
     DEVIATION_TYPE_CODE           VARCHAR2(300)       ,
-    DEV_PROPOSAL                  VARCHAR2(4000)      ,
-    AS_REGULAR                    VARCHAR2(4000)      ,
+    DEV_PROPOSAL                  CLOB                ,
+    AS_REGULAR                    CLOB                ,
     PROCESSED_DATE                DATE                ,
 
 	CONSTRAINT FCT_CLOS_DEVIATION_PK PRIMARY KEY (DEVIATION_BK, DAYID) USING INDEX LOCAL
@@ -385,8 +385,8 @@ CREATE TABLE SB_DWH.FCT_RLOS_DEVIATION (
     WI_NAME                       VARCHAR2(100)       NOT NULL,
     CHECKING_CONDITION            VARCHAR2(500)       ,
     CHECKING_RESULT               VARCHAR2(200)       ,
-    DEVIATION_REASON              VARCHAR2(4000)      ,
-    PROCESSED_DATE                DATE  ,              
+    DEVIATION_REASON              CLOB                ,
+    PROCESSED_DATE                DATE  ,
 
 	CONSTRAINT FCT_RLOS_DEVIATION_PK PRIMARY KEY (DEVIATION_BK, DAYID) USING INDEX LOCAL
 )
