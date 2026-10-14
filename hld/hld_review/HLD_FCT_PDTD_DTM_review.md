@@ -1143,7 +1143,9 @@ flowchart LR
 
 ### 18.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** thông tin người vay chính (applicant) của hồ sơ RLOS
-  tại PDTD_DTM, chi tiết tới TỪNG GIẤY TỜ ĐỊNH DANH.
+  tại PDTD_DTM, chi tiết tới TỪNG GIẤY TỜ ĐỊNH DANH. Bê 1:1 từ SB_DWH,
+  riêng `T24_CUSTOMER_SK` được tính bổ sung tại PDTD_DTM (join
+  STG_DTM.STG_DIM_CUSTOMER — SB_DWH không được đọc STG_DTM)
 - **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_TYPE`+`ID_NUMBER` —
   hash vào cột `CUSTOMER_BK`, bê 1:1 từ SB_DWH
 - **Khóa chính của bảng (PK):** `DAYID`, `CUSTOMER_BK` (giữ nguyên như SB_DWH).
@@ -1163,10 +1165,14 @@ flowchart LR
     subgraph SB_DWH
         C["FCT_RLOS_CUSTOMER"]
     end
+    subgraph STG_DTM
+        T(["STG_DIM_CUSTOMER"])
+    end
     subgraph PDTD_DTM
         D["FCT_RLOS_CUSTOMER"]
     end
-    C -.->|"bê 1:1, 37 cột"| D
+    C -.->|"bê 1:1, 35 cột"| D
+    T -.->|"LEFT JOIN theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME của chính dòng STG_FCT_RLOS_CUSTOMER đang xét (đúng nguyên văn SRS BC1 BR 1.2) — sinh T24_CUSTOMER_SK, JOIN ngay tại PDTD_DTM (SB_DWH không được đọc STG_DTM)"| D
 ```
 
 
@@ -1178,7 +1184,7 @@ flowchart LR
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.DAYID | — (cột kỹ thuật) | — |
 | 2 | CUSTOMER_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ hash của tổ hợp (hồ sơ, loại giấy tờ, số giấy tờ) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CUSTOMER_BK: PHÁI SINH STANDARD_HASH(WI_NAME \|\| ID_TYPE \|\| ID_NUMBER, 'MD5') | — (cột kỹ thuật, khóa chính) | — |
 | 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.APPLICATION_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
-| 4 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.T24_CUSTOMER_SK — join theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME (đúng nguyên văn SRS BC1 BR 1.2). Mặc định -1 nếu không khớp. Chân khách hàng T24 — khác chân khách hàng LOS/applicant thể hiện bằng chính WI_NAME/ID_TYPE/ID_NUMBER | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_CUSTOMER lấy CUSTOMER_ID | Nguồn cho chỉ tiêu/trường CUSTOMER_ID (BC1) |
+| 4 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24) — TÍNH RIÊNG TẠI PDTD_DTM (không bê từ SB_DWH): LEFT JOIN STG_DTM.STG_DIM_CUSTOMER theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME (đúng nguyên văn SRS BC1 BR 1.2), lấy DIMENSION_KEY. Mặc định -1 nếu không khớp. Chân khách hàng T24 — khác chân khách hàng LOS/applicant thể hiện bằng chính WI_NAME/ID_TYPE/ID_NUMBER | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_CUSTOMER lấy CUSTOMER_ID | Nguồn cho chỉ tiêu/trường CUSTOMER_ID (BC1) |
 | 5 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.WI_NAME (nguồn gốc xa: NG_SB_RLOS_APPLICANT_IDGRID.WI_NAME, driving table tại SB_DWH). Quan hệ 1:N với giấy tờ (1 hồ sơ có thể có nhiều giấy tờ) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | WINAME (Mã hồ sơ) |
 | 6 | ID_TYPE | VARCHAR2 | N | 50 |  | Loại giấy tờ định danh — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ID_TYPE (nguồn gốc xa: NG_SB_RLOS_APPLICANT_IDGRID.ID_TYPE) | — | Thiết kế dư thừa (đầu vào cho pivot ADD_ID/ADD_ID_OTHER nếu cần tại tầng report) |
 | 7 | ID_NUMBER | VARCHAR2 | N | 100 |  | Số giấy tờ định danh — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ID_NUMBER (nguồn gốc xa: NG_SB_RLOS_APPLICANT_IDGRID.ID_NUMBER) | — | Thiết kế dư thừa (đầu vào cho pivot ADD_ID/ADD_ID_OTHER nếu cần tại tầng report) |

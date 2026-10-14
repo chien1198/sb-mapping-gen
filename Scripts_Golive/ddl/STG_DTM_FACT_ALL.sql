@@ -356,7 +356,6 @@ CREATE TABLE STG_DTM.STG_FCT_RLOS_CUSTOMER (
     DAYID                         DATE                NOT NULL,
     CUSTOMER_BK                   VARCHAR2(64)        NOT NULL,
     APPLICATION_SK                NUMBER              NOT NULL,
-    T24_CUSTOMER_SK               NUMBER              NOT NULL,
     WI_NAME                       VARCHAR2(100)       ,
     ID_TYPE                       VARCHAR2(50)        ,
     ID_NUMBER                     VARCHAR2(100)       ,
