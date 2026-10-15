@@ -39,7 +39,7 @@ INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
 );
 
 COMMIT;
-/*
+
 -- ============================================================
 -- SB_DWH_FCT_CLOS_COLLATERAL.sql
 -- ============================================================
@@ -92,7 +92,6 @@ INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
 );
 
 COMMIT;
-*/
 -- ============================================================
 -- SB_DWH_FCT_CLOS_EXCEPTION.sql
 -- ============================================================
@@ -352,7 +351,7 @@ CREATE TABLE SB_DWH.FCT_RLOS_CUSTOMER (
     EDUCATION_LEVEL               VARCHAR2(100)       ,
     VEHICLE                       VARCHAR2(100)       ,
     PERM_ADDRESS                  VARCHAR2(500)       ,
-    CURR_HOUSE_NO                 VARCHAR2(200)       ,
+    CURR_HOUSE_NO                 VARCHAR2(300)       ,
     CURR_WARD                     VARCHAR2(100)       ,
     CITY_CODE                     VARCHAR2(50)        ,
     CITY_NAME                     VARCHAR2(200)       ,
