@@ -53,7 +53,7 @@ CREATE TABLE STG_DTM.STG_FCT_CLOS_COLLATERAL (
     DESCRIPTION                   VARCHAR2(4000)      ,
     OWNER_NAME                    VARCHAR2(200)       ,
     COLL_MGMT_METHOD              VARCHAR2(4000)      ,
-    APPRAISED_VALUE               NUMBER(20,2)        ,
+    APPRAISED_VALUE               NVARCHAR2(100)      ,
     LOAN_RATE_LTV                 NVARCHAR2(100)      ,
 
   CONSTRAINT STG_FCT_CLOS_COLLATERAL_PK PRIMARY KEY (COLLATERAL_BK, DAYID) USING INDEX LOCAL
@@ -286,7 +286,7 @@ CREATE TABLE STG_DTM.STG_FCT_RLOS_COLLATERAL (
     CONTROL_POSTER                VARCHAR2(100)       ,
     VALPAPER_TYPE                 VARCHAR2(100)       ,
     NUMBERSIGN                    VARCHAR2(200)       ,
-    APPRAISED_VALUE               NUMBER(20,2)        ,
+    APPRAISED_VALUE               NUMBER(36,2)        ,
     LOAN_RATE_LTV                 NUMBER(10,2)        ,
     TYPES_OF_COLLATERALS          VARCHAR2(500)       ,
 
