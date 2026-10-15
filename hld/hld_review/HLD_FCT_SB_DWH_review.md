@@ -30,7 +30,6 @@ flowchart LR
         D(["WFINSTRUMENTTABLE"])
         F(["NG_SB_CLOS_EXTTABLE"])
         G(["NG_SB_CLOS_APPROVAL"])
-        H(["NG_SB_CLOS_USER_MAKE_WORK_STEP"])
         M(["NG_SB_CLOS_CUST_INFO"])
         ML(["NG_SB_CLOS_CUST_INFO_LEGAL"])
         MW(["NG_SB_CLOS_MAS_DECISION"])
@@ -50,13 +49,12 @@ flowchart LR
     D -->|"LEFT JOIN WI_NAME=PROCESSINSTANCEID (không lọc CREATEDBY) — sinh APPLICATION_LINK_INFO"| E
     F -->|"driving table — base set WI_NAME đầy đủ mọi hồ sơ còn hiệu lực, full snapshot mọi DAYID"| E
     G -.->|"APP_GRP"| E
-    H -.->|"UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE"| E
     K -.->|"CUSTOMER_SK — tra ID_NUMBER qua WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, rồi lookup DIM_CLOS_CUSTOMER theo ID_NUMBER (NK) + điều kiện SCD2 hiệu lực tại DAYID"| E
     M --> K
     ML -.-> K
     MW --> WD
     WD -.->|"WORKSTEP_DECISION_SK lookup theo cặp WORKSTEP_CODE+DECISION_CODE của sự kiện hoàn tất gần nhất theo thời gian"| E
-    PR -.->|"PRODUCTLINE_SK (lookup PRODUCTLINE_CODE=NG_SB_CLOS_CUST_INFO.PRODUCT_LINE) + SUB_PRODUCT_SK (lookup SUB_PRODUCT_NAME=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT) — 2 FK riêng, review 2026-10-12, mỗi layer SCD2 hiệu lực tại DAYID độc lập"| E
+    PR -.->|"PRODUCTLINE_SK (lookup PRODUCTLINE_CODE=NG_SB_CLOS_CUST_INFO.PRODUCT_LINE) + SUB_PRODUCT_SK (lookup SUB_PRODUCT_NAME=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT) — 2 FK riêng, mỗi layer SCD2 hiệu lực tại DAYID độc lập"| E
     OU -.->|"COMPANY_SK, lookup COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, SCD2 hiệu lực tại DAYID"| E
     F --> AP
     M --> AP
@@ -79,7 +77,7 @@ flowchart LR
 | 2 | APPLICATION_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_APPLICATION. Mặc định -1 nếu không khớp | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN | — |
 | 3 | WORKSTEP_DECISION_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_WORKSTEP_DECISION (gộp từ LAST_WORKSTEP_SK+LAST_DECISION_SK) của sự kiện hoàn tất gần nhất, lookup theo cặp WORKSTEP_CODE+DECISION_CODE của sự kiện đó. Mặc định -1| Báo cáo CLOS APPLICATION (BC2) — khóa JOIN, nguồn cho chỉ tiêu/trường LAST_WORKSTEP (Bước hồ sơ cuối, tính ở PDTD_DTM) và LAST_DECISION (Quyết định bước cuối) | LAST_DECISION (Quyết định bước cuối) |
 | 4a | PRODUCTLINE_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_PRODUCT (layer Product Line) — DIM_CLOS_PRODUCT tách 2 layer SCD2 độc lập (Product Line/Sub Product, xem HLD_DIM_SB_DWH_review.md mục 7). Lookup theo PRODUCTLINE_CODE=NG_SB_CLOS_CUST_INFO.PRODUCT_LINE, điều kiện PRODUCTLINE_EFF_DATE<=DAYID<PRODUCTLINE_EXP_DATE (hoặc PRODUCTLINE_EXP_DATE IS NULL). Mặc định -1 nếu không khớp | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới PRODUCT_LINE<br>Báo cáo SLA - TAT (BC5) — khóa JOIN điều kiện SLA_DE<br>Báo cáo KPI (BC9) — điều kiện lọc STREAM khi tính SLGN_CLOS | — |
-| 4b | SUB_PRODUCT_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_PRODUCT (layer Sub Product) — mới, review 2026-10-12. Lookup theo SUB_PRODUCT_NAME=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT, điều kiện SUB_PRODUCT_EFF_DATE<=DAYID<SUB_PRODUCT_EXP_DATE (hoặc SUB_PRODUCT_EXP_DATE IS NULL). Mặc định -1 nếu không khớp. Kế thừa note review 2026-10-09: khóa JOIN dùng SUB_PRODUCT_NAME (không phải SUB_PRODUCT_CODE) — SUB_PRODUCT lưu giá trị TÊN, không phải mã | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới SUB_PRODUCT<br>Báo cáo SLA - TAT (BC5) — khóa JOIN điều kiện SLA_DE | — |
+| 4b | SUB_PRODUCT_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_PRODUCT (layer Sub Product). Lookup theo SUB_PRODUCT_NAME=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT, điều kiện SUB_PRODUCT_EFF_DATE<=DAYID<SUB_PRODUCT_EXP_DATE (hoặc SUB_PRODUCT_EXP_DATE IS NULL). Mặc định -1 nếu không khớp. Khóa JOIN dùng SUB_PRODUCT_NAME (không phải SUB_PRODUCT_CODE) — SUB_PRODUCT lưu giá trị TÊN, không phải mã | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới SUB_PRODUCT<br>Báo cáo SLA - TAT (BC5) — khóa JOIN điều kiện SLA_DE | — |
 | 5 | COMPANY_SK | NUMBER | N | 18 |  | Khóa tới DIM_LOS_COMPANY — lookup theo COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, điều kiện SCD2 hiệu lực tại DAYID theo layer Company (COMPANY_EFF_DATE<=DAYID<COMPANY_EXP_DATE, hoặc COMPANY_EXP_DATE IS NULL) — DIM_LOS_COMPANY tách 3 layer SCD2 độc lập (Company/Branch/Region, xem HLD_Table_Design.md Section 1→1.1.1); COMPANY_SK=DIMENSION_KEY vẫn lookup theo đúng layer Company, sau đó đọc thẳng BRANCH_CODE/BRANCH_NAME/REGION_CODE/REGION_NAME từ cùng dòng DIM (không kiểm tra riêng BRANCH_EFF/EXP_DATE, REGION_EFF/EXP_DATE — khớp đúng cách SRS BC1/BC2 đang dùng: 1 lần join duy nhất, đọc mọi cột cùng dòng). Mặc định -1 nếu không khớp | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới BRANCH_CODE/COMPANY_CODE/COMPANY_NAME | — |
 | 6 | CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (NK=ID_NUMBER, vì DIM_CLOS_CUSTOMER grain 1 dòng/khách hàng) — nguồn: lấy NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN theo WI_NAME (của chính dòng đang nạp) + UPPER(OBJ_TYPE)='KHÁCH HÀNG', rồi lookup DIM_CLOS_CUSTOMER.DIMENSION_KEY theo ID_NUMBER (NK) + điều kiện SCD2 hiệu lực tại DAYID. Quan hệ N:1 (nhiều hồ sơ/DAYID của cùng khách hàng có thể trỏ cùng 1 CUSTOMER_SK). Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới ZONE (DIM_CLOS_CUSTOMER.ZONE) | — |
 | 7 | WI_NAME | NVARCHAR2 | Y | 63 | PK | Mã hồ sơ tín dụng CLOS — nguồn NG_SB_CLOS_EXTTABLE.WI_NAME (direct, driving table)| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp, khóa chính<br>Báo cáo SLA - TAT (BC5) — khóa chính | WINAME (Mã hồ sơ) |
@@ -91,15 +89,12 @@ flowchart LR
 | 13 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_TERM | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CREDIT_TERM (Thời hạn cấp tín dụng) |
 | 14 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%), chỉ nhận khi nguồn là số — nguồn NG_SB_CLOS_CREDITINFO_COMM.INTEREST_RATE, ép kiểu số (TO_NUMBER), NULL nếu không phải số hợp lệ | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp (chọn thay cho INTEREST_RATE_DESC) | INTEREST_RATE (Lãi suất phê duyệt) |
 | 15 | CURRENCY_CODE | NVARCHAR2 | N | 100 |  | Loại tiền — nguồn NG_SB_CLOS_CREDITINFO_COMM.CURRENCY | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CURRENCY (Loại tiền tệ áp dụng) |
-| 16 | APPLICATION_LINK_INFO | NVARCHAR2 | N | 512 |  | Thông tin liên kết hồ sơ — cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (không lọc CREATEDBY) — nguồn WFINSTRUMENTTABLE.VAR_STR12, đổi tên (review 2026-10-04, theo yêu cầu người dùng) | Báo cáo KPI (BC9) — điều kiện lọc IS NOT NULL cho SLHS_CLOS_DAY/SLGN_CLOS_DAY (AGG_LOS_KPI_YTD_DAILY) | — |
-| 17 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | COALESCE(CASE WHEN NG_SB_CLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterMaker' THEN NG_SB_CLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_CLOS_EXTTABLE.UWMAKERUSER) — LEFT JOIN NG_SB_CLOS_USER_MAKE_WORK_STEP theo WI_NAME + WORK_STEP='UnderwriterMaker' | Báo cáo CLOS APPLICATION (BC2) — BC2 map thẳng vào cột này (không qua cột trung gian nào khác)| — |
-| 18 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | COALESCE(CASE WHEN NG_SB_CLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterChecker' THEN NG_SB_CLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_CLOS_EXTTABLE.UWCHKRUSER) — LEFT JOIN NG_SB_CLOS_USER_MAKE_WORK_STEP theo WI_NAME + WORK_STEP='UnderwriterChecker' | Báo cáo CLOS APPLICATION (BC2) — BC2 map thẳng vào cột này.| — |
-| 19 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE(CASE WHEN NG_SB_CLOS_USER_MAKE_WORK_STEP.WORK_STEP = 'CreditApproval' THEN NG_SB_CLOS_USER_MAKE_WORK_STEP.USER_MAKE END, CASE NG_SB_CLOS_APPROVAL.APP_GRP WHEN 'A1' THEN 'long.lq' WHEN 'CC' THEN 'UBTD' WHEN 'BOD' THEN 'HDQT' END) — LEFT JOIN NG_SB_CLOS_USER_MAKE_WORK_STEP theo WI_NAME (không lọc WORK_STEP), LEFT JOIN NG_SB_CLOS_APPROVAL theo WI_NAME. Khác RLOS: có hằng số hardcode theo APP_GRP thay vì 2 cột fallback trên EXTTABLE | Báo cáo CLOS APPLICATION (BC2) — BC2 map thẳng vào cột này.| — |
-| 20 | LG_REQ | NVARCHAR2 | N | 100 |  | Cờ yêu cầu bảo lãnh (Letter of Guarantee) phát sinh theo hồ sơ — nguồn NG_SB_CLOS_CUST_INFO.LG_REQ (boolean true/false)| — | Thiết kế dư thừa |
-| 21 | FI_REQ | NVARCHAR2 | N | 100 |  | Cờ yêu cầu — nguồn NG_SB_CLOS_CUST_INFO.FI_REQ (boolean true/false)| — | Thiết kế dư thừa |
-| 22 | PHONE_REQ | NVARCHAR2 | N | 100 |  | Cờ yêu cầu xác minh điện thoại — nguồn NG_SB_CLOS_CUST_INFO.PHONE_REQ (boolean true/false)| — | Thiết kế dư thừa |
-| 23 | CHANGE_REQUEST | NVARCHAR2 | N | 150 |  | Yêu cầu điều chỉnh hồ sơ — nguồn NG_SB_CLOS_CHANGEREQ.CHANGE_REQUEST.| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CHANGE_REQUEST (Thay đổi điều kiện New/Change) |
-| 24 | CHANGE_TYPE | NVARCHAR2 | N | 500 |  | Loại thay đổi điều kiện phê duyệt, giữ nguyên chuỗi gốc kể cả dạng đa giá trị nối bằng dấu `~` — nguồn NG_SB_CLOS_CHANGEREQ.CHANGE_TYPE, giữ nguyên văn không qua bảng danh mục nào (khác RLOS có DIM_RLOS_CHANGE_TYPE — xem HLD_Table_Design.md #11)., cùng lý do cột 23 | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CHANGE_TYPE (Chi tiết loại thay đổi điều kiện) |
+| 16 | APPLICATION_LINK_INFO | NVARCHAR2 | N | 512 |  | Thông tin liên kết hồ sơ — cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (không lọc CREATEDBY) — nguồn WFINSTRUMENTTABLE.VAR_STR12, đổi tên | Báo cáo KPI (BC9) — điều kiện lọc IS NOT NULL cho SLHS_CLOS_DAY/SLGN_CLOS_DAY (AGG_LOS_KPI_YTD_DAILY) | — |
+| 17 | LG_REQ | NVARCHAR2 | N | 100 |  | Cờ yêu cầu bảo lãnh (Letter of Guarantee) phát sinh theo hồ sơ — nguồn NG_SB_CLOS_CUST_INFO.LG_REQ (boolean true/false)| — | Thiết kế dư thừa |
+| 18 | FI_REQ | NVARCHAR2 | N | 100 |  | Cờ yêu cầu — nguồn NG_SB_CLOS_CUST_INFO.FI_REQ (boolean true/false)| — | Thiết kế dư thừa |
+| 19 | PHONE_REQ | NVARCHAR2 | N | 100 |  | Cờ yêu cầu xác minh điện thoại — nguồn NG_SB_CLOS_CUST_INFO.PHONE_REQ (boolean true/false)| — | Thiết kế dư thừa |
+| 20 | CHANGE_REQUEST | NVARCHAR2 | N | 150 |  | Yêu cầu điều chỉnh hồ sơ — nguồn NG_SB_CLOS_CHANGEREQ.CHANGE_REQUEST.| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CHANGE_REQUEST (Thay đổi điều kiện New/Change) |
+| 21 | CHANGE_TYPE | NVARCHAR2 | N | 500 |  | Loại thay đổi điều kiện phê duyệt, giữ nguyên chuỗi gốc kể cả dạng đa giá trị nối bằng dấu `~` — nguồn NG_SB_CLOS_CHANGEREQ.CHANGE_TYPE, giữ nguyên văn không qua bảng danh mục nào (khác RLOS có DIM_RLOS_CHANGE_TYPE — xem HLD_Table_Design.md #11)., cùng lý do cột 23 | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CHANGE_TYPE (Chi tiết loại thay đổi điều kiện) |
 
 
 
@@ -346,6 +341,7 @@ flowchart LR
         K1(["NG_SB_CLOS_CHANGEREQ"])
         N(["NG_SB_CLOS_CREDITINFO_COMM"])
         WF(["WFINSTRUMENTTABLE"])
+        UM(["NG_SB_CLOS_USER_MAKE_WORK_STEP"])
     end
     subgraph SB_DWH
         WD["DIM_CLOS_WORKSTEP_DECISION"]
@@ -371,6 +367,9 @@ flowchart LR
     A -.->|"PHÁI SINH trực tiếp trên E (không copy từ FCT_CLOS_APPLICATION): PROCESSED_DATE — 3 mức ưu tiên (MAX(EXITDATE) tại bước phê duyệt đã Submit/Send To HOSupport/.../ EXITDATE tại UnderwriterMaker+Cancel / ngày hệ thống nếu đang xử lý)"| E
     WF -.->|"LEFT JOIN WI_NAME=PROCESSINSTANCEID — sinh cột thô WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY"| E
     A -.->|"PHÁI SINH trực tiếp trên E (chuyển từ FCT_CLOS_APPLICATION, không copy): MAX(EXITDATE) lọc USERNAME/WORKSTEP/DECISION đã phê duyệt — sinh APPROVED_DATE"| E
+    UM -.->|"LEFT JOIN WI_NAME+WORK_STEP=WORKSTEP của chính dòng event — sinh UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE"| E
+    J -.->|"UWMAKERUSER/UWCHKRUSER — fallback COALESCE cho UNDERWRITERMAKER/CHECKER_USERMAKE"| E
+    I -.->|"APP_GRP — fallback CASE WHEN cho APPROVAL_USERMAKE"| E
 ```
 
 ### 5.3 Cấu trúc bảng
@@ -399,6 +398,9 @@ flowchart LR
 | 20 | WF_ACTIVITYNAME | NVARCHAR2 | N | 30 |  | Bước hiện tại của instance workflow — cột thô (cùng JOIN trên): lấy c.ACTIVITYNAME (nguồn WFINSTRUMENTTABLE.ACTIVITYNAME) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (tính tại PDTD_DTM) | — |
 | 21 | WF_CREATEDBY | VARCHAR2 | N | 50 |  | Mã người/hệ thống tạo bản ghi workflow — cột thô (cùng JOIN trên): lấy c.CREATEDBY| Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG | — |
 | 22 | APPROVED_DATE | DATE | N |  |  | Ngày phê duyệt (BC11.APPROVAL_DATE): MAX(EXITDATE) window theo WI_NAME WHERE USERNAME IS NOT NULL AND WORKSTEP_CODE IN ('CreditApproval','CreditCommittee') AND DECISION_CODE IN ('Submit','Send To HOSupport','Send To PostSanction') — DECISION_CODE tra qua WORKSTEP_DECISION_SK (cột 3) sang DIM_CLOS_WORKSTEP_DECISION, cùng cách PROCESSED_DATE đang làm. Khác LAST_APPROVAL_DATE (FCT_CLOS_APPLICATION, không lọc DECISION, phục vụ BC2): 2 metric độc lập | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FCT_CLOS_LOAN_DISBURSEMENT.APPROVAL_DATE | APPROVAL_DATE (Ngày phê duyệt) |
+| 23 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | COALESCE(CASE WHEN NG_SB_CLOS_USER_MAKE_WORK_STEP.WORK_STEP = WORKSTEP_CODE (chính dòng event) THEN NG_SB_CLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_CLOS_EXTTABLE.UWMAKERUSER) — LEFT JOIN NG_SB_CLOS_USER_MAKE_WORK_STEP theo WI_NAME + WORK_STEP=WORKSTEP_CODE='UnderwriterMaker'| — | — |
+| 24 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | COALESCE(CASE WHEN NG_SB_CLOS_USER_MAKE_WORK_STEP.WORK_STEP = WORKSTEP_CODE (chính dòng event) THEN NG_SB_CLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_CLOS_EXTTABLE.UWCHKRUSER) — LEFT JOIN NG_SB_CLOS_USER_MAKE_WORK_STEP theo WI_NAME + WORK_STEP=WORKSTEP_CODE='UnderwriterChecker'| — | — |
+| 25 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | COALESCE(CASE WHEN NG_SB_CLOS_USER_MAKE_WORK_STEP.WORK_STEP = WORKSTEP_CODE (chính dòng event) THEN NG_SB_CLOS_USER_MAKE_WORK_STEP.USER_MAKE END, CASE NG_SB_CLOS_APPROVAL.APP_GRP WHEN 'A1' THEN 'long.lq' WHEN 'CC' THEN 'UBTD' WHEN 'BOD' THEN 'HDQT' END) — LEFT JOIN NG_SB_CLOS_USER_MAKE_WORK_STEP theo WI_NAME + WORK_STEP=WORKSTEP_CODE IN ('CreditCommittee','CreditApproval')| — | — |
 
 
 ## 6. FCT_CLOS_LEGAL_PARTY
@@ -413,8 +415,8 @@ hẳn khỏi thiết kế vì bảng này tự đủ `WI_NAME`/`CUSTOMER_SK`/
 - **Ý nghĩa bảng:** bảng FACT lưu người/đối tượng liên quan vai trò pháp
   lý của hồ sơ CLOS (bao gồm cả giấy tờ định danh)
 - **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_NUMBER`+`OBJ_TYPE` —
-  hash vào cột `LEGAL_PARTY_BK`. Bổ sung `OBJ_TYPE` (review 2026-10-12):
-  "Khóa nghiệp vụ" ghi trong `CLOS - Metadata.xlsx` chỉ nêu
+  hash vào cột `LEGAL_PARTY_BK`. Bổ sung `OBJ_TYPE`: "Khóa nghiệp vụ"
+  ghi trong `CLOS - Metadata.xlsx` chỉ nêu
   (WI_NAME, ID_NUMBER), nhưng chính grain bảng này (xem 6.1) xác nhận 1
   người (cùng ID_NUMBER) có thể giữ NHIỀU vai trò (OBJ_TYPE) khác nhau
   trên cùng 1 hồ sơ — nếu BK chỉ gồm (WI_NAME, ID_NUMBER) thì 2 dòng
@@ -484,7 +486,7 @@ flowchart LR
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — CỘT MỚI: thêm để bảng đổi sang snapshot theo ngày | — (cột kỹ thuật) | — |
-| 2 | LEGAL_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng vai trò pháp lý — PHÁI SINH: STANDARD_HASH(WI_NAME \|\| ID_NUMBER \|\| OBJ_TYPE, 'MD5') — gộp 3 cột PK tự nhiên (WI_NAME, ID_NUMBER, OBJ_TYPE) thành 1 khóa đơn. Bổ sung OBJ_TYPE (review 2026-10-12) vì 1 người/hồ sơ có thể giữ nhiều vai trò (nhiều OBJ_TYPE) — thiếu OBJ_TYPE sẽ trùng BK giữa các vai trò khác nhau | — (cột kỹ thuật, một phần khóa chính) | — |
+| 2 | LEGAL_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng vai trò pháp lý — PHÁI SINH: STANDARD_HASH(WI_NAME \|\| ID_NUMBER \|\| OBJ_TYPE, 'MD5') — gộp 3 cột PK tự nhiên (WI_NAME, ID_NUMBER, OBJ_TYPE) thành 1 khóa đơn. Bổ sung OBJ_TYPE vì 1 người/hồ sơ có thể giữ nhiều vai trò (nhiều OBJ_TYPE) — thiếu OBJ_TYPE sẽ trùng BK giữa các vai trò khác nhau | — (cột kỹ thuật, một phần khóa chính) | — |
 | 3 | CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — khách hàng CHÍNH của hồ sơ (MỌI dòng đều có, không chỉ dòng OBJ_TYPE='Khách hàng'). Cách lấy: tìm dòng khác cùng WI_NAME có UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, lấy ID_NUMBER của dòng đó, lookup DIM_CLOS_CUSTOMER.DIMENSION_KEY theo ID_NUMBER (NK, tái sử dụng đúng logic dựng DIM_CLOS_CUSTOMER). Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ, không xuất trực tiếp lên báo cáo) | — |
 | 4 | APPLICATION_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_APPLICATION — join theo WI_NAME. Quan hệ N:1 (nhiều dòng vai trò pháp lý cùng WI_NAME trỏ về đúng 1 hồ sơ). Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ, không xuất trực tiếp lên báo cáo) | — |
 | 5 | WI_NAME | NVARCHAR2 | Y | 100 |  | Mã hồ sơ CLOS — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.WI_NAME. Quan hệ 1:N với hồ sơ, N không giới hạn (1 người có thể giữ nhiều vai trò, xác nhận qua CLOS Metadata) | Báo cáo CLOS APPLICATION (BC2) — nguồn gián tiếp qua DIM_CLOS_CUSTOMER.ID_NUMBER/LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE (LEFT JOIN theo WI_NAME + LEGAL_TYPE) | — |
@@ -519,7 +521,6 @@ flowchart LR
     subgraph STG_LOS
         A(["NG_SB_RLOS_ENTRY_EXIT"])
         I(["NG_SB_RLOS_EXTTABLE"])
-        J(["NG_SB_RLOS_USER_MAKE_WORK_STEP"])
         P1(["NG_SB_RLOS_APPLICANT_GENERAL"])
         P4(["NG_SB_RLOS_CBS"])
         MW(["NG_SB_RLOS_MAS_DECISION"])
@@ -536,10 +537,9 @@ flowchart LR
     A -->|"PHÁI SINH: PROCESSED_DATE, CREATION_DATE (3 mức ưu tiên), derive tại PDTD_DTM từ FCT_RLOS_WORKSTEP_EVENT (mục 16)"| E
     I -->|"CHANGE_REQUEST(=REQ_TYPE), CHANGE_TYPE — giá trị thô, không chuyển DIM (cờ/trạng thái workflow biến động nhiều lần, cùng lý do đã từ chối SCD hóa trước đây)"| E
     I -.-> CT
-    J -.->|"LEFT JOIN WI_NAME+WORK_STEP=WORKSTEP — sinh input thô UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE, công thức COALESCE/CASE tính tại PDTD_DTM"| E
     WD -.->|"WORKSTEP_DECISION_SK, lookup theo cặp WORKSTEP_CODE+DECISION_CODE của sự kiện hoàn tất gần nhất theo thời gian"| E
     MW --> WD
-    PR -.->|"SUB_PRODUCT_SK (đổi tên từ PRODUCT_SK, review 2026-10-13), lookup PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, SCD2 hiệu lực tại DAYID."| E
+    PR -.->|"SUB_PRODUCT_SK (đổi tên từ PRODUCT_SK), lookup PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, SCD2 hiệu lực tại DAYID."| E
     OU -.->|"COMPANY_SK, lookup COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, SCD2 hiệu lực tại DAYID"| E
     CT -.->|"CHANGE_TYPE_SK, lookup CHANGE_TYPE=NG_SB_RLOS_EXTTABLE.CHANGE_TYPE"| E
     CP -.->|"CARD_PROMOTION_SK, lookup PROMOTION_ID=NG_SB_RLOS_CBS.PROMOTION_ID, hồ sơ không phải thẻ dùng -1"| E
@@ -567,11 +567,8 @@ flowchart LR
 | 11 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — CREDIT_LIMIT | LOAN_AMOUNT (Số tiền phê duyệt); CREDIT_LIMIT (BC3) |
 | 12 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_TERM | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — CREDIT_TERM | LOAN_TERM (Thời hạn phê duyệt, tháng); CREDIT_TERM (BC3) |
 | 13 | CURRENCY_CODE | NVARCHAR2 | N | 100 |  | Loại tiền — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_CURRENCY: đặt cạnh APPROVED_AMT_FINAL/APPROVED_TERM (cùng bảng, cùng nguồn), dọn trùng lặp khỏi FCT_RLOS_WORKSTEP_EVENT (mục 16, không BC nào dùng) | Báo cáo Thông tin phê duyệt (BC3) — CURRENCY | CURRENCY (Đơn vị tiền tệ) |
-| 14 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH (giá trị cuối cùng, không tính lại ở PDTD_DTM): COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterMaker' THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.UWMAKERUSER) | Báo cáo RLOS APPLICATION (BC1) — BC1 map thẳng vào cột này| — |
-| 15 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH (cùng cơ chế cột trên): COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterChecker' THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.UWCHKRUSER) | Báo cáo RLOS APPLICATION (BC1) — BC1 map thẳng vào cột này. | — |
-| 16 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH: COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP IN ('CreditCommittee','CreditApproval') THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.CREDAPPRUSER, NG_SB_RLOS_EXTTABLE.CCOMMITUSER) | Báo cáo RLOS APPLICATION (BC1) — BC1 map thẳng vào cột này.| — |
-| 17 | CHANGE_REQUEST | NVARCHAR2 | N | 50 |  | Yêu cầu điều chỉnh hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.REQ_TYPE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | CHANGE_REQUEST (Thay đổi điều kiện — New/Change) |
-| 18 | CHANGE_TYPE | NVARCHAR2 | N | 255 |  | Loại thay đổi điều kiện phê duyệt — nguồn NG_SB_RLOS_EXTTABLE.CHANGE_TYPE, giữ nguyên giá trị thô. Dùng làm khóa either/or với PRODUCT_LINE khi tra cam kết SLA ở PDTD_DTM — khác CHANGE_TYPE_SK (cột 6, trỏ DIM_RLOS_CHANGE_TYPE để lấy tên/chi tiết chuẩn hóa cho BC1). Không chuyển DIM_RLOS_APPLICATION dù cùng nguồn EXTTABLE với 13 cột cờ/trạng thái khác — đây là cờ/trạng thái workflow thực sự biến động nhiều lần trong vòng đời hồ sơ, không phải "bật 1 lần duy nhất" như nhóm cờ CREATE/DELETE_FLAG | Báo cáo RLOS APPLICATION (BC1) hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) khóa tra REF_PRODUCT/SLA_* | CHANGE_TYPE (Loại thay đổi điều kiện) |
+| 14 | CHANGE_REQUEST | NVARCHAR2 | N | 50 |  | Yêu cầu điều chỉnh hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.REQ_TYPE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | CHANGE_REQUEST (Thay đổi điều kiện — New/Change) |
+| 15 | CHANGE_TYPE | NVARCHAR2 | N | 255 |  | Loại thay đổi điều kiện phê duyệt — nguồn NG_SB_RLOS_EXTTABLE.CHANGE_TYPE, giữ nguyên giá trị thô. Dùng làm khóa either/or với PRODUCT_LINE khi tra cam kết SLA ở PDTD_DTM — khác CHANGE_TYPE_SK (cột 6, trỏ DIM_RLOS_CHANGE_TYPE để lấy tên/chi tiết chuẩn hóa cho BC1). Không chuyển DIM_RLOS_APPLICATION dù cùng nguồn EXTTABLE với 13 cột cờ/trạng thái khác — đây là cờ/trạng thái workflow thực sự biến động nhiều lần trong vòng đời hồ sơ, không phải "bật 1 lần duy nhất" như nhóm cờ CREATE/DELETE_FLAG | Báo cáo RLOS APPLICATION (BC1) hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) khóa tra REF_PRODUCT/SLA_* | CHANGE_TYPE (Loại thay đổi điều kiện) |
 
 ## 8. FCT_RLOS_COLLATERAL
 
@@ -911,6 +908,7 @@ flowchart LR
         P5(["NG_SB_RLOS_SENT_CBS_LOG"])
         P7(["NG_SB_RLOS_MANUAL_DEVIATION"])
         WF(["WFINSTRUMENTTABLE"])
+        UM(["NG_SB_RLOS_USER_MAKE_WORK_STEP"])
     end
     subgraph SB_DWH
         WD["DIM_RLOS_WORKSTEP_DECISION"]
@@ -933,6 +931,8 @@ flowchart LR
     P7 -.-> AP
     B -.->|"PHÁI SINH trực tiếp trên E (không copy từ FCT_RLOS_APPLICATION): PROCESSED_DATE — 3 mức ưu tiên (MAX(EXITDATE) tại bước phê duyệt đã Submit/Send To HOSupport/.../ EXITDATE tại UnderwriterMaker+Cancel / ngày hệ thống nếu đang xử lý)"| E
     WF -.->|"LEFT JOIN WI_NAME=PROCESSINSTANCEID — sinh cột thô WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY, business rule CASE WHEN (WORKSTEP_FLAG) tính tại PDTD_DTM"| E
+    UM -.->|"LEFT JOIN WI_NAME+WORK_STEP=WORKSTEP của chính dòng event — sinh UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE"| E
+    P4 -.->|"UWMAKERUSER/UWCHKRUSER/CREDAPPRUSER/CCOMMITUSER — fallback COALESCE cho UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE (không hardcode APP_GRP như CLOS)"| E
 ```
 
 ### 12.3 Cấu trúc bảng
@@ -961,6 +961,9 @@ flowchart LR
 | 20 | WF_PROCESSNAME | NVARCHAR2 | N | 30 |  | Tên hệ thống workflow của instance đang đứng — cột thô: LEFT JOIN WFINSTRUMENTTABLE (c) theo WI_NAME=c.PROCESSINSTANCEID, lấy c.PROCESSNAME (nguồn WFINSTRUMENTTABLE.PROCESSNAME). Lặp lại giống nhau trên mọi dòng event cùng WI_NAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG | — |
 | 21 | WF_ACTIVITYNAME | NVARCHAR2 | N | 30 |  | Bước hiện tại của instance workflow — cột thô (cùng JOIN trên): lấy c.ACTIVITYNAME (nguồn WFINSTRUMENTTABLE.ACTIVITYNAME) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (tính tại PDTD_DTM) | — |
 | 22 | WF_CREATEDBY | VARCHAR2 | N | 50 |  | Mã người/hệ thống tạo bản ghi workflow — cột thô (cùng JOIN trên): lấy c.CREATEDBY. | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (điều kiện lọc, tính tại PDTD_DTM) | — |
+| 26 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP = WORKSTEP_CODE (chính dòng event) THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.UWMAKERUSER) — LEFT JOIN NG_SB_RLOS_USER_MAKE_WORK_STEP theo WI_NAME + WORK_STEP=WORKSTEP_CODE='UnderwriterMaker' (không fan-out) | — | — |
+| 27 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP = WORKSTEP_CODE (chính dòng event) THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.UWCHKRUSER) — LEFT JOIN NG_SB_RLOS_USER_MAKE_WORK_STEP theo WI_NAME + WORK_STEP=WORKSTEP_CODE='UnderwriterChecker' (không fan-out) | — | — |
+| 28 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP = WORKSTEP_CODE (chính dòng event) THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.CREDAPPRUSER, NG_SB_RLOS_EXTTABLE.CCOMMITUSER) — LEFT JOIN NG_SB_RLOS_USER_MAKE_WORK_STEP theo WI_NAME + WORK_STEP=WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') (không fan-out). Khác CLOS: fallback 2 cột trên EXTTABLE thay vì hardcode theo APP_GRP | — | — |
 
 ## 13. FCT_RLOS_CUSTOMER
 

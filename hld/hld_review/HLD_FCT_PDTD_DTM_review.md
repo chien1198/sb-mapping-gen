@@ -246,7 +246,7 @@ flowchart LR
     end
     C -->|"bê 1:1 (driving table đổi sang NG_SB_CLOS_EXTTABLE, full snapshot), thêm khóa T24_CUSTOMER_SK, bê 1:1 CHANGE_REQUEST/CHANGE_TYPE (nguồn gốc xa: NG_SB_CLOS_CHANGEREQ)"| D
     SK -.->|"CUSTOMER_SK — cấp CUST_GROUP, JOIN ngay tại SB_DWH (đúng luồng ETL SB_DWH→PDTD_DTM), kết quả là thành phần khóa chọn bảng TDKHDNL/TDKHDN"| C
-    SH -.->|"PRODUCTLINE_SK — cấp PRODUCTLINE_NAME, JOIN ngay tại SB_DWH (review 2026-10-12, thay PRODUCT_SK cũ); SUB_PRODUCT_SK — cấp SUB_PRODUCT_NAME, JOIN riêng (layer Sub Product)"| C
+    SH -.->|"PRODUCTLINE_SK — cấp PRODUCTLINE_NAME, JOIN ngay tại SB_DWH (thay PRODUCT_SK cũ); SUB_PRODUCT_SK — cấp SUB_PRODUCT_NAME, JOIN riêng (layer Sub Product)"| C
     SCA -.->|"APPLICATION_SK — cấp HAVE_ANY_DEVIATION và APP_GRP (quy đổi CASE WHEN → FLAG_APP_GRP ngay tại bước JOIN), JOIN ngay tại SB_DWH"| C
     SCA -.->|"APPLICATION_SK — cấp CREATION_DATE"| D
     C -->|"CUST_GROUP/PRODUCT_LINE_NAME/SUB_PRODUCT_NAME/HAVE_ANY_DEVIATION/FLAG_APP_GRP đã tính sẵn tại SB_DWH — LEFT JOIN R"| R
@@ -255,6 +255,7 @@ flowchart LR
     SLP -->|"nối chuỗi FULL_NAME/ID_NUMBER bằng ';' nếu nhiều đại diện"| D
     SCA -.->|"APPLICATION_SK — cấp STREAM (giữ nguyên giá trị gốc trên DIM) — PHÁI SINH tại PDTD_DTM: CASE WHEN UPPER(STREAM) IN (UPPER('Phê duyệt tín dụng'), UPPER('Sent To Disbursement Request')) THEN STREAM ELSE NULL END, sinh APPROVAL_TYPE"| D
     WE -.->|"Cung cấp nguồn cho thông tin User/Date tại Workstep, Lookup từ FCT_CLOS_APPLICATION sang qua APPLICATION_SK"| D
+    WE -.->|"sinh UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE — lấy dòng ENTRYDATE lớn nhất theo WI_NAME + WORKSTEP_CODE cố định"| D
 ```
 
 ### 4.3 Cấu trúc bảng
@@ -265,7 +266,7 @@ flowchart LR
 | 2 | APPLICATION_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_APPLICATION. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPLICATION_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN | — |
 | 3 | WORKSTEP_DECISION_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_WORKSTEP_DECISION. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.WORKSTEP_DECISION_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN, nguồn cho chỉ tiêu/trường LAST_WORKSTEP (Bước hồ sơ cuối, tính ở PDTD_DTM) và LAST_DECISION (Quyết định bước cuối) | LAST_DECISION (Quyết định bước cuối) |
 | 4a | PRODUCTLINE_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_PRODUCT (layer Product Line). Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.PRODUCTLINE_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới PRODUCT_LINE<br>Báo cáo SLA - TAT (BC5) — khóa JOIN điều kiện SLA_DE<br>Báo cáo KPI (BC9) — điều kiện lọc STREAM khi tính SLGN_CLOS | — |
-| 4b | SUB_PRODUCT_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_PRODUCT (layer Sub Product) — mới, review 2026-10-12. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.SUB_PRODUCT_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới SUB_PRODUCT<br>Báo cáo SLA - TAT (BC5) — khóa JOIN điều kiện SLA_DE | — |
+| 4b | SUB_PRODUCT_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_PRODUCT (layer Sub Product). Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.SUB_PRODUCT_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới SUB_PRODUCT<br>Báo cáo SLA - TAT (BC5) — khóa JOIN điều kiện SLA_DE | — |
 | 5 | COMPANY_SK | NUMBER | N | 18 |  | Khóa tới DIM_LOS_COMPANY — lookup theo COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.COMPANY_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới BRANCH_CODE/COMPANY_CODE/COMPANY_NAME | — |
 | 6 | CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — quan hệ 1:1 với hồ sơ qua WI_NAME, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK (chân T24, bổ sung riêng tại PDTD_DTM) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CUSTOMER_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới ZONE (DIM_CLOS_CUSTOMER.ZONE) | — |
 | 7 | T24_CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), tra qua ORG_LEGAL_ID trên DIM_CLOS_CUSTOMER. Mặc định -1| Báo cáo CLOS APPLICATION (BC2) — khóa JOIN sang DIM_T24_CUSTOMER (CUSTOMER_ID — ID khách hàng/Mã CIF) | — |
@@ -298,9 +299,9 @@ flowchart LR
 | 34 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%), chỉ nhận khi nguồn là số — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.INTEREST_RATE_PCT | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | INTEREST_RATE (Lãi suất phê duyệt) |
 | 35 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CURRENCY_CODE (nguồn gốc xa: NG_SB_CLOS_CREDITINFO_COMM.CURRENCY) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | CURRENCY (Loại tiền tệ áp dụng); CURRENCY (BC3).|
 | 36 | APPLICATION_LINK_INFO | VARCHAR2 | N | 200 |  | Thông tin liên kết hồ sơ — cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (không lọc CREATEDBY) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPLICATION_LINK_INFO | Báo cáo KPI (BC9) — điều kiện lọc IS NOT NULL cho SLHS_CLOS/SLGN_CLOS| — |
-| 37 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.UNDERWRITERMAKER_USERMAKE | Báo cáo CLOS APPLICATION (BC2) — BC2 map thẳng vào cột này| — |
-| 38 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.UNDERWRITERCHECKER_USERMAKE| Báo cáo CLOS APPLICATION (BC2) — BC2 map thẳng vào cột này.| — |
-| 39 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPROVAL_USERMAKE| Báo cáo CLOS APPLICATION (BC2) — BC2 map thẳng vào cột này.| — |
+| 37 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE đã tính xong tại SB_DWH: JOIN STG_FCT_CLOS_WORKSTEP_EVENT theo WI_NAME + WORKSTEP_CODE='UnderwriterMaker', lấy dòng ENTRYDATE lớn nhất (tránh fan-out) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | — |
+| 38 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE đã tính xong tại SB_DWH: JOIN STG_FCT_CLOS_WORKSTEP_EVENT theo WI_NAME + WORKSTEP_CODE='UnderwriterChecker', lấy dòng ENTRYDATE lớn nhất (tránh fan-out) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | — |
+| 39 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE đã tính xong tại SB_DWH: JOIN STG_FCT_CLOS_WORKSTEP_EVENT theo WI_NAME + WORKSTEP_CODE IN ('CreditCommittee','CreditApproval'), lấy dòng ENTRYDATE lớn nhất (tránh fan-out) | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | — |
 | 40 | LG_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu bảo lãnh (Letter of Guarantee) phát sinh theo hồ sơ — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.LG_REQ | — | Thiết kế dư thừa |
 | 41 | FI_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu (tương tự LG_REQ) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.FI_REQ| — | Thiết kế dư thừa |
 | 42 | PHONE_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu xác minh điện thoại (tương tự LG_REQ) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.PHONE_REQ| — | Thiết kế dư thừa |
@@ -511,8 +512,10 @@ flowchart LR
     end
     subgraph PDTD_DTM
         D["FCT_CLOS_WORKSTEP_EVENT"]
+        AA["FCT_CLOS_APPLICATION"]
     end
     C -->|"bê 1:1, cùng grain/PK — tự EXISTS-check qua các dòng cùng WI_NAME để sinh APPROVAL_FLAG + WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY đã bê 1:1 để sinh WORKSTEP_FLAG "| D
+    D -.->|"UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE bê 1:1 từ SB_DWH/STG_DTM; FCT_CLOS_APPLICATION JOIN sang D (qua STG_DTM) theo WI_NAME + WORKSTEP_CODE cố định, lấy dòng ENTRYDATE mới nhất"| AA
 ```
 
 ### 8.3 Cấu trúc bảng
@@ -543,6 +546,9 @@ flowchart LR
 | 22 | APPROVED_DATE | DATE | N |  |  | Ngày phê duyệt (BC11.APPROVAL_DATE) — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.APPROVED_DATE | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FCT_CLOS_LOAN_DISBURSEMENT.APPROVAL_DATE (mục 9) | APPROVAL_DATE (Ngày phê duyệt) |
 | 23 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, tạm thời chỉ CLOS — xem ghi chú kiến trúc tại mục 8.1): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này), ngược lại 'From Second Approval'. Input EXITDATE/WI_NAME lấy từ chính bảng này (đã bê 1:1 từ SB_DWH, cột 8/11). Dùng cho BC5.APPROVAL_FLAG — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc chỉ tính sự kiện 'First Approval' khi tính TAT_APPLICATION_HOUR | APPROVAL_FLAG (Phê duyệt lần đầu/từ lần thứ 2) |
 | 24 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4) — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH — xem ghi chú kiến trúc tại mục 8.1): 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE (tra qua WORKSTEP_DECISION_SK → DIM_CLOS_WORKSTEP_DECISION, cột 4) của TOÀN BỘ lịch sử WI_NAME (EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này) kết hợp WF_PROCESSNAME='CLOS'/WF_ACTIVITYNAME (cột 20-21, đã bê 1:1 từ SB_DWH)| Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
+| 25 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterMaker' | — | — |
+| 26 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterChecker' | — | — |
+| 27 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') | — | — |
 
 
 ## 9. FCT_CLOS_LOAN_DISBURSEMENT
@@ -632,9 +638,9 @@ flowchart LR
   — không cần bảng trung gian riêng vì `CUSTOMER_SK`/`APPLICATION_SK` đã
   có sẵn ngay trên bảng này.
 - **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_NUMBER`+`OBJ_TYPE` —
-  hash vào cột `LEGAL_PARTY_BK`, bê 1:1 từ SB_DWH (review 2026-10-12: bổ
-  sung `OBJ_TYPE` ở SB_DWH, xem SB_DWH mục 6.1, vì 1 người có thể giữ
-  nhiều vai trò trên cùng hồ sơ — xem grain ở dưới)
+  hash vào cột `LEGAL_PARTY_BK`, bê 1:1 từ SB_DWH (bổ sung `OBJ_TYPE` ở
+  SB_DWH, xem SB_DWH mục 6.1, vì 1 người có thể giữ nhiều vai trò trên
+  cùng hồ sơ — xem grain ở dưới)
 - **Khóa chính của bảng (PK):** DAYID, LEGAL_PARTY_BK — bê 1:1 từ SB_DWH.
 - **Độ chi tiết (grain):** 1 dòng = 1 người × 1 vai trò × 1 hồ sơ × 1
   ngày dữ liệu (N dòng/hồ sơ/ngày không giới hạn — 1 người có thể giữ
@@ -666,7 +672,7 @@ flowchart LR
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.DAYID | — (cột kỹ thuật, một phần khóa chính) | — |
-| 2 | LEGAL_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng vai trò pháp lý — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.LEGAL_PARTY_BK: STANDARD_HASH(WI_NAME \|\| ID_NUMBER \|\| OBJ_TYPE, 'MD5') — gộp 3 cột PK tự nhiên (WI_NAME, ID_NUMBER, OBJ_TYPE) thành 1 khóa đơn. OBJ_TYPE bổ sung review 2026-10-12 (xem SB_DWH mục 6.1) | — (cột kỹ thuật, một phần khóa chính) | — |
+| 2 | LEGAL_PARTY_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng vai trò pháp lý — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.LEGAL_PARTY_BK: STANDARD_HASH(WI_NAME \|\| ID_NUMBER \|\| OBJ_TYPE, 'MD5') — gộp 3 cột PK tự nhiên (WI_NAME, ID_NUMBER, OBJ_TYPE) thành 1 khóa đơn. OBJ_TYPE bổ sung ở SB_DWH (xem SB_DWH mục 6.1) | — (cột kỹ thuật, một phần khóa chính) | — |
 | 3 | CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — khách hàng CHÍNH của hồ sơ (MỌI dòng đều có). Bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.CUSTOMER_SK. Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ — cũng là 1 trong 3 khóa mà FCT_CLOS_APPLICATION_PARTY cũ từng cung cấp, trước khi xóa hẳn khỏi thiết kế) | — |
 | 4 | APPLICATION_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_APPLICATION — join theo WI_NAME. Bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.APPLICATION_SK. Mặc định -1 nếu không khớp | — (khóa liên kết nội bộ — cũng là 1 trong 3 khóa mà FCT_CLOS_APPLICATION_PARTY cũ từng cung cấp, trước khi xóa hẳn khỏi thiết kế) | — |
 | 5 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ CLOS — bê 1:1 từ SB_DWH.FCT_CLOS_LEGAL_PARTY.WI_NAME (nguồn gốc xa: NG_SB_CLOS_CUST_INFO_LEGAL.WI_NAME). Quan hệ 1:N với hồ sơ, N không giới hạn | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN report-time để tra ID_NUMBER (LEGAL_TYPE='CUSTOMER') khi cần đối chiếu; nguồn ETL cho FCT_CLOS_APPLICATION.LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE thực chất đi qua bản SB_DWH của bảng này, không phải qua bản PDTD_DTM này | — |
@@ -729,6 +735,7 @@ flowchart LR
     STG -.->|"MAIN_ID/RECID = RESULT_MAIN_CARD_ID (qua DIM_RLOS_APPLICATION) — sinh T24_CARD_SK/T24_SEAB_MAIN_CARD_SK"| D
     WE -.->|"PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, xóa khỏi FCT_RLOS_APPLICATION SB_DWH) — MAX/MIN/LAG(ENTRYDATE/EXITDATE/WORKSTEP_CODE) theo WI_NAME+WORKSTEP_CODE — sinh USER_SK (đổi tên từ LAST_USER_SK), BRANCH_USER, DDE_USER, QC_USER, UND_MAKER_USER, UND_CHECKER_USER, PHV_USER, APPROVER_USER (USERNAME tại từng WORKSTEP_CODE cố định, bản ghi EXITDATE lớn nhất), LAST_APPROVAL_DATE/MIN_UWM/MIN_APP (MAX/MIN EXITDATE/ENTRYDATE), CANCEL_USER_DATE, CANCEL_DATE (ENTRYDATE tại WORKSTEP_CODE='CancelRevoke'), LAST_ENTRYDATE/LAST_EXITDATE/PRE_WORKSTEP_CODE/LAST_REMARKS/LAST_REMARK_DDE/LAST_CAN_REMARKS (của sự kiện hoàn tất gần nhất) — FLAG_AUTO_CANCEL tiếp tục dùng CANCEL_DATE làm input, cùng bảng"| D
     RAPP -.->|"APPLICATION_SK — tra INTEREST_RATE_PCT/LOAN_TO_VALUE/LOAN_OBJECTIVE/TOTAL_INCOME/10 cột cờ nguồn thu/PRODUCT_NAME (đã chuyển từ FCT_RLOS_APPLICATION SB_DWH sang DIM_RLOS_APPLICATION, SCD1) — input cho REPAYMENT_SOURCE/INCOM_3/BUSINESS_INCOM/FLAG_BUSINESS_INCOME tính tại AGG_LOS_KPI_APPLICATION (mục 3)"| D
+    WE -.->|"sinh UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE — lấy dòng ENTRYDATE lớn nhất theo WI_NAME + WORKSTEP_CODE cố định"| D
 ```
 
 
@@ -769,9 +776,9 @@ flowchart LR
 | 31 | LAST_CAN_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại lần hủy hồ sơ — PHÁI SINH TẠI PDTD_DTM : REMARKS trên SB_DWH.FCT_RLOS_WORKSTEP_EVENT, bước hủy hồ sơ gần nhất theo WI_NAME — BỔ SUNG RIÊNG TẠI PDTD_DTM, không còn ở SB_DWH | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | LAST_CAN_REMARKS (Ghi chú tại bước Cancel) |
 | 32 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVED_AMT_FINAL (nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — CREDIT_LIMIT | LOAN_AMOUNT (Số tiền phê duyệt); CREDIT_LIMIT (BC3) |
 | 33 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVED_TERM | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — CREDIT_TERM| LOAN_TERM (Thời hạn phê duyệt, tháng); CREDIT_TERM (BC3) |
-| 34 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.UNDERWRITERMAKER_USERMAKE: COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterMaker' THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.UWMAKERUSER) | Báo cáo RLOS APPLICATION (BC1) — BC1 map thẳng vào cột này.| — |
-| 35 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.UNDERWRITERCHECKER_USERMAKE: COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP='UnderwriterChecker' THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.UWCHKRUSER) | Báo cáo RLOS APPLICATION (BC1) — BC1 map thẳng vào cột này.| — |
-| 36 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVAL_USERMAKE: COALESCE(CASE WHEN NG_SB_RLOS_USER_MAKE_WORK_STEP.WORK_STEP IN ('CreditCommittee','CreditApproval') THEN NG_SB_RLOS_USER_MAKE_WORK_STEP.USER_MAKE END, NG_SB_RLOS_EXTTABLE.CREDAPPRUSER, NG_SB_RLOS_EXTTABLE.CCOMMITUSER) | Báo cáo RLOS APPLICATION (BC1) — BC1 map thẳng vào cột này. | — |
+| 34 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE đã tính xong tại SB_DWH: JOIN STG_FCT_RLOS_WORKSTEP_EVENT theo WI_NAME + WORKSTEP_CODE='UnderwriterMaker', lấy dòng ENTRYDATE lớn nhất (tránh fan-out) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | — |
+| 35 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE đã tính xong tại SB_DWH: JOIN STG_FCT_RLOS_WORKSTEP_EVENT theo WI_NAME + WORKSTEP_CODE='UnderwriterChecker', lấy dòng ENTRYDATE lớn nhất (tránh fan-out) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | — |
+| 36 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE đã tính xong tại SB_DWH: JOIN STG_FCT_RLOS_WORKSTEP_EVENT theo WI_NAME + WORKSTEP_CODE IN ('CreditCommittee','CreditApproval'), lấy dòng ENTRYDATE lớn nhất (tránh fan-out) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | — |
 | 37 | CHANGE_REQUEST | VARCHAR2 | N | 200 |  | Yêu cầu điều chỉnh hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CHANGE_REQUEST| Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | CHANGE_REQUEST (Thay đổi điều kiện — New/Change) |
 | 38 | CHANGE_TYPE | VARCHAR2 | N | 500 |  | Loại thay đổi điều kiện phê duyệt — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CHANGE_TYPE | Báo cáo RLOS APPLICATION (BC1) hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) khóa tra REF_PRODUCT/SLA_* | CHANGE_TYPE (Loại thay đổi điều kiện) |
 | 39 | APPLICATION_STATUS | VARCHAR2 | N | 50 |  | Trạng thái hồ sơ chuẩn hóa (BC1) — PHÁI SINH TẠI PDTD_DTM, CHUYỂN TỪ SB_DWH, business rule (đồng bộ theo pattern CLOS mục 4): tra WORKSTEP_CODE/DECISION_CODE qua WORKSTEP_DECISION_SK (cột 3, cùng bảng, đã bê 1:1 từ SB_DWH) → SB_DWH.DIM_RLOS_WORKSTEP_DECISION, áp CASE WHEN DECISION_CODE IN ('Submit','Send To PostSanction','Submit To DisbursementMaker','Send To HOSupport') THEN 'Approved' WHEN DECISION_CODE='Reject' THEN 'Rejected' WHEN WORKSTEP_CODE IN ('CancelRevoke','CancelPermanent') THEN 'Cancelled' ELSE 'Processing' END — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — hiển thị trực tiếp<br>Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp (BI_APPSTATUS) | APPLICATION_STATUS (Trạng thái hồ sơ).|
@@ -829,7 +836,7 @@ flowchart LR
 | 3 | APPLICATION_SK | NUMBER | N | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.APPLICATION_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
 | 4 | WI_NAME | VARCHAR2 | Y | 100 | | Mã hồ sơ tín dụng RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.WI_NAME | Báo cáo RLOS APPLICATION (BC1) — khóa chính<br>Báo cáo KPI (BC9) — khóa nối AGG_LOS_KPI_APPLICATION.TSBD_G2 | — |
 | 5 | COLLATERAL_TYPE_CODE | VARCHAR2 | N | 100 |  | Nhãn phân loại nguồn của tài sản bảo đảm — gán cố định theo bảng grid mà bản ghi đến từ đó (REALESTATE/TRANSPORT/VALPAPER/OTHER). Dùng để CASE chọn đúng cột chi tiết khi dựng TYPES_OF_COLLATERALS (cột 21) — không phải dữ liệu mô tả tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.COLLATERAL_TYPE_CODE | Báo cáo RLOS APPLICATION (BC1) — điều kiện lọc tách GCN_REAL_ESTATE/GCN_OTHER, TSBD_BDS/TSBD_PTVT<br>Báo cáo Thông tin phê duyệt (BC3) — điều kiện lọc dựng TYPES_OF_COLLATERALS | Nguồn cho chỉ tiêu/trường TYPES_OF_COLLATERALS (BC3); điều kiện lọc GCN_REAL_ESTATE/GCN_OTHER/TSBD_BDS/TSBD_PTVT (BC1) |
-| 6 | CERTIFICATE_NO | VARCHAR2 | N | 500 |  | Số giấy chứng nhận tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.CERTIFICATE_NO (nguồn gốc xa: BĐS lấy NG_SB_RLOS_COL_REALESTATE.NO_CERTI; khối VALPAPER lấy thẳng NG_SB_RLOS_COL_VALPAPER.NUMBERSIGN, review 2026-10-12; khối TRANSPORT/OTHER lấy NG_SB_RLOS_COLL_CERTIGRD.CERTIFICATENO) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp (tách GCN_REAL_ESTATE/GCN_OTHER theo COLLATERAL_TYPE_CODE)<br>Báo cáo Thông tin phê duyệt (BC3) — nguồn cho TYPES_OF_COLLATERALS khi COLLATERAL_TYPE_CODE=REALESTATE | GCN_REAL_ESTATE (Số GCN TSBĐ là BĐS); GCN_OTHER (Số GCN TSBĐ là PTVT/Khác) |
+| 6 | CERTIFICATE_NO | VARCHAR2 | N | 500 |  | Số giấy chứng nhận tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.CERTIFICATE_NO (nguồn gốc xa: BĐS lấy NG_SB_RLOS_COL_REALESTATE.NO_CERTI; khối VALPAPER lấy thẳng NG_SB_RLOS_COL_VALPAPER.NUMBERSIGN; khối TRANSPORT/OTHER lấy NG_SB_RLOS_COLL_CERTIGRD.CERTIFICATENO) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp (tách GCN_REAL_ESTATE/GCN_OTHER theo COLLATERAL_TYPE_CODE)<br>Báo cáo Thông tin phê duyệt (BC3) — nguồn cho TYPES_OF_COLLATERALS khi COLLATERAL_TYPE_CODE=REALESTATE | GCN_REAL_ESTATE (Số GCN TSBĐ là BĐS); GCN_OTHER (Số GCN TSBĐ là PTVT/Khác) |
 | 7 | DESCRIPTION | VARCHAR2 | N | 4000 |  | Mô tả tài sản bảo đảm — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.DESCRIPTION, đúng nguyên văn SRS BC3: UNION theo loại tài sản — BĐS: NO_CERTI \|\| ', ' \|\| USING_PURPOSE; PTVT: BRAND \|\| ', ' \|\| CONTROL_POSTER; GTCG: NUMBERSIGN; Khác: DESCRIBE. Không dùng REMARKS (không có trong SRS) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | DESCRIPTION (Mô tả TSBĐ) |
 | 8 | OWNER_NAME | VARCHAR2 | N | 200 |  | Chủ sở hữu tài sản — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.OWNER_NAME (nguồn gốc xa: OWNER của 4 bảng grid tài sản RLOS) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp<br>Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | OWNERSHIP (Sở hữu nhà ở, BC1); OWNER (Chủ TSBĐ, BC3) |
 | 9 | REL_TO_CUSTOMER | VARCHAR2 | N | 200 |  | Quan hệ giữa chủ tài sản và khách hàng — bê 1:1 từ SB_DWH.FCT_RLOS_COLLATERAL.REL_TO_CUSTOMER (nguồn gốc xa: UNION REL_CUSTOMER/RELATION_CUSTOMER của 4 bảng grid tài sản) | Báo cáo RLOS APPLICATION (BC1) — hiển thị trực tiếp | TSBD_RELATIONSHIP (Mối quan hệ chủ tài sản và KH) |
@@ -1042,8 +1049,10 @@ flowchart LR
     end
     subgraph PDTD_DTM
         D["FCT_RLOS_WORKSTEP_EVENT"]
+        AA["FCT_RLOS_APPLICATION"]
     end
     C -->|"bê 1:1, cùng grain/PK — tự EXISTS-check qua các dòng cùng WI_NAME để sinh APPROVAL_FLAG + WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY đã bê 1:1 để sinh WORKSTEP_FLAG "| D
+    D -.->|"UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE bê 1:1 từ SB_DWH/STG_DTM; FCT_RLOS_APPLICATION JOIN sang D (qua STG_DTM) theo WI_NAME + WORKSTEP_CODE cố định, lấy dòng ENTRYDATE mới nhất"| AA
 ```
 
 ### 16.3 Cấu trúc bảng
@@ -1074,6 +1083,9 @@ flowchart LR
 | 22 | WF_CREATEDBY | VARCHAR2 | N | 50 |  | Mã người/hệ thống tạo bản ghi workflow — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_CREATEDBY.| Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (điều kiện lọc, cột 28, cùng bảng) | — |
 | 24 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, cùng cơ chế đã áp dụng cho CLOS): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này), ngược lại 'From Second Approval' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc khi tính TAT_APPLICATION_HOUR (chỉ lấy sự kiện phê duyệt lần đầu) | APPROVAL_FLAG (Phê duyệt lần đầu/từ lần thứ 2, BC5); nguồn cho chỉ tiêu/trường TAT_APPLICATION_HOUR (điều kiện lọc, BC9) |
 | 25 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4, nhánh RLOS) — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH): 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE (tra qua WORKSTEP_DECISION_SK → DIM_RLOS_WORKSTEP_DECISION, cột 4) của CHÍNH DÒNG SỰ KIỆN đang xét, kết hợp WF_PROCESSNAME='RLOS'/WF_ACTIVITYNAME (cột 21-22, đã bê 1:1 từ SB_DWH) — nhánh 2/4/5 khác CLOS (nhánh 4 có thêm OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send to UWChecker')).| Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
+| 28 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterMaker' | — | — |
+| 29 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterChecker' | — | — |
+| 30 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') | — | — |
 
 ## 17. FCT_RLOS_LOAN_DISBURSEMENT
 

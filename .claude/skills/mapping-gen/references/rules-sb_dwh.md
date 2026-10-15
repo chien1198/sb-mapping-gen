@@ -1,229 +1,350 @@
 # Rules — phase 1: CLOS/RLOS → SB_DWH
 
-Produces `mapping/SB_DWH/Mapping_<TABLE_NAME>.xlsx` for a table listed in
-`extract/SB_DWH/_index.json`, in the exact layout of the sample templates
-in `references/` (2 sheets: `Mapping`, `Variable`).
+Produces `mapping/SB_DWH/Mapping_<TABLE_NAME>.xlsx` for a table that has a
+file in `lld/sb_dwh/SB_DWH_<TABLE>.csv`, in the exact layout of the sample
+templates in `references/` (2 sheets: `Mapping`, `Variable`).
 
-This is the deepest phase: CLOS/RLOS source-system analysis, per-column
-transform logic, and JOINs between multiple source tables per system.
+This phase used to require deep CLOS/RLOS source-system analysis from raw
+docx/xlsx extracts. That analysis has already been done — the LLD CSV is
+its finished output, one row per target column, with the real SQL already
+written (driving table, JOIN clauses, derived-value expressions). This
+phase is now a **reshape**: read the LLD, decide `item_name` per column
+(the one thing the CSV doesn't carry), and place everything into the
+template's cell layout — it is not re-deriving mapping logic from scratch.
 
 ## Inputs you read (never write to these)
 
-- `extract/database/<TABLE>.md` — official target schema: column name, Oracle
-  type, nullability, size, PK marker. This is the source of truth for
-  `Column type` in the output.
-- `extract/SB_DWH/<TABLE>.md` — per-column lineage/business logic. Its
-  header metadata block gives the table's own natural key (`Khóa:` line,
-  e.g. `DIMENSION_KEY (sequence). NK = WI_NAME`) and the full list of CDC
-  source tables feeding it (`Nguồn:` line) — use these to work out JOIN
-  aliases, you don't need to cross-reference another sheet. The column
-  table itself carries, per column: `Bảng nguồn` / `Cột nguồn` (the actual
-  source table+column), `TRẠNG THÁI THIẾT KẾ` (`DA_CHOT` = confirmed,
-  anything else, e.g. `CẦN XÁC NHẬN`, = not yet confirmed — flag anything
-  you infer from a non-`DA_CHOT` row, see below), and `Mô tả`, which follows
-  one of three tags:
-  - `1:1 —` straight copy from a source column, may list **two sources
-    separated by `/`** when CLOS and RLOS both feed the same target column
-    (e.g. `NG_SB_RLOS_APPLICANT_GENERAL.WI_NAME / NG_SB_CLOS_CUST_INFO.WI_NAME`).
-  - `PHÁI SINH —` derived value, description contains the transform logic in
-    prose or pseudo-CASE-WHEN — translate it into a SQL-like expression.
-  - `KỸ THUẬT —` technical/ETL-generated column (surrogate key, FK lookup to
-    another DIM, EFF_DATE/EXP_DATE) — usually not tied to one specific
-    source system.
-  Everything needed to generate a mapping lives inside this one file per
-  table — there is no separate overview/reference file to cross-check
-  (`extract/SB_DWH/` only ever contains real table files; non-table
-  reference sheets from the xlsx are filtered out at extraction time, see
-  `mapping-extract-input`).
+- `lld/sb_dwh/SB_DWH_<TABLE>.csv` — the only input needed. 11 columns:
+  `target_table, target_column, nullable, data_type, key, description,
+  etl_logic, etl_logic_type, source_table, source_column, note`. This is
+  the source of truth for everything in the output except `Item Name`:
+  - `data_type` → `Column type` directly (already a short form like
+    `string(100)`, `number`, `date` — use it as-is, don't expand/reformat
+    to Oracle syntax).
+  - `key` → `PK`, `NK`, or blank. Any non-blank value means the column name
+    renders in **red font** in the output (`is_key: true`). `PK` also
+    drives `Table_description`/row semantics the same way it always has
+    (surrogate/natural key).
+  - `etl_logic_type` → which shape the mapping cell and any
+    JOIN/notes/description entries take (see below): `direct`, `join`,
+    `generated`, `scd2`, `computed`, `pending`.
+  - `source_table` / `source_column` → which physical table(s) this column
+    reads from. Each distinct source table gets a short alias (`A`, `B`,
+    `C`...) — see "Aliasing" below.
+  - `note` → background/justification text. See "Handling `note`" below
+    for what carries into `Description` vs. what to drop.
 - `references/Mapping_DIM_LOAN_template.xlsx` (for DIM tables) or
-  `references/Mapping_FCT_LOAN_template .xlsx` (for FCT tables, note the
+  `references/Mapping_FCT_LOAN_template .xlsx` (for FCT tables, mind the
   trailing space before `.xlsx` in that filename) — layout reference. Open
-  it read-only with openpyxl to see exact structure if needed; do not modify
-  it.
+  it read-only with openpyxl to see exact structure if needed; do not
+  modify it.
+
+You do **not** read `extract/SB_DWH/<TABLE>.md` or `extract/database/<TABLE>.md`
+for this phase anymore — the LLD CSV supersedes both (it already carries
+the resolved lineage that `extract/SB_DWH/` held, and the schema facts
+`extract/database/` held).
+
+## Aliasing
+
+The LLD's `etl_logic` writes every formula and JOIN clause using full table
+names (e.g. `NG_SB_CLOS_APPROVAL.STREAM`, `LEFT JOIN NG_SB_CLOS_APPROVAL ON
+NG_SB_CLOS_APPROVAL.WI_NAME = NG_SB_CLOS_EXTTABLE.WI_NAME`). The output,
+like the LOAN templates, aliases each distinct source table with a single
+letter — `A`, `B`, `C`... — assigned **in order of first appearance** in
+the LLD's rows (reading top to bottom), with the driving table (the
+`source_table` behind the key column's `direct` row) always `A`. Rewrite
+every mapping formula and JOIN clause to use these aliases instead of the
+LLD's full table names:
+- The header block's source list (rows 1-2, column E) lists each distinct
+  `source_table` referenced by this table's columns, one per line, as
+  `<TABLE> AS <ALIAS>` (e.g. `NG_SB_CLOS_EXTTABLE AS A`), **left-aligned**.
+- Every mapping cell and JOIN clause in the output substitutes the alias
+  for the full table name — e.g. `NG_SB_CLOS_APPROVAL.STREAM` becomes
+  `B.STREAM` once `NG_SB_CLOS_APPROVAL` is assigned alias `B`.
+- A column/table name that collides with another table's own column name
+  is not a concern here — aliasing is purely textual substitution of the
+  table-name prefix, never a rename of the column itself.
+
+## One mapping column, always — never a second blank "NULL" column
+
+The LOAN templates ship with two mapping columns (E = system 1, F = system
+2) because the original LOS tables routinely blended two source systems
+(CLOS + RLOS) in one target table. **That is no longer the shape of this
+project's tables** — every `lld/sb_dwh/SB_DWH_<TABLE>.csv` file sources
+from exactly one system. So:
+- `mapping_headers` always has **exactly one entry** — never pass a second
+  entry just because the template has an F column. `gen_mapping.py`
+  already clears any unused trailing "How to mapping" header label when
+  `mapping_headers` has fewer entries than the template ships with, so the
+  F column simply disappears from the output — don't fill it with the
+  literal `"NULL"` convention from the old multi-system design; that
+  convention was for "system X doesn't produce this column", which can't
+  happen when there's only one system to begin with.
+- The single header label is chosen by the table's **driving table**'s own
+  system — not by the target table's name prefix. The driving table is the
+  `source_table` on the row(s) with `etl_logic_type = direct` that feed the
+  table's own key column(s) (typically the first few rows, e.g. the row
+  behind `DIMENSION_KEY`'s description/note, or the PK natural-key row).
+  Read the system off that source table's own name:
+  - A driving table named `NG_SB_CLOS_*` → `"How to mapping CLOS"`
+  - A driving table named `NG_SB_RLOS_*` → `"How to mapping RLOS"`
+  - Anything else (shared/unified source table not under a CLOS/RLOS
+    prefix) → `"How to mapping LOS"`
+  In practice this usually agrees with the target table's own
+  `CLOS`/`RLOS` name segment, but don't shortcut to reading the name
+  segment alone — always confirm against the actual driving table's name,
+  since a table's target name doesn't always mirror its source system.
 
 ## Output structure (what the template encodes)
 
 Sheet `Mapping`:
-- Row 1-4: `Table name` / `Table description` / `Key` (fixed note "Bao gồm
-  các trường màu đỏ") / `Tần suất chạy dữ liệu` (FCT only) in column B, with
-  the list of source tables + SQL aliases (`TABLE_NAME AS A`) stacked down
-  column E (and F, G... for additional source systems) — one line per
-  source table joined into that column's mapping, **left-aligned** (not
-  centered) so lines of different lengths still read as one consistent
-  left-anchored list.
-- Header row (`Column name | Column type | Item Name | Description | How to
-  mapping <SYSTEM1> | How to mapping <SYSTEM2>...`): one `How to mapping`
-  column **per source system** (e.g. CLOS, RLOS) — not per CDC table. Two
-  systems is the common case for LOS tables since most target tables merge
-  CLOS + RLOS.
-- Below that, one row per target column: `Column name` in **red font** if
-  it's part of the table's key (SK/PK, or the natural key noted in
-  extract/database — e.g. `DIMENSION_KEY`, or `DAYID` + business key for
-  FCT), black otherwise. `Column type` copied from extract/database.
-  **`Item Name` must always be filled** with a short Vietnamese business
-  name for the column (derived from its `Mô tả`/description) — never leave
-  it blank; `scripts/validate_mapping.py` enforces this (rule #13).
-  `Description` only filled when there's a caveat worth calling out (unusual
-  rule, edge case) — leave blank otherwise, don't restate the obvious.
-  Occasionally a row above a column is a merged/plain note row reading
-  "Điều kiện lấy dữ liệu" with the filter condition in the Description
-  column — used when a column's value depends on a WHERE/filter clause.
-- After all columns: a "Điều kiện join giữa các bảng" label **in column D**
-  (the Description column, not column A), then the JOIN clauses between
-  each system's source tables (e.g. `LEFT JOIN B.WI_NAME = A.WI_NAME`) laid
-  out as **one clause per ROW, one column per source system** — clause[0]
-  of every system on the first row below the label, clause[1] on the next
-  row, and so on. Mirrors the FCT_LOAN template's own worked example
-  (its "Điều kiện join" section spans two rows for two JOIN clauses per
-  system). Never stack multiple clauses into one cell with `\n` — each
-  cell holds exactly one JOIN clause. Both the label row and every
-  JOIN-clause row carry the template's colored fill and cell borders —
-  `gen_mapping.py` gets this by capturing the template's own styling from
-  those exact rows before it wipes the sample data, not by inventing a
-  color.
-- Optional trailing "Chú ý:" row for free-text caveats that don't belong to
-  one column — **only emitted when there is real note content** (never as
-  an empty placeholder), and both the "Chú ý:" label and its content must
-  be bold, with the content left-aligned and vertically centered (matching
-  the template's own B72 example — `gen_mapping.py` gets this by capturing
-  that row's style from the template before wiping the sample data, the
-  same pattern used for the join rows). When there is more than one
-  distinct point to flag, pass `notes` as a JSON list instead of one
-  string — `gen_mapping.py` numbers each item "1. ", "2. ", ... on its own
-  line inside the single B-column cell, **deliberately without wrap_text**
-  (the user's own call: wrapping collapses numbered points into one dense
-  visual block that's easy to skim past during review — leaving wrap off
-  keeps each "\n"-separated point on its own legible line), so unrelated
-  concerns stay visually separate instead of running together as one
-  paragraph.
+- Row 1-2: `Table name` / `Table description` in column B, with the list
+  of distinct source tables (`<TABLE> AS <ALIAS>`) stacked down column E —
+  one line per source table, **left-aligned**.
+- Row 3: `Key` — fixed note "Bao gồm các trường màu đỏ".
+- Row 4: `Tần suất chạy dữ liệu` (FCT only).
+- Header row: `Column name | Column type | Item Name | Description | How
+  to mapping <SYSTEM>` — exactly one mapping column, per the rule above.
+- Below that, one row per target column from the LLD, in the same order as
+  the CSV: `Column name` in red font when `key` is non-blank (`PK`/`NK`),
+  black otherwise. `Column type` from `data_type`. `Item Name` always
+  filled (see below) — `scripts/validate_mapping.py` rule #13 enforces
+  this. `Description` always filled too, with the LLD's full `description`
+  text (plus any `[CẦN REVIEW]` caveat) — see "Item Name and Description"
+  below.
+- After all columns: "Điều kiện join giữa các bảng" label in column D, JOIN
+  clauses one per row in column E (see "Building JOIN conditions" below).
+  Omit this section entirely (`join_conditions` left out of the JSON) if
+  no column in the table has `etl_logic_type = join`.
+- Optional trailing "Chú ý:" row — only emitted when there's real
+  table-wide note content that doesn't belong to one column (most
+  table-level LLD caveats belong in a specific row's Description instead;
+  reserve this for something that really applies to the whole table).
 
-Sheet `Variable`: global variables referenced in mapping formulas (e.g.
-`V_DATE_BATCH`, `V_IS_START_YEAR`). Only relevant for FCT tables with
-day-over-day accumulation logic. If the table doesn't need any, copy the
-template's Variable sheet as-is (it's harmless boilerplate) — don't invent
-variables that aren't needed.
+Sheet `Variable`: copy from the template unchanged unless the table has
+day-over-day accumulation logic that needs a new variable — same as
+before, don't invent variables that aren't needed.
 
-## How to derive the "How to mapping" formulas
+## Deriving the mapping cell per `etl_logic_type`
 
-- Determine the source systems for the table from how many distinct source
-  DBs its columns cite (usually CLOS and RLOS for LOS tables). This sets
-  `mapping_headers` (e.g. `["How to mapping CLOS", "How to mapping RLOS"]`)
-  and the number of source columns (E, F, ...). **When both CLOS and RLOS
-  are present, CLOS always goes first (column E), RLOS second (column F)**
-  — this order must be identical across every table in the project so a
-  reviewer scanning many files can rely on column E always being CLOS.
-  Never flip it even if RLOS happens to be the "primary" or only-populated
-  system for a given table — a table with only one system still keeps that
-  system in its conventional slot and puts literal `"NULL"` in every cell
-  of the other column, rather than dropping/reordering the header.
-  `scripts/validate_mapping.py` enforces this order when both labels are
-  present in the header row.
-- Assign SQL aliases (A, B, C...) per system, one alias per distinct source
-  table cited for that system, in the order first referenced — mirror how
-  the LOAN templates alias each source table via `AS X`. List every source
-  table + its alias in the header block column for that system.
-- Per column, per system:
-  - `1:1 —` with one source per system → `<ALIAS>.<SOURCE_COLUMN>`.
-  - `1:1 —` with `A / B` sources → split on `/`, assign each half to its
-    matching system's mapping column.
-  - `PHÁI SINH —` → translate the described logic into a SQL-like
-    expression (CASE WHEN / string functions / window functions as
-    described). Keep it in the same language/register as the extract
-    (Vietnamese conditions are fine, this mirrors the template's own style).
-  - `KỸ THUẬT —` → sequence/lookup logic in one column if it's genuinely
-    system-specific (e.g. differs by CLOS/RLOS lookup path), otherwise put
-    the same value in all mapping columns, or in just the first if it's a
-    single shared computation (e.g. `SEQ_xxx.NEXTVAL`, DATASOURCE literal).
-  - If a system doesn't produce this column at all — no ETL logic feeds it
-    from that source — set that mapping cell to the literal string `"NULL"`
-    (never a blank/`null` JSON value). This is the template's own
-    convention (see the LOAN template's literal `NULL` cells) and keeps
-    "not applicable in this source" visually distinct from "forgot to
-    fill in".
-- JOIN conditions: derive from the table's own `Khóa:` line (natural key,
-  e.g. `NK = WI_NAME`) plus each column's `Bảng nguồn` / `Cột nguồn` —
-  e.g. a column sourced from `NG_SB_CLOS_APPROVAL` keyed by `WI_NAME`
-  joins to the main entity table aliased earlier on that same key. One
-  JOIN chain per system. Pass each system's chain as a **list of
-  individual JOIN clauses**, one clause per source table beyond the first
-  — the script renders each list entry on its own line within the cell,
-  never concatenated into one run-on string.
+In every case below, apply the alias substitution from "Aliasing" above
+before writing the final mapping/JOIN text — the LLD's full table names
+never survive unchanged into the output.
 
-### Flagging uncertainty
+- `direct` → the mapping cell is `etl_logic` with its table name replaced
+  by the assigned alias (e.g. `NG_SB_CLOS_EXTTABLE.WI_NAME` → `A.WI_NAME`).
+- `generated` → technical/ETL-generated value (surrogate key, FK
+  self-reference, hash business key).
+  - **Every `DIMENSION_KEY` row, and every `*_SK` column, on every
+    SB_DWH table — no exceptions, regardless of what `etl_logic` actually
+    says** (blank, `= DIMENSION_KEY (cùng dòng)`, a named
+    `SEQ_x.NEXTVAL` call, or anything else): the mapping cell is always
+    the fixed literal `"Sinh bằng Oracle sequence tại SB_DWH"`. This is a
+    project-wide default for this phase, not a case-by-case judgment call
+    — don't branch on whether the SK mirrors the PK, shares a sequence
+    with another column, or has its own named sequence; all of that detail
+    belongs in `description`, never in the mapping cell itself. Move
+    whatever `etl_logic` originally said (the sequence name if one is
+    given, which layer's change triggers a new value, "giữ nguyên khi
+    không đổi", etc.) into this column's `description`, appended after the
+    LLD's own `description` text, the same way the `EFF_DATE` rule above
+    relocates its CDC prose. Also drop any "Mặc định -1 nếu không có giá
+    trị phù hợp" note text for these specific rows — that FK-default
+    caveat describes a *looked-up* FK resolving against another DIM, which
+    doesn't apply to a column whose value is simply the next/current
+    sequence value.
+  - **Any other `generated` row that is not `DIMENSION_KEY` or an `*_SK`
+    column** (e.g. a hash business key column like `*_BK`): mapping cell
+    is `etl_logic` as-is, alias-substituted where it references a source
+    table (e.g. `STANDARD_HASH(...)`) — unaffected by the rule above.
+  **Exception — FCT's `DAYID` column** (the PK row whose `etl_logic` is
+  literally `v_batch_date`): mapping cell is the literal `v_batch_date`,
+  nothing else — this is the one `generated` case that's a plain variable
+  reference, not a sequence/hash expression, and is not a `DIMENSION_KEY`/
+  `*_SK` column.
+- `scd2` → `EFF_DATE`/`EXP_DATE` plumbing.
+  - **`EFF_DATE` / `<LAYER>_EFF_DATE` rows**: the mapping cell is always
+    just the literal `v_batch_date` — never the full CDC prose the LLD
+    writes around it (e.g. `etl_logic` reading "CDC: v_batch_date khi phát
+    hiện thay đổi trên NG_SB_CLOS_MAS_PRO_LINE (so sánh toàn bộ cột
+    non-key với bản ghi đang hiệu lực)" still becomes mapping cell
+    `v_batch_date`). Move the CDC explanation that surrounds it (which
+    source table/columns the comparison runs against, what counts as a
+    change) into this column's `description` instead — see "Item Name and
+    Description" below; don't drop that context, just relocate it out of
+    the mapping cell. This applies uniformly: every `EFF_DATE`-type row in
+    this project's LLD resolves to `v_batch_date` at ETL time, the prose
+    is explaining *when* a new version appears, not *what value* gets
+    written.
+  - **`EXP_DATE` / `<LAYER>_EXP_DATE` rows**: mapping cell is `etl_logic`
+    as-is — almost always the literal `NULL` (current/active row), with
+    the "closed by previous row's EFF_DATE - 1" mechanics living in `note`
+    (already headed to `description` by the normal note-handling rule, not
+    something to special-case here). This column's convention is
+    unaffected by the `EFF_DATE` change above.
+- `computed` → derived/business logic (equivalent to the old `PHÁI SINH`
+  tag). Mapping cell is `etl_logic` as-is apart from alias substitution —
+  it's already a SQL-like expression (CASE WHEN, string functions,
+  literals inside a UNION branch, etc.), just carry it over; reformat only
+  if the raw text has obvious transcription noise (stray line-wrap), never
+  re-derive the logic itself.
+- `join` → see "Building JOIN conditions" below — the mapping cell is the
+  **final target expression** (the part after the last `→` in
+  `etl_logic`), alias-substituted; the JOIN clause itself moves to the
+  join section.
+- `pending` → the LLD's own convention for "not yet decided". Mapping cell
+  is the literal string `"NULL"`. Description gets a `[CẦN REVIEW] ` prefix
+  explaining what's missing — pull the reason from `note`/`description` if
+  one is given, otherwise say plainly that the LLD left this column
+  pending. Never invent a formula for a `pending` row.
 
-Any inference drawn from a column whose `TRẠNG THÁI THIẾT KẾ` is anything
-other than `DA_CHOT` (e.g. `CẦN XÁC NHẬN`), or any derived-logic
-translation you are not fully certain of, must be marked in the output so
-the user can spot it during review: prefix the cell's text with
-`[CẦN REVIEW] ` (kept inside the Description column when the mapping
-formula itself is confident but the source key isn't, or inside the
-mapping cell itself when the formula is a guess). Never silently guess and
-present it as settled — the whole point of the review pass is to catch
-these.
+## Building JOIN conditions
+
+`join`-type rows in the LLD write their full logic in one `etl_logic`
+string shaped like:
+```
+LEFT JOIN <TABLE> ON <condition> → <TABLE>.<COLUMN>
+```
+(occasionally chained, e.g. two `→`-separated hops for a nested lookup).
+Split on `→`:
+- Everything **before** the last `→` is one or more JOIN clauses — alias-
+  substitute every table reference in each clause (both the table being
+  joined and any table it references in its `ON` condition), then collect
+  the result into `join_conditions` for this source column (list of
+  strings, one clause per hop, in the order they appear). E.g.
+  `LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL ON NG_SB_CLOS_CUST_INFO_LEGAL.WI_NAME
+  = NG_SB_CLOS_EXTTABLE.WI_NAME` becomes `LEFT JOIN B.WI_NAME = A.WI_NAME`
+  (dropping the redundant table-name repetition the LLD's prose carries,
+  matching the LOAN template's own terse `LEFT JOIN B.WI_NAME = A.WI_NAME`
+  style). Several different columns in the same table often repeat the
+  *same* JOIN clause (e.g. every column pulled from
+  `NG_SB_CLOS_CUST_INFO_LEGAL` repeats that same JOIN) — de-duplicate
+  identical clauses across columns before building the final
+  `join_conditions` list, don't emit the same JOIN line once per column.
+- The part **after** the last `→` is the mapping cell value for that
+  column, alias-substituted (e.g. `NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER` →
+  `B.ID_NUMBER`).
+
+Since this phase now has exactly one mapping column, `join_conditions` is a
+list with **exactly one entry**: the deduplicated list of JOIN clauses for
+this table's single source system, each one rendered on its own row by
+`gen_mapping.py` (never multiple clauses stacked with `\n` in one cell —
+this is what `scripts/validate_mapping.py` rule #3 checks).
+
+## Item Name and Description
+
+The LLD's `description` field is a full sentence (e.g. "Business key — số
+ĐKKD/CMND của khách hàng, định danh pháp lý ổn định, không đổi giữa các hồ
+sơ khác nhau"), not the short label the template's `Item Name` column
+expects. Both columns get filled, from the same source, at two different
+lengths:
+- `item_name` (column C) — a short Vietnamese business name (2-5 words),
+  derived/condensed from the row's `description`. Never leave it blank.
+- `description` (column D, the template's own `Description` column) — the
+  **full, verbatim** `description` text from the LLD. Always fill it (not
+  just when there's a caveat, unlike the old extract-based convention) —
+  this column is now where the complete business meaning lives, not a
+  "only when there's something unusual" field.
+
+When the row's `note` contains an open caveat (see below), append it to
+the end of this same `description` value — don't create a separate
+field or leave `description` blank just to make room for the caveat.
+
+For `EFF_DATE`/`<LAYER>_EFF_DATE` rows specifically (see the `scd2` rule
+above): since the mapping cell is shortened to the bare `v_batch_date`
+literal, fold the CDC explanation that `etl_logic` originally carried
+(which source table/columns the comparison runs against) into this
+column's `description`, appended after the LLD's own `description` text —
+e.g. `description: "Ngày bắt đầu hiệu lực của layer Product Line — CDC:
+phát hiện thay đổi trên NG_SB_CLOS_MAS_PRO_LINE (so sánh toàn bộ cột
+non-key với bản ghi đang hiệu lực)"`. This is the one case where text
+moves from `etl_logic` into `description` rather than from `note`.
+
+## Handling `note`
+
+`note` mixes two kinds of content: resolved review history (dated entries
+like "Review 2026-09-25: đổi NK từ WI_NAME sang ID_NUMBER", or references
+to where a decision was confirmed, e.g. "Theo HLD_DIM_SB_DWH_review.md
+mục...") and genuinely open caveats (marked with `⚠️`, or phrases like
+`CẦN XÁC NHẬN` / `PENDING xác nhận` / `cần BA xác nhận`).
+- **Open caveats** (the `⚠️`-marked kind): append to the column's
+  `description` value (after the LLD's own description text) with a
+  `[CẦN REVIEW] ` prefix, keeping the substance of what's unconfirmed —
+  e.g. a row whose LLD `description` is "Khoảng cách địa bàn khách hàng"
+  and whose `note` has "⚠️ Metadata: cần BA xác nhận đơn vị đo (nghi vấn
+  km)" becomes `description: "Khoảng cách địa bàn khách hàng [CẦN REVIEW]
+  Cần BA xác nhận đơn vị đo (nghi vấn km)"`.
+- **Resolved history / internal cross-references**: don't append these —
+  they document how the LLD reached its current state, not something the
+  mapping reviewer needs to act on. Leave them out of `description`
+  entirely; the LLD's own `description` field is already the right length
+  for this column, no further context needed from `note` unless it's an
+  open caveat.
+- When in doubt whether a note is still open, check for `⚠️`, `TODO`,
+  `CẦN XÁC NHẬN`, `PENDING` markers specifically — these are the LLD's own
+  convention for "still open," per the project's established review
+  workflow.
 
 ## Steps
 
 1. Confirm scope with the user if not already clear: one specific table, or
-   all tables in `extract/SB_DWH/_index.json`. Default to one table at a
-   time unless the user explicitly asks for a batch — this keeps each
-   output reviewable, per the user's workflow of testing one file before
-   running the rest.
-2. Read `extract/database/<TABLE>.md` (official target schema) and
-   `extract/SB_DWH/<TABLE>.md` (lineage, source tables/columns, and
-   confirmation status — everything needed lives in this one file, see
-   above).
-3. Work out the header block (sources per system + aliases), the per-column
-   mapping per system, join conditions, and any Variable-sheet needs, per
-   the rules above. Every column also needs an `item_name` (short
-   Vietnamese business name, from its `Mô tả`) — never leave blank.
-4. Write the result as a JSON file matching the schema documented at the top
-   of `scripts/gen_mapping.py` (read that docstring for the exact field
-   names) to a scratch path (the session scratchpad directory, not `/tmp`).
-   **When re-generating a table you've mapped before** (input doc updated),
-   write `notes`/`[CẦN REVIEW]` flags fresh from the current extract content
-   — never reuse or copy forward a previous run's JSON/notes. A caveat from
-   an old run may already be resolved in the new doc (e.g. a column that
-   used to have no lineage now has one); carrying it forward unchanged
-   would leave a stale warning in the output about a problem that no longer
-   exists. Every flag in the final output must trace to something you can
-   point to in the *current* `extract/SB_DWH/<TABLE>.md`.
-5. Pick the template: `references/Mapping_DIM_LOAN_template.xlsx` for a DIM
+   all tables in `lld/sb_dwh/`. Default to one table at a time unless the
+   user explicitly asks for a batch.
+2. Read `lld/sb_dwh/SB_DWH_<TABLE>.csv`.
+3. Identify the driving table (the `source_table` behind the key column's
+   `direct` row) and read its system off its own name (CLOS / RLOS / LOS,
+   see above) — this sets the single mapping header. Assign it alias `A`.
+   Walk the rest of the rows in order and assign `B`, `C`, ... to every
+   other distinct `source_table` the first time it appears, building the
+   header block's source list (`<TABLE> AS <ALIAS>`) as you go.
+4. Walk every row and build its `columns` entry: `name`, `type` (from
+   `data_type`), `is_key` (from `key`), `item_name` (condensed from
+   `description`), `description` (the LLD's full `description` text plus
+   any `[CẦN REVIEW]` caveat from `note`, per the rules above), and
+   `mapping` (a one-element list, alias-substituted per the
+   `etl_logic_type` rules above).
+5. Collect and deduplicate JOIN clauses from every `join`-type row into a
+   single `join_conditions` list (one element, itself a list of clauses).
+   Omit the key entirely if there are no `join`-type rows.
+6. Write the result as a JSON file matching the schema documented at the
+   top of `scripts/gen_mapping.py` to a scratch path (the session
+   scratchpad directory, not `/tmp`). `mapping_headers` has exactly one
+   entry; every column's `mapping` list has exactly one entry — never pad
+   to two.
+   **When re-generating a table you've mapped before** (LLD updated since),
+   rebuild `notes`/`[CẦN REVIEW]` flags fresh from the current LLD content
+   — never reuse or copy forward a previous run's JSON.
+7. Pick the template: `references/Mapping_DIM_LOAN_template.xlsx` for a DIM
    table, `references/Mapping_FCT_LOAN_template .xlsx` (mind the trailing
-   space in the filename) for a FCT table.
-6. Run:
+   space) for a FCT table.
+8. Run:
    ```bash
    .venv/bin/python scripts/gen_mapping.py <scratch>/<table>.json "<template>" mapping/SB_DWH/Mapping_<TABLE>.xlsx
    ```
-7. Self-check the output before reporting it as done:
+9. Self-check the output before reporting it as done:
    ```bash
    .venv/bin/python scripts/validate_mapping.py mapping/SB_DWH/Mapping_<TABLE>.xlsx
    ```
-   This catches formatting regressions only (bold header lines, no stray
-   strikethrough, multi-line JOIN cells, no blank mapping/Item Name cells,
-   etc. — see the checklist at the top of `scripts/validate_mapping.py` for
-   the full, current list) — it does not judge business-logic correctness.
-   If it exits non-zero, the bug is almost always in
-   `scripts/gen_mapping.py`'s styling/placement logic, not in the JSON data
-   — fix the script, regenerate, and re-validate before moving on. Never
-   hand back a file that fails this check without saying so.
-8. Report to the user: output path, the validator's result, which
-   columns/rows got a `[CẦN REVIEW]` flag and why, and any column you could
-   not confidently map at all (its mapping cells should be the literal
-   `"NULL"` with a `[CẦN REVIEW]`-prefixed note in Description explaining
-   why, never a fabricated formula — call this out explicitly in your
-   summary).
+   This catches formatting regressions only — see the checklist at the top
+   of `scripts/validate_mapping.py`. The CLOS/RLOS column-order check (rule
+   #11) only triggers when both labels appear as separate headers, which
+   never happens now that each table has exactly one mapping column — it
+   won't false-positive. If the validator exits non-zero, the bug is
+   almost always in `scripts/gen_mapping.py`'s styling/placement logic, not
+   the JSON data — fix the script, regenerate, and re-validate.
+10. Report to the user: output path, the validator's result, which
+    columns got a `[CẦN REVIEW]` flag and why (from `pending` rows or
+    `⚠️`-marked notes), and any column you could not confidently map at all.
 
 ## Notes
 
 - `mapping/` is git-ignored (see `.gitignore`) — safe to regenerate freely.
-- The script (`scripts/gen_mapping.py`) only places pre-decided strings into
-  cells and preserves template styling (red key font, header fill, borders).
-  It does no analysis — all mapping logic must be decided before calling it.
-- `scripts/validate_mapping.py` is a formatting self-check, not a linter you
-  run separately on demand — always run it on every table, every time. Treat
-  any new formatting requirement the user raises in review as something to
-  encode as a check in that script, don't just fix the one file by hand.
-- If a table's shape doesn't fit the assumptions above (e.g. more than 2
-  source systems, or a target column with no clear source at all), inspect
-  the actual extract content and template layout directly rather than
-  forcing it through — ask the user if the right structure is unclear.
+- The script (`scripts/gen_mapping.py`) only places pre-decided strings
+  into cells and preserves template styling. It does no analysis.
+- `scripts/validate_mapping.py` is a formatting self-check, not a linter
+  you run separately on demand — always run it on every table, every time.
+- If a table's LLD doesn't fit the assumptions above (e.g. a column with an
+  `etl_logic_type` not covered here, or `etl_logic` whose `→`-split doesn't
+  cleanly separate JOIN clause from target expression), inspect the actual
+  CSV row directly and use judgment rather than forcing it through — ask
+  the user if the right structure is unclear.

@@ -55,11 +55,11 @@ that have actually shipped before:
       Description/D) for what should have been a table-wide filter written
       into the fixed row instead.
   13. Every real column row must have a non-blank "Item Name" (column C).
-      `extract/database/<TABLE>.md` always has a business-meaning
-      "Mô tả" for every column, so there's no legitimate reason to leave
-      this blank — a past run left it empty for several columns across
-      multiple tables even though the source description existed, and it
-      went unnoticed because nothing checked for it.
+      Every phase's input (the LLD CSV, `lld/<phase>/...csv`) always has a
+      `description` field for every column, so there's no legitimate
+      reason to leave this blank — a past run left it empty for several
+      columns across multiple tables even though the source description
+      existed, and it went unnoticed because nothing checked for it.
 
 Usage:
     python3 scripts/validate_mapping.py <output.xlsx>
@@ -206,9 +206,9 @@ def check_join_conditions_one_per_cell(ws, header_row, join_content_rows, errors
 
 
 def check_item_name_not_blank(ws, first_data_row, join_row, errors):
-    """extract/database/<TABLE>.md always carries a "Mô tả" for every
+    """Every phase's LLD input always carries a `description` for every
     column, so "Item Name" (column C) should never be left blank — it's a
-    lossy re-derivation of that description, not new information the
+    short condensed form of that description, not new information the
     generator has to invent. Skip the same non-column rows the mapping-cell
     check skips (JOIN label, "Chú ý:", the "Điều kiện lấy dữ liệu" sub-row
     which has no column name in column A)."""
@@ -221,7 +221,7 @@ def check_item_name_not_blank(ws, first_data_row, join_row, errors):
         if item_cell.value is None or (isinstance(item_cell.value, str) and item_cell.value.strip() == ""):
             errors.append(
                 f"{item_cell.coordinate}: cột 'Item Name' của cột '{name}' bị bỏ trống — "
-                f"phải lấy từ Mô tả trong extract/database/<TABLE>.md, không để trống"
+                f"phải lấy từ description trong LLD, không để trống"
             )
 
 

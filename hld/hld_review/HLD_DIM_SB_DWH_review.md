@@ -29,7 +29,7 @@ flowchart LR
     R -->|"LEFT JOIN theo REGION_CODE (=BRANCH.REGION) — bổ sung tên Khu vực"| C
 ```
 
-**Dedup `NG_SB_RLOS_MAS_BRANCH` trước khi JOIN (review 2026-10-12):** grain
+**Dedup `NG_SB_RLOS_MAS_BRANCH` trước khi JOIN:** grain
 thật của `MAS_BRANCH` là `TRANSACTION_OFF_ID` (chi tiết hơn `BRANCH_ID` —
 1 `BRANCH_ID` có nhiều `TRANSACTION_OFF_ID`, chưa được khai thác ở model
 này). Join trực tiếp theo `BRANCH_ID` sẽ fan-out `DIM_LOS_COMPANY`. ETL
@@ -61,20 +61,20 @@ FCT_CLOS/RLOS_APPLICATION.
 | 5 | COMPANY_ADDRESS | NVARCHAR2 | N | 200 |  | Địa chỉ đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_ADDRESS_VN. Layer Company | — | Thiết kế dư thừa |
 | 6 | COMPANY_EMAIL | VARCHAR2 | N | 200 |  | Email đơn vị kinh doanh — nguồn MAS_COMPANY.COMPANY_EMAIL. Layer Company | — | Thiết kế dư thừa |
 | 7 | ZONE | NUMBER | N | 18 |  | Mã khu vực nội bộ theo LOS (khác REGION_CODE của MAS_REGION) — nguồn MAS_COMPANY.ZONE. Layer Company | — | Thiết kế dư thừa |
-| 8 | COMPANY_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Company (COMPANY_NAME/COMPANY_ADDRESS/COMPANY_EMAIL/ZONE) — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_COMPANY, review 2026-10-12) | — | — |
+| 8 | COMPANY_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Company (COMPANY_NAME/COMPANY_ADDRESS/COMPANY_EMAIL/ZONE) — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_COMPANY) | — | — |
 | 9 | COMPANY_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Company; NULL = đang hiệu lực | — | — |
-| 10 | BRANCH_SK | NUMBER | N | 18 |  | Surrogate key riêng của layer Branch — mới, review 2026-10-12 | — | — |
-| 11 | BRANCH_CODE | VARCHAR2 | N | 200 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH đã dedup về 1 dòng/BRANCH_ID (review 2026-10-12). Layer Branch | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | MÃ CHI NHÁNH |
+| 10 | BRANCH_SK | NUMBER | N | 18 |  | Surrogate key riêng của layer Branch | — | — |
+| 11 | BRANCH_CODE | VARCHAR2 | N | 200 |  | Mã chi nhánh — nguồn MAS_COMPANY.BRANCH_ID, LEFT JOIN MAS_BRANCH đã dedup về 1 dòng/BRANCH_ID. Layer Branch | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | MÃ CHI NHÁNH |
 | 12 | BRANCH_NAME | NVARCHAR2 | N | 200 |  | Tên chi nhánh — nguồn MAS_BRANCH.BRANCH_NAME_VN (sau dedup). Layer Branch | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | TÊN CHI NHÁNH |
-| 13 | BRANCH_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Branch (BRANCH_CODE/BRANCH_NAME) — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_BRANCH sau dedup, review 2026-10-12) | — | — |
+| 13 | BRANCH_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Branch (BRANCH_CODE/BRANCH_NAME) — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_BRANCH sau dedup) | — | — |
 | 14 | BRANCH_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Branch; NULL = đang hiệu lực | — | — |
-| 15 | REGION_SK | NUMBER | N | 18 |  | Surrogate key riêng của layer Region — mới, review 2026-10-12 | — | — |
+| 15 | REGION_SK | NUMBER | N | 18 |  | Surrogate key riêng của layer Region | — | — |
 | 16 | REGION_CODE | NUMBER | N | 18 |  | Mã khu vực địa lý — nguồn MAS_BRANCH.REGION (sau dedup), LEFT JOIN MAS_REGION.REGION_CODE. Layer Region | — | Thiết kế dư thừa |
 | 17 | REGION_NAME | NVARCHAR2 | N | 200 |  | Tên khu vực địa lý — nguồn MAS_REGION.REGION_NAME_VN. Layer Region | — | Thiết kế dư thừa |
-| 18 | REGION_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Region (REGION_CODE/REGION_NAME) — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_REGION, review 2026-10-12) | — | — |
+| 18 | REGION_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Region (REGION_CODE/REGION_NAME) — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_REGION) | — | — |
 | 19 | REGION_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Region; NULL = đang hiệu lực | — | — |
 
-**Tổng 19 cột** (từ 15 cột trước đó, review 2026-10-12): bỏ `CITY`/
+**Tổng 19 cột** (từ 15 cột trước đó): bỏ `CITY`/
 `DISTRICT` (2 cột); tách `EFF_DATE`/`EXP_DATE` dùng chung thành 3 cặp
 riêng theo layer (+4 cột ròng: `COMPANY_EFF/EXP_DATE`,
 `BRANCH_EFF/EXP_DATE`, `REGION_EFF/EXP_DATE` thay cho 1 cặp cũ); thêm
@@ -238,12 +238,12 @@ flowchart LR
 | 2 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_CUSTOMER, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 | — | — |
 | 3 | ID_NUMBER | VARCHAR2 | N | 100 | BK | Số ĐKKD/CMND của khách hàng — định danh pháp lý ổn định, không đổi giữa các hồ sơ khác nhau. Nguồn: NG_SB_CLOS_CUST_INFO LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' | — | Nguồn cho chỉ tiêu/trường CUSTOMER_SK (khóa join FCT_CLOS_APPLICATION, tra qua ID_NUMBER; FCT_CLOS_LEGAL_PARTY.CUSTOMER_SK) |
 | 4 | FULL_NAME | NVARCHAR2 | N | 200 |  | Tên doanh nghiệp khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME (dòng đại diện đã chọn ở cột ID_NUMBER) | Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo Thông tin phê duyệt (BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) | CUSTOMER_NAME (Tên khách hàng) |
-| 5 | CUST_GROUP | NVARCHAR2 | N | 200 |  | Phân khúc khách hàng doanh nghiệp (SME/MSME/USME/STR/JSC/SOC/BANK/FDI/NBFI) — nguồn NG_SB_CLOS_CUST_INFO.CUST_GROUP|
+| 5 | CUST_GROUP | NVARCHAR2 | N | 200 |  | Phân khúc khách hàng doanh nghiệp (SME/MSME/USME/STR/JSC/SOC/BANK/FDI/NBFI) — nguồn NG_SB_CLOS_CUST_INFO.CUST_GROUP | Báo cáo SLA - TAT (BC5) — khóa chọn bảng REF_SLA_TDKHDNL/TDKHDN<br>Báo cáo KPI (BC9) — khóa chọn bảng REF khi tính POINT | Nguồn cho chỉ tiêu/trường REF_PRODUCT/SLA_* (BC5); POINT (BC9) |
 | 6 | CUST_CATEGORY | NVARCHAR2 | N | 200 |  | Phân loại khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUST_CATEGORY. Metadata ghi nhận cả loại hình pháp lý lẫn giá trị dạng mã số trong cùng cột — cần BA xác nhận quy tắc chuẩn | — | Thiết kế dư thừa |
 | 7 | PRECUSTGROUP | NVARCHAR2 | N | 300 |  | Phân khúc khách hàng trước xử lý — nguồn NG_SB_CLOS_CUST_INFO.PRECUSTGROUP, cùng bộ giá trị với CUST_GROUP (SME/MSME/JSC/SOC/NBFI/FDI). Cần BA xác nhận khác biệt cụ thể với CUST_GROUP | — | Thiết kế dư thừa |
-| 8 | INDUSTRY_LVL1_CODE | VARCHAR2 | N | 200 |  | Mã ngành kinh doanh cấp 1 — Nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_1|
-| 9 | INDUSTRY_LVL2_CODE | VARCHAR2 | N | 200 |  | Mã ngành kinh doanh cấp 2 — Nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_2|
-| 10 | INDUSTRY_LVL3_CODE | VARCHAR2 | N | 200 |  | Mã ngành kinh doanh cấp 3 — Nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_3|
+| 8 | INDUSTRY_LVL1_CODE | VARCHAR2 | N | 200 |  | Mã ngành kinh doanh cấp 1 — nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_1 | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | INDUSTRY_GROUP (Ngành kinh doanh cấp 1) |
+| 9 | INDUSTRY_LVL2_CODE | VARCHAR2 | N | 200 |  | Mã ngành kinh doanh cấp 2 — nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_2 | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | INDUSTRY_CLASS (Ngành kinh doanh cấp 2) |
+| 10 | INDUSTRY_LVL3_CODE | VARCHAR2 | N | 200 |  | Mã ngành kinh doanh cấp 3 — nguồn NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_3 | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | INDUSTRY (Ngành kinh doanh cấp 3) |
 | 11 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) | — | — |
 | 12 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
@@ -373,16 +373,16 @@ nguồn layer đó). Mỗi layer có NK riêng đủ để UNIQUE/CDC.
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_PRODUCT, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới. Phát sinh phiên bản mới khi bất kỳ layer nào (Product Line/Sub Product) đổi | — | — |
-| 2 | PRODUCTLINE_SK | NUMBER | Y | 18 |  | Surrogate key riêng của layer Product Line — mới, review 2026-10-12 | — | — |
-| 3 | PRODUCTLINE_CODE | NVARCHAR2 | N | 100 | NK | Mã dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_CODE (đổi tên từ PRODUCT_LINE_CODE, review 2026-10-12). Layer Product Line | Báo cáo CLOS APPLICATION (BC2) | PRODUCT_LINE (Dòng sản phẩm) |
-| 4 | PRODUCTLINE_NAME | NVARCHAR2 | N | 100 |  | Tên dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_NAME (đổi tên từ PRODUCT_LINE_NAME, review 2026-10-12). Layer Product Line | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Product Line trên REF_SLA_NLTT) |
-| 5 | PRODUCTLINE_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Product Line — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_PRO_LINE, review 2026-10-12) | — | — |
+| 2 | PRODUCTLINE_SK | NUMBER | Y | 18 |  | Surrogate key riêng của layer Product Line | — | — |
+| 3 | PRODUCTLINE_CODE | NVARCHAR2 | N | 100 | NK | Mã dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_CODE (đổi tên từ PRODUCT_LINE_CODE). Layer Product Line | Báo cáo CLOS APPLICATION (BC2) | PRODUCT_LINE (Dòng sản phẩm) |
+| 4 | PRODUCTLINE_NAME | NVARCHAR2 | N | 100 |  | Tên dòng sản phẩm — nguồn NG_SB_CLOS_MAS_PRO_LINE.PRODUCT_LINE_NAME (đổi tên từ PRODUCT_LINE_NAME). Layer Product Line | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Product Line trên REF_SLA_NLTT) |
+| 5 | PRODUCTLINE_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Product Line — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_PRO_LINE) | — | — |
 | 6 | PRODUCTLINE_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Product Line; NULL = đang hiệu lực | — | — |
-| 7 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | Surrogate key riêng của layer Sub Product — mới, review 2026-10-12 | — | — |
+| 7 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | Surrogate key riêng của layer Sub Product | — | — |
 | 8 | SUB_PRODUCT_CODE | NVARCHAR2 | N | 255 | NK | Mã sản phẩm nhánh — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_CODE, unique toàn cục. Layer Sub Product | Báo cáo CLOS APPLICATION (BC2) | SUB_PRODUCT (Sản phẩm nhánh) |
-| 9 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 255 |  | Tên sản phẩm nhánh chi tiết — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_NAME (đổi tên từ PRODUCT_NAME, review 2026-10-06, đồng nhất với SUB_PRODUCT_CODE). Layer Sub Product | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Sub Product trên REF_SLA_NLTT) |
-| 10 | SUB_PRODUCT_ACTIVE | VARCHAR2 | N | 100 |  | Trạng thái hiệu lực của sản phẩm nhánh — nguồn NG_SB_CLOS_MAS_SUB_PROD.ACTIVE (đổi tên từ SUB_PROD_ACTIVE, review 2026-10-12). Layer Sub Product | — | — |
-| 11 | SUB_PRODUCT_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Sub Product — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_SUB_PROD, review 2026-10-12) | — | — |
+| 9 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 255 |  | Tên sản phẩm nhánh chi tiết — nguồn NG_SB_CLOS_MAS_SUB_PROD.SUB_PROD_NAME (đổi tên từ PRODUCT_NAME, đồng nhất với SUB_PRODUCT_CODE). Layer Sub Product | Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT<br>Báo cáo KPI (BC9) — qua SLA_DE_TOTAL_RESULT | Nguồn cho chỉ tiêu/trường SLA_DE_RESULT/SLA_DE_TOTAL_RESULT (khóa JOIN Sub Product trên REF_SLA_NLTT) |
+| 10 | SUB_PRODUCT_ACTIVE | VARCHAR2 | N | 100 |  | Trạng thái hiệu lực của sản phẩm nhánh — nguồn NG_SB_CLOS_MAS_SUB_PROD.ACTIVE (đổi tên từ SUB_PROD_ACTIVE). Layer Sub Product | — | — |
+| 11 | SUB_PRODUCT_EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của layer Sub Product — do ETL tính qua CDC riêng cho layer này (so sánh toàn bộ cột non-key của MAS_SUB_PROD) | — | — |
 | 12 | SUB_PRODUCT_EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của layer Sub Product; NULL = đang hiệu lực | — | — |
 
 **Tổng 12 cột:** khác bản chất với `COMPANY_SK` trên `DIM_LOS_COMPANY` —

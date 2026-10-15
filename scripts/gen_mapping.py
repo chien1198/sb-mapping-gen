@@ -166,7 +166,7 @@ def set_key_font(cell, is_key):
     cell.font = f
 
 
-def fill_header_block(ws, data):
+def fill_header_block(ws, data, header_row):
     ws.cell(row=1, column=2).value = data["table_name"]
     ws.cell(row=2, column=2).value = data.get("table_description", "")
     ws.cell(row=3, column=2).value = data.get("key_note", "Bao gồm các trường màu đỏ")
@@ -191,9 +191,12 @@ def fill_header_block(ws, data):
         horizontal="left", vertical=ws.cell(row=1, column=1).alignment.vertical
     )
 
-    # clear any pre-existing source lines from the template rows 1..12, cols E..F,
-    # resetting their font so no leftover styling (e.g. strikethrough) survives
-    for r in range(1, 13):
+    # clear any pre-existing source lines from rows 1..header_row-1, cols
+    # E..F (the header block's own row count — grown by
+    # ensure_header_block_room when a table has more source tables than the
+    # template's own worked example shipped rows for), resetting their font
+    # so no leftover styling (e.g. strikethrough) survives.
+    for r in range(1, header_row):
         for c in (5, 6):
             cell = ws.cell(row=r, column=c)
             cell.value = None
@@ -221,11 +224,65 @@ def fill_mapping_headers(ws, header_row, mapping_headers, last_mapping_col):
         ws.cell(row=header_row, column=c).value = None
 
 
+def ensure_header_block_room(ws, data, header_row):
+    """The header block (rows 1..header_row-1) holds the per-source-system
+    "TABLE AS X" lines in columns E/F onward. A template only ships as many
+    of these rows as its own worked example needed (e.g. 4 for DIM_LOAN) —
+    a table with more distinct source tables than that (common once a
+    table joins many CLOS tables) needs extra rows inserted, or
+    fill_header_block would overwrite the header row itself (and whatever
+    sits below it) instead of growing into fresh space. Returns the
+    (possibly shifted) header_row."""
+    max_lines = max((len(src.get("lines", [])) for src in data.get("sources", [])), default=0)
+    available = header_row - 1  # rows 1..header_row-1 are free for source lines
+    shortfall = max_lines - available
+    if shortfall <= 0:
+        return header_row
+
+    # style the new rows after the template's own last header-block row
+    # (header_row - 1) so inserted rows match the existing source-line rows
+    # instead of coming in blank/unstyled.
+    template_row = header_row - 1
+    insert_at = header_row
+    ws.insert_rows(insert_at, amount=shortfall)
+    for offset in range(shortfall):
+        new_row = insert_at + offset
+        for c in range(1, ws.max_column + 1):
+            src_cell = ws.cell(row=template_row, column=c)
+            dst_cell = ws.cell(row=new_row, column=c)
+            dst_cell.font = copy.copy(src_cell.font)
+            dst_cell.fill = copy.copy(src_cell.fill)
+            dst_cell.border = copy.copy(src_cell.border)
+            dst_cell.alignment = copy.copy(src_cell.alignment)
+            dst_cell.number_format = src_cell.number_format
+        ws.row_dimensions[new_row].height = ws.row_dimensions[template_row].height
+
+    return header_row + shortfall
+
+
 def build(data, template_path, output_path):
     wb = openpyxl.load_workbook(template_path)
     ws = wb["Mapping"]
 
     header_row, condition_row, first_data_row, join_row, notes_row = find_layout(ws)
+    header_row = ensure_header_block_room(ws, data, header_row)
+    condition_row = header_row + 1
+    first_data_row = header_row + 2
+    # re-locate join/notes rows since their positions shifted along with
+    # everything else when rows were inserted above them by
+    # ensure_header_block_room
+    if join_row is not None:
+        join_row = None
+        for r in range(first_data_row, ws.max_row + 1):
+            if ws.cell(row=r, column=JOIN_LABEL_COL).value == "Điều kiện join giữa các bảng":
+                join_row = r
+                break
+    if notes_row is not None:
+        notes_row = None
+        for r in range(first_data_row, ws.max_row + 1):
+            if ws.cell(row=r, column=1).value == "Chú ý:":
+                notes_row = r
+                break
 
     mapping_headers = data["mapping_headers"]
     n_sources = len(mapping_headers)
@@ -272,7 +329,7 @@ def build(data, template_path, output_path):
             continue
         ws.cell(row=condition_row, column=c).value = None
 
-    fill_header_block(ws, data)
+    fill_header_block(ws, data, header_row)
     fill_mapping_headers(ws, header_row, mapping_headers, last_mapping_col)
 
     # table-wide row filter (e.g. STG_DTM's EXP_DATE/DAYID window) goes into

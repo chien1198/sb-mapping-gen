@@ -1,6 +1,6 @@
 ---
 name: mapping-gen
-description: Generate a mapping Excel file for one DIM/FCT table in the LOS/PDTD datamart pipeline — CLOS/RLOS to SB_DWH, SB_DWH to STG_DTM, SB_DWH to PDTD_DTM, or (not yet available) Datamart to Report. Use when the user asks to gen/generate/create mapping for a table or destination, at any stage of the pipeline.
+description: Generate a mapping Excel file for one DIM/FCT table in the LOS/PDTD datamart pipeline — CLOS/RLOS to SB_DWH, SB_DWH to STG_DTM, STG_DTM to PDTD_DTM, or (not yet available) Datamart to Report. Use when the user asks to gen/generate/create mapping for a table or destination, at any stage of the pipeline.
 ---
 
 # Generate mapping Excel — router
@@ -8,13 +8,23 @@ description: Generate a mapping Excel file for one DIM/FCT table in the LOS/PDTD
 This is a **4-phase pipeline**, each phase mapping data one layer further
 downstream:
 
-1. **SB_DWH** — CLOS/RLOS source systems → `SB_DWH.<TABLE>` (deep source
-   analysis, multiple "How to mapping <SYSTEM>" columns, JOINs)
-2. **STG_DTM** — `SB_DWH.<TABLE>` → `STG_DTM.STG_<TABLE>` (1:1 copy, single
-   source, table-wide row filter)
-3. **PDTD_DTM** — `SB_DWH.<TABLE_LOS>` → `PDTD_DTM.<TABLE_PDTD>` (column
-   matching against a differently-shaped target schema, not 1:1)
+1. **SB_DWH** — CLOS/RLOS source systems → `SB_DWH.<TABLE>` (reshapes
+   `lld/sb_dwh/SB_DWH_<TABLE>.csv`, multiple "How to mapping <SYSTEM>"
+   columns, JOINs)
+2. **STG_DTM** — `SB_DWH.<TABLE>` → `STG_DTM.STG_<TABLE>` (reshapes
+   `lld/stg_dtm/STG_DTM_STG_<TABLE>.csv`, 1:1 copy, single source,
+   table-wide row filter)
+3. **PDTD_DTM** — `STG_DTM.<TABLE>` → `PDTD_DTM.<TABLE>` (reshapes
+   `lld/pdtd_dtm/PDTD_DTM_<TABLE>.csv`, an aggregation layer on top of
+   STG_DTM — can be 1:1 or need JOINs, not a fixed shape)
 4. **Report** — Datamart → report extract (not yet available, see below)
+
+All three implemented phases now work the same way: a table's mapping
+logic has already been fully decided in its LLD CSV (`lld/<phase>/`), so
+the skill's job is to **reshape** that LLD into the template's Excel
+layout — assigning short aliases, splitting JOIN clauses into their own
+section, picking a header label — not to re-derive source/target logic
+from raw docx/xlsx extracts the way earlier versions of this skill did.
 
 This skill is a single entry point: it identifies which phase the user
 means, then reads the matching rules file in `references/` and follows it.
@@ -25,20 +35,28 @@ covers how to tell the phases apart and the two things every phase shares
 
 ## Identifying the phase
 
-The user names a **destination**, not a phase number — match on that:
+The user names a **destination**, not a phase number — match on that, but
+confirm it against where the table's LLD file actually lives, since a
+table's own name can exist under more than one phase (e.g.
+`DIM_CLOS_APPLICATION` has both a `lld/sb_dwh/` file and a `lld/pdtd_dtm/`
+file — same business table, two different mapping jobs):
 
-| User says / implies | Destination | Rules file |
-|---|---|---|
-| "SB_DWH", "gen mapping cho SB_DWH", table only exists in `extract/SB_DWH/_index.json`, or no destination given for a table that's clearly source-system-to-DWH work | `SB_DWH` | `references/rules-sb_dwh.md` |
-| "STG_DTM", "STG", table name already prefixed `STG_` | `STG_DTM` | `references/rules-stg_dtm.md` |
-| "PDTD_DTM", "PDTD", table name prefixed `DIM_PDTD_`/`FCT_PDTD_` | `PDTD_DTM` | `references/rules-pdtd_dtm.md` |
-| "Report", "báo cáo" | `Report` | not implemented — see below |
+| User says / implies | Destination | LLD path | Rules file |
+|---|---|---|---|
+| "SB_DWH", "gen mapping cho SB_DWH", or no destination given but the table only exists under `lld/sb_dwh/` | `SB_DWH` | `lld/sb_dwh/SB_DWH_<TABLE>.csv` | `references/rules-sb_dwh.md` |
+| "STG_DTM", "STG", table name already prefixed `STG_` | `STG_DTM` | `lld/stg_dtm/STG_DTM_STG_<TABLE>.csv` | `references/rules-stg_dtm.md` |
+| "PDTD_DTM", "PDTD" | `PDTD_DTM` | `lld/pdtd_dtm/PDTD_DTM_<TABLE>.csv` | `references/rules-pdtd_dtm.md` |
+| "Report", "báo cáo" | `Report` | — | not implemented — see below |
 
-If the destination is genuinely ambiguous from the user's wording (e.g.
-they just say a bare table name that could belong to more than one phase,
-or say "gen mapping" with no destination and no other context), ask —
-don't guess silently, since the four phases produce very different output
-shapes and picking the wrong one wastes a full generation+review cycle.
+Note PDTD_DTM target tables keep their original business name (e.g.
+`DIM_CLOS_APPLICATION`, `DIM_T24_CARD`, `AGG_LOS_KPI_APPLICATION`) — there
+is no `DIM_PDTD_*`/`FCT_PDTD_*` naming prefix in this project's actual
+schema, so don't use that pattern to detect the phase.
+
+If the bare table name the user gives exists under more than one `lld/*`
+path and they haven't said which destination they mean, **ask** — don't
+guess silently, since the phases produce very different output shapes and
+picking the wrong one wastes a full generation+review cycle.
 
 Once identified, **read the matching rules file in full** before doing
 anything else — each one is self-contained (inputs, output structure,
@@ -62,10 +80,11 @@ the user wants to start now.
 - **One table per run** unless the user explicitly asks for all tables in
   that phase — keeps each output reviewable before running the rest.
 - **Output path pattern**: `mapping/<DESTINATION>/Mapping_<TARGET_TABLE>.xlsx`
-  (e.g. `mapping/SB_DWH/Mapping_DIM_LOS_GEO.xlsx`,
-  `mapping/STG_DTM/Mapping_STG_DIM_LOS_GEO.xlsx`,
-  `mapping/PDTD_DTM/Mapping_DIM_PDTD_GEO.xlsx`). `mapping/` is git-ignored
-  — safe to regenerate freely.
+  (e.g. `mapping/SB_DWH/Mapping_DIM_CLOS_CUSTOMER.xlsx`,
+  `mapping/STG_DTM/Mapping_STG_DIM_CLOS_CUSTOMER.xlsx`,
+  `mapping/PDTD_DTM/Mapping_DIM_CLOS_CUSTOMER.xlsx` — the `<TARGET_TABLE>`
+  is always that phase's own LLD `target_table` value, not a name you
+  construct). `mapping/` is git-ignored — safe to regenerate freely.
 - **Same renderer for every phase**: `scripts/gen_mapping.py` fills a copy
   of `references/Mapping_DIM_LOAN_template.xlsx` (DIM) or
   `references/Mapping_FCT_LOAN_template .xlsx` (FCT, mind the trailing
