@@ -79,6 +79,51 @@ referenced table just becomes another lettered alias inside the same
 single mapping column, exactly as phase 1 already does when a table joins
 across several source tables of the same system.
 
+## Table-wide row filter (DIM tables with EFF/EXP columns) — merge-by-key, not full reload
+
+PDTD_DTM does not run its own SCD2 comparison against the table's current
+rows — `STG_DTM` already owns SCD2 (it sets `EFF_DATE`/`EXP_DATE` when CDC
+detects a change). PDTD_DTM's job is to **MERGE (UPSERT) by key** only the
+rows that changed state since the previous run, confirmed against a real
+ETL job's own filter:
+
+```sql
+STG_DIM_CUSTOMER.EFF_DATE = v_batch_date OR
+(STG_DIM_CUSTOMER.EXP_DATE >= v_prev_date AND STG_DIM_CUSTOMER.EXP_DATE < v_batch_date)
+```
+
+— rows just opened exactly on `v_batch_date` (new version), OR rows that
+expired in `(v_prev_date, v_batch_date)` (version just superseded). This is
+a table-wide filter, same shape and placement as STG_DTM's own filter: it
+lives in the PK row's `etl_logic` as `<PK> WHERE <filter>`, split on
+`WHERE` the same way, and goes into `table_condition`, never a per-column
+`condition`.
+
+For a DIM table with several EFF/EXP layer pairs (e.g. `DIM_CLOS_PRODUCT`'s
+Product Line/Sub Product, `DIM_LOS_COMPANY`'s Company/Branch/Region), apply
+one such clause per layer (driving table's own alias, e.g. `A.<LAYER>_EFF_DATE`
+/ `A.<LAYER>_EXP_DATE`) and OR-combine them, parenthesized per layer — same
+pattern as the STG_DTM table-wide filter.
+
+The PK column's own `mapping` value (`A.DIMENSION_KEY`, before `WHERE`) is
+unaffected — `DIMENSION_KEY` is still carried over verbatim from SB_DWH via
+STG_DTM (sourced from a SB_DWH sequence), never a freshly-generated PDTD_DTM
+sequence.
+
+**`extra_variables`**: every PDTD_DTM DIM mapping that carries this
+table-wide filter (i.e. nearly all of them) must also declare the JSON's
+`extra_variables` key so `scripts/gen_mapping.py` appends a `V_PREV_DATE`
+row to the template's "Variable" sheet:
+```json
+"extra_variables": [["V_PREV_DATE", "DATE", "Ngày chạy dữ liệu - 1", null]]
+```
+Always add this row for every PDTD_DTM table in this phase, regardless of
+whether that specific table's own filter happens to reference it — keeps
+the Variable sheet consistent across the whole PDTD_DTM mapping set. This
+is additive only (it never touches `V_DATE_BATCH` or the other existing
+rows) and is a no-key-at-all no-op for STG_DTM/SB_DWH phases, which don't
+set `extra_variables`.
+
 ## Deriving the mapping cell per `etl_logic_type`
 
 - `direct` → mapping cell is `etl_logic`, alias-substituted (e.g.

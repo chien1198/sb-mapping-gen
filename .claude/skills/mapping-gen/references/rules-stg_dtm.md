@@ -58,9 +58,23 @@ the LLD CSV supersedes it.
   derived.** The LLD's PK row (`DIMENSION_KEY` for DIM, `DAYID` for FCT)
   writes its `etl_logic` as `<TABLE>.<PK_COLUMN> WHERE <filter
   expression>` — e.g. `DIM_CLOS_CUSTOMER.DIMENSION_KEY WHERE
-  DIM_CLOS_CUSTOMER.EXP_DATE IS NULL OR DIM_CLOS_CUSTOMER.EXP_DATE >=
-  v_batch_date - 3` or `FCT_CLOS_APPLICATION.DAYID WHERE
-  FCT_CLOS_APPLICATION.DAYID = v_batch_date`. Split on `WHERE`:
+  DIM_CLOS_CUSTOMER.EXP_DATE IS NULL OR (DIM_CLOS_CUSTOMER.EXP_DATE >=
+  v_prev_date AND DIM_CLOS_CUSTOMER.EXP_DATE < v_batch_date)` or
+  `FCT_CLOS_APPLICATION.DAYID WHERE FCT_CLOS_APPLICATION.DAYID =
+  v_batch_date`. The DIM shape (`EXP_DATE IS NULL OR (EXP_DATE >=
+  v_prev_date AND EXP_DATE < v_batch_date)`) is the standard STG_DTM
+  row-selection rule confirmed against a real ETL job's own filter: it
+  takes **every currently-effective record** (`EXP_DATE IS NULL`) plus
+  **every record that expired since the previous run** (`EXP_DATE` falling
+  in `[v_prev_date, v_batch_date)`) — a precise "since last run" window,
+  not a fixed lookback like the older `v_batch_date - N` buffer. A table
+  with several EFF/EXP layer pairs (e.g. `DIM_CLOS_PRODUCT`'s Product
+  Line/Sub Product, `DIM_LOS_COMPANY`'s Company/Branch/Region) OR-combines
+  one such clause per layer, parenthesized, same as before. `v_prev_date`
+  does **not** need a `extra_variables`/Variable-sheet entry at this
+  phase — that's only added at PDTD_DTM (see `rules-pdtd_dtm.md`), since
+  STG_DTM's own template copy doesn't reference it elsewhere. Split the
+  filter on `WHERE`:
   - Before `WHERE` → the PK column's own mapping cell value, alias-
     substituted (e.g. `DIM_CLOS_CUSTOMER.DIMENSION_KEY` → `A.DIMENSION_KEY`).
   - After `WHERE` → the table-wide filter, alias-substituted (e.g.

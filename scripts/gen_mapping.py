@@ -50,6 +50,11 @@ contract. Summary:
   "notes": [                             # optional; list = numbered points, or a plain string
     "Các khóa nghiệp vụ của NG_SB_CLOS_CUST_INFO... đang CẦN XÁC NHẬN",
     "RESULT_MAIN_CARD_ID và FIRST_APPROVED_* không có lineage tương ứng, đã bỏ qua"
+  ],
+  "extra_variables": [                  # optional; appends rows to the "Variable" sheet,
+                                          # right after its last existing row. Each entry:
+                                          # [Variable, Data type, Description, How to mapping]
+    ["V_PREV_DATE", "DATE", "Ngày chạy dữ liệu - 1", None]
   ]
 }
 
@@ -100,6 +105,49 @@ import openpyxl
 HEADER_ROW_LABEL = "Column name"
 FIRST_MAPPING_COL = 5  # column E
 JOIN_LABEL_COL = 4  # column D — "Điều kiện join giữa các bảng" label (Description column)
+
+
+def fill_variable_sheet(wb, extra_variables):
+    """Append rows to the 'Variable' sheet (STT, Variable, Data type,
+    Description, How to mapping), continuing the sheet's own STT numbering
+    and copying the style of its last existing data row."""
+    if not extra_variables or "Variable" not in wb.sheetnames:
+        return
+    ws = wb["Variable"]
+
+    header_row = None
+    for r in range(1, ws.max_row + 1):
+        if ws.cell(row=r, column=1).value == "STT":
+            header_row = r
+            break
+    if header_row is None:
+        return
+
+    last_row = header_row
+    last_stt = 0
+    for r in range(header_row + 1, ws.max_row + 1):
+        stt = ws.cell(row=r, column=1).value
+        if isinstance(stt, int):
+            last_row = r
+            last_stt = stt
+
+    style_row = last_row if last_row > header_row else header_row + 1
+
+    for i, (name, dtype, desc, mapping) in enumerate(extra_variables, start=1):
+        target_row = last_row + i
+        for col in range(1, 6):
+            src_cell = ws.cell(row=style_row, column=col)
+            dst_cell = ws.cell(row=target_row, column=col)
+            dst_cell.font = copy.copy(src_cell.font)
+            dst_cell.border = copy.copy(src_cell.border)
+            dst_cell.fill = copy.copy(src_cell.fill)
+            dst_cell.alignment = copy.copy(src_cell.alignment)
+        ws.row_dimensions[target_row].height = ws.row_dimensions[style_row].height
+        ws.cell(row=target_row, column=1).value = last_stt + i
+        ws.cell(row=target_row, column=2).value = name
+        ws.cell(row=target_row, column=3).value = dtype
+        ws.cell(row=target_row, column=4).value = desc
+        ws.cell(row=target_row, column=5).value = mapping
 
 
 def find_layout(ws):
@@ -412,6 +460,8 @@ def build(data, template_path, output_path):
             value_cell.value = notes
         label_cell.font = openpyxl.styles.Font(name=label_cell.font.name, bold=True, color=label_cell.font.color)
         value_cell.font = openpyxl.styles.Font(name=value_cell.font.name, bold=True, color=value_cell.font.color)
+
+    fill_variable_sheet(wb, data.get("extra_variables"))
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     wb.save(output_path)
