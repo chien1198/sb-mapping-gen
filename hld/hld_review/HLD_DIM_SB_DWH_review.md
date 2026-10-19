@@ -168,7 +168,7 @@ flowchart LR
     end
     C -->|"grain hồ sơ — driving table: WI_NAME, LOANCASEID, CREDIT_PROFILE, CREATE_EMPLOYEE_CODE/NAME + CHANNEL dư thừa"| F
     A -->|"LEFT JOIN theo WI_NAME: ZONEE→ZONE, LOAN_PURPOSE, EMAIL, DISTANCE_BRANCH_CUSTOMER, PRODUCT_LINE, SUB_PRODUCT "| F
-    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER (khách hàng chính đứng tên vay)"| F
+    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy CUSTOMER_CODE (khách hàng chính đứng tên vay)"| F
     B -->|"1:1 STREAM, APP_GRP"| F
     E -.->|"PHÁI SINH: MIN(ENTRYDATE) — sinh CREATION_DATE"| F
     G -->|1:1 HAVE_ANY_DEVIATION| F
@@ -196,7 +196,7 @@ flowchart LR
 | 15 | DISTANCE_BRANCH_CUSTOMER | NVARCHAR2 | N | 200 |  | Dải khoảng cách từ khách hàng đến chi nhánh xử lý hồ sơ này (đã phân nhóm sẵn, không phải số đo thô) — nguồn NG_SB_CLOS_CUST_INFO.DISTANCE_BRANCH_CUSTOMER. Cần BA xác nhận đơn vị đo (nghi vấn km) | — | Thiết kế dư thừa |
 | 16 | PRODUCT_LINE | NVARCHAR2 | N | 200 |  | Dòng sản phẩm tự khai theo hồ sơ (mã PRO01-06) — nguồn NG_SB_CLOS_CUST_INFO.PRODUCT_LINE. Text as-is, KHÔNG dùng để tra REF_PRODUCT/SLA_* (khóa tra vẫn qua DIM_CLOS_PRODUCT/FCT, xem ghi chú cuối mục) | Báo cáo CLOS APPLICATION (BC2) | PRODUCT_LINE (Dòng sản phẩm) |
 | 17 | SUB_PRODUCT | NVARCHAR2 | N | 255 |  | Sản phẩm vay chi tiết tự khai theo hồ sơ — nguồn NG_SB_CLOS_CUST_INFO.SUB_PRODUCT. Text as-is, cùng lý do cột 17 | Báo cáo CLOS APPLICATION (BC2) | SUB_PRODUCT (Sản phẩm nhánh) |
-| 18 | ID_NUMBER | NVARCHAR2 | N | 100 |  | Số ĐKKD/CMND của khách hàng đứng tên vay chính — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG'. Dùng nội bộ để tự tra CUSTOMER_SK trên FCT, không phải khóa report dùng để join | — | Thể hiện quan hệ hồ sơ↔khách hàng trực tiếp trên DIM này |
+| 18 | CUSTOMER_CODE | NVARCHAR2 | N | 100 |  | Số ĐKKD/CMND của khách hàng đứng tên vay chính — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG'. Dùng nội bộ để tự tra CUSTOMER_SK trên FCT, không phải khóa report dùng để join | — | Thể hiện quan hệ hồ sơ↔khách hàng trực tiếp trên DIM này |
 | 19 | CHANNEL | NVARCHAR2 | N | 255 |  | Kênh nộp hồ sơ (eBanking/khác) — nguồn NG_SB_CLOS_EXTTABLE.CHANNEL | — | Thiết kế dư thừa |
 | 20 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) | — | — |
 | 21 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
@@ -207,8 +207,8 @@ flowchart LR
 ### 4.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** thông tin doanh nghiệp khách hàng chính CLOS — lưu tên khách hàng cùng các thuộc tính mô tả CỐ HỮU của khách hàng (phân khúc, loại hình pháp lý, ngành nghề kinh doanh...).
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** `ID_NUMBER`
-- **Độ chi tiết (grain):** 1 dòng = 1 khách hàng (theo `ID_NUMBER` — số ĐKKD/CMND, định danh pháp lý ổn định không đổi giữa các hồ sơ khác nhau). Lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2).
+- **Khóa nghiệp vụ (BK):** `CUSTOMER_CODE`
+- **Độ chi tiết (grain):** 1 dòng = 1 khách hàng (theo `CUSTOMER_CODE` — số ĐKKD/CMND, định danh pháp lý ổn định không đổi giữa các hồ sơ khác nhau). Lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2).
 - **Phục vụ báo cáo:**
   - Báo cáo CLOS APPLICATION (BC2)
   - Báo cáo Thông tin phê duyệt (BC3)
@@ -225,8 +225,8 @@ flowchart LR
     subgraph SB_DWH
         E["DIM_CLOS_CUSTOMER"]
     end
-    A -->|1:1 CUSTOMER_NAME → FULL_NAME, CUST_GROUP, CUST_CATEGORY, PRECUSTGROUP, INDUSTRY_CODE_LEVEL_1/2/3| E
-    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER làm NK; ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME)=1 khi 1 khách hàng có nhiều hồ sơ"| E
+    A -->|1:1 CUSTOMER_NAME → CUSTOMER_NAME, CUST_GROUP, CUST_CATEGORY, PRECUSTGROUP, INDUSTRY_CODE_LEVEL_1/2/3| E
+    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy CUSTOMER_CODE làm NK; ROW_NUMBER() OVER (PARTITION BY CUSTOMER_CODE ORDER BY WI_NAME)=1 khi 1 khách hàng có nhiều hồ sơ"| E
 ```
 
 
@@ -236,8 +236,8 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_CUSTOMER, sinh bằng Oracle sequence tại SB_DWH | — | — |
 | 2 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_CUSTOMER, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 | — | — |
-| 3 | ID_NUMBER | VARCHAR2 | N | 100 | BK | Số ĐKKD/CMND của khách hàng — định danh pháp lý ổn định, không đổi giữa các hồ sơ khác nhau. Nguồn: NG_SB_CLOS_CUST_INFO LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' | — | Nguồn cho chỉ tiêu/trường CUSTOMER_SK (khóa join FCT_CLOS_APPLICATION, tra qua ID_NUMBER; FCT_CLOS_LEGAL_PARTY.CUSTOMER_SK) |
-| 4 | FULL_NAME | NVARCHAR2 | N | 200 |  | Tên doanh nghiệp khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME (dòng đại diện đã chọn ở cột ID_NUMBER) | Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo Thông tin phê duyệt (BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) | CUSTOMER_NAME (Tên khách hàng) |
+| 3 | CUSTOMER_CODE | VARCHAR2 | N | 100 | BK | Số ĐKKD/CMND của khách hàng — định danh pháp lý ổn định, không đổi giữa các hồ sơ khác nhau. Nguồn: NG_SB_CLOS_CUST_INFO LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' | — | Nguồn cho chỉ tiêu/trường CUSTOMER_SK (khóa join FCT_CLOS_APPLICATION, tra qua CUSTOMER_CODE; FCT_CLOS_LEGAL_PARTY.CUSTOMER_SK) |
+| 4 | CUSTOMER_NAME | NVARCHAR2 | N | 200 |  | Tên doanh nghiệp khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME (dòng đại diện đã chọn ở cột CUSTOMER_CODE) | Báo cáo CLOS APPLICATION (BC2)<br>Báo cáo Thông tin phê duyệt (BC3)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) | CUSTOMER_NAME (Tên khách hàng) |
 | 5 | CUST_GROUP | NVARCHAR2 | N | 200 |  | Phân khúc khách hàng doanh nghiệp (SME/MSME/USME/STR/JSC/SOC/BANK/FDI/NBFI) — nguồn NG_SB_CLOS_CUST_INFO.CUST_GROUP | Báo cáo SLA - TAT (BC5) — khóa chọn bảng REF_SLA_TDKHDNL/TDKHDN<br>Báo cáo KPI (BC9) — khóa chọn bảng REF khi tính POINT | Nguồn cho chỉ tiêu/trường REF_PRODUCT/SLA_* (BC5); POINT (BC9) |
 | 6 | CUST_CATEGORY | NVARCHAR2 | N | 200 |  | Phân loại khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUST_CATEGORY. Metadata ghi nhận cả loại hình pháp lý lẫn giá trị dạng mã số trong cùng cột — cần BA xác nhận quy tắc chuẩn | — | Thiết kế dư thừa |
 | 7 | PRECUSTGROUP | NVARCHAR2 | N | 300 |  | Phân khúc khách hàng trước xử lý — nguồn NG_SB_CLOS_CUST_INFO.PRECUSTGROUP, cùng bộ giá trị với CUST_GROUP (SME/MSME/JSC/SOC/NBFI/FDI). Cần BA xác nhận khác biệt cụ thể với CUST_GROUP | — | Thiết kế dư thừa |
@@ -682,14 +682,14 @@ flowchart LR
 ### 13.1 Mục đích thiết kế
 
 - **Ý nghĩa bảng:** danh mục sản phẩm tín dụng RLOS (bán lẻ/cá nhân) — lưu
-  dòng sản phẩm chính (`PRODUCTLINE_CODE`) và sản phẩm nhánh (`SUB_PRODUCT_CODE`,
+  dòng sản phẩm chính (`PRODUCTLINE_CODE`) và sản phẩm nhánh (`SUB_PRODUCT_NAME`,
   con của sản phẩm chính). `PRODUCTLINE_SK` tách riêng
   cho layer cha (Product Line) dù cùng nguồn với layer con — chỉ layer
   nhỏ nhất (Sub Product) mới quản lý SCD2 (EFF_DATE/EXP_DATE riêng).
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (NK) theo layer:** `PRODUCTLINE_CODE` (layer Product Line), `SUB_PRODUCT_CODE` (layer Sub Product) — mỗi layer đã có NK riêng.
+- **Khóa nghiệp vụ (NK/BK) theo layer:** `PRODUCTLINE_CODE` (layer Product Line); `PRODUCTLINE_CODE` + `SUB_PRODUCT_NAME` (layer Sub Product, hash vào `SUB_PRODUCT_BK`) — `SUB_PRODUCT_CODE` không unique trên dữ liệu thật nên không dùng làm khóa.
 - **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời
-  gian (SCD Type 2, khóa tự nhiên `PRODUCTLINE_CODE` + `SUB_PRODUCT_CODE` +
+  gian (SCD Type 2, khóa tự nhiên `PRODUCTLINE_CODE` + `SUB_PRODUCT_NAME` +
   `EFF_DATE`).
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
@@ -706,7 +706,7 @@ flowchart LR
     subgraph SB_DWH
         C["DIM_RLOS_PRODUCT"]
     end
-    B -->|"grain — 1 dòng/(PRODUCTLINE_CODE, SUB_PRODUCT_CODE), gồm PRODUCTLINE_NAME/SCORE_REQUIRED/SCORE_MODEL"| C
+    B -->|"grain — 1 dòng/(PRODUCTLINE_CODE, SUB_PRODUCT_NAME), gồm PRODUCTLINE_NAME/SCORE_REQUIRED/SCORE_MODEL"| C
 ```
 
 ### 13.3 Cấu trúc bảng
@@ -718,12 +718,13 @@ flowchart LR
 | 3 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 | NK | Mã dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_CODE (= PRODUCTLINE_CODE của MAS_PRODUCT_LINE, cùng khái niệm).| Báo cáo RLOS APPLICATION (BC1) | PRODUCT_LINE (Dòng sản phẩm) |
 | 4 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_NAME.| Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay PRODUCTLINE_CODE | PRODUCT_LINE (Dòng sản phẩm) |
 | 5 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | Layer nhỏ nhất/đại diện của cả dòng (grain chính của DIM), FK duy nhất mà FCT_RLOS_APPLICATION dùng. Bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 6 | SUB_PRODUCT_CODE | VARCHAR2 | N | 200 | NK | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
-| 7 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 200 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME.| Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
-| 8 | SCORE_REQUIRED | VARCHAR2 | N | 200 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED | — | Thiết kế dư thừa |
-| 9 | SCORE_MODEL | VARCHAR2 | N | 200 |  | Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL | — | Thiết kế dư thừa |
-| 10 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — CHỈ 1 cặp cho layer nhỏ nhất (Sub Product), do ETL tính qua CDC so toàn bộ cột non-key của MAS_SUB_PRODUCT (layer cha PRODUCTLINE đổi cũng kéo theo version mới của cả dòng, dù không có EFF/EXP riêng) | — | — |
-| 11 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 6 | SUB_PRODUCT_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của layer Sub Product — PHÁI SINH: STANDARD_HASH(PRODUCTLINE_CODE \|\| SUB_PRODUCT_NAME, 'MD5') | — | — |
+| 7 | SUB_PRODUCT_CODE | VARCHAR2 | N | 200 |  | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
+| 8 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 200 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME.| Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
+| 9 | SCORE_REQUIRED | VARCHAR2 | N | 200 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED | — | Thiết kế dư thừa |
+| 10 | SCORE_MODEL | VARCHAR2 | N | 200 |  | Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL | — | Thiết kế dư thừa |
+| 11 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — CHỈ 1 cặp cho layer nhỏ nhất (Sub Product), do ETL tính qua CDC so toàn bộ cột non-key của MAS_SUB_PRODUCT (layer cha PRODUCTLINE đổi cũng kéo theo version mới của cả dòng, dù không có EFF/EXP riêng) | — | — |
+| 12 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 13A. DIM_RLOS_SECONDPRODUCT
 

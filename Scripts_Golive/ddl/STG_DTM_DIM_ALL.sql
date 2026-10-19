@@ -22,7 +22,7 @@ BEGIN
         distance_branch_customer VARCHAR2(100),
         product_line             VARCHAR2(200),
         sub_product              VARCHAR2(255),
-        id_number                VARCHAR2(100),
+        customer_code            VARCHAR2(100),
         channel                  VARCHAR2(200),
         eff_date                 DATE,
         exp_date                 DATE
@@ -113,8 +113,8 @@ BEGIN
       (
         dimension_key      NUMBER not null,
         customer_sk        NUMBER not null,
-        id_number          VARCHAR2(100),
-        full_name          VARCHAR2(200),
+        customer_code      VARCHAR2(100),
+        customer_name      VARCHAR2(200),
         cust_group         VARCHAR2(100),
         cust_category      VARCHAR2(200),
         precustgroup       VARCHAR2(100),
@@ -150,7 +150,7 @@ BEGIN
           maxextents unlimited
         )';
    EXECUTE IMMEDIATE 'alter index STG_DTM.STG_DIM_CLOS_CUSTOMER_PK nologging';
-   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_CUSTOMER_ID_NUMBER_IDX on STG_DTM.STG_DIM_CLOS_CUSTOMER (ID_NUMBER)
+   EXECUTE IMMEDIATE 'create index STG_DTM.STG_DIM_CLOS_CUSTOMER_CUSTOMER_CODE_IDX on STG_DTM.STG_DIM_CLOS_CUSTOMER (CUSTOMER_CODE)
         tablespace STG_DTM_TBS
         pctfree 10
         initrans 2
@@ -1207,6 +1207,7 @@ BEGIN
         productline_code VARCHAR2(100),
         productline_name VARCHAR2(200),
         sub_product_sk    NUMBER not null,
+        sub_product_bk    VARCHAR2(64),
         sub_product_code VARCHAR2(100),
         sub_product_name VARCHAR2(150),
         score_required   VARCHAR2(10),

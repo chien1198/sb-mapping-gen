@@ -271,7 +271,7 @@ BEGIN
       distance_branch_customer VARCHAR2(100),
       product_line             VARCHAR2(200),
       sub_product              VARCHAR2(255),
-      id_number                VARCHAR2(100),
+      customer_code            VARCHAR2(100),
       channel                  VARCHAR2(200),
       eff_date                 DATE,
       exp_date                 DATE
@@ -282,8 +282,8 @@ BEGIN
    -- ============================================================
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_CLOS_CUSTOMER (
       customer_sk        NUMBER,
-      id_number          VARCHAR2(100),
-      full_name          VARCHAR2(200),
+      customer_code      VARCHAR2(100),
+      customer_name      VARCHAR2(200),
       cust_group         VARCHAR2(100),
       cust_category      VARCHAR2(200),
       precustgroup       VARCHAR2(100),

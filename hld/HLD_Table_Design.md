@@ -144,7 +144,7 @@ flowchart LR
     end
     C -->|"grain hồ sơ — driving table: WI_NAME, LOANCASEID, CREDIT_PROFILE, CREATE_EMPLOYEE_CODE/NAME + CHANNEL dư thừa (review 2026-10-02: đổi tên EMPLOYEE_CODE/NAME→CREATE_EMPLOYEE_CODE/NAME; xóa FIRST_APPROVED_WI_NAME/CUSTOMER_NAME/PRODUCT_NAME, xem 1.2.1.1)"| F
     A -->|"LEFT JOIN theo WI_NAME: ZONEE→ZONE, LOAN_PURPOSE, EMAIL, DISTANCE_BRANCH_CUSTOMER, PRODUCT_LINE, SUB_PRODUCT (review 2026-10-02: xóa APP_DATE, trùng CREATION_DATE; review 2026-09-30 lượt 2: LG_REQ/FI_REQ/PHONE_REQ chuyển sang FCT_CLOS_APPLICATION, xem 1.2.2.1)"| F
-    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER (khách hàng chính đứng tên vay)"| F
+    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy CUSTOMER_CODE (khách hàng chính đứng tên vay)"| F
     B -->|"1:1 STREAM, APP_GRP (APPROVAL_TYPE chuyển tính tại FCT_CLOS_APPLICATION tầng PDTD_DTM, review 2026-09-30 lượt 2 — xem 2.2.2.1)"| F
     E -.->|"PHÁI SINH: MIN(ENTRYDATE) — sinh CREATION_DATE (APPROVED_DATE chuyển sang FCT_CLOS_APPLICATION, review 2026-09-30 lượt 2 — xem 1.2.2.1)"| F
     G -->|1:1 HAVE_ANY_DEVIATION| F
@@ -224,7 +224,7 @@ CLOS_APPLICATION_DAILY.PRODUCTLINE_SK`/`SUB_PRODUCT_SK` (⚠️ review
 layer, xem 1.2.1.2) như thiết kế cũ (xem 2.2.1.1 Section 1, "Lưu ý về
 PRODUCT_LINE/SUB_PRODUCT dùng làm khóa tra"), không đổi.
 
-**Thêm mới — khách hàng chính (review 2026-09-25, lượt 2):** `ID_NUMBER`
+**Thêm mới — khách hàng chính (review 2026-09-25, lượt 2):** `CUSTOMER_CODE`
 — số ĐKKD/CMND của khách hàng đứng tên vay chính, lấy qua `NG_SB_CLOS_
 CUST_INFO_LEGAL` lọc `UPPER(OBJ_TYPE)='KHÁCH HÀNG'` theo `WI_NAME` (mỗi
 hồ sơ chỉ có đúng 1 dòng OBJ_TYPE='Khách hàng', đã xác nhận — xem
@@ -264,7 +264,7 @@ không thể tra `DIM_CLOS_CUSTOMER` theo điều kiện "hiệu lực tại DAY
 như trên `FCT_CLOS_APPLICATION`. Thay vào đó, dùng đúng logic đã
 dùng để dựng chính `DIM_CLOS_CUSTOMER`: `WI_NAME` (của dòng đang ETL) →
 `NG_SB_CLOS_CUST_INFO_LEGAL` lọc `UPPER(OBJ_TYPE)='KHÁCH HÀNG'` → lấy
-`ID_NUMBER` → LEFT JOIN `DIM_CLOS_CUSTOMER` theo `ID_NUMBER` (NK) lấy
+`CUSTOMER_CODE` → LEFT JOIN `DIM_CLOS_CUSTOMER` theo `CUSTOMER_CODE` (NK) lấy
 bản ghi hiện hành (`EXP_DATE IS NULL`) tại thời điểm ETL — ra
 `CUSTOMER_SK`/`CUST_GROUP`. Xem cột `CUSTOMER_SK` (mới, cột 27) tại
 Section 2.
@@ -340,7 +340,7 @@ riêng ở đây chỉ giữ sơ đồ lineage tổng quan).
   SB_DWH_DIM_CLOS_APPLICATION.csv` — cả 2 cột chỉ là bản sao trực tiếp
   (`direct`) từ `NG_SB_CLOS_EXTTABLE`, không dùng làm khóa JOIN ở bất kỳ
   nơi nào. Báo cáo lấy tên khách hàng (BC2/BC3/BC4) qua `DIM_CLOS_
-  CUSTOMER.FULL_NAME` bằng `CUSTOMER_SK` có sẵn trên `FCT_CLOS_
+  CUSTOMER.CUSTOMER_NAME` bằng `CUSTOMER_SK` có sẵn trên `FCT_CLOS_
   APPLICATION`/`FCT_CLOS_WORKSTEP_EVENT`; tên sản phẩm (BC5/BC9) qua
   `DIM_CLOS_PRODUCT.PRODUCT_NAME` bằng `PRODUCT_SK` — không đụng đến 2
   cột dư thừa này trên `DIM_CLOS_APPLICATION`. Khai thác hồ sơ↔khách
@@ -571,8 +571,8 @@ flowchart LR
     subgraph SB_DWH
         E["DIM_CLOS_CUSTOMER"]
     end
-    A -->|1:1 CUSTOMER_NAME → FULL_NAME, CUST_GROUP, CUST_CATEGORY, PRECUSTGROUP, INDUSTRY_CODE_LEVEL_1/2/3| E
-    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER làm NK; ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME DESC)=1 khi 1 khách hàng có nhiều hồ sơ — lấy hồ sơ mới nhất"| E
+    A -->|1:1 CUSTOMER_NAME → CUSTOMER_NAME, CUST_GROUP, CUST_CATEGORY, PRECUSTGROUP, INDUSTRY_CODE_LEVEL_1/2/3| E
+    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy CUSTOMER_CODE làm NK; ROW_NUMBER() OVER (PARTITION BY CUSTOMER_CODE ORDER BY WI_NAME DESC)=1 khi 1 khách hàng có nhiều hồ sơ — lấy hồ sơ mới nhất"| E
 ```
 
 **Ghi chú lineage — đổi khóa nghiệp vụ (review 2026-09-25, theo yêu cầu
@@ -580,7 +580,7 @@ người dùng):** thiết kế trước đây (xem lịch sử ngay dưới) d�
 làm NK — nghĩa là grain thật là "1 dòng/hồ sơ", không phải "1 dòng/khách
 hàng". Một khách hàng nộp nhiều hồ sơ (nhiều `WI_NAME`) sẽ tạo nhiều dòng
 trùng lặp cho cùng 1 khách hàng — sai bản chất DIM khách hàng. NK mới là
-**`ID_NUMBER`** (số ĐKKD/CMND của khách hàng, định danh pháp lý ổn định,
+**`CUSTOMER_CODE`** (số ĐKKD/CMND của khách hàng, định danh pháp lý ổn định,
 không đổi giữa các hồ sơ khác nhau) — lấy bằng `NG_SB_CLOS_CUST_INFO` LEFT
 JOIN `NG_SB_CLOS_CUST_INFO_LEGAL` theo `WI_NAME` + `UPPER(OBJ_TYPE)='KHÁCH
 HÀNG'` (mỗi hồ sơ chỉ có đúng 1 dòng `OBJ_TYPE='Khách hàng'` — đã xác nhận
@@ -588,12 +588,12 @@ trước đây, xem `FCT_CLOS_LEGAL_PARTY`, 1.2.1.7). `WI_NAME` **không còn l�
 cột lưu trữ trên bảng này** — chỉ là điều kiện join lúc ETL, không đại
 diện cho grain nữa.
 
-**Dedupe khi 1 `ID_NUMBER` xuất hiện ở nhiều `WI_NAME` (⚠️ review
+**Dedupe khi 1 `CUSTOMER_CODE` xuất hiện ở nhiều `WI_NAME` (⚠️ review
 2026-10-12, sửa lại logic chọn dòng đại diện):** `NG_SB_CLOS_CUST_INFO`
 và `NG_SB_CLOS_CUST_INFO_LEGAL` đều grain "n hồ sơ x 1 khách hàng" — một
 khách hàng nộp nhiều hồ sơ (nhiều `WI_NAME`) sẽ sinh nhiều dòng cho cùng
-`ID_NUMBER` sau khi lookup qua `WI_NAME`, cần dedupe còn lại đúng 1 dòng.
-Lấy 1 dòng đại diện bằng `ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER
+`CUSTOMER_CODE` sau khi lookup qua `WI_NAME`, cần dedupe còn lại đúng 1 dòng.
+Lấy 1 dòng đại diện bằng `ROW_NUMBER() OVER (PARTITION BY CUSTOMER_CODE ORDER
 BY WI_NAME DESC) = 1` — tức lấy thông tin khách hàng tại **hồ sơ cuối
 cùng** (`WI_NAME` lớn nhất). `WI_NAME` có cấu trúc `SB-<số tự tăng 10
 chữ số>-CLOS` (xác nhận `CLOS - Metadata.xlsx`, sheet "3. Column Review",
@@ -618,7 +618,7 @@ xem đánh giá lại chi tiết ngay dưới.
 theo đúng ngữ nghĩa KHÁCH HÀNG vs HỒ SƠ (review 2026-09-25):**
 
 - **Giữ/thêm — thuộc tính KHÁCH HÀNG thật (ổn định qua các hồ sơ khác
-  nhau của cùng 1 khách hàng):** `CUSTOMER_NAME`→`FULL_NAME`,
+  nhau của cùng 1 khách hàng):** `CUSTOMER_NAME`→`CUSTOMER_NAME`,
   `CUST_GROUP` (chuyển từ `DIM_CLOS_APPLICATION`, xem ghi chú TODO dưới),
   `CUST_CATEGORY`, `PRECUSTGROUP`, và 3 cột mới `INDUSTRY_CODE_LEVEL_1/
   2/3` (gap SRS, xem ghi chú riêng dưới).
@@ -639,14 +639,14 @@ theo đúng ngữ nghĩa KHÁCH HÀNG vs HỒ SƠ (review 2026-09-25):**
 - **Xóa vì trùng lặp với NK mới:** `ORG_LEGAL_ID` (trước đây ở PDTD_DTM,
   2.2.1.6 — LEFT JOIN `FCT_CLOS_LEGAL_PARTY` theo `WI_NAME`+`LEGAL_TYPE=
   'CUSTOMER'` lấy `ID_NUMBER` của khách hàng chính) nay **trùng lặp hoàn
-  toàn** với NK `ID_NUMBER` của chính bảng này — xóa cột, báo cáo tra
+  toàn** với NK `CUSTOMER_CODE` của chính bảng này — xóa cột, báo cáo tra
   trực tiếp NK của dòng.
 
 **Bổ sung `CUST_GROUP` (review 2026-09-25) — ⚠️ TODO còn trùng lặp tạm
 thời ở `DIM_CLOS_APPLICATION`:** `CUST_GROUP` (phân khúc KH: SME/MSME/
 USME/STR/JSC/SOC/BANK/FDI/NBFI) là thuộc tính khách hàng thật, không phải
 hồ sơ — theo quyết định người dùng, thêm vào đây (nguồn
-`NG_SB_CLOS_CUST_INFO.CUST_GROUP`, cùng dòng dùng để lấy `ID_NUMBER`).
+`NG_SB_CLOS_CUST_INFO.CUST_GROUP`, cùng dòng dùng để lấy `CUSTOMER_CODE`).
 Cột này **hiện vẫn còn tồn tại trùng lặp tại `DIM_CLOS_APPLICATION`**
 (1.2.1.1/2.2.1.1, dùng làm input tính `BUSINESS_FLOW`/chọn bảng SLA) — người
 dùng sẽ đánh giá xóa ở đó khi làm lại `DIM_CLOS_APPLICATION` ở lượt review
@@ -710,7 +710,7 @@ flowchart LR
     D -->|"LEFT JOIN WI_NAME=PROCESSINSTANCEID (không lọc CREATEDBY) — sinh APPLICATION_LINK_INFO (đổi tên từ VAR_STR12, review 2026-10-04)"| E
     F -->|"driving table — base set WI_NAME đầy đủ mọi hồ sơ còn hiệu lực, full snapshot mọi DAYID"| E
     G -.->|"APP_GRP"| E
-    K -.->|"CUSTOMER_SK — tra ID_NUMBER qua WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, rồi lookup DIM_CLOS_CUSTOMER theo ID_NUMBER (NK) + điều kiện SCD2 hiệu lực tại DAYID"| E
+    K -.->|"CUSTOMER_SK — tra ID_NUMBER qua WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, rồi lookup DIM_CLOS_CUSTOMER theo CUSTOMER_CODE (NK) + điều kiện SCD2 hiệu lực tại DAYID"| E
     M --> K
     ML -.-> K
     MW --> WD
@@ -731,11 +731,11 @@ flowchart LR
 
 **⚠️ Cập nhật join `CUSTOMER_SK` sau khi `DIM_CLOS_CUSTOMER` đổi grain
 (review 2026-09-25):** trước đây join thẳng `WI_NAME + SCD2 tại DAYID`
-(quan hệ 1:1 hồ sơ↔DIM). Nay `DIM_CLOS_CUSTOMER` có NK=`ID_NUMBER`
+(quan hệ 1:1 hồ sơ↔DIM). Nay `DIM_CLOS_CUSTOMER` có NK=`CUSTOMER_CODE`
 (grain 1 dòng/khách hàng, xem 1.2.1.6) — ETL phải qua 1 bước tra cứu
 trung gian: `WI_NAME` (của dòng `FCT_CLOS_APPLICATION` đang nạp) →
 `NG_SB_CLOS_CUST_INFO_LEGAL` lọc `UPPER(OBJ_TYPE)='KHÁCH HÀNG'` → lấy
-`ID_NUMBER` → lookup `DIM_CLOS_CUSTOMER.DIMENSION_KEY` theo `ID_NUMBER` +
+`ID_NUMBER` → lookup `DIM_CLOS_CUSTOMER.DIMENSION_KEY` theo `CUSTOMER_CODE` +
 điều kiện SCD2 hiệu lực tại `DAYID`. Quan hệ vẫn N:1 (nhiều hồ sơ/DAYID
 của cùng khách hàng có thể trỏ cùng 1 `CUSTOMER_SK`), không phải 1:1 như
 trước — đây là hệ quả tất yếu của việc grain khách hàng độc lập với hồ sơ.
@@ -872,7 +872,7 @@ PARTY` (1.2.2.7) tự nó đã mang sẵn `WI_NAME` (và cả `CUSTOMER_SK`/
 biệt duy nhất so với bên RLOS là nhánh CLOS chưa từng mất surrogate key
 ổn định, nhưng bảng cầu nối vẫn dư thừa vì đích đến (`FCT_CLOS_LEGAL_
 PARTY`) đã tự đủ khóa join trực tiếp. Đã xóa hoàn toàn khỏi thiết kế.
-`DIM_CLOS_CUSTOMER` (PDTD_DTM) lookup `ID_NUMBER`/`LEGAL_REPRESENTATIVE`/
+`DIM_CLOS_CUSTOMER` (PDTD_DTM) lookup `CUSTOMER_CODE`/`LEGAL_REPRESENTATIVE`/
 `ADD_ID_REPRESENTATIVE` bằng cách JOIN thẳng `FCT_CLOS_LEGAL_PARTY` theo
 `WI_NAME`+`LEGAL_TYPE`, không qua bảng này nữa. Giữ lại số hiệu `1.2.2.2`
 như một mục rỗng trỏ chuyển tiếp, không xóa số để không làm lệch số các
@@ -1019,8 +1019,8 @@ flowchart LR
     K1 -->|1:1 CHANGE_REQUEST, CHANGE_TYPE| D
     E -.->|"PHÁI SINH: MAX(EXITDATE) theo điều kiện WORKSTEP/DECISION đã phê duyệt — sinh APPROVED_DATE; MIN(ENTRYDATE) — sinh CREATION_DATE"| D
     N -->|1:1 HAVE_ANY_DEVIATION| D
-    H -->|1:1 CUSTOMER_NAME → FULL_NAME, CUST_GROUP| KC
-    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy ID_NUMBER làm NK"| KC
+    H -->|1:1 CUSTOMER_NAME → CUSTOMER_NAME, CUST_GROUP| KC
+    L -.->|"LEFT JOIN WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' — lấy CUSTOMER_CODE làm NK"| KC
     U -->|"grain 1 dòng/LOGIN_ID, CDC xác định thay đổi (review 2026-09-18)"| F
 ```
 
@@ -1461,7 +1461,7 @@ flowchart LR
         E["FCT_CLOS_LEGAL_PARTY"]
     end
     A -->|1:1 NAMEE→FULL_NAME, ID_NUMBER, OBJ_TYPE, LEGAL_DOC| E
-    K -.->|"CUSTOMER_SK — tìm dòng cùng WI_NAME có UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, lấy ID_NUMBER, lookup DIM_CLOS_CUSTOMER theo ID_NUMBER (NK) — mọi dòng đều có, kể cả dòng không phải vai trò Khách hàng"| E
+    K -.->|"CUSTOMER_SK — tìm dòng cùng WI_NAME có UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, lấy ID_NUMBER, lookup DIM_CLOS_CUSTOMER theo CUSTOMER_CODE (NK) — mọi dòng đều có, kể cả dòng không phải vai trò Khách hàng"| E
     AP -.->|"APPLICATION_SK, join theo WI_NAME"| E
 ```
 
@@ -1496,7 +1496,7 @@ không còn `DIMENSION_KEY` sequence.
    Cách lấy: từ `WI_NAME` của dòng đang xét, tìm dòng khác cùng `WI_NAME`
    có `UPPER(OBJ_TYPE)='KHÁCH HÀNG'` trên chính `NG_SB_CLOS_CUST_INFO_
    LEGAL`, lấy `ID_NUMBER` của dòng đó, lookup sang `DIM_CLOS_CUSTOMER.
-   DIMENSION_KEY` theo `ID_NUMBER` (NK, xem 1.2.1.6) — tái sử dụng đúng
+   DIMENSION_KEY` theo `CUSTOMER_CODE` (NK, xem 1.2.1.6) — tái sử dụng đúng
    logic đã dùng để dựng `DIM_CLOS_CUSTOMER`, không phát minh lại. Mặc
    định -1 nếu không khớp.
 2. **Chiều hồ sơ — `APPLICATION_SK`:** join theo `WI_NAME` sang
@@ -1827,11 +1827,32 @@ lập — version của nó đi theo version của dòng Sub Product chứa nó.
 (dùng chung `SEQ_DIM_RLOS_PRODUCT`), không phải sequence riêng — có thể
 lặp lại nhiều lần cho cùng 1 `PRODUCTLINE_CODE` (không ổn định/cố định
 theo mã). Đổi tên `PRODUCT_SK` → `SUB_PRODUCT_SK` (đúng layer nó đại
-diện); bỏ `PRODUCT_BK` (mỗi layer đã có NK riêng —
-`PRODUCTLINE_CODE`/`SUB_PRODUCT_CODE` — không cần hash composite).
-`FCT_RLOS_APPLICATION` giữ nguyên 1 FK duy nhất (`SUB_PRODUCT_SK`,
+diện). `FCT_RLOS_APPLICATION` giữ nguyên 1 FK duy nhất (`SUB_PRODUCT_SK`,
 1.3.2.1) — Product Line đọc qua cùng dòng join, không cần FK riêng (theo
 yêu cầu người dùng: PRODUCTLINE chỉ là thông tin bổ trợ cho SUB_PRODUCT).
+
+**⚠️ Review 2026-10-19 (theo yêu cầu người dùng, phát hiện trên dữ liệu
+thật): khóa nghiệp vụ layer Sub Product KHÔNG phải (`PRODUCTLINE_CODE`,
+`SUB_PRODUCT_CODE`) như kết luận 2026-10-13 — thêm lại cột
+`SUB_PRODUCT_BK`.** Dữ liệu thật trên `NG_SB_RLOS_MAS_SUB_PRODUCT` cho
+thấy `SUB_PRODUCT_CODE` không đáng tin làm khóa: (1) cùng 1
+`SUB_PRODUCT_CODE` xuất hiện ở nhiều `PRODUCT_CODE` khác nhau (không
+tự unique), và (2) ngay trong cùng 1 `PRODUCT_CODE`, có trường hợp cùng
+`SUB_PRODUCT_NAME` nhưng khác `SUB_PRODUCT_CODE` — nên composite
+(`PRODUCT_CODE`, `SUB_PRODUCT_CODE`) cũng không unique. Khóa nghiệp vụ
+thật sự ổn định, đã xác nhận unique trên dữ liệu, là
+(`PRODUCT_CODE`, `SUB_PRODUCT_NAME`) — khớp với cách SRS BC1/BC9 dùng
+`SUB_PRODUCT` (giá trị dạng tên, ví dụ pattern `LIKE '%Phát hành%'`
+trong BC9/BC7, xem `extract/srs_report/BC9.md`/`BC7.md`), không phải mã
+ngắn. Do đó: đổi NK từ `SUB_PRODUCT_CODE` sang `SUB_PRODUCT_NAME`; thêm
+lại cột hash `SUB_PRODUCT_BK = STANDARD_HASH(PRODUCT_CODE ||
+SUB_PRODUCT_NAME, 'MD5')` làm BK chính thức của layer Sub Product (lý do
+đảo ngược quyết định "bỏ PRODUCT_BK" 2026-10-13 — quyết định đó dựa trên
+giả định `SUB_PRODUCT_CODE` tự thân đã là NK đáng tin, giả định này sai
+trên dữ liệu thật). `SUB_PRODUCT_CODE` vẫn giữ trên DIM như thuộc tính
+thường (không còn đánh dấu NK). Cập nhật đồng bộ FK lookup từ
+`FCT_RLOS_APPLICATION`/`PDTD_DTM_FCT_RLOS_APPLICATION` sang so khớp
+`SUB_PRODUCT_NAME` (xem 1.3.2.1, Section 2 → 1.3.1.2/2.3.1.2).
 
 **SCD2 — CDC key:** so sánh toàn bộ cột non-key của `NG_SB_RLOS_MAS_SUB_
 PRODUCT` tại mỗi lần ETL chạy — bất kỳ cột nào đổi (kể cả `PRODUCTLINE_
@@ -1998,7 +2019,7 @@ flowchart LR
     I -.-> CT
     WD -.->|"WORKSTEP_DECISION_SK (đổi tên từ LAST_WORKSTEP_DECISION_SK, review 2026-10-04; gộp từ LAST_WORKSTEP_SK+LAST_DECISION_SK), lookup theo cặp WORKSTEP_CODE+DECISION_CODE của sự kiện hoàn tất gần nhất theo thời gian"| E
     MW --> WD
-    PR -.->|"SUB_PRODUCT_SK (đổi tên từ PRODUCT_SK, review 2026-10-13 — DIM_RLOS_PRODUCT tách layer PRODUCTLINE_SK), lookup PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, SCD2 hiệu lực tại DAYID."| E
+    PR -.->|"SUB_PRODUCT_SK (đổi tên từ PRODUCT_SK, review 2026-10-13 — DIM_RLOS_PRODUCT tách layer PRODUCTLINE_SK), lookup PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_NAME=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT (⚠️ review 2026-10-19: đổi từ SUB_PRODUCT_CODE — SUB_PRODUCT_CODE không unique trên dữ liệu thật, xem Section 1 → 1.3.1.2), SCD2 hiệu lực tại DAYID."| E
     OU -.->|"COMPANY_SK, lookup COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, SCD2 hiệu lực tại DAYID"| E
     CT -.->|"CHANGE_TYPE_SK, lookup CHANGE_TYPE=NG_SB_RLOS_EXTTABLE.CHANGE_TYPE"| E
     CP -.->|"CARD_PROMOTION_SK, lookup PROMOTION_ID=NG_SB_RLOS_CBS.PROMOTION_ID, hồ sơ không phải thẻ dùng -1"| E
@@ -2786,7 +2807,7 @@ hẳn cột `T24_CUSTOMER_SK` khỏi `SB_DWH.FCT_RLOS_CUSTOMER` (và khỏi
 hẳn việc tính cột này xuống `PDTD_DTM.FCT_RLOS_CUSTOMER` (2.3.2.x), nơi
 `STG_DIM_CUSTOMER` thuộc cùng tầng STG_DTM hợp lệ để join, cùng pattern
 đã áp dụng cho `PDTD_DTM.FCT_CLOS_APPLICATION.T24_CUSTOMER_SK` (2.2.2.1,
-join `STG_DIM_CUSTOMER` qua `STG_DIM_CLOS_CUSTOMER.ID_NUMBER`). Join
+join `STG_DIM_CUSTOMER` qua `STG_DIM_CLOS_CUSTOMER.CUSTOMER_CODE`). Join
 theo `ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME` của chính dòng
 `STG_FCT_RLOS_CUSTOMER` đang xét (đúng nguyên văn SRS BC1 BR 1.2,
 không đổi công thức nghiệp vụ — chỉ đổi tầng tính). Mặc định -1 nếu
@@ -3024,9 +3045,9 @@ trình A1 (khác toàn bộ DIM khác trong tài liệu này).
 **Vai trò cầu nối duy nhất giữa LOS và T24:** đây là chỗ DUY NHẤT nối được
 hồ sơ tín dụng LOS (CLOS/RLOS) sang khách hàng lõi T24 — join qua số giấy
 tờ định danh (`LEGAL_ID` + `LEGAL_DOC_NAME`, đã chuẩn hóa ở T24) khớp với số
-giấy tờ trên phía LOS: `DIM_CLOS_CUSTOMER.ID_NUMBER` (⚠️ review 2026-09-25:
+giấy tờ trên phía LOS: `DIM_CLOS_CUSTOMER.CUSTOMER_CODE` (⚠️ review 2026-09-25:
 đổi từ `ORG_LEGAL_ID` — cột này đã bị xóa khỏi `DIM_CLOS_CUSTOMER` vì
-trùng lặp hoàn toàn với NK mới `ID_NUMBER` sau khi đổi grain sang 1
+trùng lặp hoàn toàn với NK mới `CUSTOMER_CODE` sau khi đổi grain sang 1
 dòng/khách hàng, xem 1.2.1.6/2.2.1.6; giá trị/nguồn dữ liệu không đổi,
 chỉ đổi tên cột tham chiếu) phía CLOS, và
 `ID_TYPE`/`ID_NUMBER` trên `FCT_RLOS_CUSTOMER` phía RLOS (⚠️ review
@@ -3853,7 +3874,7 @@ flowchart LR
 hàng — review 2026-09-25, xem 1.2.1.6). Cột `ORG_LEGAL_ID` (trước đây
 LEFT JOIN `DIM_CLOS_LEGAL_PARTY` theo `WI_NAME`+`LEGAL_TYPE='CUSTOMER'`
 lấy ID_NUMBER của khách hàng chính) đã **XÓA** — trùng lặp hoàn toàn với
-NK mới `ID_NUMBER` của chính bảng này (xem 2.2.1.6 Section 2).
+NK mới `CUSTOMER_CODE` của chính bảng này (xem 2.2.1.6 Section 2).
 
 **Chuyển `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` sang
 `FCT_CLOS_APPLICATION` (review 2026-09-26, theo yêu cầu người
@@ -3906,7 +3927,7 @@ flowchart LR
     WE -.->|"review 2026-10-15: sinh UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE — lấy dòng ENTRYDATE lớn nhất theo WI_NAME tại đúng WORKSTEP_CODE cố định (3 cột này đã xóa khỏi SB_DWH.FCT_CLOS_APPLICATION, chuyển sang WE)"| D
 ```
 
-> Ghi chú: đúng luồng ETL SB_DWH → PDTD_DTM → report, mọi JOIN dùng để TÍNH SẴN cột (`REF_PRODUCT`/`SLA_*`, `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE`) đều thực hiện ngay tại SB_DWH — `DIM_CLOS_CUSTOMER`/`DIM_CLOS_PRODUCT`/`DIM_CLOS_APPLICATION`/`FCT_CLOS_LEGAL_PARTY` ở đây đều là bản SB_DWH, KHÔNG phải bản PDTD_DTM. PDTD_DTM chỉ còn 2 bảng liên quan trực tiếp lineage: `R` (REF, chỉ tồn tại ở PDTD_DTM — nơi duy nhất JOIN REF_ được phép xảy ra) và `D` (bảng đích). **Không còn `ORG_LEGAL_ID`** (xóa khỏi ETL, review 2026-09-26 — theo yêu cầu người dùng) — giá trị này chỉ là `ID_NUMBER` của khách hàng chính, báo cáo tự JOIN report-time `D.CUSTOMER_SK` → `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER` khi cần, không ETL sẵn; `T24_CUSTOMER_SK` (khóa tới `DIM_T24_CUSTOMER`) nay tra qua `DIM_CLOS_CUSTOMER.ID_NUMBER` (không còn `ORG_LEGAL_ID` để tra, cột này đã xóa). Riêng `DIM_CLOS_WORKSTEP_DECISION` KHÔNG xuất hiện trong sơ đồ — bảng này chỉ được JOIN RA để tra `WORKSTEP_CODE`/`DECISION_CODE` làm điều kiện CASE WHEN trực tiếp cho `APPLICATION_STATUS`/`FLAG_AUTO_CANCEL` (không phải thành phần khóa dẫn tới một nguồn REF/FCT khác), nên không tính là nguồn theo đúng nghĩa lineage. Chi tiết JOIN đầy đủ xem cột "Mô tả" của bảng cấu trúc bên dưới.
+> Ghi chú: đúng luồng ETL SB_DWH → PDTD_DTM → report, mọi JOIN dùng để TÍNH SẴN cột (`REF_PRODUCT`/`SLA_*`, `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE`) đều thực hiện ngay tại SB_DWH — `DIM_CLOS_CUSTOMER`/`DIM_CLOS_PRODUCT`/`DIM_CLOS_APPLICATION`/`FCT_CLOS_LEGAL_PARTY` ở đây đều là bản SB_DWH, KHÔNG phải bản PDTD_DTM. PDTD_DTM chỉ còn 2 bảng liên quan trực tiếp lineage: `R` (REF, chỉ tồn tại ở PDTD_DTM — nơi duy nhất JOIN REF_ được phép xảy ra) và `D` (bảng đích). **Không còn `ORG_LEGAL_ID`** (xóa khỏi ETL, review 2026-09-26 — theo yêu cầu người dùng) — giá trị này chỉ là `ID_NUMBER` của khách hàng chính, báo cáo tự JOIN report-time `D.CUSTOMER_SK` → `PDTD_DTM.DIM_CLOS_CUSTOMER.CUSTOMER_CODE` khi cần, không ETL sẵn; `T24_CUSTOMER_SK` (khóa tới `DIM_T24_CUSTOMER`) nay tra qua `DIM_CLOS_CUSTOMER.CUSTOMER_CODE` (không còn `ORG_LEGAL_ID` để tra, cột này đã xóa). Riêng `DIM_CLOS_WORKSTEP_DECISION` KHÔNG xuất hiện trong sơ đồ — bảng này chỉ được JOIN RA để tra `WORKSTEP_CODE`/`DECISION_CODE` làm điều kiện CASE WHEN trực tiếp cho `APPLICATION_STATUS`/`FLAG_AUTO_CANCEL` (không phải thành phần khóa dẫn tới một nguồn REF/FCT khác), nên không tính là nguồn theo đúng nghĩa lineage. Chi tiết JOIN đầy đủ xem cột "Mô tả" của bảng cấu trúc bên dưới.
 
 **⚠️ review 2026-10-04 (theo yêu cầu người dùng) — nhận thêm 9 cột
 "người phụ trách từng bước" derive TẠI ĐÂY (không còn bê 1:1 từ SB_DWH,
@@ -3936,7 +3957,7 @@ vật lý `ZONE` riêng trên bảng này — báo cáo lấy `ZONE` chuẩn hó
 REGION_KHDN` tại tầng truy vấn báo cáo (xem 2.1.1) — nhất quán với quyết
 định "ZONE là join-time-only, không lưu vật lý" đã chốt ở `DIM_LOS_COMPANY`.
 Bổ sung khóa kỹ thuật `T24_CUSTOMER_SK` (tra qua `DIM_CLOS_CUSTOMER
-.ID_NUMBER` — ⚠️ review 2026-09-25: đổi từ `ORG_LEGAL_ID` sau khi cột đó bị
+.CUSTOMER_CODE` — ⚠️ review 2026-09-25: đổi từ `ORG_LEGAL_ID` sau khi cột đó bị
 xóa khỏi `DIM_CLOS_CUSTOMER` do trùng lặp với NK mới, xem 2.2.1.6 — review
 2026-09-17: đổi tên từ `CUSTOMER_SK` để phân biệt rõ với khách hàng LOS)
 để báo cáo join sang `DIM_T24_CUSTOMER` (T24) khi cần.
@@ -3987,7 +4008,7 @@ dòng đã được BA xác nhận chính thức, xem Section 3 #19. **Không nh
 `ORG_LEGAL_ID`** (rà soát lại review 2026-09-26, cùng ngày, theo yêu
 cầu người dùng) — giá trị này chỉ là `ID_NUMBER` của khách hàng chính
 trên hồ sơ, báo cáo BC2 tự JOIN report-time `CUSTOMER_SK` (cột có sẵn)
-→ `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER` khi cần hiển thị, không cần
+→ `PDTD_DTM.DIM_CLOS_CUSTOMER.CUSTOMER_CODE` khi cần hiển thị, không cần
 ETL sẵn một cột riêng cho việc này — khác `LEGAL_REPRESENTATIVE`/
 `ADD_ID_REPRESENTATIVE`, 2 cột này bắt buộc ETL sẵn vì phải nối chuỗi
 nhiều dòng khớp (report không tự làm được).
@@ -4426,7 +4447,7 @@ WI_NAME` → LEFT JOIN `SB_DWH.FCT_CLOS_LEGAL_PARTY`). Bảng PDTD_DTM này
 chỉ còn phục vụ report-time lookup `ID_NUMBER` (`LEGAL_TYPE='CUSTOMER'`)
 khi BC2 cần đối chiếu — không phải nguồn ETL cho `FCT_CLOS_APPLICATION_
 DAILY` nữa. `ORG_LEGAL_ID` cũng không còn ETL — báo cáo tự JOIN
-report-time `CUSTOMER_SK` → `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER`. Cơ
+report-time `CUSTOMER_SK` → `PDTD_DTM.DIM_CLOS_CUSTOMER.CUSTOMER_CODE`. Cơ
 chế nạp: mỗi `DAYID`, lặp lại toàn bộ dòng `FCT_CLOS_LEGAL_PARTY` (SB_DWH, không snapshot theo ngày) — tức
 1 dòng SB_DWH sinh N dòng PDTD_DTM (1 dòng/ngày còn hiệu lực), giống cách
 `FCT_CLOS_APPLICATION_PARTY` cũ snapshot `FCT_CLOS_LEGAL_PARTY` theo
@@ -5181,7 +5202,7 @@ nào khai thác trực tiếp — xem Section 3.
 | 15 | DISTANCE_BRANCH_CUSTOMER | VARCHAR2 | N | 100 |  | Dải khoảng cách từ khách hàng đến chi nhánh xử lý hồ sơ này (đã phân nhóm sẵn, không phải số đo thô) — NHẬN LẠI TỪ DIM_CLOS_CUSTOMER (review 2026-09-25) — nguồn NG_SB_CLOS_CUST_INFO.DISTANCE_BRANCH_CUSTOMER. ⚠️ Metadata: cần BA xác nhận đơn vị đo (nghi vấn km) |
 | 16 | PRODUCT_LINE | VARCHAR2 | N | 200 |  | Dòng sản phẩm tự khai theo hồ sơ (mã PRO01-06) — BỔ SUNG (review 2026-09-25 lượt 2, theo SRS BC2 STT27) — nguồn NG_SB_CLOS_CUST_INFO.PRODUCT_LINE. Text as-is, KHÔNG join DIM_CLOS_PRODUCT (xem ghi chú dưới) |
 | 17 | SUB_PRODUCT | VARCHAR2 | N | 255 |  | Sản phẩm vay chi tiết tự khai theo hồ sơ — BỔ SUNG (review 2026-09-25 lượt 2, theo SRS BC2 STT28) — nguồn NG_SB_CLOS_CUST_INFO.SUB_PRODUCT. Text as-is, cùng lý do cột 16 |
-| 18 | ID_NUMBER | VARCHAR2 | N | 100 |  | Số ĐKKD/CMND của khách hàng đứng tên vay chính — BỔ SUNG (review 2026-09-25 lượt 2, theo yêu cầu người dùng) — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' (mỗi hồ sơ đúng 1 dòng, xem FCT_CLOS_LEGAL_PARTY 1.2.2.7). Thể hiện tường minh quan hệ hồ sơ↔khách hàng trên chính DIM này; dùng nội bộ để tự tra `CUSTOMER_SK` trên FCT, không phải khóa report dùng để join |
+| 18 | CUSTOMER_CODE | VARCHAR2 | N | 100 |  | Số ĐKKD/CMND của khách hàng đứng tên vay chính — BỔ SUNG (review 2026-09-25 lượt 2, theo yêu cầu người dùng) — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' (mỗi hồ sơ đúng 1 dòng, xem FCT_CLOS_LEGAL_PARTY 1.2.2.7). Thể hiện tường minh quan hệ hồ sơ↔khách hàng trên chính DIM này; dùng nội bộ để tự tra `CUSTOMER_SK` trên FCT, không phải khóa report dùng để join |
 | 19 | CHANNEL | VARCHAR2 | N | 200 |  | Kênh nộp hồ sơ (eBanking/khác) — BỔ SUNG (review 2026-09-25 lượt 2), nguồn NG_SB_CLOS_EXTTABLE.CHANNEL. Thiết kế dư thừa |
 | 20 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
 | 21 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
@@ -5237,7 +5258,7 @@ bổ sung dư thừa
 `FCT_CLOS_WORKSTEP_EVENT`, không cần JOIN fan-out sang `FCT_CLOS_
 APPLICATION_DAILY`. **Review 2026-09-25 lượt 2:** đổi driving table,
 xóa `CUST_GROUP`/`CHANGE_REQUEST`/`CHANGE_TYPE`, thêm 8 cột hồ sơ-grain +
-`PRODUCT_LINE`/`SUB_PRODUCT`/`ID_NUMBER` + 18 cột dư thừa từ EXTTABLE.
+`PRODUCT_LINE`/`SUB_PRODUCT`/`CUSTOMER_CODE` + 18 cột dư thừa từ EXTTABLE.
 **Review 2026-09-25 lượt 3:** xóa `INDUSTRY_LVL1/2/3_CODE` (đã có ở
 `DIM_CLOS_CUSTOMER`, 1.2.1.6 — thuộc tính khách hàng, trùng lặp tại đây);
 đổi nguồn `EMPLOYEE_CODE`/`EMPLOYEE_NAME` từ `NG_SB_CLOS_CUST_INFO` sang
@@ -5309,7 +5330,7 @@ Nay 26 cột.
 - Xóa `CUSTOMER_NAME`, `PRODUCT_NAME`: xác nhận qua `lld/sb_dwh/
   SB_DWH_DIM_CLOS_APPLICATION.csv` — cả 2 chỉ là bản sao trực tiếp từ
   `NG_SB_CLOS_EXTTABLE`, không dùng làm khóa JOIN ở bất kỳ đâu. Báo cáo
-  (BC2/BC3/BC4) lấy tên khách hàng qua `DIM_CLOS_CUSTOMER.FULL_NAME`
+  (BC2/BC3/BC4) lấy tên khách hàng qua `DIM_CLOS_CUSTOMER.CUSTOMER_NAME`
   bằng `CUSTOMER_SK`; tên sản phẩm (BC5/BC9) qua `DIM_CLOS_PRODUCT.
   SUB_PRODUCT_NAME` bằng `PRODUCTLINE_SK`/`SUB_PRODUCT_SK` (⚠️ review
   2026-10-12: 2 FK, thay `PRODUCT_SK` cũ) — không đụng đến 2 cột dư thừa này.
@@ -5599,8 +5620,8 @@ trực tiếp, không cần bảng `MAP_` seed.
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_CUSTOMER, sinh bằng Oracle sequence tại SB_DWH |
 | 2 | CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_CUSTOMER, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 |
-| 3 | ID_NUMBER | VARCHAR2 | N | 100 | NK | Số ĐKKD/CMND của khách hàng — định danh pháp lý ổn định, không đổi giữa các hồ sơ khác nhau (review 2026-09-25, đổi NK từ WI_NAME). Nguồn: NG_SB_CLOS_CUST_INFO LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' lấy ID_NUMBER; dedupe khi 1 ID_NUMBER xuất hiện ở nhiều WI_NAME bằng ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME) = 1 |
-| 4 | FULL_NAME | VARCHAR2 | N | 200 |  | Tên doanh nghiệp khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME (dòng đại diện đã chọn ở cột ID_NUMBER) |
+| 3 | CUSTOMER_CODE | VARCHAR2 | N | 100 | NK | Số ĐKKD/CMND của khách hàng — định danh pháp lý ổn định, không đổi giữa các hồ sơ khác nhau (review 2026-09-25, đổi NK từ WI_NAME). Nguồn: NG_SB_CLOS_CUST_INFO LEFT JOIN NG_SB_CLOS_CUST_INFO_LEGAL theo WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' lấy ID_NUMBER; dedupe khi 1 ID_NUMBER xuất hiện ở nhiều WI_NAME bằng ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME) = 1 |
+| 4 | CUSTOMER_NAME | VARCHAR2 | N | 200 |  | Tên doanh nghiệp khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUSTOMER_NAME (dòng đại diện đã chọn ở cột CUSTOMER_CODE) |
 | 5 | CUST_GROUP | VARCHAR2 | N | 100 |  | Phân khúc khách hàng doanh nghiệp (SME/MSME/USME/STR/JSC/SOC/BANK/FDI/NBFI) — CHUYỂN TỪ DIM_CLOS_APPLICATION (review 2026-09-25, xác định lại là thuộc tính khách hàng, không phải hồ sơ). Nguồn NG_SB_CLOS_CUST_INFO.CUST_GROUP. Đã xóa khỏi DIM_CLOS_APPLICATION (1.2.1.1) khi review riêng bảng đó, không còn trùng lặp |
 | 6 | CUST_CATEGORY | VARCHAR2 | N | 200 |  | Phân loại khách hàng — nguồn NG_SB_CLOS_CUST_INFO.CUST_CATEGORY. ⚠️ Metadata: dữ liệu ghi nhận cả loại hình pháp lý (VD "Công ty TNHH MTV") lẫn giá trị dạng mã số trong cùng cột — cần BA xác nhận quy tắc chuẩn |
 | 7 | PRECUSTGROUP | VARCHAR2 | N | 100 |  | Phân khúc khách hàng trước xử lý — nguồn NG_SB_CLOS_CUST_INFO.PRECUSTGROUP, cùng bộ giá trị với CUST_GROUP (SME/MSME/JSC/SOC/NBFI/FDI). ⚠️ Metadata: cần BA xác nhận khác biệt cụ thể với CUST_GROUP — có phải phân khúc trước khi hồ sơ được xử lý/phân loại lại |
@@ -5610,7 +5631,7 @@ trực tiếp, không cần bảng `MAP_` seed.
 | 11 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) |
 | 12 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
-- Bảng DIM lưu thông tin doanh nghiệp khách hàng chính CLOS, 1 dòng = 1 khách hàng (theo ID_NUMBER) — KHÔNG còn theo hồ sơ (review 2026-09-25). Phục vụ BC1, BC2, BC3, BC4.
+- Bảng DIM lưu thông tin doanh nghiệp khách hàng chính CLOS, 1 dòng = 1 khách hàng (theo CUSTOMER_CODE) — KHÔNG còn theo hồ sơ (review 2026-09-25). Phục vụ BC1, BC2, BC3, BC4.
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
 
 **So với thiết kế cũ (tách từ `FCT_LOS_APPLICATION_PARTY` gộp):** đây là
@@ -5629,7 +5650,7 @@ phân biệt sau khi tách vật lý CLOS/RLOS). Giai đoạn 2026-09-21 từng 
 nâng lên 17 cột.
 
 **Đổi grain + rà soát lại toàn bộ cột (review 2026-09-25) — nay còn 12
-cột:** NK đổi từ `WI_NAME` sang `ID_NUMBER` (cột 3). Xóa `WI_NAME` khỏi
+cột:** NK đổi từ `WI_NAME` sang `CUSTOMER_CODE` (cột 3). Xóa `WI_NAME` khỏi
 danh sách cột (chỉ còn là điều kiện join ETL). Chuyển `CUST_GROUP` từ
 `DIM_CLOS_APPLICATION` vào đây (cột 5, ⚠️ TODO còn trùng lặp tạm ở nơi
 cũ). Thêm 3 cột `INDUSTRY_LVL1/2/3_CODE` (cột 8-10, gap SRS). Xóa 8 cột
@@ -5661,15 +5682,15 @@ không làm lệch số các bảng DIM khác trong nhóm CLOS.
 | 4a | PRODUCTLINE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT (layer Product Line) — ⚠️ review 2026-10-12: thay cho PRODUCT_SK cũ, DIM_CLOS_PRODUCT tách 2 layer SCD2 độc lập (xem Section 1 → 1.2.1.2). Lookup theo PRODUCTLINE_CODE=NG_SB_CLOS_CUST_INFO.PRODUCT_LINE, điều kiện PRODUCTLINE_EFF_DATE<=DAYID<PRODUCTLINE_EXP_DATE (hoặc PRODUCTLINE_EXP_DATE IS NULL). Mặc định -1 nếu không khớp |
 | 4b | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT (layer Sub Product) — mới, review 2026-10-12. Lookup theo SUB_PRODUCT_NAME=NG_SB_CLOS_CUST_INFO.SUB_PRODUCT, điều kiện SUB_PRODUCT_EFF_DATE<=DAYID<SUB_PRODUCT_EXP_DATE (hoặc SUB_PRODUCT_EXP_DATE IS NULL). Mặc định -1 nếu không khớp. Kế thừa note review 2026-10-09: khóa JOIN dùng SUB_PRODUCT_NAME (không phải SUB_PRODUCT_CODE) — NG_SB_CLOS_CUST_INFO.SUB_PRODUCT lưu giá trị TÊN sản phẩm nhánh (xác nhận SRS BC9 + người dùng) |
 | 5 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY — lookup theo COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
-| 6 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (NK=ID_NUMBER, vì DIM_CLOS_CUSTOMER grain 1 dòng/khách hàng) — nguồn: lấy NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN theo WI_NAME (của chính dòng đang nạp) + UPPER(OBJ_TYPE)='KHÁCH HÀNG', rồi lookup DIM_CLOS_CUSTOMER.DIMENSION_KEY theo ID_NUMBER (NK) + điều kiện SCD2 hiệu lực tại DAYID. Quan hệ N:1 (nhiều hồ sơ/DAYID của cùng khách hàng có thể trỏ cùng 1 CUSTOMER_SK). Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK |
+| 6 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (NK=CUSTOMER_CODE, vì DIM_CLOS_CUSTOMER grain 1 dòng/khách hàng) — nguồn: lấy NG_SB_CLOS_CUST_INFO_LEGAL.ID_NUMBER, LEFT JOIN theo WI_NAME (của chính dòng đang nạp) + UPPER(OBJ_TYPE)='KHÁCH HÀNG', rồi lookup DIM_CLOS_CUSTOMER.DIMENSION_KEY theo CUSTOMER_CODE (NK) + điều kiện SCD2 hiệu lực tại DAYID. Quan hệ N:1 (nhiều hồ sơ/DAYID của cùng khách hàng có thể trỏ cùng 1 CUSTOMER_SK). Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK |
 | 7 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS — nguồn NG_SB_CLOS_EXTTABLE.WI_NAME (direct, driving table) |
 | 8 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy / hoàn tất gần nhất) — nguồn NG_SB_CLOS_ENTRY_EXIT, COALESCE theo thứ tự: (1) MAX(EXITDATE) tại WORKSTEP IN ('CreditCommittee','CreditApproval') AND DECISION đã hoàn tất phê duyệt (Submit/Reject/Send To HOSupport/Send To PostSanction/Submit To DisbursementMaker); (2) NVL(EXITDATE,ENTRYDATE) tại WORKSTEP='CancelRevoke'; (3) EXITDATE của sự kiện hoàn tất gần nhất |
 | 9 | PROPOSED_AMT | NUMBER | N | 20,2 |  | Số tiền đề xuất — nguồn NG_SB_CLOS_CREDITINFO_COMM.PRECREDITLIMIT |
 | 10 | CREDIT_LIMIT_APPROVAL | NUMBER | N | 20,2 |  | Hạn mức do chuyên gia phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_CD.CREDIT_LIMIT |
 | 11 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng (BC1.LOAN_AMOUNT, BC3.CREDIT_LIMIT) — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_LIMIT, map thẳng 1 nguồn |
-| 12 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_TERM |
-| 13 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%), chỉ nhận khi nguồn là số — nguồn NG_SB_CLOS_CREDITINFO_COMM.INTEREST_RATE, ép kiểu số (TO_NUMBER), NULL nếu không phải số hợp lệ |
-| 14 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền — nguồn NG_SB_CLOS_CREDITINFO_COMM.CURRENCY |
+| 12 | APPROVED_TERM | NVARCHAR2 | N | 100 |  | Kỳ hạn phê duyệt — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_TERM, giữ nguyên văn gốc vì có giá trị không ép được sang số |
+| 13 | INTEREST_RATE_PCT | NVARCHAR2 | N | 500 |  | Lãi suất phê duyệt (%) — nguồn NG_SB_CLOS_CREDITINFO_COMM.INTEREST_RATE, giữ nguyên văn gốc (có giá trị không phải số, ví dụ "Theo thỏa thuận") |
+| 14 | CURRENCY_CODE | NVARCHAR2 | N | 100 |  | Loại tiền — nguồn NG_SB_CLOS_CREDITINFO_COMM.CURRENCY |
 | 15 | APPLICATION_LINK_INFO | VARCHAR2 | N | 200 |  | Thông tin liên kết hồ sơ — cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (không lọc CREATEDBY) — đổi tên từ VAR_STR12 (review 2026-10-04, theo yêu cầu người dùng). Dùng làm điều kiện lọc IS NOT NULL cho SLHS_CLOS/SLGN_CLOS (AGG_LOS_KPI_YTD_DAILY) |
 | 16 | LG_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu bảo lãnh (Letter of Guarantee) phát sinh theo hồ sơ — nguồn NG_SB_CLOS_CUST_INFO.LG_REQ (boolean true/false) |
 | 17 | FI_REQ | VARCHAR2 | N | 10 |  | Cờ yêu cầu — nguồn NG_SB_CLOS_CUST_INFO.FI_REQ (boolean true/false) |
@@ -5943,7 +5964,7 @@ bản gộp: 9 cột RLOS-only + `DATASOURCE` + `CERTIFICATE_NO`).
 | 9 | RAISED_BY | VARCHAR2 | N | 100 | PK | Người nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_BY. Cột USER_SK bên cạnh giữ khóa tới DIM |
 | 10 | RAISED_DATE_TIME | TIMESTAMP | N |  | PK | Thời điểm nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_DATE_TIME |
 | 11 | RCTYPE | VARCHAR2 | N | 20 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_CLOS_EXCEPTION.RCTYPE |
-| 12 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (review 2026-09-26, bổ sung vật lý — trước đây chỉ là lookup tạm để tính CHECK_FTR, chưa denormalize thành cột): tra ID_NUMBER qua WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, rồi lookup DIM_CLOS_CUSTOMER theo ID_NUMBER (NK) + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
+| 12 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER (review 2026-09-26, bổ sung vật lý — trước đây chỉ là lookup tạm để tính CHECK_FTR, chưa denormalize thành cột): tra ID_NUMBER qua WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, rồi lookup DIM_CLOS_CUSTOMER theo CUSTOMER_CODE (NK) + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
 
 **Chuyển `CHECK_FTR`/`FIRST_WORKSTEP_RETURN` sang tính tại PDTD_DTM (review
 2026-09-26, theo yêu cầu người dùng):** 2 cột này là business rule CASE
@@ -6212,7 +6233,7 @@ sau — bảng nay còn 23 cột.
 | 3 | FULL_NAME | VARCHAR2 | N | 200 |  | Họ tên/tên đối tượng — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE |
 | 4 | OBJ_TYPE | VARCHAR2 | N | 100 |  | Loại đối tượng của giấy tờ pháp lý — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.OBJ_TYPE (Khách hàng, Người đại diện theo pháp luật, Chủ sở hữu TSBĐ, Thành viên góp vốn chính, Khác). 1 người (cùng ID_NUMBER) có thể giữ nhiều vai trò khác nhau trên cùng hồ sơ (nhiều dòng, xác nhận BA) |
 | 5 | LEGAL_DOC | VARCHAR2 | N | 100 |  | Tên loại giấy tờ pháp lý — nguồn NG_SB_CLOS_CUST_INFO_LEGAL.LEGAL_DOC |
-| 6 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — khách hàng CHÍNH của hồ sơ (MỌI dòng đều có, không chỉ dòng OBJ_TYPE='Khách hàng'). Cách lấy: tìm dòng khác cùng WI_NAME có UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, lấy ID_NUMBER của dòng đó, lookup DIM_CLOS_CUSTOMER.DIMENSION_KEY theo ID_NUMBER (NK, xem 1.2.1.6) — tái sử dụng đúng logic dựng DIM_CLOS_CUSTOMER. Mặc định -1 nếu không khớp |
+| 6 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — khách hàng CHÍNH của hồ sơ (MỌI dòng đều có, không chỉ dòng OBJ_TYPE='Khách hàng'). Cách lấy: tìm dòng khác cùng WI_NAME có UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, lấy ID_NUMBER của dòng đó, lookup DIM_CLOS_CUSTOMER.DIMENSION_KEY theo CUSTOMER_CODE (NK, xem 1.2.1.6) — tái sử dụng đúng logic dựng DIM_CLOS_CUSTOMER. Mặc định -1 nếu không khớp |
 | 7 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_APPLICATION — join theo WI_NAME (1.2.1.1). Quan hệ N:1 (nhiều dòng vai trò pháp lý cùng WI_NAME trỏ về đúng 1 hồ sơ). Mặc định -1 nếu không khớp |
 
 - Bảng FACT lưu người/đối tượng liên quan vai trò pháp lý của hồ sơ CLOS (bao gồm cả giấy tờ), 1 dòng = 1 người × 1 vai trò × 1 hồ sơ (N dòng/hồ sơ, không giới hạn) — snapshot trung thực từ nguồn, không SCD2 (nguồn không có CDC key ổn định). Phục vụ BC2.
@@ -6525,16 +6546,17 @@ phục vụ `DIM_RLOS_SECONDPRODUCT`, 1.3.1.2A).
 | 3 | PRODUCTLINE_CODE | VARCHAR2 | N | 100 | NK | Mã dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_CODE (= PRODUCTLINE_CODE của MAS_PRODUCT_LINE, cùng khái niệm) |
 | 4 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_NAME |
 | 5 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | ⚠️ review 2026-10-13: đổi tên từ PRODUCT_SK — layer nhỏ nhất/đại diện của cả dòng (grain chính của DIM), FK duy nhất mà FCT_RLOS_APPLICATION dùng. Bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp |
-| 6 | SUB_PRODUCT_CODE | VARCHAR2 | N | 100 | NK | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE |
-| 7 | SUB_PRODUCT_NAME | VARCHAR2 | N | 150 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME |
-| 8 | SCORE_REQUIRED | VARCHAR2 | N | 10 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED (chưa xác nhận báo cáo nào cần, xem Section 3) |
-| 9 | SCORE_MODEL | VARCHAR2 | N | 100 |  | Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL (chưa xác nhận báo cáo nào cần, xem Section 3) |
-| 10 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — CHỈ 1 cặp cho layer nhỏ nhất (Sub Product), do ETL tính qua CDC so toàn bộ cột non-key của MAS_SUB_PRODUCT (⚠️ review 2026-10-13: layer cha PRODUCTLINE đổi cũng kéo theo version mới của cả dòng, dù không có EFF/EXP riêng) |
-| 11 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
+| 6 | SUB_PRODUCT_BK | VARCHAR2 | N | 64 | BK | ⚠️ review 2026-10-19 (theo yêu cầu người dùng, thêm lại sau khi đã bỏ ở review 2026-10-13): khóa nghiệp vụ hash của layer Sub Product — PHÁI SINH: STANDARD_HASH(PRODUCT_CODE \|\| SUB_PRODUCT_NAME, 'MD5'). Dữ liệu thật trên MAS_SUB_PRODUCT cho thấy SUB_PRODUCT_CODE không unique (trùng giữa nhiều PRODUCT_CODE khác nhau) và composite (PRODUCT_CODE, SUB_PRODUCT_CODE) cũng không unique (có trường hợp cùng SUB_PRODUCT_NAME nhưng khác SUB_PRODUCT_CODE dưới cùng PRODUCT_CODE) — chỉ (PRODUCT_CODE, SUB_PRODUCT_NAME) mới xác nhận unique, nên đổi sang hash theo NAME thay vì CODE |
+| 7 | SUB_PRODUCT_CODE | VARCHAR2 | N | 100 |  | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE. ⚠️ review 2026-10-19: bỏ đánh dấu NK (không unique trên dữ liệu thật, xem cột SUB_PRODUCT_BK) — giữ lại như thuộc tính hiển thị/báo cáo thông thường |
+| 8 | SUB_PRODUCT_NAME | VARCHAR2 | N | 150 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME. ⚠️ review 2026-10-19: là NK thật của layer Sub Product (cùng PRODUCTLINE_CODE/PRODUCT_CODE) — xem rationale tại Section 1 → 1.3.1.2 |
+| 9 | SCORE_REQUIRED | VARCHAR2 | N | 10 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED (chưa xác nhận báo cáo nào cần, xem Section 3) |
+| 10 | SCORE_MODEL | VARCHAR2 | N | 100 |  | Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL (chưa xác nhận báo cáo nào cần, xem Section 3) |
+| 11 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — CHỈ 1 cặp cho layer nhỏ nhất (Sub Product), do ETL tính qua CDC so toàn bộ cột non-key của MAS_SUB_PRODUCT (⚠️ review 2026-10-13: layer cha PRODUCTLINE đổi cũng kéo theo version mới của cả dòng, dù không có EFF/EXP riêng) |
+| 12 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
-- Bảng DIM lưu danh mục sản phẩm tín dụng RLOS (dòng sản phẩm chính, sản phẩm nhánh, con của sản phẩm chính), 1 dòng = 1 phiên bản thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên PRODUCTLINE_CODE+SUB_PRODUCT_CODE+EFF_DATE).
+- Bảng DIM lưu danh mục sản phẩm tín dụng RLOS (dòng sản phẩm chính, sản phẩm nhánh, con của sản phẩm chính), 1 dòng = 1 phiên bản thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên PRODUCTLINE_CODE+SUB_PRODUCT_NAME+EFF_DATE).
 - Khóa chính của bảng (PK): **DIMENSION_KEY**.
-- Đã bỏ cột `PRODUCT_BK` (review 2026-10-13) — mỗi layer đã có NK riêng (`PRODUCTLINE_CODE`/`SUB_PRODUCT_CODE`), không cần hash composite.
+- ⚠️ Review 2026-10-19: thêm lại cột `SUB_PRODUCT_BK` (đã bỏ ở review 2026-10-13) — `SUB_PRODUCT_CODE` không unique trên dữ liệu thật nên không dùng được làm NK; khóa nghiệp vụ đúng là `PRODUCTLINE_CODE`+`SUB_PRODUCT_NAME`, hash vào `SUB_PRODUCT_BK`. Xem rationale đầy đủ ở Section 1 → 1.3.1.2.
 
 **Đã giải quyết (review 2026-09-18, theo Meeting note 20260909 mục #1):**
 đổi **nguồn nạp** — trước đây đọc từ `MAP_RLOS_PRODUCT` (tạm thay cho
@@ -6798,15 +6820,15 @@ không cần bảng `MAP_` seed.
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD |
 | 2 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION. Mặc định -1 nếu không khớp |
 | 3 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP_DECISION (gộp từ LAST_WORKSTEP_SK+LAST_DECISION_SK) của sự kiện hoàn tất gần nhất, lookup theo cặp WORKSTEP_CODE+DECISION_CODE của sự kiện đó. Mặc định -1 — đổi tên từ LAST_WORKSTEP_DECISION_SK (review 2026-10-04, theo yêu cầu người dùng, đồng bộ pattern CLOS) |
-| 4 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | ⚠️ review 2026-10-13: đổi tên từ PRODUCT_SK (DIM_RLOS_PRODUCT tách layer PRODUCTLINE_SK, xem Section 1 → 1.3.1.2). Khóa tới DIM_RLOS_PRODUCT (layer Sub Product) — PHÁI SINH: lookup theo PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_RLOS_PRODUCT. Mặc định -1 nếu không khớp |
+| 4 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | ⚠️ review 2026-10-13: đổi tên từ PRODUCT_SK (DIM_RLOS_PRODUCT tách layer PRODUCTLINE_SK, xem Section 1 → 1.3.1.2). Khóa tới DIM_RLOS_PRODUCT (layer Sub Product) — PHÁI SINH: lookup theo PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_NAME=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT (⚠️ review 2026-10-19: đổi từ SUB_PRODUCT_CODE — không unique trên dữ liệu thật, xem Section 1 → 1.3.1.2), điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_RLOS_PRODUCT. Mặc định -1 nếu không khớp |
 | 5 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY — PHÁI SINH: lookup theo COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_LOS_COMPANY. Mặc định -1 nếu không khớp |
 | 6 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CHANGE_TYPE. Chỉ có giá trị với hồ sơ thay đổi điều kiện phê duyệt, còn lại Unknown -1. Nguồn: NG_SB_RLOS_EXTTABLE.CHANGE_TYPE |
 | 7 | CARD_PROMOTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CARD_PROMOTION. Lookup NG_SB_RLOS_CBS.PROMOTION_ID; hồ sơ không phải thẻ dùng -1 |
 | 8 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng RLOS — nguồn NG_SB_RLOS_ENTRY_EXIT.WINAME |
 | 9 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên — nguồn NG_SB_RLOS_ENTRY_EXIT, cùng công thức 3 mức ưu tiên đã dùng cho nhánh CLOS |
 | 10 | CREATION_DATE | DATE | N |  |  | TRUNC(MIN(ENTRYDATE)) theo WI_NAME — nguồn NG_SB_RLOS_ENTRY_EXIT.ENTRYDATE |
-| 11 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT |
-| 12 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_TERM |
+| 11 | APPROVED_AMT_FINAL | NUMBER | N | 25,2 |  | Hạn mức phê duyệt cuối cùng — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT |
+| 12 | APPROVED_TERM | NUMBER | N | 15 |  | Kỳ hạn phê duyệt — nguồn NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_TERM |
 | 13 | CHANGE_REQUEST | VARCHAR2 | N | 200 |  | Yêu cầu điều chỉnh hồ sơ — nguồn NG_SB_RLOS_EXTTABLE.REQ_TYPE |
 | 14 | CHANGE_TYPE | VARCHAR2 | N | 500 |  | Loại thay đổi điều kiện phê duyệt — nguồn NG_SB_RLOS_EXTTABLE.CHANGE_TYPE, giữ nguyên giá trị thô. Dùng làm khóa either/or với PRODUCT_LINE khi tra cam kết SLA ở PDTD_DTM — khác CHANGE_TYPE_SK (cột 6, trỏ DIM_RLOS_CHANGE_TYPE để lấy tên/chi tiết chuẩn hóa cho BC1). Không chuyển DIM_RLOS_APPLICATION dù cùng nguồn EXTTABLE với 13 cột cờ/trạng thái khác — đây là cờ/trạng thái workflow thực sự biến động nhiều lần trong vòng đời hồ sơ, không phải "bật 1 lần duy nhất" như nhóm cờ CREATE/DELETE_FLAG |
 
@@ -7440,7 +7462,7 @@ Cấu trúc cột **giống hệt** bản SB_DWH (bê 1:1, xem Section 2 → SB_
 | 2 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_T24_CUSTOMER, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 nếu không có giá trị phù hợp |
 | 3 | CUSTOMER_ID | VARCHAR2 | N | 50 | NK | Mã khách hàng CIF — nguồn STG_DIM_CUSTOMER.CUSTOMER (1:1 từ SB_DWH.DIM_CUSTOMER.CUSTOMER) |
 | 4 | SHORT_NAME | VARCHAR2 | N | 200 |  | Tên khách hàng theo T24 — nguồn STG_DIM_CUSTOMER.SHORT_NAME (1:1 từ SB_DWH.DIM_CUSTOMER.SHORT_NAME) |
-| 5 | LEGAL_ID | VARCHAR2 | N | 100 |  | Số giấy tờ định danh đã chuẩn hóa — nguồn STG_DIM_CUSTOMER.LEGAL_ID. Đây là cột nối về LOS (khớp DIM_CLOS_CUSTOMER.ID_NUMBER — ⚠️ review 2026-09-25: đổi từ ORG_LEGAL_ID sau khi cột đó bị xóa do trùng lặp với NK mới, xem 2.2.1.6 / khớp FCT_RLOS_CUSTOMER.ID_NUMBER+ID_TYPE, xem 1.3.2.8 — review 2026-09-26: đổi từ ADD_ID/ADD_ID_OTHER sau khi bảng đó đổi grain sang giấy tờ) |
+| 5 | LEGAL_ID | VARCHAR2 | N | 100 |  | Số giấy tờ định danh đã chuẩn hóa — nguồn STG_DIM_CUSTOMER.LEGAL_ID. Đây là cột nối về LOS (khớp DIM_CLOS_CUSTOMER.CUSTOMER_CODE — ⚠️ review 2026-09-25: đổi từ ORG_LEGAL_ID sau khi cột đó bị xóa do trùng lặp với NK mới, xem 2.2.1.6 / khớp FCT_RLOS_CUSTOMER.ID_NUMBER+ID_TYPE, xem 1.3.2.8 — review 2026-09-26: đổi từ ADD_ID/ADD_ID_OTHER sau khi bảng đó đổi grain sang giấy tờ) |
 | 6 | LEGAL_DOC_NAME | VARCHAR2 | N | 100 |  | Loại giấy tờ định danh — nguồn STG_DIM_CUSTOMER.LEGAL_DOC_NAME. Phải khớp cùng lúc với LEGAL_ID khi tra |
 | 7 | DATE_OF_BIRTH | DATE | N |  |  | Ngày sinh — nguồn STG_DIM_CUSTOMER.DATE_OF_BIRTH |
 | 8 | GENDER | VARCHAR2 | N | 20 |  | Giới tính — nguồn STG_DIM_CUSTOMER.GENDER |
@@ -7463,8 +7485,8 @@ của các bảng CHUNG khác.
 toàn. BC2 dùng `CUSTOMER_ID` nhưng qua đường lookup khác:
 `STG_DIM_CUSTOMER` LEFT JOIN `REF_CLOS_LEGAL`, lấy giá trị `CUSTOMER` với
 điều kiện `TRIM(LEGAL_TYPE) = 'CUSTOMER'` — đây chính là join key
-`ID_NUMBER` trên `DIM_CLOS_CUSTOMER` (⚠️ review 2026-09-25: đổi từ
-`ORG_LEGAL_ID` sau khi cột đó bị xóa do trùng lặp với NK mới `ID_NUMBER`
+`CUSTOMER_CODE` trên `DIM_CLOS_CUSTOMER` (⚠️ review 2026-09-25: đổi từ
+`ORG_LEGAL_ID` sau khi cột đó bị xóa do trùng lặp với NK mới `CUSTOMER_CODE`
 — nay là NK trực tiếp của bảng, không còn cần tra qua `FCT_CLOS_LEGAL_
 PARTY` với điều kiện `LEGAL_TYPE='CUSTOMER'` nữa vì `DIM_CLOS_CUSTOMER`
 tự thân đã dùng đúng `ID_NUMBER` của khách hàng chính, xem 2.2.1.6),
@@ -7963,7 +7985,7 @@ cột: driving table `NG_SB_CLOS_EXTTABLE`, đã gồm `APP_GRP`/
 `HAVE_ANY_DEVIATION`, DQ-11 đã giải quyết (chỉ còn `CREDIT_PROFILE`, đã
 xóa `INDUSTRY_LVL1/2/3_CODE` vì trùng `DIM_CLOS_CUSTOMER`), các cột hồ
 sơ-grain nhận lại từ `DIM_CLOS_CUSTOMER`, `PRODUCT_LINE`/`SUB_PRODUCT`/
-`ID_NUMBER`, và 1 cột dư thừa lưu vết nguồn EXTTABLE còn lại (`CHANNEL`;
+`CUSTOMER_CODE`, và 1 cột dư thừa lưu vết nguồn EXTTABLE còn lại (`CHANNEL`;
 `CREATE_EMPLOYEE_CODE`/`CREATE_EMPLOYEE_NAME` đổi tên từ `EMPLOYEE_CODE`/
 `EMPLOYEE_NAME`, review 2026-10-02, cùng nguồn EXTTABLE) — KHÔNG còn
 `CUST_GROUP` (đã chuyển hẳn về `DIM_CLOS_CUSTOMER`), `CHANGE_REQUEST`/
@@ -8113,7 +8135,7 @@ join thêm.
 
 ###### 2.2.1.6 DIM_CLOS_CUSTOMER — ⚠️ review 2026-09-26 (theo yêu cầu người dùng): chuyển hẳn LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE sang FCT_CLOS_APPLICATION
 
-**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_PARTY` → tách phần khách hàng chính CLOS thành DIM riêng (bỏ tiền tố PDTD, đổi tên `DIM_CLOS_CUSTOMER`). **Đổi grain (review 2026-09-25):** xem 2.2.1.6 Section 1 và 1.2.1.6 Section 2 (SB_DWH) — nay 1 dòng/khách hàng (NK=ID_NUMBER), không còn 1 dòng/hồ sơ.
+**Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_PARTY` → tách phần khách hàng chính CLOS thành DIM riêng (bỏ tiền tố PDTD, đổi tên `DIM_CLOS_CUSTOMER`). **Đổi grain (review 2026-09-25):** xem 2.2.1.6 Section 1 và 1.2.1.6 Section 2 (SB_DWH) — nay 1 dòng/khách hàng (NK=CUSTOMER_CODE), không còn 1 dòng/hồ sơ.
 
 Cấu trúc cột **giống hệt** bản SB_DWH (bê nguyên 1:1, xem Section 2 → 1.
 SB_DWH → 1.2 Bộ bảng CLOS → 1.2.1.6 DIM_CLOS_CUSTOMER — nay 12 cột sau
@@ -8129,12 +8151,12 @@ Section 2 → 2.2.2.1 và Section 1 → 2.2.1.6/2.2.2.1).
 **Xóa `ORG_LEGAL_ID` (review 2026-09-25):** cột này trước đây (LEFT JOIN
 `DIM_CLOS_LEGAL_PARTY` theo `WI_NAME`+`LEGAL_TYPE='CUSTOMER'` lấy
 `ID_NUMBER` của khách hàng chính) nay **trùng lặp hoàn toàn** với NK mới
-`ID_NUMBER` của chính `DIM_CLOS_CUSTOMER` (SB_DWH, 1.2.1.6) — xóa khỏi
+`CUSTOMER_CODE` của chính `DIM_CLOS_CUSTOMER` (SB_DWH, 1.2.1.6) — xóa khỏi
 danh sách cột, báo cáo tra trực tiếp NK của dòng thay vì cột phái sinh
 riêng. Xem Section 3. (`ORG_LEGAL_ID` vẫn tồn tại độc lập ở
 `FCT_CLOS_APPLICATION`, xem 2.2.2.1 — cột đó không trùng NK, vì
 `FCT_CLOS_APPLICATION` có grain hồ sơ × ngày, không có NK
-`ID_NUMBER` riêng như DIM này.)
+`CUSTOMER_CODE` riêng như DIM này.)
 
 **Chuyển `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` sang
 `FCT_CLOS_APPLICATION` (review 2026-09-26, theo yêu cầu người
@@ -8157,7 +8179,7 @@ bảng DIM khác trong nhóm CLOS.
 
 ##### 2.2.2 FCT
 
-###### 2.2.2.1 FCT_CLOS_APPLICATION — ⚠️ review 2026-09-26 (theo yêu cầu người dùng): nhận thêm 6 cột BUSINESS_FLOW/REF_PRODUCT/SLA_* từ DIM_CLOS_APPLICATION + 2 cột LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE từ DIM_CLOS_CUSTOMER (không nhận ORG_LEGAL_ID — xóa khỏi ETL, xem ghi chú bên dưới) + 5 cột business rule chuyển từ SB_DWH (đổi driving table sang EXTTABLE, full snapshot). ⚠️ review 2026-10-04 (theo yêu cầu người dùng): nhận thêm 9 cột "người phụ trách từng bước" derive tại đây từ FCT_CLOS_WORKSTEP_EVENT (thay vì bê 1:1); xóa 1 cột CREATION_DATE trùng lặp (cấp qua DIM_CLOS_APPLICATION); T24_CUSTOMER_SK nay tra qua DIM_CLOS_CUSTOMER.ID_NUMBER — nay 53 cột
+###### 2.2.2.1 FCT_CLOS_APPLICATION — ⚠️ review 2026-09-26 (theo yêu cầu người dùng): nhận thêm 6 cột BUSINESS_FLOW/REF_PRODUCT/SLA_* từ DIM_CLOS_APPLICATION + 2 cột LEGAL_REPRESENTATIVE/ADD_ID_REPRESENTATIVE từ DIM_CLOS_CUSTOMER (không nhận ORG_LEGAL_ID — xóa khỏi ETL, xem ghi chú bên dưới) + 5 cột business rule chuyển từ SB_DWH (đổi driving table sang EXTTABLE, full snapshot). ⚠️ review 2026-10-04 (theo yêu cầu người dùng): nhận thêm 9 cột "người phụ trách từng bước" derive tại đây từ FCT_CLOS_WORKSTEP_EVENT (thay vì bê 1:1); xóa 1 cột CREATION_DATE trùng lặp (cấp qua DIM_CLOS_APPLICATION); T24_CUSTOMER_SK nay tra qua DIM_CLOS_CUSTOMER.CUSTOMER_CODE — nay 53 cột
 
 **Bảng cũ (trước tách):** `FCT_PDTD_APPLICATION_DAILY` → tách phần CLOS thành `FCT_CLOS_APPLICATION` (bỏ tiền tố PDTD, dùng chung tên với SB_DWH)
 
@@ -8170,7 +8192,7 @@ bảng DIM khác trong nhóm CLOS.
 | 4b | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_PRODUCT (layer Sub Product) — mới, review 2026-10-12. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.SUB_PRODUCT_SK |
 | 5 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY — lookup theo COMPANY_CODE=NG_SB_CLOS_CUST_INFO.COMPANY_CODE, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.COMPANY_SK |
 | 6 | CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — quan hệ 1:1 với hồ sơ qua WI_NAME, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK (chân T24, bổ sung riêng tại PDTD_DTM) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CUSTOMER_SK |
-| 7 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), tra qua DIM_CLOS_CUSTOMER.ID_NUMBER (review 2026-10-04: đổi từ ORG_LEGAL_ID — cột này đã xóa khỏi DIM_CLOS_CUSTOMER từ review 2026-09-25 do trùng lặp với NK mới ID_NUMBER, xem 2.2.1.6). Mặc định -1 |
+| 7 | T24_CUSTOMER_SK | NUMBER | Y | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), tra qua DIM_CLOS_CUSTOMER.CUSTOMER_CODE (review 2026-10-04: đổi từ ORG_LEGAL_ID — cột này đã xóa khỏi DIM_CLOS_CUSTOMER từ review 2026-09-25 do trùng lặp với NK mới CUSTOMER_CODE, xem 2.2.1.6). Mặc định -1 |
 | 8 | WI_NAME | VARCHAR2 | Y | 100 | PK | Mã hồ sơ tín dụng CLOS — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.WI_NAME (nguồn gốc xa: NG_SB_CLOS_EXTTABLE.WI_NAME, driving table tại SB_DWH) |
 | 9 | RI_USER | VARCHAR2 | N | 100 |  | User khởi tạo hồ sơ (bước RequestInitiate) — PHÁI SINH TẠI PDTD_DTM (review 2026-10-04, chuyển từ SB_DWH, theo yêu cầu người dùng): USERNAME tại bản ghi SB_DWH.FCT_CLOS_WORKSTEP_EVENT WHERE WORKSTEP_CODE='RequestInitiate' theo WI_NAME (quy ước tối đa 1 dòng/hồ sơ, không cần MAX/MIN EXITDATE) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không còn ở SB_DWH |
 | 10 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất — PHÁI SINH TẠI PDTD_DTM (review 2026-10-04, chuyển từ SB_DWH): USERNAME trên SB_DWH.FCT_CLOS_WORKSTEP_EVENT tại WORKSTEP_CODE='BranchSupport', bản ghi EXITDATE lớn nhất (<=DAYID) theo WI_NAME — BỔ SUNG RIÊNG TẠI PDTD_DTM, không còn ở SB_DWH |
@@ -8195,9 +8217,9 @@ bảng DIM khác trong nhóm CLOS.
 | 29 | PROPOSED_AMT | NUMBER | N | 20,2 |  | Số tiền đề xuất — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.PROPOSED_AMT (nguồn gốc xa: NG_SB_CLOS_CREDITINFO_COMM.PRECREDITLIMIT) |
 | 30 | CREDIT_LIMIT_APPROVAL | NUMBER | N | 20,2 |  | Hạn mức do chuyên gia phê duyệt — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CREDIT_LIMIT_APPROVAL |
 | 31 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng (BC1.LOAN_AMOUNT, BC3.CREDIT_LIMIT) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPROVED_AMT_FINAL |
-| 32 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPROVED_TERM |
-| 33 | INTEREST_RATE_PCT | NUMBER | N | 8,4 |  | Lãi suất phê duyệt (%), chỉ nhận khi nguồn là số — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.INTEREST_RATE_PCT |
-| 34 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CURRENCY_CODE (nguồn gốc xa: NG_SB_CLOS_CREDITINFO_COMM.CURRENCY) |
+| 32 | APPROVED_TERM | NVARCHAR2 | N | 100 |  | Kỳ hạn phê duyệt — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPROVED_TERM |
+| 33 | INTEREST_RATE_PCT | NVARCHAR2 | N | 500 |  | Lãi suất phê duyệt (%) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.INTEREST_RATE_PCT |
+| 34 | CURRENCY_CODE | NVARCHAR2 | N | 100 |  | Loại tiền — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CURRENCY_CODE (nguồn gốc xa: NG_SB_CLOS_CREDITINFO_COMM.CURRENCY) |
 | 35 | APPLICATION_LINK_INFO | VARCHAR2 | N | 200 |  | Thông tin liên kết hồ sơ — cột generic của WFINSTRUMENTTABLE — LEFT JOIN riêng theo WI_NAME=PROCESSINSTANCEID (không lọc CREATEDBY) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.APPLICATION_LINK_INFO (đổi tên từ VAR_STR12, review 2026-10-04, theo yêu cầu người dùng) |
 | 36 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH — review 2026-10-15 (theo yêu cầu người dùng): đổi nguồn, không còn bê 1:1 từ chính STG_FCT_CLOS_APPLICATION (cột đã xóa khỏi bảng đó) mà JOIN sang STG_FCT_CLOS_WORKSTEP_EVENT (cột đã chuyển sang bảng đó, cùng tầng STG_DTM), lấy dòng event ENTRYDATE mới nhất tại đúng WORKSTEP_CODE='UnderwriterMaker': STG_FCT_CLOS_WORKSTEP_EVENT.UNDERWRITERMAKER_USERMAKE WHERE STG_FCT_CLOS_WORKSTEP_EVENT.WORKSTEP_CODE = 'UnderwriterMaker' AND STG_FCT_CLOS_WORKSTEP_EVENT.WI_NAME = STG_FCT_CLOS_APPLICATION.WI_NAME ORDER BY STG_FCT_CLOS_WORKSTEP_EVENT.ENTRYDATE DESC FETCH FIRST 1 ROW ONLY. Bản ghi ENTRYDATE lớn nhất theo WI_NAME + WORKSTEP_CODE để không fan-out ra nhiều dòng APPLICATION — cùng pattern đã dùng cho UND_MAKER_USER cùng bảng, nhưng ORDER BY ENTRYDATE thay vì EXITDATE. Qua vùng chìa STG_DTM, không join thẳng SB_DWH |
 | 37 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH — review 2026-10-15 (theo yêu cầu người dùng): đổi nguồn, JOIN sang STG_FCT_CLOS_WORKSTEP_EVENT, lấy dòng event ENTRYDATE mới nhất tại đúng WORKSTEP_CODE='UnderwriterChecker': STG_FCT_CLOS_WORKSTEP_EVENT.UNDERWRITERCHECKER_USERMAKE WHERE STG_FCT_CLOS_WORKSTEP_EVENT.WORKSTEP_CODE = 'UnderwriterChecker' AND STG_FCT_CLOS_WORKSTEP_EVENT.WI_NAME = STG_FCT_CLOS_APPLICATION.WI_NAME ORDER BY STG_FCT_CLOS_WORKSTEP_EVENT.ENTRYDATE DESC FETCH FIRST 1 ROW ONLY. Cùng cơ chế cột trên. Qua vùng chìa STG_DTM |
@@ -8237,7 +8259,7 @@ xem công thức đầy đủ tại cột 37-39 phía trên.
 **Xóa `ORG_LEGAL_ID` khỏi ETL (rà soát lại review 2026-09-26, cùng ngày,
 theo yêu cầu người dùng):** giá trị này chỉ là `ID_NUMBER` của khách
 hàng chính — báo cáo BC2 tự JOIN report-time `CUSTOMER_SK` (cột 6, cột
-có sẵn) → `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER` khi cần hiển thị,
+có sẵn) → `PDTD_DTM.DIM_CLOS_CUSTOMER.CUSTOMER_CODE` khi cần hiển thị,
 không cần ETL/lưu vật lý một cột riêng cho việc này (khác
 `LEGAL_REPRESENTATIVE`/`ADD_ID_REPRESENTATIVE` — 2 cột này BẮT BUỘC ETL
 sẵn vì phải nối chuỗi nhiều dòng khớp, không thể để report tự làm).
@@ -8503,7 +8525,7 @@ PDTD_DTM này (2.2.2.8) chỉ còn phục vụ report-time lookup `ID_NUMBER`
 (qua `LEGAL_TYPE='CUSTOMER'`) khi báo cáo BC2 cần đối chiếu — không còn
 là nguồn ETL cho `FCT_CLOS_APPLICATION` nữa. `ORG_LEGAL_ID` cũng
 không còn ETL trên `FCT_CLOS_APPLICATION` — báo cáo tự JOIN
-report-time `CUSTOMER_SK` → `PDTD_DTM.DIM_CLOS_CUSTOMER.ID_NUMBER`.
+report-time `CUSTOMER_SK` → `PDTD_DTM.DIM_CLOS_CUSTOMER.CUSTOMER_CODE`.
 
 #### 2.3 Bộ bảng RLOS
 
@@ -8595,9 +8617,11 @@ chú `POINT` của BC9 (2.1.9).
 
 Cấu trúc cột **kế thừa toàn bộ** từ SB_DWH (bê 1:1, xem Section 2 → 1. SB_DWH
 → 1.3 Bộ bảng RLOS → 1.3.1.2 DIM_RLOS_PRODUCT trong `HLD_DIM_SB_DWH.md` —
-11 cột, nguồn `NG_SB_RLOS_MAS_SUB_PRODUCT` DUY NHẤT — review 2026-10-04;
+12 cột, nguồn `NG_SB_RLOS_MAS_SUB_PRODUCT` DUY NHẤT — review 2026-10-04;
 ⚠️ review 2026-10-13: thêm `PRODUCTLINE_SK` layer cha, đổi tên
-`PRODUCT_SK`→`SUB_PRODUCT_SK`, bỏ `PRODUCT_BK` — xem rationale đầy đủ ở
+`PRODUCT_SK`→`SUB_PRODUCT_SK`; ⚠️ review 2026-10-19: thêm lại cột
+`SUB_PRODUCT_BK` (hash theo PRODUCT_CODE+SUB_PRODUCT_NAME), đổi NK từ
+`SUB_PRODUCT_CODE` sang `SUB_PRODUCT_NAME` — xem rationale đầy đủ ở
 bản SB_DWH), **không bổ sung cột nào ở PDTD_DTM**.
 
 - Bảng DIM lưu danh mục sản phẩm tín dụng RLOS, bê nguyên 1:1 từ SB_DWH, không có cột phái sinh nào ở tầng này.
@@ -8738,7 +8762,7 @@ thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
 | 1 | DAYID | DATE | Y |  | PK | Ngày dữ liệu, dạng số YYYYMMDD — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.DAYID |
 | 2 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPLICATION_SK |
 | 3 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_WORKSTEP_DECISION. Mặc định -1 — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.WORKSTEP_DECISION_SK (đổi tên từ LAST_WORKSTEP_DECISION_SK, review 2026-10-04, theo yêu cầu người dùng, đồng bộ pattern CLOS) |
-| 4 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | ⚠️ review 2026-10-13: đổi tên từ PRODUCT_SK (DIM_RLOS_PRODUCT tách layer PRODUCTLINE_SK, xem Section 1 → 1.3.1.2). Khóa tới DIM_RLOS_PRODUCT (layer Sub Product) — lookup theo PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_CODE=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.SUB_PRODUCT_SK |
+| 4 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | ⚠️ review 2026-10-13: đổi tên từ PRODUCT_SK (DIM_RLOS_PRODUCT tách layer PRODUCTLINE_SK, xem Section 1 → 1.3.1.2). Khóa tới DIM_RLOS_PRODUCT (layer Sub Product) — lookup theo PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_NAME=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT (⚠️ review 2026-10-19: đổi từ SUB_PRODUCT_CODE — không unique trên dữ liệu thật, xem Section 1 → 1.3.1.2), điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.SUB_PRODUCT_SK |
 | 5 | COMPANY_SK | NUMBER | Y | 18 |  | Khóa tới DIM_LOS_COMPANY — lookup theo COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.COMPANY_SK |
 | 6 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CHANGE_TYPE. Chỉ có giá trị với hồ sơ thay đổi điều kiện phê duyệt, còn lại Unknown -1. Nguồn: NG_SB_RLOS_EXTTABLE.CHANGE_TYPE — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CHANGE_TYPE_SK |
 | 7 | CARD_PROMOTION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_CARD_PROMOTION. Lookup NG_SB_RLOS_CBS.PROMOTION_ID; hồ sơ không phải thẻ dùng -1 — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CARD_PROMOTION_SK |
@@ -8766,8 +8790,8 @@ thêm/bớt cột nào ở layer này, không có REF_ nào join thêm.
 | 29 | LAST_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú của sự kiện hoàn tất gần nhất — PHÁI SINH TẠI PDTD_DTM (review 2026-10-04, chuyển từ SB_DWH): REMARKS trên SB_DWH.FCT_RLOS_WORKSTEP_EVENT của cùng bản ghi "sự kiện hoàn tất gần nhất" (cột 26-28) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không còn ở SB_DWH |
 | 30 | LAST_REMARK_DDE | VARCHAR2 | N | 4000 |  | Ghi chú tại bước DetailDataEntry — PHÁI SINH TẠI PDTD_DTM (review 2026-10-04, chuyển từ SB_DWH): REMARKS trên SB_DWH.FCT_RLOS_WORKSTEP_EVENT, bước WORKSTEP_CODE='DetailDataEntry' gần nhất (bản ghi EXITDATE lớn nhất <=DAYID) theo WI_NAME — BỔ SUNG RIÊNG TẠI PDTD_DTM, không còn ở SB_DWH |
 | 31 | LAST_CAN_REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại lần hủy hồ sơ — PHÁI SINH TẠI PDTD_DTM (review 2026-10-04, chuyển từ SB_DWH): REMARKS trên SB_DWH.FCT_RLOS_WORKSTEP_EVENT, bước hủy hồ sơ gần nhất theo WI_NAME — BỔ SUNG RIÊNG TẠI PDTD_DTM, không còn ở SB_DWH |
-| 32 | APPROVED_AMT_FINAL | NUMBER | N | 20,2 |  | Hạn mức phê duyệt cuối cùng — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVED_AMT_FINAL (nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT) |
-| 33 | APPROVED_TERM | NUMBER | N | 5 |  | Kỳ hạn phê duyệt — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVED_TERM |
+| 32 | APPROVED_AMT_FINAL | NUMBER | N | 25,2 |  | Hạn mức phê duyệt cuối cùng — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVED_AMT_FINAL (nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_AMOUNT) |
+| 33 | APPROVED_TERM | NUMBER | N | 15 |  | Kỳ hạn phê duyệt — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.APPROVED_TERM |
 | 34 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH — review 2026-10-15 (theo yêu cầu người dùng): đổi nguồn, không còn bê 1:1 từ chính STG_FCT_RLOS_APPLICATION (cột đã xóa khỏi bảng đó) mà JOIN sang STG_FCT_RLOS_WORKSTEP_EVENT (cột đã chuyển sang bảng đó, cùng tầng STG_DTM), lấy dòng event ENTRYDATE mới nhất tại đúng WORKSTEP_CODE='UnderwriterMaker': (SELECT WE.UNDERWRITERMAKER_USERMAKE FROM STG_FCT_RLOS_WORKSTEP_EVENT WE WHERE WE.WI_NAME = STG_FCT_RLOS_APPLICATION.WI_NAME AND WE.WORKSTEP_CODE = 'UnderwriterMaker' ORDER BY WE.ENTRYDATE DESC FETCH FIRST 1 ROW ONLY). Bản ghi ENTRYDATE lớn nhất theo WI_NAME + WORKSTEP_CODE='UnderwriterMaker' (lọc đúng workstep để không fan-out — cùng pattern đã dùng cho UND_MAKER_USER cùng bảng, nhưng ORDER BY ENTRYDATE thay vì EXITDATE, không yêu cầu EXITDATE<=v_batch_date vì giá trị USER_MAKE gắn tại lúc vào bước) |
 | 35 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH — review 2026-10-15 (theo yêu cầu người dùng): đổi nguồn, JOIN sang STG_FCT_RLOS_WORKSTEP_EVENT, lấy dòng event ENTRYDATE mới nhất tại đúng WORKSTEP_CODE='UnderwriterChecker': (SELECT WE.UNDERWRITERCHECKER_USERMAKE FROM STG_FCT_RLOS_WORKSTEP_EVENT WE WHERE WE.WI_NAME = STG_FCT_RLOS_APPLICATION.WI_NAME AND WE.WORKSTEP_CODE = 'UnderwriterChecker' ORDER BY WE.ENTRYDATE DESC FETCH FIRST 1 ROW ONLY). Bản ghi ENTRYDATE lớn nhất theo WI_NAME + WORKSTEP_CODE='UnderwriterChecker', cùng cơ chế cột trên |
 | 36 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | PHÁI SINH, COALESCE ĐÃ TÍNH XONG TẠI SB_DWH — review 2026-10-15 (theo yêu cầu người dùng): đổi nguồn, JOIN sang STG_FCT_RLOS_WORKSTEP_EVENT, lấy dòng event ENTRYDATE mới nhất tại đúng WORKSTEP_CODE IN ('CreditCommittee','CreditApproval'): (SELECT WE.APPROVAL_USERMAKE FROM STG_FCT_RLOS_WORKSTEP_EVENT WE WHERE WE.WI_NAME = STG_FCT_RLOS_APPLICATION.WI_NAME AND WE.WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') ORDER BY WE.ENTRYDATE DESC FETCH FIRST 1 ROW ONLY). Bản ghi ENTRYDATE lớn nhất theo WI_NAME + WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') — khác 2 cột trên (chỉ 1 workstep cố định) vì APPROVAL_USERMAKE gắn với cả 2 bước cấp phê duyệt |
@@ -9353,12 +9377,12 @@ tương ứng ở Section 1/2 của bảng đó.
 | 58 | `FCT_RLOS_APPLICATION` (PDTD_DTM, 2.3.2.1) — `T24_CARD_SK`/`T24_SEAB_MAIN_CARD_SK`, trỏ `DIM_T24_CARD`/`DIM_T24_SEAB_MAIN_CARD` — review 2026-09-21, đóng gap BC1.K_TYPE/HOME_ADDRESS | SRS BC1 (BR 1.2, nested table) xác nhận `K_TYPE`/`HOME_ADDRESS` nguồn từ `STG_DTM.STG_DIM_CARD`/`STG_DIM_SEAB_MAIN_CARD`, join qua `RESULT_MAIN_CARD_ID` (có sẵn trên `DIM_RLOS_APPLICATION`) = `MAIN_ID`/`RECID`. `SB_DWH.DIM_CARD`/`DIM_SEAB_MAIN_CARD` (nguồn gốc T24 của 2 bảng STG này) không có trong bất kỳ datamodel xlsx nào của repo — từng cân nhắc bỏ FK, join trực tiếp STG vào fact, nhưng không đúng kiến trúc chuẩn của tài liệu (mọi nguồn T24 phải đi qua `DIM_T24_*` tại PDTD_DTM, FK trên fact, không denormalize) | Người dùng xác nhận (2026-09-21): đúng kiến trúc là FK trên fact trỏ `DIM_T24_CARD`/`DIM_T24_SEAB_MAIN_CARD` (2.1.11/2.1.12, cùng pattern `DIM_T24_CUSTOMER`/`DIM_T24_COMPANY`), không denormalize giá trị trực tiếp lên FCT; 2 bảng T24 gốc có sẵn trên database, chỉ cần map đúng tên bảng/cột đã biết từ SRS (`MAIN_ID`/`K_TYPE`, `RECID`/`HOME_ADDRESS`), không cần thể hiện đầy đủ cấu trúc cột. Đã bổ sung `DIM_T24_CARD` (2.1.11)/`DIM_T24_SEAB_MAIN_CARD` (2.1.12) và khôi phục 2 FK trên `FCT_RLOS_APPLICATION` (cột 81-82) | ĐÃ GIẢI QUYẾT |
 | 59 | `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (SB_DWH, 1.2.2.1/1.3.2.1) — sơ đồ lineage thiếu vẽ DIM cho nhiều FK đã có cột thật — review 2026-09-21, theo yêu cầu người dùng rà soát toàn bộ *_SK trên FCT | Rà soát toàn bộ cột `*_SK` trên mọi bảng FCT và đối chiếu với node DIM trong mermaid lineage (Section 1) phát hiện 2 bảng lớn nhất chỉ vẽ đúng 1 DIM (CUSTOMER/APPLICANT) trong khi cột thật có tới 6-8 FK — `CURRENT_WORKSTEP_SK`, `LAST_WORKSTEP_SK`, `LAST_DECISION_SK`, `LAST_USER_SK`, `PRODUCT_SK`, `COMPANY_SK` (cả CLOS/RLOS) + `CHANGE_TYPE_SK`, `CARD_PROMOTION_SK` (riêng RLOS) đều "mồ côi" trong sơ đồ. Riêng `FCT_RLOS_APPLICATION.PRODUCT_SK` còn thiếu CẢ công thức lookup ở Section 2 (chỉ ghi "Khóa tới DIM_RLOS_PRODUCT", không nêu nguồn) — không chỉ thiếu vẽ | Đã bổ sung đủ node + cạnh JOIN vào mermaid của cả 2 bảng (`hld/HLD_Table_Design.md` và mirror `hld/HLD_FCT_SB_DWH.md`), dùng đúng công thức đã có sẵn ở Section 2 cho các FK đã có công thức (`PRODUCT_SK`/`COMPANY_SK` CLOS), và bổ sung công thức mới cho `PRODUCT_SK` RLOS (nguồn `NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE/SUB_PRODUCT`, đối xứng pattern CLOS, đã xác nhận tồn tại thật qua `RLOS - Metadata.xlsx`) — cập nhật đồng thời mô tả cột 9 ở Section 2 của cả 2 file. Các bảng FCT còn lại (WORKSTEP_EVENT, EXCEPTION, COLLATERAL, DEVIATION, APPLICATION_PARTY, SUB_PRODUCT, LOAN_DISBURSEMENT...) đã rà soát và xác nhận không có gap tương tự | ĐÃ GIẢI QUYẾT |
 | 60 | `DIM_CLOS_LEGAL_PARTY` — QUYẾT ĐỊNH THAY THẾ dòng #36 (review 2026-09-25) | Dòng #36 (2026-09-17) giải quyết CDC-key-rỗng bằng cách GIỮ NGUYÊN kiến trúc DIM, chỉ đổi khóa so khớp SCD2 sang full-row-key 5 cột. Người dùng nay quyết định đổi hướng khác | Chuyển hẳn `DIM_CLOS_LEGAL_PARTY` thành **FACT** (`FCT_CLOS_LEGAL_PARTY`, SB_DWH 1.2.2.7 / PDTD_DTM 2.2.2.8) — đúng theo "Red flag — source table has no CDC key → can't be a DIM/SCD2" (`design-method.md`). Bỏ `DIMENSION_KEY`/`EFF_DATE`/`EXP_DATE`, PK đổi thành composite `WI_NAME+ID_NUMBER`. Đồng thời bổ sung 2 chiều FK mới `CUSTOMER_SK`/`APPLICATION_SK` (yêu cầu mới của người dùng). Quyết định #36 (giữ DIM) coi như đã bị thay thế — không xóa dòng #36, chỉ ghi nhận thay đổi tại đây | ĐÃ GIẢI QUYẾT |
-| 61 | `DIM_CLOS_CUSTOMER` (SB_DWH 1.2.1.6 / PDTD_DTM 2.2.1.6) — đổi grain "1 dòng/hồ sơ" → "1 dòng/khách hàng" — review 2026-09-25 | NK cũ (`WI_NAME`) khiến 1 khách hàng nộp nhiều hồ sơ tạo nhiều dòng trùng lặp trong DIM khách hàng — sai bản chất DIM. Đồng thời rà soát lại phát hiện nhiều cột "làm giàu" (review 2026-09-21) thực chất là thuộc tính HỒ SƠ, không phải khách hàng | Đổi NK sang `ID_NUMBER` (số ĐKKD/CMND, lấy qua `NG_SB_CLOS_CUST_INFO_LEGAL` lọc `OBJ_TYPE='Khách hàng'`), dedupe bằng `ROW_NUMBER() OVER (PARTITION BY ID_NUMBER ORDER BY WI_NAME)=1`. Xóa 8 cột hồ sơ-grain (`APP_DATE`, `ZONE`, `LOAN_PURPOSE`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER`) và cột `ORG_LEGAL_ID` (trùng NK mới). Thêm `CUST_GROUP` (chuyển từ `DIM_CLOS_APPLICATION`) + 3 cột `INDUSTRY_LVL1/2/3_CODE` (xem dòng #62, #63 riêng) | ĐÃ GIẢI QUYẾT |
+| 61 | `DIM_CLOS_CUSTOMER` (SB_DWH 1.2.1.6 / PDTD_DTM 2.2.1.6) — đổi grain "1 dòng/hồ sơ" → "1 dòng/khách hàng" — review 2026-09-25 | NK cũ (`WI_NAME`) khiến 1 khách hàng nộp nhiều hồ sơ tạo nhiều dòng trùng lặp trong DIM khách hàng — sai bản chất DIM. Đồng thời rà soát lại phát hiện nhiều cột "làm giàu" (review 2026-09-21) thực chất là thuộc tính HỒ SƠ, không phải khách hàng | Đổi NK sang `CUSTOMER_CODE` (số ĐKKD/CMND, lấy qua `NG_SB_CLOS_CUST_INFO_LEGAL` lọc `OBJ_TYPE='Khách hàng'`), dedupe bằng `ROW_NUMBER() OVER (PARTITION BY CUSTOMER_CODE ORDER BY WI_NAME)=1`. Xóa 8 cột hồ sơ-grain (`APP_DATE`, `ZONE`, `LOAN_PURPOSE`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER`) và cột `ORG_LEGAL_ID` (trùng NK mới). Thêm `CUST_GROUP` (chuyển từ `DIM_CLOS_APPLICATION`) + 3 cột `INDUSTRY_LVL1/2/3_CODE` (xem dòng #62, #63 riêng) | ĐÃ GIẢI QUYẾT |
 | 62 | `DIM_CLOS_APPLICATION` (1.2.1.1/2.2.1.1) — `CUST_GROUP` còn trùng lặp tạm thời sau khi chuyển sang `DIM_CLOS_CUSTOMER` — review 2026-09-25 | `CUST_GROUP` đã được thêm vào `DIM_CLOS_CUSTOMER` (dòng #61) vì là thuộc tính khách hàng thật, nhưng THEO YÊU CẦU NGƯỜI DÙNG chưa xóa khỏi `DIM_CLOS_APPLICATION` trong lượt review này (để dành đánh giá khi review riêng bảng đó — cột này đang là input tính `BUSINESS_FLOW`/chọn bảng SLA ở `DIM_CLOS_APPLICATION`) | Khi review `DIM_CLOS_APPLICATION`: quyết định có xóa `CUST_GROUP` khỏi đó không (đổi công thức `BUSINESS_FLOW`/SLA sang JOIN qua `CUSTOMER_SK` lấy từ `DIM_CLOS_CUSTOMER` thay vì đọc cột local) | ĐÃ GIẢI QUYẾT |
 | 63 | `DIM_CLOS_CUSTOMER` — 3 cột `INDUSTRY_LVL1/2/3_CODE` mới, gap SRS vs metadata (cùng pattern DQ-11, dòng #2) — review 2026-09-25 | SRS gốc `BC2_PDTD_DTM_SRS_v1.0.docx` (table 8, rows 9-11) xác nhận trực tiếp nguồn `NG_SB_CLOS_CUST_INFO.INDUSTRY_CODE_LEVEL_1/2/3`, nhưng `CLOS - Metadata.xlsx` (sheet "3. Column Review", 20 cột đã review của `NG_SB_CLOS_CUST_INFO`) KHÔNG liệt kê 3 cột này | Cần xác nhận trực tiếp trên database (giống cách đã làm cho DQ-11, dòng #2) rằng 3 cột `INDUSTRY_CODE_LEVEL_1/2/3` thật sự tồn tại trên `NG_SB_CLOS_CUST_INFO` — hiện mới chỉ có bằng chứng giấy tờ SRS, chưa kiểm tra DB thực tế | PENDING |
 | 64 | `DIM_CLOS_CUSTOMER` — 8 cột hồ sơ-grain bị loại, chưa có đích đến — review 2026-09-25 | `APP_DATE`, `ZONE`, `LOAN_PURPOSE`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER` đã bị xóa khỏi `DIM_CLOS_CUSTOMER` (xác định lại là thuộc tính hồ sơ, không phải khách hàng) nhưng CHƯA được thêm vào bất kỳ bảng nào khác — hiện "mồ côi" | Khi review `DIM_CLOS_APPLICATION`: quyết định đưa 8 cột này về đó (cùng nguồn `NG_SB_CLOS_CUST_INFO`, quan hệ 1:1 với hồ sơ) hay bỏ hẳn theo column-optimization rule (kiểm tra lại xem còn báo cáo nào cần không) | ĐÃ GIẢI QUYẾT |
 | 65 | `DIM_CLOS_APPLICATION` (1.2.1.1/2.2.1.1) — hoàn tất tách bạch KHÁCH HÀNG vs HỒ SƠ với `DIM_CLOS_CUSTOMER` — review 2026-09-25 (lượt 1, xem tiếp #66/#67 cho lượt 2) | Tiếp nối dòng #61/#62/#64: `DIM_CLOS_CUSTOMER` đã đổi grain sang 1 dòng/khách hàng, cần `DIM_CLOS_APPLICATION` xử lý dứt điểm 2 phần: (1) xóa `CUST_GROUP` (dòng #62), (2) nhận lại 8 cột hồ sơ-grain mồ côi (dòng #64) | Đã xóa `CUST_GROUP` khỏi `DIM_CLOS_APPLICATION` (SB_DWH 1.2.1.1, PDTD_DTM 2.2.1.1) — mọi công thức từng đọc cột local (`BUSINESS_FLOW`, chọn bảng SLA `CLOS_REF_SLA_TDKHDNL`/`CLOS_REF_SLA_TDKHDN` cho `REF_PRODUCT`/`SLA_*`) đổi sang JOIN qua `CUSTOMER_SK` → `DIM_CLOS_CUSTOMER.CUST_GROUP`. Đã cập nhật tương tự `CHECK_FTR` trên `FCT_CLOS_EXCEPTION` (1.2.2.4, whitelist theo CUST_GROUP) và `CUST_GROUP` denormalize trên `FCT_CLOS_LOAN_DISBURSEMENT` (2.2.2.7, qua CUSTOMER_SK có sẵn trên DIM_CLOS_APPLICATION). Đã thêm 8 cột hồ sơ-grain (`ZONE`, `APP_DATE`, `LOAN_PURPOSE`, `LG_REQ`, `FI_REQ`, `PHONE_REQ`, `EMAIL`, `DISTANCE_BRANCH_CUSTOMER`) vào `DIM_CLOS_APPLICATION`. **Cập nhật (lượt 2, xem #66):** số cột đã đổi tiếp, xem dòng #66 | ĐÃ GIẢI QUYẾT |
-| 66 | `DIM_CLOS_APPLICATION` (1.2.1.1/2.2.1.1) — đổi driving table, thêm thông tin hồ sơ/khách hàng chính và dư thừa EXTTABLE — review 2026-09-25 (lượt 2) | Người dùng yêu cầu: (1) đổi driving table sang `NG_SB_CLOS_EXTTABLE` (đúng bảng "cầm trịch" WI_NAME của hồ sơ CLOS theo KEY CDC); (2) bổ sung thông tin khách hàng chính (`CUSTOMER_NAME`/`ID_NUMBER`) lên DIM này để thể hiện quan hệ hồ sơ↔khách hàng sau khi `DIM_CLOS_CUSTOMER` đổi NK bỏ `WI_NAME`; (3) rà soát lại SRS+metadata để bổ sung cột hồ sơ-grain còn thiếu; (4) chuyển `CHANGE_REQUEST`/`CHANGE_TYPE` (nguồn `NG_SB_CLOS_CHANGEREQ`, "thay đổi thường xuyên") sang Fact | Đổi NK `WI_NAME` sang nguồn `NG_SB_CLOS_EXTTABLE` (KEY CDC=WI_NAME, xác nhận qua `DS_BANG_202608.xlsx`, cùng grain với CUST_INFO nên không đổi ý nghĩa dữ liệu). Xóa `CHANGE_REQUEST`/`CHANGE_TYPE` khỏi DIM (chuyển hẳn sang `FCT_CLOS_APPLICATION` khi review riêng bảng đó — theo yêu cầu người dùng, chấp nhận để lại tham chiếu treo tạm thời ở `FCT_CLOS_WORKSTEP_EVENT`/`FCT_CLOS_EXCEPTION`/`FCT_CLOS_DEVIATION`/`FCT_CLOS_COLLATERAL`/`FCT_CLOS_APPLICATION_PARTY`/`REF_PRODUCT`+`SLA_*` PDTD_DTM cho tới khi đó, xem #67). ⚠️ **Review 2026-10-04 (đối chiếu SRS BC2, phát hiện tham chiếu treo thật sự tồn tại trong LLD CSV, không chỉ trong tài liệu): đã GIẢI QUYẾT HOÀN TOÀN.** Bổ sung `CHANGE_REQUEST`/`CHANGE_TYPE` vào `FCT_CLOS_APPLICATION` (SB_DWH/STG_DTM/PDTD_DTM, nguồn `NG_SB_CLOS_CHANGEREQ`, join theo `WI_NAME`) — xem `hld_review/HLD_FCT_SB_DWH_review.md` mục 1 cột 23-24 và `hld_review/HLD_FCT_PDTD_DTM_review.md` mục 4 cột 55-56. `REF_PRODUCT`/`SLA_*` (PDTD_DTM) hết treo ngay (đã tham chiếu `STG_FCT_CLOS_APPLICATION.CHANGE_REQUEST` từ trước, nay cột tồn tại thật). Rà soát `FCT_CLOS_WORKSTEP_EVENT`/`FCT_CLOS_EXCEPTION`/`FCT_CLOS_DEVIATION`/`FCT_CLOS_COLLATERAL` xác nhận không còn tham chiếu nào tới CHANGE_REQUEST/CHANGE_TYPE (đã dọn sạch trong các đợt rewrite sau này). `FCT_CLOS_APPLICATION_PARTY` đã xóa hẳn khỏi thiết kế (review 2026-09-26, hợp nhất vào `FCT_CLOS_LEGAL_PARTY`) nên không còn tồn tại để treo. Thêm `PRODUCT_LINE`/`SUB_PRODUCT` (CUST_INFO, text as-is, không join `DIM_CLOS_PRODUCT` — khóa tra `REF_PRODUCT`/`SLA_*` vẫn giữ nguyên qua `DIM_CLOS_PRODUCT`/FCT như cũ, xác nhận theo yêu cầu người dùng). Thêm `ID_NUMBER` (qua `NG_SB_CLOS_CUST_INFO_LEGAL` lọc `OBJ_TYPE='KHÁCH HÀNG'`). Thêm 18 cột dư thừa lưu vết nguồn EXTTABLE (`CUSTOMER_NAME`, `DECISION`, `CURR_WSNAME`, `PREV_WSNAME`, `PRODUCT_NAME`, 10 cột `*USER`, `CHECKER3_TARGET`, `CHANNEL`) — không có report nào dùng trực tiếp nhưng người dùng quyết định vẫn thêm để không bỏ sót thuộc tính gốc của driving table mới. Loại trừ `RN` (rác 100% rỗng) và `COMPANY_CODE`/`COMPANY_NAME`/`BRANCH_CODE`/`BRANCH_NAME` (đã có `COMPANY_SK` → `DIM_LOS_COMPANY`, không cần thêm lại dạng text). SB_DWH: 33→52 cột; PDTD_DTM: 40→59 cột | ĐÃ GIẢI QUYẾT |
+| 66 | `DIM_CLOS_APPLICATION` (1.2.1.1/2.2.1.1) — đổi driving table, thêm thông tin hồ sơ/khách hàng chính và dư thừa EXTTABLE — review 2026-09-25 (lượt 2) | Người dùng yêu cầu: (1) đổi driving table sang `NG_SB_CLOS_EXTTABLE` (đúng bảng "cầm trịch" WI_NAME của hồ sơ CLOS theo KEY CDC); (2) bổ sung thông tin khách hàng chính (`CUSTOMER_NAME`/`CUSTOMER_CODE`) lên DIM này để thể hiện quan hệ hồ sơ↔khách hàng sau khi `DIM_CLOS_CUSTOMER` đổi NK bỏ `WI_NAME`; (3) rà soát lại SRS+metadata để bổ sung cột hồ sơ-grain còn thiếu; (4) chuyển `CHANGE_REQUEST`/`CHANGE_TYPE` (nguồn `NG_SB_CLOS_CHANGEREQ`, "thay đổi thường xuyên") sang Fact | Đổi NK `WI_NAME` sang nguồn `NG_SB_CLOS_EXTTABLE` (KEY CDC=WI_NAME, xác nhận qua `DS_BANG_202608.xlsx`, cùng grain với CUST_INFO nên không đổi ý nghĩa dữ liệu). Xóa `CHANGE_REQUEST`/`CHANGE_TYPE` khỏi DIM (chuyển hẳn sang `FCT_CLOS_APPLICATION` khi review riêng bảng đó — theo yêu cầu người dùng, chấp nhận để lại tham chiếu treo tạm thời ở `FCT_CLOS_WORKSTEP_EVENT`/`FCT_CLOS_EXCEPTION`/`FCT_CLOS_DEVIATION`/`FCT_CLOS_COLLATERAL`/`FCT_CLOS_APPLICATION_PARTY`/`REF_PRODUCT`+`SLA_*` PDTD_DTM cho tới khi đó, xem #67). ⚠️ **Review 2026-10-04 (đối chiếu SRS BC2, phát hiện tham chiếu treo thật sự tồn tại trong LLD CSV, không chỉ trong tài liệu): đã GIẢI QUYẾT HOÀN TOÀN.** Bổ sung `CHANGE_REQUEST`/`CHANGE_TYPE` vào `FCT_CLOS_APPLICATION` (SB_DWH/STG_DTM/PDTD_DTM, nguồn `NG_SB_CLOS_CHANGEREQ`, join theo `WI_NAME`) — xem `hld_review/HLD_FCT_SB_DWH_review.md` mục 1 cột 23-24 và `hld_review/HLD_FCT_PDTD_DTM_review.md` mục 4 cột 55-56. `REF_PRODUCT`/`SLA_*` (PDTD_DTM) hết treo ngay (đã tham chiếu `STG_FCT_CLOS_APPLICATION.CHANGE_REQUEST` từ trước, nay cột tồn tại thật). Rà soát `FCT_CLOS_WORKSTEP_EVENT`/`FCT_CLOS_EXCEPTION`/`FCT_CLOS_DEVIATION`/`FCT_CLOS_COLLATERAL` xác nhận không còn tham chiếu nào tới CHANGE_REQUEST/CHANGE_TYPE (đã dọn sạch trong các đợt rewrite sau này). `FCT_CLOS_APPLICATION_PARTY` đã xóa hẳn khỏi thiết kế (review 2026-09-26, hợp nhất vào `FCT_CLOS_LEGAL_PARTY`) nên không còn tồn tại để treo. Thêm `PRODUCT_LINE`/`SUB_PRODUCT` (CUST_INFO, text as-is, không join `DIM_CLOS_PRODUCT` — khóa tra `REF_PRODUCT`/`SLA_*` vẫn giữ nguyên qua `DIM_CLOS_PRODUCT`/FCT như cũ, xác nhận theo yêu cầu người dùng). Thêm `CUSTOMER_CODE` (qua `NG_SB_CLOS_CUST_INFO_LEGAL` lọc `OBJ_TYPE='KHÁCH HÀNG'`). Thêm 18 cột dư thừa lưu vết nguồn EXTTABLE (`CUSTOMER_NAME`, `DECISION`, `CURR_WSNAME`, `PREV_WSNAME`, `PRODUCT_NAME`, 10 cột `*USER`, `CHECKER3_TARGET`, `CHANNEL`) — không có report nào dùng trực tiếp nhưng người dùng quyết định vẫn thêm để không bỏ sót thuộc tính gốc của driving table mới. Loại trừ `RN` (rác 100% rỗng) và `COMPANY_CODE`/`COMPANY_NAME`/`BRANCH_CODE`/`BRANCH_NAME` (đã có `COMPANY_SK` → `DIM_LOS_COMPANY`, không cần thêm lại dạng text). SB_DWH: 33→52 cột; PDTD_DTM: 40→59 cột | ĐÃ GIẢI QUYẾT |
 | 67 | `FCT_CLOS_WORKSTEP_EVENT`/`FCT_CLOS_EXCEPTION`/`FCT_CLOS_DEVIATION`/`FCT_CLOS_COLLATERAL`/`FCT_CLOS_APPLICATION_PARTY` và `REF_PRODUCT`/`SLA_*` (PDTD_DTM 2.2.1.1) — tham chiếu treo tới `CHANGE_REQUEST`/`CHANGE_TYPE` sau khi 2 cột này bị xóa khỏi `DIM_CLOS_APPLICATION` — review 2026-09-25 (lượt 2) | Dòng #66 xóa `CHANGE_REQUEST`/`CHANGE_TYPE` khỏi `DIM_CLOS_APPLICATION` ngay lập tức (theo yêu cầu người dùng, chấp nhận rủi ro tạm thời) trong khi hơn 10 vị trí khác (mermaid lineage + công thức either/or `PRODUCT_LINE`/`CHANGE_TYPE` cho `REF_PRODUCT`/`SLA_*`) vẫn còn tham chiếu 2 cột này qua `DIM_CLOS_APPLICATION` | Cần cập nhật từng vị trí khi review `FCT_CLOS_APPLICATION` (nơi 2 cột sẽ được thêm vào): đổi mọi mermaid `-->|1:1 CHANGE_REQUEST, CHANGE_TYPE\|` trỏ `DIM_CLOS_APPLICATION` sang trỏ `FCT_CLOS_APPLICATION`, và sửa công thức either/or `CHANGE_TYPE` trong `REF_PRODUCT`/`SLA_*` (2.2.1.1 PDTD_DTM) lấy qua `APPLICATION_SK` thay vì đọc cột local đã xóa. (⚠️ review 2026-09-26: `FCT_CLOS_APPLICATION_PARTY` PDTD_DTM đã xóa hẳn, 2.2.2.2 — loại khỏi danh sách tham chiếu treo này, không còn tồn tại để cập nhật) | PENDING |
 | 80 | `DIM_CLOS_APPLICATION` (1.2.1.1/2.2.1.1) — xóa `INDUSTRY_LVL1/2/3_CODE` trùng lặp, đổi nguồn `EMPLOYEE_CODE`/`EMPLOYEE_NAME` — review 2026-09-25 (lượt 3) | Sau lượt 2, `INDUSTRY_LVL1/2/3_CODE` vẫn còn tồn tại song song ở cả `DIM_CLOS_APPLICATION` và `DIM_CLOS_CUSTOMER` — người dùng xác nhận đây là thuộc tính khách hàng thật (ngành nghề kinh doanh cố hữu), không phải hồ sơ, cần xóa khỏi `DIM_CLOS_APPLICATION`. Đồng thời `EMPLOYEE_CODE`/`EMPLOYEE_NAME` (trước đây nguồn `NG_SB_CLOS_CUST_INFO.EMP_CODE`/`EMP_NAME`) cần đổi sang lấy trực tiếp từ driving table `NG_SB_CLOS_EXTTABLE` (đã có sẵn 2 cột cùng tên theo metadata) | Đã xóa `INDUSTRY_LVL1/2/3_CODE` khỏi `DIM_CLOS_APPLICATION` (SB_DWH 1.2.1.1, PDTD_DTM 2.2.1.1) — vẫn giữ nguyên ở `DIM_CLOS_CUSTOMER` (1.2.1.6), không còn trùng lặp. Đã đổi nguồn `EMPLOYEE_CODE`/`EMPLOYEE_NAME` sang `NG_SB_CLOS_EXTTABLE.EMPLOYEE_CODE`/`EMPLOYEE_NAME`, cùng driving table với `WI_NAME`/`LOANCASEID`/`CREDIT_PROFILE`, không cần LEFT JOIN `NG_SB_CLOS_CUST_INFO` cho 2 cột này nữa. SB_DWH: 52→49 cột; PDTD_DTM: 59→56 cột | ĐÃ GIẢI QUYẾT |
 | 81 | `DIM_RLOS_APPLICATION` (1.3.1.1/2.3.1.1) — lấy đầy đủ cột dư thừa driving table `NG_SB_RLOS_EXTTABLE`, chuyển `DEVIATION_G3` sang report-time PDTD_DTM — review 2026-09-25 (lượt 1) | Tương tự lượt review `DIM_CLOS_APPLICATION` (#66): driving table đã đổi sang `NG_SB_RLOS_EXTTABLE` từ trước (review 2026-09-22) nhưng mới lấy 4 cột (`WI_NAME`, `LOANCASEID`, `CHANGE_REQUEST`, `CHANGE_TYPE`), bỏ sót các cột khác. Đồng thời phát hiện `DEVIATION_G3` (SB_DWH, SCD2, đọc thẳng `NG_SB_RLOS_MANUAL_DEVIATION`) trùng khái niệm/công thức với `AGG_LOS_KPI_APPLICATION.DEVIATION_G3` (PDTD_DTM, report-time, đọc qua `FCT_RLOS_DEVIATION`) — 2 luồng tính song song không cần thiết cho cùng 1 khái niệm | Rà soát toàn bộ 50 cột `NG_SB_RLOS_EXTTABLE` đối chiếu SRS BC1: xác nhận `UWMAKERUSER`/`UWCHKRUSER`/`CREDAPPRUSER`/`CCOMMITUSER` có report dùng thật (fallback COALESCE cho `UNDERWRITERMAKER_TAKERESPON`/`UNDERWRITERCHECKER_TAKERESPON`/`APPROVAL_TAKERESPON`); thêm 49 cột còn lại làm "Thiết kế dư thừa"; loại trừ `ITEMINDEX` (khóa vật lý kỹ thuật) và `BRANCH_CODE`/`BRANCH_NAME` (đã có qua `COMPANY_SK`→`DIM_LOS_COMPANY`). Theo yêu cầu người dùng: bỏ hẳn `DEVIATION_G3` khỏi `DIM_RLOS_APPLICATION` SB_DWH, chuyển tính report-time tại PDTD_DTM (2.3.1.1) đọc `FCT_RLOS_DEVIATION`, dùng chung nguồn/công thức với `AGG_LOS_KPI_APPLICATION` — khóa tra SLA (`REF_PRODUCT`/`SLA_*`) dùng giá trị report-time này. SB_DWH: 28→80 cột; PDTD_DTM: 34→87 cột (7 cột mới, thêm `DEVIATION_G3`) | ĐÃ GIẢI QUYẾT |
