@@ -399,7 +399,6 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT (
     TAT_CALENDAR_HOUR             NUMBER(18,6)        ,
     TAT_WORKING_HOUR              NUMBER(18,6)        ,
     TAT_CPC_HOUR                  NUMBER(18,6)        ,
-    EVENT_SEQ_ASC                 NUMBER(5)           ,
     PROCESSED_DATE                DATE                ,
     WF_PROCESSNAME                VARCHAR2(50)        ,
     WF_ACTIVITYNAME               VARCHAR2(200)       ,
@@ -407,6 +406,9 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT (
     APPROVED_DATE           DATE                ,
     APPROVAL_FLAG                 VARCHAR2(50)        ,
     WORKSTEP_FLAG                 VARCHAR2(200)       ,
+    UNDERWRITERMAKER_USERMAKE     VARCHAR2(100)       ,
+    UNDERWRITERCHECKER_USERMAKE   VARCHAR2(100)       ,
+    APPROVAL_USERMAKE             VARCHAR2(100)       ,
 
 	CONSTRAINT FCT_CLOS_WORKSTEP_EVENT_PK PRIMARY KEY (WORKSTEP_EVENT_BK, DAYID) USING INDEX LOCAL
 )
@@ -778,13 +780,15 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT (
     TAT_CALENDAR_HOUR             NUMBER(18,6)        ,
     TAT_WORKING_HOUR              NUMBER(18,6)        ,
     TAT_CPC_HOUR                  NUMBER(18,6)        ,
-    EVENT_SEQ_ASC                 NUMBER(5)           ,
     PROCESSED_DATE                DATE                ,
     WF_PROCESSNAME                VARCHAR2(50)        ,
     WF_ACTIVITYNAME               VARCHAR2(200)       ,
     WF_CREATEDBY                  VARCHAR2(50)        ,
     APPROVAL_FLAG                 VARCHAR2(50)        ,
     WORKSTEP_FLAG                 VARCHAR2(200)       ,
+    UNDERWRITERMAKER_USERMAKE     VARCHAR2(100)       ,
+    UNDERWRITERCHECKER_USERMAKE   VARCHAR2(100)       ,
+    APPROVAL_USERMAKE             VARCHAR2(100)       ,
 
 	CONSTRAINT FCT_RLOS_WORKSTEP_EVENT_PK PRIMARY KEY (WORKSTEP_EVENT_BK, DAYID) USING INDEX LOCAL
 )

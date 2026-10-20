@@ -172,9 +172,11 @@ flowchart LR
     end
     A -->|"driving table CLOS — lọc DAYID=v_batch_date (full snapshot, KHÔNG lọc hồ sơ đã kết thúc): DAYID, WI_NAME, PROCESSED_DATE, APPLICATION_SK, PRODUCTLINE_SK, SUB_PRODUCT_SK, COMPANY_SK, APPLICATION_LINK_INFO"| K
     B -->|"driving table RLOS — lọc DAYID=v_batch_date (full snapshot): DAYID, WI_NAME, PROCESSED_DATE, APPLICATION_SK, PRODUCTLINE_SK, SUB_PRODUCT_SK, COMPANY_SK"| K
+    A -.->|"JOIN qua WI_NAME+DAYID — đọc 6 cờ HAS_DDE/UWM/UWC/APPROVAL/FINAL_APPROVAL/CANCELLED_FLAG (carry-forward một-chiều, xem mục 4) — sinh VOLUME, O(1) lookup thay cho EXISTS quét lịch sử WORKSTEP_EVENT"| K
+    B -.->|"JOIN qua WI_NAME+DAYID — cùng 6 cờ HAS_*_FLAG (carry-forward một-chiều, xem mục 11) — sinh VOLUME nhánh RLOS"| K
     L -.->|"RLOS-only, lọc DAYID=v_batch_date trực tiếp (point-in-time, KHÔNG còn MAX(DAYID) toàn lịch sử), COUNT(*) theo WI_NAME — sinh TSBD_G2, NULL nhánh CLOS"| K
     V -->|"UNION theo WI_NAME, lọc DAYID=v_batch_date trực tiếp (point-in-time), COUNT(*) theo WI_NAME — sinh DEVIATION_G2/DEVIATION_G3"| K
-    W -->|"EXISTS USERNAME thuộc 2 tài khoản test trong lịch sử CÓ ENTRYDATE<=v_batch_date — sinh IS_TEST_ACCOUNT; tổng thời gian xử lý theo nhóm bước CÓ EXITDATE<=v_batch_date, chỉ tính event APPROVAL_FLAG='First Approval' — sinh TAT_APPLICATION_HOUR; VOLUME tính theo lịch sử bước xa nhất đã đạt VỚI ENTRYDATE/EXITDATE<=v_batch_date (point-in-time)"| K
+    W -->|"EXISTS USERNAME thuộc 2 tài khoản test trong lịch sử CÓ ENTRYDATE<=v_batch_date — sinh IS_TEST_ACCOUNT; tổng thời gian xử lý theo nhóm bước CÓ EXITDATE<=v_batch_date, chỉ tính event APPROVAL_FLAG='First Approval' — sinh TAT_APPLICATION_HOUR"| K
 ```
 
 
@@ -191,7 +193,7 @@ flowchart LR
 | 6 | COMPANY_SK | NUMBER | N | 18 |  | Khóa tới DIM_LOS_COMPANY. Mặc định -1 — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.COMPANY_SK/PDTD_DTM.FCT_RLOS_APPLICATION.COMPANY_SK — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa JOIN tới DIM_LOS_COMPANY để lấy điều kiện lọc ẩn COMPANY_CODE NOT IN (...) dùng trong công thức SLHS_RLOS/SLGN_RLOS  tại AGG_LOS_KPI_YTD_DAILY | Nguồn cho chỉ tiêu SLHS_RLOS/SLGN_RLOS (điều kiện lọc loại trừ chi nhánh) |
 | 7 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng CLOS hoặc RLOS — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.WI_NAME/PDTD_DTM.FCT_RLOS_APPLICATION.WI_NAME (đã lọc DAYID=v_batch_date) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa JOIN, đồng thời hiển thị trực tiếp làm mã hồ sơ | Mã hồ sơ (WI_NAME) |
 | 8 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý của hồ sơ — bê 1:1 từ PDTD_DTM.FCT_CLOS_APPLICATION.PROCESSED_DATE/PDTD_DTM.FCT_RLOS_APPLICATION.PROCESSED_DATE (cùng DAYID=v_batch_date đã lọc). Là THUỘC TÍNH CỐ ĐỊNH của hồ sơ (ngày hồ sơ thực sự chốt/hủy, KHÁC DAYID — không đổi ngược theo thời gian một khi hồ sơ đã chốt), là mốc để AGG_LOS_KPI_YTD_DAILY xếp hồ sơ vào đúng ngày phát sinh khi SUM/COUNT lên grain ngày — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — khóa lọc theo ngày, đồng thời hiển thị trực tiếp làm ngày dữ liệu | Ngày dữ liệu (PROCESSED_DATE) |
-| 9 | VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1| Báo cáo KPI (BC9) — hiển thị trực tiếp (Tỷ lệ KPI), đồng thời là mẫu số của QUY_DOI (cột 10) | Tỷ lệ KPI (VOLUME) |
+| 9 | VOLUME | NUMBER | N | 5,2 |  | Mức độ hoàn thành hồ sơ, thang 0-1 — PHÁI SINH TẠI PDTD_DTM: JOIN FCT_CLOS_APPLICATION/FCT_RLOS_APPLICATION (theo DATASOURCE) qua WI_NAME+DAYID, đọc 6 cờ trạng thái một-chiều HAS_DDE/UWM/UWC/APPROVAL/FINAL_APPROVAL/CANCELLED_FLAG — HAS_FINAL_APPROVAL_FLAG='Y' → 1.0; HAS_CANCELLED_FLAG='Y' → lấy điểm theo bước xa nhất đã đạt TRƯỚC KHI hủy (0.8/0.6/0.5/0.2 theo HAS_APPROVAL/UWC/UWM/DDE_FLAG, không phải NULL); còn lại lấy theo bước xa nhất đã đạt (0.8/0.6/0.5/0.2), hồ sơ chưa tới DetailDataEntry → NULL | Báo cáo KPI (BC9) — hiển thị trực tiếp (Tỷ lệ KPI), đồng thời là mẫu số của QUY_DOI (cột 10) | Tỷ lệ KPI (VOLUME) |
 | 10 | POINT | NUMBER | N | 12,4 |  | Điểm KPI — PHÁI SINH TẠI PDTD_DTM: RLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCTLINE_NAME [qua PRODUCTLINE_SK cột 5a → DIM_RLOS_PRODUCT layer Product Line — vẫn CHỈ 1 khóa PRODUCTLINE_NAME, không cần SUB_PRODUCT] + SYSTEM_CODE='RLOS') + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER; CLOS: SLA_DE_TOTAL_RESULT (report-time LEFT JOIN REF_SLA_NLTT theo PRODUCTLINE_NAME [qua PRODUCTLINE_SK cột 5a → DIM_CLOS_PRODUCT layer Product Line] + SUB_PRODUCT_NAME [qua SUB_PRODUCT_SK cột 5b → DIM_CLOS_PRODUCT layer Sub Product] — 2 lần join riêng theo đúng layer + SYSTEM_CODE='CLOS') + SLA_CREDIT_OFFICER + SLA_CREDIT_APPROVER, riêng APP_GRP='C1' (tra qua DIM_CLOS_APPLICATION) cộng thêm hằng số 4 giờ. | Báo cáo KPI (BC9) — hiển thị trực tiếp (Điểm KPI), đồng thời là tử số của QUY_DOI (cột 10) | Điểm KPI (POINT) |
 | 11 | QUY_DOI | NUMBER | N | 12,4 |  | Điểm KPI quy đổi — PHÁI SINH TẠI PDTD_DTM: POINT*8/VOLUME (input từ cột 10/9, cùng bảng), NULL nếu VOLUME NULL. Là đầu vào duy nhất của QUY_DOI_RLOS/QUY_DOI_CLOS ở AGG_LOS_KPI_YTD_DAILY — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo KPI (BC9) — hiển thị trực tiếp, đồng thời nguồn cho QUY_DOI_RLOS/QUY_DOI_CLOS lũy kế tại AGG_LOS_KPI_YTD_DAILY | Điểm KPI quy đổi (QUY_DOI) |
 | 12 | TAT_APPLICATION_HOUR | NUMBER | N | 18,6 |  | Tổng thời gian xử lý của hồ sơ, đơn vị giờ| Báo cáo KPI (BC9) — nguồn cho TAT_RLOS_SEC/UNSEC_SUM_HOUR và TAT_CLOS_SUM_HOUR tại AGG_LOS_KPI_YTD_DAILY, qua đó nguồn cho chỉ tiêu TAT_RLOS/TAT_CLOS/TAT_TB phái sinh tại tầng report | Nguồn cho chỉ tiêu TAT_RLOS/TAT_CLOS |
@@ -256,6 +258,8 @@ flowchart LR
     SCA -.->|"APPLICATION_SK — cấp STREAM (giữ nguyên giá trị gốc trên DIM) — PHÁI SINH tại PDTD_DTM: CASE WHEN UPPER(STREAM) IN (UPPER('Phê duyệt tín dụng'), UPPER('Sent To Disbursement Request')) THEN STREAM ELSE NULL END, sinh APPROVAL_TYPE"| D
     WE -.->|"Cung cấp nguồn cho thông tin User/Date tại Workstep, Lookup từ FCT_CLOS_APPLICATION sang qua APPLICATION_SK"| D
     WE -.->|"sinh UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE — lấy dòng ENTRYDATE lớn nhất theo WI_NAME + WORKSTEP_CODE cố định"| D
+    DWE["PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT"] -.->|"EXISTS event mới trong batch theo WORKSTEP_CODE (DetailDataEntry/UnderwriterMaker/UnderwriterChecker/CreditApproval+CreditCommittee), kết hợp OR với cờ PREV (carry-forward) — sinh 6 cờ một-chiều HAS_DDE/UWM/UWC/APPROVAL/FINAL_APPROVAL/CANCELLED_FLAG"| D
+    D -.->|"self-reference FCT_CLOS_APPLICATION_PREV (snapshot DAYID=v_batch_date-1 của chính bảng này) — carry-forward giá trị cờ cũ nếu đã 'Y'"| D
 ```
 
 ### 4.3 Cấu trúc bảng
@@ -319,7 +323,22 @@ flowchart LR
 | 54 | APPROVAL_TYPE | VARCHAR2 | N | 200 |  | Loại luồng phê duyệt (BC2) — PHÁI SINH TẠI PDTD_DTM: CASE WHEN UPPER(STREAM) IN (UPPER('Phê duyệt tín dụng'), UPPER('Sent To Disbursement Request')) THEN STREAM ELSE NULL END, STREAM tra qua APPLICATION_SK (cột 2, cùng bảng) → DIM_CLOS_APPLICATION.STREAM (giữ nguyên giá trị gốc trên DIM, không ép case khi gán) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH.| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | APPROVAL_TYPE (Loại luồng phê duyệt) |
 | 55 | CHANGE_REQUEST | VARCHAR2 | N | 200 |  | Yêu cầu điều chỉnh hồ sơ — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CHANGE_REQUEST (nguồn gốc xa: NG_SB_CLOS_CHANGEREQ.CHANGE_REQUEST).| Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CHANGE_REQUEST (Thay đổi điều kiện New/Change) |
 | 56 | CHANGE_TYPE | VARCHAR2 | N | 500 |  | Loại thay đổi điều kiện phê duyệt, giữ nguyên chuỗi gốc đa giá trị nối bằng dấu `~` — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CHANGE_TYPE (nguồn gốc xa: NG_SB_CLOS_CHANGEREQ.CHANGE_TYPE), cùng lý do cột 55 | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | CHANGE_TYPE (Chi tiết loại thay đổi điều kiện) |
+| 57 | HAS_DDE_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã từng tới bước DetailDataEntry', chỉ chuyển Y, không bao giờ quay lại N — PHÁI SINH TẠI PDTD_DTM: COALESCE(FCT_CLOS_APPLICATION_PREV.HAS_DDE_FLAG, 'N') OR EXISTS event mới WORKSTEP_CODE='DetailDataEntry' trong batch (STG_FCT_CLOS_WORKSTEP_EVENT, chỉ delta ngày — không full-scan lịch sử) | Báo cáo KPI (BC9) — nguồn cho VOLUME (AGG_LOS_KPI_APPLICATION, mục 3) | Nguồn cho chỉ tiêu VOLUME |
+| 58 | HAS_UWM_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã từng tới bước UnderwriterMaker' — PHÁI SINH TẠI PDTD_DTM, cùng cơ chế carry-forward cột 57 | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — điều kiện lọc phạm vi báo cáo: WI_NAME IN (SELECT WI_NAME FROM FCT_CLOS_APPLICATION WHERE HAS_UWM_FLAG='Y') trên FCT_CLOS_WORKSTEP_EVENT, thay EXISTS quét lịch sử<br>Báo cáo KPI (BC9) — nguồn cho VOLUME | Nguồn cho chỉ tiêu VOLUME; điều kiện lọc phạm vi BC4 |
+| 59 | HAS_UWC_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã từng tới bước UnderwriterChecker' — PHÁI SINH TẠI PDTD_DTM, cùng cơ chế carry-forward cột 57 | Báo cáo KPI (BC9) — nguồn cho VOLUME (mức 0.6) | Nguồn cho chỉ tiêu VOLUME |
+| 60 | HAS_APPROVAL_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã từng tới bước CreditApproval/CreditCommittee' (chưa cần đã có quyết định) — PHÁI SINH TẠI PDTD_DTM, cùng cơ chế carry-forward cột 57 | Báo cáo KPI (BC9) — nguồn cho VOLUME (mức 0.8) | Nguồn cho chỉ tiêu VOLUME |
+| 61 | HAS_FINAL_APPROVAL_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã có quyết định phê duyệt hoàn tất' (WORKSTEP IN (CreditApproval,CreditCommittee) AND DECISION kết thúc — đúng case 1 của PROCESSED_DATE) — PHÁI SINH TẠI PDTD_DTM: cùng cơ chế carry-forward cột 57, EXISTS cần JOIN thêm STG_DIM_CLOS_WORKSTEP_DECISION để lấy DECISION_CODE | Báo cáo KPI (BC9) — nguồn cho VOLUME (mức 1.0) | Nguồn cho chỉ tiêu VOLUME |
+| 62 | HAS_CANCELLED_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã rơi vào CancelRevoke/CancelPermanent' — PHÁI SINH TẠI PDTD_DTM, cùng cơ chế carry-forward cột 57 | Báo cáo KPI (BC9) — VOLUME dùng cờ này để xác nhận hồ sơ đã KẾT THÚC do hủy, lấy điểm theo bước xa nhất đã đạt trước khi hủy thay vì NULL | Nguồn cho chỉ tiêu VOLUME |
 
+**Cơ chế carry-forward 6 cờ HAS_*_FLAG (cột 57-62):** mỗi batch, trước
+khi tính các cờ cho `DAYID=v_batch_date`, snapshot `FCT_CLOS_APPLICATION`
+tại `DAYID=v_batch_date-1` ra bảng tạm `FCT_CLOS_APPLICATION_PREV`
+(TRUNCATE + INSERT SELECT) để tránh vừa đọc vừa ghi trên cùng bảng đích.
+Công thức mỗi cờ: `COALESCE(PREV.HAS_X_FLAG, 'N') OR EXISTS(event X mới
+trong STG_FCT_CLOS_WORKSTEP_EVENT của batch hiện tại)` — một khi đã 'Y'
+sẽ không bao giờ quay lại 'N'. Thay thế hoàn toàn cách tính cũ (5 EXISTS
+quét toàn bộ lịch sử `WORKSTEP_EVENT` mỗi lần cần biết trạng thái hồ sơ)
+— nay chỉ cần 1 lookup O(1) qua PK `WI_NAME+DAYID`.
 
 ## 5. FCT_CLOS_COLLATERAL
 
@@ -486,17 +505,24 @@ flowchart LR
 ## 8. FCT_CLOS_WORKSTEP_EVENT
 
 ### 8.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** bảng FACT nhật ký workflow mức nguyên tử của hệ CLOS,
-  bê nguyên 1:1 từ SB_DWH
+- **Ý nghĩa bảng:** bảng FACT nhật ký workflow mức nguyên tử của hệ CLOS.
+  Nguồn nạp = UNION ALL 2 nhánh: (1) event thật, bê nguyên 1:1 từ SB_DWH
+  (delta phát sinh/thay đổi trong ngày batch); (2) carry-forward hồ sơ
+  treo (xem mục 8.4) — hồ sơ chưa đạt case phê duyệt hoàn tất/hủy nhưng
+  không có event mới trong ngày, được bổ sung 1 dòng tại DAYID=v_batch_date
+  để BC4 không bị mất hồ sơ treo.
 - **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`WORKSTEP_CODE`+
-  `ENTRYDATE` — hash vào cột `WORKSTEP_EVENT_BK`, bê 1:1 từ SB_DWH
+  `ENTRYDATE` — hash vào cột `WORKSTEP_EVENT_BK`, bê 1:1 từ SB_DWH (nhánh
+  event thật); nhánh carry-forward giữ nguyên BK gốc của dòng được
+  carry-forward (không hash lại)
 - **Khóa chính của bảng (PK):** DAYID, WORKSTEP_EVENT_BK
 - **Độ chi tiết (grain):** 1 dòng = 1 phiên bản của 1 logical event (hồ sơ
   x workstep x lần vào bước) — hồ sơ quay lại cùng 1 bước nhiều lần thì
-  mỗi lần là 1 sự kiện riêng.
+  mỗi lần là 1 sự kiện riêng. Nhánh carry-forward: 1 dòng/hồ sơ treo/ngày
+  (không nhân bản — dedup theo ENTRYDATE lớn nhất trước khi carry-forward).
 - **Phục vụ báo cáo:**
   - Báo cáo Thông tin phê duyệt (BC3)
-  - Báo cáo Tuần Chuyên viên Thẩm định (BC4) — `WORKSTEP_FLAG` (BC4.FLAG)
+  - Báo cáo Tuần Chuyên viên Thẩm định (BC4) — `WORKSTEP_FLAG` (BC4.FLAG), nay đọc đủ cả hồ sơ treo nhờ nhánh carry-forward
   - Báo cáo SLA - TAT (BC5) — `APPROVAL_FLAG`
   - Báo cáo RETURN (BC8)
   - Báo cáo KPI (BC9) — nguồn tính VOLUME/NHAN_SU/TAT_CLOS qua UNION với FCT_RLOS_WORKSTEP_EVENT, `APPROVAL_FLAG='First Approval'` điều kiện lọc TAT_APPLICATION_HOUR
@@ -510,13 +536,62 @@ flowchart LR
     subgraph SB_DWH
         C["FCT_CLOS_WORKSTEP_EVENT"]
     end
+    subgraph PDTD_DTM_PREV["PDTD_DTM (snapshot DAYID=v_batch_date-1)"]
+        DPREV["FCT_CLOS_WORKSTEP_EVENT (ngày hôm trước)"]
+        P["FCT_CLOS_WORKSTEP_EVENT_PREV"]
+    end
     subgraph PDTD_DTM
         D["FCT_CLOS_WORKSTEP_EVENT"]
-        AA["FCT_CLOS_APPLICATION"]
     end
-    C -->|"bê 1:1, cùng grain/PK — tự EXISTS-check qua các dòng cùng WI_NAME để sinh APPROVAL_FLAG + WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY đã bê 1:1 để sinh WORKSTEP_FLAG "| D
-    D -.->|"UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE bê 1:1 từ SB_DWH/STG_DTM; FCT_CLOS_APPLICATION JOIN sang D (qua STG_DTM) theo WI_NAME + WORKSTEP_CODE cố định, lấy dòng ENTRYDATE mới nhất"| AA
+    DPREV -.->|"TRUNCATE + INSERT SELECT DAYID=v_batch_date-1 — snapshot trước khi UNION, tránh vừa đọc vừa ghi trên D"| P
+    C -->|"NHÁNH 1/2 (UNION ALL): bê 1:1, cùng grain/PK — tự EXISTS-check qua các dòng cùng WI_NAME để sinh APPROVAL_FLAG + WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY đã bê 1:1 để sinh WORKSTEP_FLAG "| D
+    P -->|"NHÁNH 2/2 (UNION ALL, MỚI — carry-forward hồ sơ treo cho BC4): ROW_NUMBER() PARTITION BY WI_NAME ORDER BY ENTRYDATE DESC = 1, loại hồ sơ đã đạt case phê duyệt hoàn tất/Cancel, loại hồ sơ đã có event thật trong ngày — DAYID/PROCESSED_DATE gán = v_batch_date, các cột khác giữ nguyên"| D
 ```
+
+### 8.4 Carry-forward hồ sơ treo (nhánh 2/2 UNION ALL)
+
+**Vấn đề gốc:** `WORKSTEP_EVENT` nạp theo delta (chỉ ghi event
+phát sinh/thay đổi trong ngày). `PROCESSED_DATE` có 3 mức ưu tiên, mức 3
+(fallback = DAYID) dùng cho hồ sơ đang xử lý (chưa phê duyệt/hủy) — nhưng
+nếu hồ sơ "đứng im" ở 1 bước nhiều ngày (không có event mới), nó không có
+dòng nào ở các DAYID sau ngày entry gốc → biến mất khỏi BC4 ở những ngày
+đó dù vẫn đang treo thật.
+
+**Giải pháp:** mỗi batch, sau khi nạp nhánh event thật, carry-forward
+thêm 1 dòng cho mỗi hồ sơ còn treo từ `DAYID=v_batch_date-1` sang
+`v_batch_date`:
+1. Snapshot `FCT_CLOS_WORKSTEP_EVENT` tại `DAYID=v_batch_date-1` ra bảng
+   tạm `FCT_CLOS_WORKSTEP_EVENT_PREV` (TRUNCATE + INSERT SELECT) — tránh
+   vừa đọc vừa ghi trên bảng đích.
+2. Dedup: `ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE
+   DESC) = 1` — chỉ lấy đúng 1 dòng mới nhất/hồ sơ (phòng trường hợp hồ
+   sơ có nhiều event cùng ngày T-1).
+3. Lọc còn treo: `NOT ((WORKSTEP_CODE IN ('CreditCommittee',
+   'CreditApproval') AND DECISION_CODE IN ('Send To HOSupport','Reject',
+   'Submit','Send To PostSanction','Submit To DisbursementMaker')) OR
+   (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Cancel'))` —
+   loại hồ sơ đã đạt case phê duyệt hoàn tất/hủy (JOIN
+   `DIM_CLOS_WORKSTEP_DECISION` qua `WORKSTEP_DECISION_SK` để lấy
+   `DECISION_CODE`).
+4. Loại hồ sơ đã có event thật trong ngày `v_batch_date` (tránh trùng
+   với nhánh 1): `NOT EXISTS (SELECT 1 FROM STG_FCT_CLOS_WORKSTEP_EVENT e
+   WHERE e.WI_NAME = ...)`.
+5. Insert dòng carry-forward: `DAYID` và `PROCESSED_DATE` gán =
+   `v_batch_date` (đúng bản chất fallback case 3); mọi cột khác
+   (`WORKSTEP_CODE`, `ENTRYDATE`, `EXITDATE`, `TAT_*`, `WORKSTEP_FLAG`...)
+   giữ nguyên giá trị của dòng PREV — không tính lại.
+
+Kết quả: tại mỗi `DAYID`, tập hồ sơ treo tự thu hẹp dần khi hồ sơ đạt
+case phê duyệt/hủy (dòng event thật của ngày đó làm nó không còn thỏa
+điều kiện (3) ở ngày sau) — đúng ngữ nghĩa "ngày T có N hồ sơ treo, ngày
+T+1 chỉ còn N' ≤ N nếu một số đã được xử lý xong".
+
+**Phạm vi báo cáo (BC4):** carry-forward chỉ bổ sung hồ sơ *chưa đạt case
+phê duyệt/hủy*, không giới hạn theo bước — việc giới hạn "chỉ hồ sơ đã
+từng qua UnderwriterMaker" (đúng phạm vi BC4) được áp dụng ở **report-time**
+bằng điều kiện `WI_NAME IN (SELECT WI_NAME FROM FCT_CLOS_APPLICATION
+WHERE HAS_UWM_FLAG='Y')`, đọc cờ carry-forward trên `FCT_CLOS_APPLICATION`
+(xem mục 4.3) — không lặp lại logic lọc UWM ngay tại bước này.
 
 ### 8.3 Cấu trúc bảng
 
@@ -534,21 +609,20 @@ flowchart LR
 | 10 | EXITDATE | TIMESTAMP | N |  |  | Thời điểm hồ sơ ra khỏi bước xử lý — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.EXITDATE (nguồn gốc xa: ENTRY_EXIT.EXITDATE). NULL nghĩa là hồ sơ đang nằm tại bước này | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — hiển thị trực tiếp, đồng thời là nguồn tính PROCESSED_DATE (BC8)<br>Báo cáo SLA - TAT (BC5) — dùng tính EXITDATE_DDE (MAX theo bước DetailDataEntry) | EXITDATE (Thời gian tạo quyết định / kết thúc bước).|
 | 11 | USERNAME | VARCHAR2 | N | 100 |  | Tên tài khoản người xử lý hồ sơ — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.USERNAME (nguồn gốc xa: ENTRY_EXIT.USERNAME). Giữ nguyên giá trị gốc để báo cáo hiển thị thẳng, không phải join qua DIM_LOS_USER | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp theo điều kiện WORKSTEP_CODE (BI_APPROVER/BI_COMMITTEE)<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp theo điều kiện WORKSTEP_CODE (UND_MAKER)<br>Báo cáo KPI (BC9) — đếm DISTINCT theo danh sách WORKSTEP cho NHAN_SU | USERNAME (User xử lý — BI_APPROVER/BI_COMMITTEE/UND_MAKER tùy báo cáo) |
 | 12 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.REMARKS (nguồn gốc xa: ENTRY_EXIT.REMARKS) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REMARKS (Ghi chú) |
-| 13 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.TAT_SOURCE_SEC (nguồn gốc xa: ENTRY_EXIT.TAT). Giữ lại để đối soát với 3 cột TAT tính lại bên dưới. Đơn vị "giây" kế thừa từ extract gốc, chưa chốt chính thức | Nguồn cho chỉ tiêu/trường TAT_CALENDAR_HOUR (điều kiện tính khi có giá trị, thay công thức lệch ngày) | — |
-| 14 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.TAT_CALENDAR_HOUR: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ. NULL nếu chưa có EXITDATE | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước (STEP01_BRANCH_CL_TAT, STEP02_DDE_CL_TAT...)<br>Báo cáo KPI (BC9) — SUM theo nhóm bước cho TAT_CLOS | TAT_CALENDAR_HOUR (TAT theo giờ lịch tự nhiên) |
-| 15 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.TAT_WORKING_HOUR: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật; giờ tính 8-12 và 13-17. NULL nếu chưa có EXITDATE | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước (STEP01_BRANCH_WK_TAT, STEP02_DDE_WK_TAT...)<br>Báo cáo KPI (BC9) — SUM theo nhóm bước cho TAT_CLOS | TAT_WORKING_HOUR (TAT theo giờ làm việc) |
-| 16 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.TAT_CPC_HOUR: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30. NULL nếu chưa có EXITDATE | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước, so sánh với REF_SLA_* để ra kết quả đạt/không đạt SLA | TAT_CPC_HOUR (TAT theo giờ cam kết SLA) |
-| 17 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.EVENT_SEQ_ASC: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN); chiều giảm dần (mới→cũ) khi cần có thể tự suy bằng COUNT(*) OVER (PARTITION BY WI_NAME) - EVENT_SEQ_ASC + 1, không cần cột riêng | Nguồn cho chỉ tiêu/trường FIRST_WORKSTEP_RETURN (xác định sự kiện trả về đầu tiên, BC7, trên FCT_CLOS_EXCEPTION) | — |
-| 18 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH (KHÔNG copy/JOIN từ FCT_CLOS_APPLICATION.PROCESSED_DATE), bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.PROCESSED_DATE: MAX(EXITDATE) window theo WI_NAME WHERE WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') AND DECISION_CODE IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker') — DECISION_CODE ở đây tra qua JOIN WORKSTEP_DECISION_SK sang DIM_CLOS_WORKSTEP_DECISION; nếu rỗng → EXITDATE tại WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Cancel' (cùng cách tra); nếu vẫn rỗng → ngày dữ liệu hệ thống (DAYID) | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REPORT_DATE (Ngày báo cáo) |
-| 19 | WF_PROCESSNAME | VARCHAR2 | N | 50 |  | Tên hệ thống workflow của instance đang đứng, đã lọc tài khoản test — cột thô, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WF_PROCESSNAME (thay cho WORKSTEP_FLAG đã tính sẵn) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 24, cùng bảng) | — |
-| 20 | WF_ACTIVITYNAME | VARCHAR2 | N | 200 |  | Bước hiện tại của instance workflow, đã lọc tài khoản test — cột thô, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WF_ACTIVITYNAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 24, cùng bảng) | — |
-| 21 | WF_CREATEDBY | VARCHAR2 | N | 50 |  | Mã người/hệ thống tạo bản ghi workflow — cột thô, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WF_CREATEDBY.: SRS áp dụng điều kiện lọc `CREATEDBY NOT IN (5 tài khoản hệ thống/test)` đồng nhất cho CẢ CLOS VÀ RLOS ngay tại điều kiện JOIN WFINSTRUMENTTABLE — trước đây điều kiện này lọc sẵn trong JOIN tại SB_DWH, nay bê nguyên giá trị thô để áp điều kiện lọc ngay trong WORKSTEP_FLAG (cột 25, cùng bảng) tại chính PDTD_DTM, đồng bộ đúng cơ chế đã áp dụng cho nhánh RLOS (mục 16) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (điều kiện lọc, cột 25, cùng bảng) | — |
-| 22 | APPROVED_DATE | DATE | N |  |  | Ngày phê duyệt (BC11.APPROVAL_DATE) — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.APPROVED_DATE | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FCT_CLOS_LOAN_DISBURSEMENT.APPROVAL_DATE (mục 9) | APPROVAL_DATE (Ngày phê duyệt) |
-| 23 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, tạm thời chỉ CLOS — xem ghi chú kiến trúc tại mục 8.1): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này), ngược lại 'From Second Approval'. Input EXITDATE/WI_NAME lấy từ chính bảng này (đã bê 1:1 từ SB_DWH, cột 8/11). Dùng cho BC5.APPROVAL_FLAG — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc chỉ tính sự kiện 'First Approval' khi tính TAT_APPLICATION_HOUR | APPROVAL_FLAG (Phê duyệt lần đầu/từ lần thứ 2) |
-| 24 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4) — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH — xem ghi chú kiến trúc tại mục 8.1): 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE (tra qua WORKSTEP_DECISION_SK → DIM_CLOS_WORKSTEP_DECISION, cột 4) của TOÀN BỘ lịch sử WI_NAME (EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này) kết hợp WF_PROCESSNAME='CLOS'/WF_ACTIVITYNAME (cột 20-21, đã bê 1:1 từ SB_DWH)| Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
-| 25 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterMaker' | — | — |
-| 26 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterChecker' | — | — |
-| 27 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') | — | — |
+| 13 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.TAT_SOURCE_SEC (nguồn gốc xa: ENTRY_EXIT.TAT). Giữ lại để đối soát với 3 cột TAT tính lại ngay tại tầng này. Đơn vị "giây" kế thừa từ extract gốc, chưa chốt chính thức | Nguồn cho chỉ tiêu/trường TAT_CALENDAR_HOUR (cột 14, cùng bảng) | — |
+| 14 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, review 2026-10-20 theo yêu cầu người dùng): STG_FCT_CLOS_WORKSTEP_EVENT.TAT_SOURCE_SEC / 3600, hoặc (CAST(NVL(EXITDATE, TRUNC(v_batch_date+1) - INTERVAL '1' SECOND) AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước (STEP01_BRANCH_CL_TAT, STEP02_DDE_CL_TAT...)<br>Báo cáo KPI (BC9) — SUM theo nhóm bước cho TAT_CLOS | TAT_CALENDAR_HOUR (TAT theo giờ lịch tự nhiên) |
+| 15 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, review 2026-10-20 theo yêu cầu người dùng — GET_BUSINESS_MINUTE là hàm PL/SQL tự viết, deploy được ở cả 2 schema): GET_BUSINESS_MINUTE(ENTRYDATE, NVL(EXITDATE, TRUNC(v_batch_date+1) - INTERVAL '1' SECOND)) / 60 trên STG_FCT_CLOS_WORKSTEP_EVENT. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật; giờ tính 8-12 và 13-17 | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước (STEP01_BRANCH_WK_TAT, STEP02_DDE_WK_TAT...)<br>Báo cáo KPI (BC9) — SUM theo nhóm bước cho TAT_CLOS, nguồn cho AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (SUM trực tiếp cột này, không tự gọi lại GET_BUSINESS_MINUTE) | TAT_WORKING_HOUR (TAT theo giờ làm việc) |
+| 16 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, review 2026-10-20, cùng lý do cột 15): GET_BUSINESS_MINUTE_CPC(ENTRYDATE, NVL(EXITDATE, TRUNC(v_batch_date+1) - INTERVAL '1' SECOND)) / 60 trên STG_FCT_CLOS_WORKSTEP_EVENT. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30 | Báo cáo SLA - TAT (BC5) — SUM theo từng nhóm bước, so sánh với REF_SLA_* để ra kết quả đạt/không đạt SLA | TAT_CPC_HOUR (TAT theo giờ cam kết SLA) |
+| 17 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH (KHÔNG copy/JOIN từ FCT_CLOS_APPLICATION.PROCESSED_DATE), bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.PROCESSED_DATE: MAX(EXITDATE) window theo WI_NAME WHERE WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') AND DECISION_CODE IN ('Send To HOSupport','Reject','Submit','Send To PostSanction','Submit To DisbursementMaker') — DECISION_CODE ở đây tra qua JOIN WORKSTEP_DECISION_SK sang DIM_CLOS_WORKSTEP_DECISION; nếu rỗng → EXITDATE tại WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Cancel' (cùng cách tra); nếu vẫn rỗng → ngày dữ liệu hệ thống (DAYID) | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REPORT_DATE (Ngày báo cáo) |
+| 18 | WF_PROCESSNAME | VARCHAR2 | N | 50 |  | Tên hệ thống workflow của instance đang đứng, đã lọc tài khoản test — cột thô, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WF_PROCESSNAME (thay cho WORKSTEP_FLAG đã tính sẵn) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 23, cùng bảng) | — |
+| 19 | WF_ACTIVITYNAME | VARCHAR2 | N | 200 |  | Bước hiện tại của instance workflow, đã lọc tài khoản test — cột thô, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WF_ACTIVITYNAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 23, cùng bảng) | — |
+| 20 | WF_CREATEDBY | VARCHAR2 | N | 50 |  | Mã người/hệ thống tạo bản ghi workflow — cột thô, bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.WF_CREATEDBY.: SRS áp dụng điều kiện lọc `CREATEDBY NOT IN (5 tài khoản hệ thống/test)` đồng nhất cho CẢ CLOS VÀ RLOS ngay tại điều kiện JOIN WFINSTRUMENTTABLE — trước đây điều kiện này lọc sẵn trong JOIN tại SB_DWH, nay bê nguyên giá trị thô để áp điều kiện lọc ngay trong WORKSTEP_FLAG (cột 24, cùng bảng) tại chính PDTD_DTM, đồng bộ đúng cơ chế đã áp dụng cho nhánh RLOS (mục 16) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (điều kiện lọc, cột 24, cùng bảng) | — |
+| 21 | APPROVED_DATE | DATE | N |  |  | Ngày phê duyệt (BC11.APPROVAL_DATE) — bê 1:1 từ SB_DWH.FCT_CLOS_WORKSTEP_EVENT.APPROVED_DATE | Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FCT_CLOS_LOAN_DISBURSEMENT.APPROVAL_DATE (mục 9) | APPROVAL_DATE (Ngày phê duyệt) |
+| 22 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, tạm thời chỉ CLOS — xem ghi chú kiến trúc tại mục 8.1): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này), ngược lại 'From Second Approval'. Input EXITDATE/WI_NAME lấy từ chính bảng này (đã bê 1:1 từ SB_DWH, cột 8/11). Dùng cho BC5.APPROVAL_FLAG — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc chỉ tính sự kiện 'First Approval' khi tính TAT_APPLICATION_HOUR | APPROVAL_FLAG (Phê duyệt lần đầu/từ lần thứ 2) |
+| 23 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4) — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH — xem ghi chú kiến trúc tại mục 8.1): 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE (tra qua WORKSTEP_DECISION_SK → DIM_CLOS_WORKSTEP_DECISION, cột 4) của TOÀN BỘ lịch sử WI_NAME (EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này) kết hợp WF_PROCESSNAME='CLOS'/WF_ACTIVITYNAME (cột 19-20, đã bê 1:1 từ SB_DWH)| Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
+| 24 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterMaker' | — | — |
+| 25 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterChecker' | — | — |
+| 26 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') | — | — |
 
 
 ## 9. FCT_CLOS_LOAN_DISBURSEMENT
@@ -736,6 +810,8 @@ flowchart LR
     WE -.->|"PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, xóa khỏi FCT_RLOS_APPLICATION SB_DWH) — MAX/MIN/LAG(ENTRYDATE/EXITDATE/WORKSTEP_CODE) theo WI_NAME+WORKSTEP_CODE — sinh USER_SK (đổi tên từ LAST_USER_SK), BRANCH_USER, DDE_USER, QC_USER, UND_MAKER_USER, UND_CHECKER_USER, PHV_USER, APPROVER_USER (USERNAME tại từng WORKSTEP_CODE cố định, bản ghi EXITDATE lớn nhất), LAST_APPROVAL_DATE/MIN_UWM/MIN_APP (MAX/MIN EXITDATE/ENTRYDATE), CANCEL_USER_DATE, CANCEL_DATE (ENTRYDATE tại WORKSTEP_CODE='CancelRevoke'), LAST_ENTRYDATE/LAST_EXITDATE/PRE_WORKSTEP_CODE/LAST_REMARKS/LAST_REMARK_DDE/LAST_CAN_REMARKS (của sự kiện hoàn tất gần nhất) — FLAG_AUTO_CANCEL tiếp tục dùng CANCEL_DATE làm input, cùng bảng"| D
     RAPP -.->|"APPLICATION_SK — tra INTEREST_RATE_PCT/LOAN_TO_VALUE/LOAN_OBJECTIVE/TOTAL_INCOME/10 cột cờ nguồn thu/PRODUCT_NAME (đã chuyển từ FCT_RLOS_APPLICATION SB_DWH sang DIM_RLOS_APPLICATION, SCD1) — input cho REPAYMENT_SOURCE/INCOM_3/BUSINESS_INCOM/FLAG_BUSINESS_INCOME tính tại AGG_LOS_KPI_APPLICATION (mục 3)"| D
     WE -.->|"sinh UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE — lấy dòng ENTRYDATE lớn nhất theo WI_NAME + WORKSTEP_CODE cố định"| D
+    DWE["PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT"] -.->|"EXISTS event mới trong batch theo WORKSTEP_CODE (DetailDataEntry/UnderwriterMaker/UnderwriterChecker/CreditApproval+CreditCommittee), kết hợp OR với cờ PREV (carry-forward) — sinh 6 cờ một-chiều HAS_DDE/UWM/UWC/APPROVAL/FINAL_APPROVAL/CANCELLED_FLAG"| D
+    D -.->|"self-reference FCT_RLOS_APPLICATION_PREV (snapshot DAYID=v_batch_date-1 của chính bảng này) — carry-forward giá trị cờ cũ nếu đã 'Y'"| D
 ```
 
 
@@ -793,6 +869,19 @@ flowchart LR
 | 48 | SLA_CHECKER | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát thẩm định — CHUYỂN TỪ `DIM_RLOS_APPLICATION`. PHÁI SINH TẠI PDTD_DTM, cùng LEFT JOIN REF_ trên (cột 45) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_CHECKER (Cam kết SLA kiểm soát thẩm định) |
 | 49 | SLA_CREDIT_APPROVER | NUMBER | N | 10,2 |  | Cam kết giờ cho cấp phê duyệt — CHUYỂN TỪ `DIM_RLOS_APPLICATION`. PHÁI SINH TẠI PDTD_DTM, cùng LEFT JOIN REF_ trên (cột 45) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp | SLA_CREDIT_APPROVER (Cam kết SLA cấp phê duyệt) |
 | 50 | CURRENCY_CODE | VARCHAR2 | N | 10 |  | Loại tiền (BC3.CURRENCY) — bê 1:1 từ SB_DWH.FCT_RLOS_APPLICATION.CURRENCY_CODE (nguồn gốc xa: NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_CURRENCY): đặt cạnh APPROVED_AMT_FINAL (cột 32)/APPROVED_TERM (cột 33) để BC3 lookup đủ 3 cột tại cùng 1 bảng, dọn trùng lặp khỏi FCT_RLOS_WORKSTEP_EVENT (mục 16, không BC nào dùng) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp | CURRENCY (Đơn vị tiền tệ) |
+| 51 | HAS_DDE_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã từng tới bước DetailDataEntry', chỉ chuyển Y, không bao giờ quay lại N — PHÁI SINH TẠI PDTD_DTM: COALESCE(FCT_RLOS_APPLICATION_PREV.HAS_DDE_FLAG, 'N') OR EXISTS event mới WORKSTEP_CODE='DetailDataEntry' trong batch (STG_FCT_RLOS_WORKSTEP_EVENT, chỉ delta ngày — không full-scan lịch sử) | Báo cáo KPI (BC9) — nguồn cho VOLUME (AGG_LOS_KPI_APPLICATION, mục 3) | Nguồn cho chỉ tiêu VOLUME |
+| 52 | HAS_UWM_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã từng tới bước UnderwriterMaker' — PHÁI SINH TẠI PDTD_DTM, cùng cơ chế carry-forward cột 51 | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — điều kiện lọc phạm vi báo cáo: WI_NAME IN (SELECT WI_NAME FROM FCT_RLOS_APPLICATION WHERE HAS_UWM_FLAG='Y') trên FCT_RLOS_WORKSTEP_EVENT, thay EXISTS quét lịch sử<br>Báo cáo KPI (BC9) — nguồn cho VOLUME | Nguồn cho chỉ tiêu VOLUME; điều kiện lọc phạm vi BC4 |
+| 53 | HAS_UWC_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã từng tới bước UnderwriterChecker' — PHÁI SINH TẠI PDTD_DTM, cùng cơ chế carry-forward cột 51 | Báo cáo KPI (BC9) — nguồn cho VOLUME (mức 0.6) | Nguồn cho chỉ tiêu VOLUME |
+| 54 | HAS_APPROVAL_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã từng tới bước CreditApproval/CreditCommittee' (chưa cần đã có quyết định) — PHÁI SINH TẠI PDTD_DTM, cùng cơ chế carry-forward cột 51 | Báo cáo KPI (BC9) — nguồn cho VOLUME (mức 0.8) | Nguồn cho chỉ tiêu VOLUME |
+| 55 | HAS_FINAL_APPROVAL_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã có quyết định phê duyệt hoàn tất' (WORKSTEP IN (CreditApproval,CreditCommittee) AND DECISION kết thúc — đúng case 1 của PROCESSED_DATE) — PHÁI SINH TẠI PDTD_DTM: cùng cơ chế carry-forward cột 51, EXISTS cần JOIN thêm STG_DIM_RLOS_WORKSTEP_DECISION để lấy DECISION_CODE | Báo cáo KPI (BC9) — nguồn cho VOLUME (mức 1.0) | Nguồn cho chỉ tiêu VOLUME |
+| 56 | HAS_CANCELLED_FLAG | VARCHAR2 | N | 1 |  | Cờ một chiều 'hồ sơ đã rơi vào CancelRevoke/CancelPermanent' — PHÁI SINH TẠI PDTD_DTM, cùng cơ chế carry-forward cột 51 | Báo cáo KPI (BC9) — VOLUME dùng cờ này để xác nhận hồ sơ đã KẾT THÚC do hủy, lấy điểm theo bước xa nhất đã đạt trước khi hủy thay vì NULL | Nguồn cho chỉ tiêu VOLUME |
+
+**Cơ chế carry-forward 6 cờ HAS_*_FLAG (cột 51-56):** cùng cơ chế đã áp
+dụng cho `FCT_CLOS_APPLICATION` (mục 4.3) — snapshot `FCT_RLOS_APPLICATION`
+tại `DAYID=v_batch_date-1` ra bảng tạm `FCT_RLOS_APPLICATION_PREV`
+trước mỗi batch, mỗi cờ = `COALESCE(PREV.HAS_X_FLAG, 'N') OR
+EXISTS(event X mới trong STG_FCT_RLOS_WORKSTEP_EVENT của batch hiện
+tại)`, một-chiều (chỉ chuyển 'Y', không quay lại 'N').
 
 
 ## 12. FCT_RLOS_COLLATERAL
@@ -1018,21 +1107,26 @@ flowchart LR
 - **Ý nghĩa bảng:** nhật ký workflow mức nguyên tử của hệ RLOS (bán lẻ/cá
   nhân) — mỗi dòng là 1 lần hồ sơ đi qua 1 bước xử lý (workstep) trên
   workflow, ghi lại đầy đủ thời gian vào/ra, người xử lý, quyết định và
-  các chỉ số TAT tính sẵn. Giữ HẾT MỌI SỰ KIỆN.
+  các chỉ số TAT tính sẵn. Nguồn nạp = UNION ALL 2 nhánh: (1) event thật,
+  giữ HẾT MỌI SỰ KIỆN, bê 1:1 từ SB_DWH (delta phát sinh/thay đổi trong
+  ngày batch); (2) carry-forward hồ sơ treo (xem mục 16.4), cùng cơ chế
+  đã áp dụng cho `FCT_CLOS_WORKSTEP_EVENT` (mục 8.4).
 - **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`WORKSTEP_CODE`+
   `ENTRYDATE` — hash vào cột `WORKSTEP_EVENT_BK`, bê 1:1 từ SB_DWH (xem
-  `HLD_FCT_SB_DWH_review.md` mục 12)
+  `HLD_FCT_SB_DWH_review.md` mục 12); nhánh carry-forward giữ nguyên BK
+  gốc (không hash lại)
 - **Khóa chính của bảng (PK):** DAYID, WORKSTEP_EVENT_BK — bê 1:1 từ
   SB_DWH (xem `HLD_FCT_SB_DWH_review.md` mục 12): `WORKSTEP_EVENT_BK`
   gộp 3 cột PK tự nhiên cũ (WI_NAME, WORKSTEP_CODE, ENTRYDATE) thành 1
   khóa hash duy nhất.
 - **Độ chi tiết (grain):** 1 dòng = 1 phiên bản của 1 logical event (hồ
-  sơ × workstep × lần vào bước).
+  sơ × workstep × lần vào bước). Nhánh carry-forward: 1 dòng/hồ sơ
+  treo/ngày (dedup theo ENTRYDATE lớn nhất trước khi carry-forward).
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
   - Báo cáo CLOS APPLICATION (BC2)
   - Báo cáo Thông tin phê duyệt (BC3)
-  - Báo cáo Tuần Chuyên viên Thẩm định (BC4) — `WORKSTEP_FLAG` (BC4.FLAG)
+  - Báo cáo Tuần Chuyên viên Thẩm định (BC4) — `WORKSTEP_FLAG` (BC4.FLAG), nay đọc đủ cả hồ sơ treo nhờ nhánh carry-forward
   - Báo cáo SLA - TAT (BC5) — `APPROVAL_FLAG`
   - Báo cáo EXCEPTION - FTR (BC7)
   - Báo cáo RETURN (BC8)
@@ -1047,15 +1141,29 @@ flowchart LR
     subgraph SB_DWH
         C["FCT_RLOS_WORKSTEP_EVENT"]
     end
+    subgraph PDTD_DTM_PREV["PDTD_DTM (snapshot DAYID=v_batch_date-1)"]
+        DPREV["FCT_RLOS_WORKSTEP_EVENT (ngày hôm trước)"]
+        P["FCT_RLOS_WORKSTEP_EVENT_PREV"]
+    end
     subgraph PDTD_DTM
         D["FCT_RLOS_WORKSTEP_EVENT"]
-        AA["FCT_RLOS_APPLICATION"]
     end
-    C -->|"bê 1:1, cùng grain/PK — tự EXISTS-check qua các dòng cùng WI_NAME để sinh APPROVAL_FLAG + WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY đã bê 1:1 để sinh WORKSTEP_FLAG "| D
-    D -.->|"UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE bê 1:1 từ SB_DWH/STG_DTM; FCT_RLOS_APPLICATION JOIN sang D (qua STG_DTM) theo WI_NAME + WORKSTEP_CODE cố định, lấy dòng ENTRYDATE mới nhất"| AA
+    DPREV -.->|"TRUNCATE + INSERT SELECT DAYID=v_batch_date-1 — snapshot trước khi UNION, tránh vừa đọc vừa ghi trên D"| P
+    C -->|"NHÁNH 1/2 (UNION ALL): bê 1:1, cùng grain/PK — tự EXISTS-check qua các dòng cùng WI_NAME để sinh APPROVAL_FLAG + WF_PROCESSNAME/WF_ACTIVITYNAME/WF_CREATEDBY đã bê 1:1 để sinh WORKSTEP_FLAG "| D
+    P -->|"NHÁNH 2/2 (UNION ALL, MỚI — carry-forward hồ sơ treo cho BC4): ROW_NUMBER() PARTITION BY WI_NAME ORDER BY ENTRYDATE DESC = 1, loại hồ sơ đã đạt case phê duyệt hoàn tất/Cancel, loại hồ sơ đã có event thật trong ngày — DAYID/PROCESSED_DATE gán = v_batch_date, các cột khác giữ nguyên"| D
 ```
 
-### 16.3 Cấu trúc bảng
+### 16.3 Carry-forward hồ sơ treo (nhánh 2/2 UNION ALL)
+
+Cùng cơ chế và lý do đã áp dụng cho `FCT_CLOS_WORKSTEP_EVENT` (mục 8.4),
+đổi `FCT_CLOS_*` → `FCT_RLOS_*`, `STG_FCT_CLOS_WORKSTEP_EVENT` →
+`STG_FCT_RLOS_WORKSTEP_EVENT`, `DIM_CLOS_WORKSTEP_DECISION` →
+`DIM_RLOS_WORKSTEP_DECISION`. Phạm vi BC4 (chỉ hồ sơ đã qua
+UnderwriterMaker) áp dụng tại report-time qua `WI_NAME IN (SELECT
+WI_NAME FROM FCT_RLOS_APPLICATION WHERE HAS_UWM_FLAG='Y')` (xem mục
+11.3).
+
+### 16.4 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -1072,20 +1180,19 @@ flowchart LR
 | 11 | REMARKS | VARCHAR2 | N | 4000 |  | Ghi chú tại bước xử lý — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.REMARKS (nguồn gốc xa: ENTRY_EXIT.REMARKS) | Báo cáo Thông tin phê duyệt (BC3) — hiển thị trực tiếp<br>Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | REMARKS (Ghi chú) |
 | 12 | REASON_CODE | VARCHAR2 | N | 50 |  | Mã lý do hủy hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.REASON_CODE (nguồn gốc xa: NG_SB_RLOS_ENTRY_EXIT.REASON_CODE, chỉ RLOS có cột này) | — | Thiết kế dư thừa |
 | 13 | REASON_DESC | VARCHAR2 | N | 500 |  | Diễn giải lý do hủy hồ sơ — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.REASON_DESC (nguồn gốc xa: NG_SB_RLOS_ENTRY_EXIT.REASON_DESC, chỉ RLOS có cột này) | — | Thiết kế dư thừa |
-| 14 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.TAT_SOURCE_SEC (nguồn gốc xa: ENTRY_EXIT.TAT). Giữ lại để đối soát với 3 cột TAT tính lại bên dưới | — | Nguồn cho chỉ tiêu/trường TAT_CALENDAR_HOUR (input tính toán, dùng khi EXITDATE-ENTRYDATE không đủ dữ liệu) |
-| 15 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.TAT_CALENDAR_HOUR: TAT_SOURCE_SEC / 3600, hoặc (CAST(EXITDATE AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước xử lý (BranchSupport, DetailDataEntry, DataInputerChecker, UnderwriterMaker, UnderwriterChecker, CreditApproval, CreditCommittee...) | STEP01_BRANCH_CL_TAT, STEP02_DDE_CL_TAT, STEP03_QUALITY_CHECKER_CL_TAT, STEP04_UNDMAKER_CL_TAT, STEP04_UNDCHECKER_CL_TAT, STEP07_APPROVER_CL_TAT, STEP07_COMMITTEE_CL_TAT, TAT_PHONG_CL_TAT, TAT_KHOI_PDTD_CL_TAT |
-| 16 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.TAT_WORKING_HOUR: GET_BUSINESS_MINUTE(ENTRYDATE, EXITDATE) / 60. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước xử lý, cùng nhóm cột với TAT_CALENDAR_HOUR | STEP01_BRANCH_WK_TAT, STEP02_DDE_WK_TAT, STEP03_QUALITY_CHECKER_WK_TAT, STEP04_UNDMAKER_WK_TAT, STEP04_UNDCHECKER_WK_TAT, STEP07_APPROVER_WK_TAT, STEP07_COMMITTEE_WK_TAT, TAT_PHONG_WK_TAT, TAT_KHOI_PDTD_WK_TAT |
-| 17 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.TAT_CPC_HOUR: GET_BUSINESS_MINUTE_CPC(ENTRYDATE, EXITDATE) / 60. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30 | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước để so sánh với các mốc SLA đã cam kết (SLA_DE, SLA_QC, SLA_MARKER, SLA_CHECKER, SLA_CREDIT_OFFICER, SLA_CREDIT_APPROVER) | STEP01_BRANCH_TAT_CPC, STEP02_DDE_TAT_CPC, STEP03_QUALITY_CHECKER_TAT_CPC, STEP04_UNDMAKER_TAT_CPC, STEP04_UNDCHECKER_TAT_CPC, STEP04_UND_TAT_CPC, STEP07_APPROVER_TAT_CPC |
-| 18 | EVENT_SEQ_ASC | NUMBER | N | 5 |  | Thứ tự sự kiện theo chiều cũ đến mới — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.EVENT_SEQ_ASC: ROW_NUMBER() OVER (PARTITION BY WI_NAME ORDER BY ENTRYDATE ASC). Dùng xác định sự kiện trả về đầu tiên cho BC7 (FIRST_WORKSTEP_RETURN) | — | Thiết kế dư thừa |
-| 19 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH (không copy/JOIN từ FCT_RLOS_APPLICATION), bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.PROCESSED_DATE | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8)<br>Báo cáo KPI (BC9) — mốc xếp hồ sơ vào đúng DAYID khi SUM/COUNT SLHS_RLOS/SLGN_RLOS/TAT_RLOS lên grain ngày (qua AGG_LOS_KPI_APPLICATION) | REPORT_DATE (Ngày báo cáo, BC4); PROCESSED_DATE (Ngày dữ liệu, BC8) |
-| 20 | WF_PROCESSNAME | VARCHAR2 | N | 50 |  | Tên hệ thống workflow của instance đang đứng — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_PROCESSNAME (thay cho WORKSTEP_FLAG đã tính sẵn, cùng cơ chế đã áp dụng cho CLOS) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 28, cùng bảng) | — |
-| 21 | WF_ACTIVITYNAME | VARCHAR2 | N | 200 |  | Bước hiện tại của instance workflow — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_ACTIVITYNAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 28, cùng bảng) | — |
-| 22 | WF_CREATEDBY | VARCHAR2 | N | 50 |  | Mã người/hệ thống tạo bản ghi workflow — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_CREATEDBY.| Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (điều kiện lọc, cột 28, cùng bảng) | — |
-| 24 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, cùng cơ chế đã áp dụng cho CLOS): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này), ngược lại 'From Second Approval' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc khi tính TAT_APPLICATION_HOUR (chỉ lấy sự kiện phê duyệt lần đầu) | APPROVAL_FLAG (Phê duyệt lần đầu/từ lần thứ 2, BC5); nguồn cho chỉ tiêu/trường TAT_APPLICATION_HOUR (điều kiện lọc, BC9) |
-| 25 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4, nhánh RLOS) — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH): 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE (tra qua WORKSTEP_DECISION_SK → DIM_RLOS_WORKSTEP_DECISION, cột 4) của CHÍNH DÒNG SỰ KIỆN đang xét, kết hợp WF_PROCESSNAME='RLOS'/WF_ACTIVITYNAME (cột 21-22, đã bê 1:1 từ SB_DWH) — nhánh 2/4/5 khác CLOS (nhánh 4 có thêm OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send to UWChecker')).| Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
-| 28 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterMaker' | — | — |
-| 29 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterChecker' | — | — |
-| 30 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') | — | — |
+| 14 | TAT_SOURCE_SEC | NUMBER | N | 12 |  | Thời gian xử lý do hệ nguồn ghi, đơn vị giây — bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.TAT_SOURCE_SEC (nguồn gốc xa: ENTRY_EXIT.TAT). Giữ lại để đối soát với 3 cột TAT tính lại ngay tại tầng này | — | Nguồn cho chỉ tiêu/trường TAT_CALENDAR_HOUR (cột 15, cùng bảng) |
+| 15 | TAT_CALENDAR_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo lịch tự nhiên, đơn vị giờ — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, review 2026-10-20 theo yêu cầu người dùng): STG_FCT_RLOS_WORKSTEP_EVENT.TAT_SOURCE_SEC / 3600, hoặc (CAST(NVL(EXITDATE, TRUNC(v_batch_date+1) - INTERVAL '1' SECOND) AS DATE) - CAST(ENTRYDATE AS DATE)) * 24 nếu TAT_SOURCE_SEC rỗng. Không trừ ngày nghỉ | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước xử lý (BranchSupport, DetailDataEntry, DataInputerChecker, UnderwriterMaker, UnderwriterChecker, CreditApproval, CreditCommittee...) | STEP01_BRANCH_CL_TAT, STEP02_DDE_CL_TAT, STEP03_QUALITY_CHECKER_CL_TAT, STEP04_UNDMAKER_CL_TAT, STEP04_UNDCHECKER_CL_TAT, STEP07_APPROVER_CL_TAT, STEP07_COMMITTEE_CL_TAT, TAT_PHONG_CL_TAT, TAT_KHOI_PDTD_CL_TAT |
+| 16 | TAT_WORKING_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ làm việc, đơn vị giờ — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, review 2026-10-20 theo yêu cầu người dùng — GET_BUSINESS_MINUTE là hàm PL/SQL tự viết, deploy được ở cả 2 schema): GET_BUSINESS_MINUTE(ENTRYDATE, NVL(EXITDATE, TRUNC(v_batch_date+1) - INTERVAL '1' SECOND)) / 60 trên STG_FCT_RLOS_WORKSTEP_EVENT. Loại trừ ngày lễ, chiều thứ Bảy, cả ngày Chủ nhật | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước xử lý, cùng nhóm cột với TAT_CALENDAR_HOUR<br>Báo cáo KPI (BC9) — nguồn cho AGG_LOS_KPI_APPLICATION.TAT_APPLICATION_HOUR (SUM trực tiếp cột này, không tự gọi lại GET_BUSINESS_MINUTE) | STEP01_BRANCH_WK_TAT, STEP02_DDE_WK_TAT, STEP03_QUALITY_CHECKER_WK_TAT, STEP04_UNDMAKER_WK_TAT, STEP04_UNDCHECKER_WK_TAT, STEP07_APPROVER_WK_TAT, STEP07_COMMITTEE_WK_TAT, TAT_PHONG_WK_TAT, TAT_KHOI_PDTD_WK_TAT |
+| 17 | TAT_CPC_HOUR | NUMBER | N | 18,6 |  | Thời gian xử lý theo giờ cam kết SLA, đơn vị giờ — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, review 2026-10-20, cùng lý do cột 16): GET_BUSINESS_MINUTE_CPC(ENTRYDATE, NVL(EXITDATE, TRUNC(v_batch_date+1) - INTERVAL '1' SECOND)) / 60 trên STG_FCT_RLOS_WORKSTEP_EVENT. Giờ theo cam kết SLA, tính 8-11:30 và 13:30-16:30 | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp, SUM theo từng bước để so sánh với các mốc SLA đã cam kết (SLA_DE, SLA_QC, SLA_MARKER, SLA_CHECKER, SLA_CREDIT_OFFICER, SLA_CREDIT_APPROVER) | STEP01_BRANCH_TAT_CPC, STEP02_DDE_TAT_CPC, STEP03_QUALITY_CHECKER_TAT_CPC, STEP04_UNDMAKER_TAT_CPC, STEP04_UNDCHECKER_TAT_CPC, STEP04_UND_TAT_CPC, STEP07_APPROVER_TAT_CPC |
+| 18 | PROCESSED_DATE | DATE | N |  |  | Ngày xử lý chung của hồ sơ theo 3 mức ưu tiên (phê duyệt cuối / hủy tại UnderwriterMaker / ngày dữ liệu hệ thống nếu đang xử lý) — PHÁI SINH ĐÃ TÍNH XONG TẠI SB_DWH (không copy/JOIN từ FCT_RLOS_APPLICATION), bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.PROCESSED_DATE | Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8)<br>Báo cáo KPI (BC9) — mốc xếp hồ sơ vào đúng DAYID khi SUM/COUNT SLHS_RLOS/SLGN_RLOS/TAT_RLOS lên grain ngày (qua AGG_LOS_KPI_APPLICATION) | REPORT_DATE (Ngày báo cáo, BC4); PROCESSED_DATE (Ngày dữ liệu, BC8) |
+| 19 | WF_PROCESSNAME | VARCHAR2 | N | 50 |  | Tên hệ thống workflow của instance đang đứng — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_PROCESSNAME (thay cho WORKSTEP_FLAG đã tính sẵn, cùng cơ chế đã áp dụng cho CLOS) | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 27, cùng bảng) | — |
+| 20 | WF_ACTIVITYNAME | VARCHAR2 | N | 200 |  | Bước hiện tại của instance workflow — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_ACTIVITYNAME | Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (cột 27, cùng bảng) | — |
+| 21 | WF_CREATEDBY | VARCHAR2 | N | 50 |  | Mã người/hệ thống tạo bản ghi workflow — cột thô, bê 1:1 từ SB_DWH.FCT_RLOS_WORKSTEP_EVENT.WF_CREATEDBY.| Nguồn cho chỉ tiêu/trường WORKSTEP_FLAG (điều kiện lọc, cột 27, cùng bảng) | — |
+| 23 | APPROVAL_FLAG | VARCHAR2 | N | 50 |  | Đánh dấu lần phê duyệt đầu hay lần phê duyệt lại — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, cùng cơ chế đã áp dụng cho CLOS): 'First Approval' nếu EXITDATE <= MIN(EXITDATE của các sự kiện phê duyệt trong cùng hồ sơ, EXISTS-check qua các dòng cùng WI_NAME trên chính bảng này), ngược lại 'From Second Approval' — BỔ SUNG RIÊNG TẠI PDTD_DTM, không có ở SB_DWH | Báo cáo SLA - TAT (BC5) — hiển thị trực tiếp<br>Báo cáo KPI (BC9) — điều kiện lọc khi tính TAT_APPLICATION_HOUR (chỉ lấy sự kiện phê duyệt lần đầu) | APPROVAL_FLAG (Phê duyệt lần đầu/từ lần thứ 2, BC5); nguồn cho chỉ tiêu/trường TAT_APPLICATION_HOUR (điều kiện lọc, BC9) |
+| 24 | WORKSTEP_FLAG | VARCHAR2 | N | 200 |  | Trạng thái tổng hợp hồ sơ dạng mô tả (trường FLAG của BC4, nhánh RLOS) — PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH): 5 nhánh CASE-WHEN theo thứ tự ưu tiên dựa trên WORKSTEP_CODE/DECISION_CODE (tra qua WORKSTEP_DECISION_SK → DIM_RLOS_WORKSTEP_DECISION, cột 4) của CHÍNH DÒNG SỰ KIỆN đang xét, kết hợp WF_PROCESSNAME='RLOS'/WF_ACTIVITYNAME (cột 20-21, đã bê 1:1 từ SB_DWH) — nhánh 2/4/5 khác CLOS (nhánh 4 có thêm OR (WORKSTEP_CODE='UnderwriterMaker' AND DECISION_CODE='Send to UWChecker')).| Báo cáo Tuần Chuyên viên Thẩm định (BC4) — hiển thị trực tiếp | FLAG (Trạng thái) |
+| 27 | UNDERWRITERMAKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterMaker' | — | — |
+| 28 | UNDERWRITERCHECKER_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE='UnderwriterChecker' | — | — |
+| 29 | APPROVAL_USERMAKE | VARCHAR2 | N | 100 |  | Bê 1:1 từ SB_DWH/STG_DTM — chỉ có giá trị khác NULL trên dòng event WORKSTEP_CODE IN ('CreditCommittee','CreditApproval') | — | — |
 
 ## 17. FCT_RLOS_LOAN_DISBURSEMENT
 
