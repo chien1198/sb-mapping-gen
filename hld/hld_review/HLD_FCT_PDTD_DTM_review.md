@@ -949,7 +949,7 @@ khối VALPAPER. Bảng còn 18 cột (trước 20 cột). Xem
 ### 13.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** bê nguyên 1:1 cấu trúc từ SB_DWH — lưu chi tiết từng
   lần đăng ký sản phẩm phụ đi kèm hồ sơ tín dụng RLOS (SeABuy, SeACivil,
-  SeATeacher, SeAWoman, thẻ tín dụng phụ) — hạn mức, thời hạn, thuộc tính
+  SeATeacher, SeAWomen, thẻ tín dụng phụ) — hạn mức, thời hạn, thuộc tính
   thẻ phụ nếu có.
 - **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`SUB_PRODUCT_LINE`+
   `SPP_AMOUNT`+`SPP_TERM` — hash vào cột `SUB_PRODUCT_BK`, bê 1:1 từ

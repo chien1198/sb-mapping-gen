@@ -1875,7 +1875,7 @@ flowchart LR
 
 **Bảng mới (review 2026-10-04, theo yêu cầu người dùng):** danh mục tổ
 hợp (sản phẩm chính, sản phẩm phụ) hợp lệ của RLOS — "sản phẩm phụ" ở
-đây là SeABuy/SeATeacher/SeAWoman/SeACivil/Thẻ tín dụng, sản phẩm thứ 2
+đây là SeABuy/SeATeacher/SeAWomen/SeACivil/Thẻ tín dụng, sản phẩm thứ 2
 đi kèm sản phẩm chính (đã có trên `MAS_PRODUCT_LINE.SECONDARY_PRODUCT`,
 cùng nguồn đã dùng cho `DIM_RLOS_PRODUCT`, 1.3.1.2 — nhưng tách riêng
 thành DIM độc lập vì quan hệ (sản phẩm chính, sản phẩm phụ) là N:N,
@@ -2005,6 +2005,7 @@ flowchart LR
         P1(["NG_SB_RLOS_APPLICANT_GENERAL"])
         P4(["NG_SB_RLOS_CBS"])
         MW(["NG_SB_RLOS_MAS_DECISION"])
+        CRQ(["SB_RLOS_CHANGE_REQUEST"])
     end
     subgraph SB_DWH
         WD["DIM_RLOS_WORKSTEP_DECISION"]
@@ -2016,12 +2017,13 @@ flowchart LR
     end
     A -->|"PHÁI SINH: PROCESSED_DATE, CREATION_DATE (3 mức ưu tiên) — review 2026-10-04: xóa HAS_ACTION_IN_DAY và 18 cột người phụ trách từng bước/mốc thời gian (LAST_USER_SK, BRANCH_USER...LAST_CAN_REMARKS, cùng nguồn), derive tại PDTD_DTM từ FCT_RLOS_WORKSTEP_EVENT (1.3.2.7)"| E
     I -->|"CHANGE_REQUEST(=REQ_TYPE), CHANGE_TYPE — giá trị thô, không chuyển DIM (cờ/trạng thái workflow biến động nhiều lần, cùng lý do đã từ chối SCD hóa trước đây)"| E
-    I -.-> CT
+    I -->|"WI_NAME"| CRQ
+    CRQ -.-> CT
     WD -.->|"WORKSTEP_DECISION_SK (đổi tên từ LAST_WORKSTEP_DECISION_SK, review 2026-10-04; gộp từ LAST_WORKSTEP_SK+LAST_DECISION_SK), lookup theo cặp WORKSTEP_CODE+DECISION_CODE của sự kiện hoàn tất gần nhất theo thời gian"| E
     MW --> WD
     PR -.->|"SUB_PRODUCT_SK (đổi tên từ PRODUCT_SK, review 2026-10-13 — DIM_RLOS_PRODUCT tách layer PRODUCTLINE_SK), lookup PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE AND SUB_PRODUCT_NAME=NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT (⚠️ review 2026-10-19: đổi từ SUB_PRODUCT_CODE — SUB_PRODUCT_CODE không unique trên dữ liệu thật, xem Section 1 → 1.3.1.2), SCD2 hiệu lực tại DAYID."| E
     OU -.->|"COMPANY_SK, lookup COMPANY_CODE=NG_SB_RLOS_APPLICANT_GENERAL.COMPANY_CODE, SCD2 hiệu lực tại DAYID"| E
-    CT -.->|"CHANGE_TYPE_SK, lookup CHANGE_TYPE=NG_SB_RLOS_EXTTABLE.CHANGE_TYPE"| E
+    CT -.->|"CHANGE_TYPE_SK, lookup qua SB_RLOS_CHANGE_REQUEST.WI_NAME=NG_SB_RLOS_EXTTABLE.WI_NAME → CHANGE_TYPE_CODE+DETAIL_CHANGE_TYPE_CODE"| E
     CP -.->|"CARD_PROMOTION_SK, lookup PROMOTION_ID=NG_SB_RLOS_CBS.PROMOTION_ID, hồ sơ không phải thẻ dùng -1"| E
     P1 --> PR
     P1 --> OU
@@ -2246,12 +2248,12 @@ flowchart LR
         SP["DIM_RLOS_SECONDPRODUCT"]
         C["FCT_RLOS_APPLICATION_SECONDPRODUCT"]
     end
-    A1 -->|"driving table (review 2026-09-27, sửa lại — khớp SRS BC1 BR 1.2) — 1 dòng = 1 hồ sơ x 1 lần đăng ký sản phẩm phụ, WI_NAME + SUB_PRODUCT_LINE ('SeABuy'/'SeACivil'/'SeATeacher'/'SeAWoman'/'Thẻ tín dụng') tự phân biệt loại"| C
+    A1 -->|"driving table (review 2026-09-27, sửa lại — khớp SRS BC1 BR 1.2) — 1 dòng = 1 hồ sơ x 1 lần đăng ký sản phẩm phụ, WI_NAME + SUB_PRODUCT_LINE ('SeABuy'/'SeACivil'/'SeATeacher'/'SeAWomen'/'Thẻ tín dụng') tự phân biệt loại"| C
     A2 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='Thẻ tín dụng' — bổ sung SPP_AMOUNT/SPP_TERM/CARD_TYPE_CODE, 1 hồ sơ có thể khớp NHIỀU dòng (nhiều thẻ phụ) nên tự nhân dòng qua JOIN"| C
     A3 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='SeABuy' — bổ sung SPP_AMOUNT/SPP_TERM"| C
     A4 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='SeACivil' — bổ sung SPP_AMOUNT/SPP_TERM"| C
     A5 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='SeATeacher' — bổ sung SPP_AMOUNT/SPP_TERM"| C
-    A6 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='SeAWoman' — bổ sung SPP_AMOUNT/SPP_TERM"| C
+    A6 -.->|"LEFT JOIN theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='SeAWomen' — bổ sung SPP_AMOUNT/SPP_TERM"| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
     SP -.->|"SECONDPRODUCT_SK — MỚI (review 2026-10-04, theo yêu cầu người dùng): lookup PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE (sản phẩm chính của hồ sơ) AND SECONDARY_PRODUCT=SUB_PRODUCT_LINE (cột có sẵn trên chính dòng này), SCD2 hiệu lực tại DAYID. Mặc định -1 nếu hồ sơ không có sản phẩm phụ hoặc không khớp"| C
     P1 -->|1:1 WI_NAME, POLICY, CAMPAIGN, EMPLOYEE_CODE/NAME, COLL_REQUIRE, IS_SEC_PRODUCT, DEVIATION_FLAG| D
@@ -2292,7 +2294,7 @@ là 5 nguồn tự sinh dòng độc lập, `SUB_PRODUCT_TYPE_CODE` gán theo "d
   lọc đúng loại (nguyên văn BR 1.2): `f.WI_NAME=af.WI_NAME AND
   f.SUB_PRODUCT_LINE='Thẻ tín dụng'` (CREDIT_CARD_APP), tương tự cho 4
   bảng còn lại với `SUB_PRODUCT_LINE='SeABuy'/'SeACivil'/'SeATeacher'/
-  'SeAWoman'`. Đây KHÔNG phải UNION 5 nguồn độc lập — chỉ là JOIN thêm
+  'SeAWomen'`. Đây KHÔNG phải UNION 5 nguồn độc lập — chỉ là JOIN thêm
   cột `SPP_AMOUNT`/`SPP_TERM`/`CARD_TYPE_CODE` vào đúng dòng của A1.
   Riêng `CREDIT_CARD_APP`: LEFT JOIN theo bản chất SQL sẽ tự NHÂN DÒNG
   nếu khớp N dòng thẻ phụ của cùng 1 hồ sơ — đúng lý do bảng có thể
@@ -2310,7 +2312,7 @@ là 5 nguồn tự sinh dòng độc lập, `SUB_PRODUCT_TYPE_CODE` gán theo "d
   theo yêu cầu người dùng, phát hiện tiếp theo cùng ngày):** sau khi sửa
   lại cơ chế nạp, cột này chỉ còn là CASE WHEN ánh xạ 1-1 từ
   `SUB_PRODUCT_LINE` (`'SeACivil'→'CIVIL'`, `'SeATeacher'→'TEACHER'`,
-  `'SeAWoman'→'WOMAN'`, `'SeABuy'→'SEABUY'`, `'Thẻ tín dụng'→
+  `'SeAWomen'→'WOMAN'`, `'SeABuy'→'SEABUY'`, `'Thẻ tín dụng'→
   'CREDIT_CARD'`) — không còn mang thêm giá trị phân biệt nào so với
   chính `SUB_PRODUCT_LINE` đã có sẵn trên driving table. Giữ cả 2 cột là
   dư thừa thật (khác các trường hợp "cột kỹ thuật, một phần PK" khác
@@ -6638,7 +6640,7 @@ dòng lưu lịch sử theo thời gian (khóa tự nhiên
 | 3 | SECONDPRODUCT_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (sản phẩm chính, sản phẩm phụ) — PHÁI SINH: STANDARD_HASH(PRODUCTLINE_CODE \|\| SECONDARY_PRODUCT, 'MD5') (đổi sang nối trực tiếp + MD5, review 2026-10-12) |
 | 4 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 |  | Mã dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCTLINE_CODE |
 | 5 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCT_LINE_NAME |
-| 6 | SECONDARY_PRODUCT | VARCHAR2 | N | 200 |  | Sản phẩm phụ đi kèm (SeABuy/SeATeacher/SeAWoman/SeACivil/Thẻ tín dụng — không phải sản phẩm con của sản phẩm chính, xác nhận EU Meeting note #10) — nguồn MAS_PRODUCT_LINE.SECONDARY_PRODUCT |
+| 6 | SECONDARY_PRODUCT | VARCHAR2 | N | 200 |  | Sản phẩm phụ đi kèm (SeABuy/SeATeacher/SeAWomen/SeACivil/Thẻ tín dụng — không phải sản phẩm con của sản phẩm chính, xác nhận EU Meeting note #10) — nguồn MAS_PRODUCT_LINE.SECONDARY_PRODUCT |
 | 7 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_PRODUCT_LINE |
 | 8 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 
@@ -6793,19 +6795,21 @@ tế, đã loại bỏ khỏi thiết kế mới. BC5/BC9/BC11 chỉ dùng `CHAN
 `CHANGE_REQUEST` làm điều kiện JOIN/filter nội bộ (không xuất cột, không
 qua bảng này).
 
-**Ghi chú kỹ thuật ETL — NK là CODE, không phải NAME (review 2026-09-17):**
-NK của bảng này (`CHANGE_TYPE_CODE`+`DETAIL_CHANGE_TYPE_CODE`) đã được xác
-nhận đúng — `KEY CDC` của `SB_RLOS_MAS_CHANGE_TYPE` trong
-`input/DS_BANG_202608.xlsx` chính là cặp CODE này, khớp cấu trúc cột gốc
-tại `extract/database/DIM_LOS_CHANGE_TYPE.md`. Tuy nhiên SRS BC1 (BR 1.2)
-viết điều kiện JOIN thực tế theo TÊN: `g.CHANGE_TYPE = y.CHANGE_TYPE_NAME`
-(`g` = `NG_SB_RLOS_EXTTABLE`, `y` = `SB_RLOS_MAS_CHANGE_TYPE`) — vì bảng
-FCT nguồn `NG_SB_RLOS_EXTTABLE.CHANGE_TYPE` lưu trực tiếp TÊN loại thay
-đổi (không phải mã), không phản ánh đúng bản chất NK chuẩn của bảng danh
-mục này. **Khi ETL nạp `NG_SB_RLOS_EXTTABLE` để tra `CHANGE_TYPE_SK`
-(xem cột tương ứng trên FCT), phải map `CHANGE_TYPE` (NAME) sang
-`CHANGE_TYPE_CODE` qua `SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_NAME` trước,
-rồi mới tra NK (CODE) trên DIM này** — không được tra thẳng theo NAME.
+**Ghi chú kỹ thuật ETL — NK là CODE, join qua `SB_RLOS_CHANGE_REQUEST`
+(review 2026-10-22, theo SRS BC1 v1.1):** NK của bảng này
+(`CHANGE_TYPE_CODE`+`DETAIL_CHANGE_TYPE_CODE`) đã được xác nhận đúng —
+`KEY CDC` của `SB_RLOS_MAS_CHANGE_TYPE` trong `input/DS_BANG_202608.xlsx`
+chính là cặp CODE này, khớp cấu trúc cột gốc tại
+`extract/database/DIM_LOS_CHANGE_TYPE.md`. SRS BC1 v1.1 (BR 1.2) viết lại
+điều kiện JOIN thực tế: `NG_SB_RLOS_EXTTABLE` (`g`) LEFT JOIN
+`SB_RLOS_CHANGE_REQUEST` (`al`) theo `g.WI_NAME = al.WI_NAME`, rồi
+`al.CHANGE_TYPE_CODE = y.CHANGE_TYPE_CODE AND al.DETAIL_CHANGE_TYPE_CODE =
+y.DETAIL_CHANGE_TYPE_CODE` (`y` = `SB_RLOS_MAS_CHANGE_TYPE`) — join 2 cấp
+qua bảng trung gian theo đúng NK chuẩn (CODE), không còn join trực tiếp
+theo NAME như bản SRS trước. **Khi ETL nạp `NG_SB_RLOS_EXTTABLE` để tra
+`CHANGE_TYPE_SK` (xem cột tương ứng trên FCT), phải LEFT JOIN
+`SB_RLOS_CHANGE_REQUEST` theo `WI_NAME` trước để lấy `CHANGE_TYPE_CODE`/
+`DETAIL_CHANGE_TYPE_CODE`, rồi mới tra NK (CODE) trên DIM này.**
 
 **Không rơi vào pattern "application-scoped source":** `SB_RLOS_MAS_CHANGE_TYPE`
 mang tiền tố `MAS_`, là danh mục cấu hình gốc thật — cùng bản chất với
@@ -7023,7 +7027,7 @@ trực tiếp trên fact này) — tổng 21 cột.
 | 3 | APPLICATION_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 nếu không khớp |
 | 4 | SECONDPRODUCT_SK | NUMBER | Y | 18 |  | Khóa tới DIM_RLOS_SECONDPRODUCT — MỚI (review 2026-10-04, theo yêu cầu người dùng): PHÁI SINH lookup PRODUCTLINE_CODE=NG_SB_RLOS_APPLICANT_GENERAL.PRODUCT_LINE (sản phẩm chính gắn với hồ sơ, qua WI_NAME) AND SECONDARY_PRODUCT=SUB_PRODUCT_LINE (cột 6, cùng bảng), điều kiện SCD2 EFF_DATE<=DAYID<EXP_DATE (hoặc EXP_DATE IS NULL) trên DIM_RLOS_SECONDPRODUCT. Mặc định -1 nếu hồ sơ không có sản phẩm phụ hoặc không khớp |
 | 5 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng RLOS — nguồn NG_SB_RLOS_SUB_PRODUCT.WI_NAME (driving table) |
-| 6 | SUB_PRODUCT_LINE | VARCHAR2 | N | 200 |  | Dòng của sản phẩm phụ — nguồn NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE (driving table). Trường SAN_PHAM_PHU của BC1 — 5 giá trị khả dĩ ('SeABuy'/'SeACivil'/'SeATeacher'/'SeAWoman'/'Thẻ tín dụng') tự phân biệt loại sản phẩm phụ, đủ dùng làm điều kiện JOIN sang 5 bảng grid, không cần cột chuẩn hóa riêng (`SUB_PRODUCT_TYPE_CODE` đã xóa hẳn khỏi thiết kế — chỉ là ánh xạ 1-1 dư thừa của cột này). Đồng thời là đầu vào tra SECONDPRODUCT_SK (cột 4, cùng bảng) |
+| 6 | SUB_PRODUCT_LINE | VARCHAR2 | N | 200 |  | Dòng của sản phẩm phụ — nguồn NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE (driving table). Trường SAN_PHAM_PHU của BC1 — 5 giá trị khả dĩ ('SeABuy'/'SeACivil'/'SeATeacher'/'SeAWomen'/'Thẻ tín dụng') tự phân biệt loại sản phẩm phụ, đủ dùng làm điều kiện JOIN sang 5 bảng grid, không cần cột chuẩn hóa riêng (`SUB_PRODUCT_TYPE_CODE` đã xóa hẳn khỏi thiết kế — chỉ là ánh xạ 1-1 dư thừa của cột này). Đồng thời là đầu vào tra SECONDPRODUCT_SK (cột 4, cùng bảng) |
 | 7 | SPP_AMOUNT | NUMBER | N | 20,2 |  | Hạn mức của sản phẩm phụ — PHÁI SINH: LEFT JOIN đúng 1 trong 5 bảng grid theo WI_NAME=WI_NAME AND SUB_PRODUCT_LINE='<giá trị tương ứng>' (không phải UNION 5 nguồn độc lập), lấy LIMIT_NO. Ép kiểu số từ text định dạng Việt Nam, DEFAULT NULL ON CONVERSION ERROR. Trường SPP_Amount của BC1 |
 | 8 | SPP_TERM | NUMBER | N | 5 |  | Thời hạn của sản phẩm phụ, đơn vị tháng — PHÁI SINH (cùng cơ chế JOIN cột 7): CREDIT_CARD_APP.TERM hoặc SEABUY_APP/CIVIL_APP/TEACHER_APP/WOMAN_APP.TIME_VALID của đúng bảng đã khớp điều kiện JOIN. Trường SPP_Term của BC1 |
 | 9 | CARD_TYPE_CODE | VARCHAR2 | N | 100 |  | Loại thẻ đăng ký lúc đề xuất sản phẩm phụ là thẻ tín dụng — nguồn NG_SB_RLOS_CREDIT_CARD_APP.CARD_TYPE (LEFT JOIN theo cơ chế cột 7). Chỉ có ở dòng SUB_PRODUCT_LINE='Thẻ tín dụng'. Là khái niệm khác BC1.K_TYPE (loại thẻ thật sau giải ngân, nguồn STG_DIM_CARD.K_TYPE, join qua NG_SB_RLOS_SENT_CBS_LOG.RESULT_SEAB_MAIN_CARD_ID = STG_DIM_CARD.MAIN_ID — thuộc FCT_RLOS_APPLICATION, không đi qua bảng này) — không dùng để tra BC1.K_TYPE |
@@ -8719,7 +8723,7 @@ PDTD_DTM.
 | 3 | SECONDPRODUCT_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (sản phẩm chính, sản phẩm phụ) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(PRODUCTLINE_CODE \|\| SECONDARY_PRODUCT, 'MD5') (đổi sang nối trực tiếp + MD5, review 2026-10-12) |
 | 4 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 |  | Mã dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCTLINE_CODE |
 | 5 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCT_LINE_NAME |
-| 6 | SECONDARY_PRODUCT | VARCHAR2 | N | 200 |  | Sản phẩm phụ đi kèm (SeABuy/SeATeacher/SeAWoman/SeACivil/Thẻ tín dụng) — nguồn MAS_PRODUCT_LINE.SECONDARY_PRODUCT |
+| 6 | SECONDARY_PRODUCT | VARCHAR2 | N | 200 |  | Sản phẩm phụ đi kèm (SeABuy/SeATeacher/SeAWomen/SeACivil/Thẻ tín dụng) — nguồn MAS_PRODUCT_LINE.SECONDARY_PRODUCT |
 | 7 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do SB_DWH quản lý, bê nguyên qua tầng PDTD_DTM |
 | 8 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành |
 

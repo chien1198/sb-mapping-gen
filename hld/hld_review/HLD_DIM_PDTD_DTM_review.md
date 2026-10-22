@@ -537,7 +537,7 @@ flowchart LR
 | 2 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_CHANGE_TYPE, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
 | 3 | CHANGE_TYPE_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (loại thay đổi, chi tiết loại thay đổi) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(CHANGE_TYPE_CODE \|\| DETAIL_CHANGE_TYPE_CODE, 'MD5') | — | — |
 | 4 | CHANGE_TYPE_CODE | NVARCHAR2 | N | 200 |  | Mã loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_CODE. Thành phần nguồn của CHANGE_TYPE_BK (không còn tự đánh dấu khóa, xem cột 3) | Báo cáo RLOS APPLICATION (BC1) — khóa tra CHANGE_TYPE_SK | — |
-| 5 | CHANGE_TYPE_NAME | NVARCHAR2 | N | 200 |  | Tên loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_NAME | — | Nguồn cho chỉ tiêu/trường CHANGE_TYPE_SK (ETL map NG_SB_RLOS_EXTTABLE.CHANGE_TYPE dạng tên sang CHANGE_TYPE_CODE trước khi tra khóa) |
+| 5 | CHANGE_TYPE_NAME | NVARCHAR2 | N | 200 |  | Tên loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_NAME | — | — |
 | 6 | DETAIL_CHANGE_TYPE_CODE | NVARCHAR2 | N | 200 |  | Mã chi tiết loại thay đổi — nguồn SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_CODE | — | — |
 | 7 | DETAIL_CHANGE_TYPE_NAME | NVARCHAR2 | N | 200 |  | Tên chi tiết loại thay đổi — nguồn SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_NAME. BC1 dùng trường này làm CHANGE_TYPE_DETAIL | Báo cáo RLOS APPLICATION (BC1) | CHANGE_TYPE_DETAIL (Chi tiết loại thay đổi điều kiện) |
 | 8 | IS_ACTIVE | NVARCHAR2 | N | 1 |  | Cờ hiệu lực của loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.IS_ACTIVE | — | — |
@@ -670,7 +670,7 @@ flowchart LR
 ## 14A. DIM_RLOS_SECONDPRODUCT
 
 ### 14A.1 Mục đích thiết kế
-- **Ý nghĩa bảng:** danh mục tổ hợp (sản phẩm chính, sản phẩm phụ) hợp lệ của RLOS — "sản phẩm phụ" ở đây là SeABuy/SeATeacher/SeAWoman/SeACivil/Thẻ tín dụng, sản phẩm thứ 2 đi kèm sản phẩm chính
+- **Ý nghĩa bảng:** danh mục tổ hợp (sản phẩm chính, sản phẩm phụ) hợp lệ của RLOS — "sản phẩm phụ" ở đây là SeABuy/SeATeacher/SeAWomen/SeACivil/Thẻ tín dụng, sản phẩm thứ 2 đi kèm sản phẩm chính
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY` (giữ nguyên giá trị từ SB_DWH)
 - **Khóa nghiệp vụ (BK):** composite `PRODUCTLINE_CODE` + `SECONDARY_PRODUCT` — hash vào cột `SECONDPRODUCT_BK`
 - **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `PRODUCTLINE_CODE` + `SECONDARY_PRODUCT` + `EFF_DATE`).
@@ -698,7 +698,7 @@ flowchart LR
 | 3 | SECONDPRODUCT_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (sản phẩm chính, sản phẩm phụ) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(PRODUCTLINE_CODE \|\| SECONDARY_PRODUCT, 'MD5') | — | — |
 | 4 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 |  | Mã dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCTLINE_CODE.| Báo cáo RLOS APPLICATION (BC1) | PRODUCT_LINE (Dòng sản phẩm) |
 | 5 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCT_LINE_NAME.| Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay PRODUCTLINE_CODE | PRODUCT_LINE (Dòng sản phẩm) |
-| 6 | SECONDARY_PRODUCT | VARCHAR2 | N | 200 |  | Sản phẩm phụ đi kèm (SeABuy/SeATeacher/SeAWoman/SeACivil/Thẻ tín dụng — không phải sản phẩm con của sản phẩm chính, xác nhận EU Meeting note #10) — nguồn MAS_PRODUCT_LINE.SECONDARY_PRODUCT | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN qua FCT_RLOS_APPLICATION_SECONDPRODUCT.SECONDPRODUCT_SK | SAN_PHAM_PHU (Sản phẩm phụ chi tiết) |
+| 6 | SECONDARY_PRODUCT | VARCHAR2 | N | 200 |  | Sản phẩm phụ đi kèm (SeABuy/SeATeacher/SeAWomen/SeACivil/Thẻ tín dụng — không phải sản phẩm con của sản phẩm chính, xác nhận EU Meeting note #10) — nguồn MAS_PRODUCT_LINE.SECONDARY_PRODUCT | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN qua FCT_RLOS_APPLICATION_SECONDPRODUCT.SECONDPRODUCT_SK | SAN_PHAM_PHU (Sản phẩm phụ chi tiết) |
 | 7 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do SB_DWH quản lý, bê nguyên qua tầng PDTD_DTM | — | — |
 | 8 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
@@ -823,3 +823,94 @@ flowchart LR
 ### 18.3 Cấu trúc bảng
 
 Lấy 1:1 từ bảng có sẵn trên `STG_DTM.STG_DIM_SEAB_PRODUCTS_DE`.
+
+## 19. DIM_T24_CARD
+
+### 19.1 Mục đích thiết kế
+- **Ý nghĩa bảng:** chiều thẻ tín dụng lõi T24 — bảng mới (review 2026-09-21), tách ra khỏi cách join trực tiếp `STG_DIM_CARD` vào fact, theo yêu cầu người dùng: kéo `DIM_CARD` (T24) 1:1 lên PDTD_DTM, đặt FK vật lý trên `FCT_RLOS_APPLICATION` thay vì denormalize giá trị `K_TYPE` trực tiếp lên FCT.
+- **Khóa chính của bảng (PK):** `DIMENSION_KEY` (giữ nguyên giá trị từ SB_DWH qua vùng chìa STG_DTM)
+- **Khóa nghiệp vụ (NK):** `MAIN_ID` — join key với `RESULT_MAIN_CARD_ID` trên `DIM_RLOS_APPLICATION`
+- **Độ chi tiết (grain):** 1 dòng = 1 thẻ T24 (theo phiên bản SCD2).
+- **Phục vụ báo cáo:**
+  - Báo cáo RLOS APPLICATION (BC1) — qua FK `T24_CARD_SK` trên `FCT_RLOS_APPLICATION`
+
+### 19.2 Sơ đồ lineage
+```mermaid
+flowchart LR
+    subgraph SB_DWH_T24["SB_DWH (T24 core banking)"]
+        A(["DIM_CARD"])
+    end
+    subgraph STG_DTM["Vùng chìa STG_DTM"]
+        S(["STG_DIM_CARD"])
+    end
+    subgraph PDTD_DTM
+        D["DIM_T24_CARD"]
+    end
+    A --> S
+    S -->|"1:1 MAIN_ID, K_TYPE — join qua RESULT_MAIN_CARD_ID (có sẵn trên DIM_RLOS_APPLICATION) = MAIN_ID"| D
+```
+
+**Bảng mới, không so sánh với thiết kế cũ:** phát sinh khi đóng gap
+`BC1.K_TYPE` — SRS BC1 (BR 1.2, nested table) xác nhận nguồn `STG_DTM.
+STG_DIM_CARD`. Cùng pattern `DIM_T24_CUSTOMER`/`DIM_T24_COMPANY`/
+`DIM_T24_LOAN`/`DIM_T24_SEAB_PRODUCTS_DE` (chỉ tồn tại ở PDTD_DTM, bê
+1:1 qua vùng chìa, không đi qua CDC của LOS). `SB_DWH.DIM_CARD` không
+có trong bất kỳ datamodel xlsx nào của repo — người dùng xác nhận trực
+tiếp (2026-09-21): bảng có sẵn trên database nguồn T24, chỉ cần map
+đúng tên bảng/cột đã biết từ SRS (`MAIN_ID`, `K_TYPE`).
+
+### 19.3 Cấu trúc bảng
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_T24_CARD — giữ nguyên DIMENSION_KEY của bảng chiều tương ứng bên SB_DWH (qua vùng chìa STG_DTM), không sinh sequence mới | — | — |
+| 2 | CARD_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_T24_CARD, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 nếu không có giá trị phù hợp | Báo cáo RLOS APPLICATION (BC1) — FK trên FCT_RLOS_APPLICATION.T24_CARD_SK | — |
+| 3 | MAIN_ID | VARCHAR2 | N | 100 | NK | Mã thẻ chính theo T24 — nguồn STG_DIM_CARD.MAIN_ID (1:1 từ SB_DWH.DIM_CARD.MAIN_ID). Join key với RESULT_MAIN_CARD_ID trên DIM_RLOS_APPLICATION | — | — |
+| 4 | K_TYPE | VARCHAR2 | N | 100 |  | Loại thẻ tín dụng — nguồn STG_DIM_CARD.K_TYPE | Báo cáo RLOS APPLICATION (BC1) | K_TYPE (Loại thẻ tín dụng) |
+| 5 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi — do SB_DWH quản lý, bê nguyên qua vùng chìa, không tính lại ở DTM | — | — |
+| 6 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành — do SB_DWH quản lý, bê nguyên qua vùng chìa | — | — |
+
+## 20. DIM_T24_SEAB_MAIN_CARD
+
+### 20.1 Mục đích thiết kế
+- **Ý nghĩa bảng:** chiều thẻ chính SeAB lõi T24 — bảng mới (review 2026-09-21), cùng lý do tách bảng với `DIM_T24_CARD` (mục 19): kéo `DIM_SEAB_MAIN_CARD` (T24) 1:1 lên PDTD_DTM, đặt FK vật lý trên `FCT_RLOS_APPLICATION` thay vì denormalize giá trị `HOME_ADDRESS` trực tiếp lên FCT.
+- **Khóa chính của bảng (PK):** `DIMENSION_KEY` (giữ nguyên giá trị từ SB_DWH qua vùng chìa STG_DTM)
+- **Khóa nghiệp vụ (NK):** `RECID` — join key với `RESULT_MAIN_CARD_ID` trên `DIM_RLOS_APPLICATION`
+- **Độ chi tiết (grain):** 1 dòng = 1 thẻ chính T24 (theo phiên bản SCD2).
+- **Phục vụ báo cáo:**
+  - Báo cáo RLOS APPLICATION (BC1) — qua FK `T24_SEAB_MAIN_CARD_SK` trên `FCT_RLOS_APPLICATION`
+
+### 20.2 Sơ đồ lineage
+```mermaid
+flowchart LR
+    subgraph SB_DWH_T24["SB_DWH (T24 core banking)"]
+        A(["DIM_SEAB_MAIN_CARD"])
+    end
+    subgraph STG_DTM["Vùng chìa STG_DTM"]
+        S(["STG_DIM_SEAB_MAIN_CARD"])
+    end
+    subgraph PDTD_DTM
+        D["DIM_T24_SEAB_MAIN_CARD"]
+    end
+    A --> S
+    S -->|"1:1 RECID, HOME_ADDRESS — join qua RESULT_MAIN_CARD_ID (có sẵn trên DIM_RLOS_APPLICATION) = RECID"| D
+```
+
+**Bảng mới, không so sánh với thiết kế cũ:** cùng lý do đã áp dụng cho
+`DIM_T24_CARD` (mục 19) — phát sinh khi đóng gap `BC1.HOME_ADDRESS`,
+nguồn `STG_DTM.STG_DIM_SEAB_MAIN_CARD`. `SB_DWH.DIM_SEAB_MAIN_CARD`
+cũng không có trong bất kỳ datamodel xlsx nào của repo — cùng xác nhận
+của người dùng như `DIM_T24_CARD`: bảng có sẵn trên database nguồn
+T24, chỉ cần map đúng tên bảng/cột đã biết từ SRS (`RECID`,
+`HOME_ADDRESS`).
+
+### 20.3 Cấu trúc bảng
+
+| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_T24_SEAB_MAIN_CARD — giữ nguyên DIMENSION_KEY của bảng chiều tương ứng bên SB_DWH (qua vùng chìa STG_DTM), không sinh sequence mới | — | — |
+| 2 | SEAB_MAIN_CARD_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_T24_SEAB_MAIN_CARD, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định -1 nếu không có giá trị phù hợp | Báo cáo RLOS APPLICATION (BC1) — FK trên FCT_RLOS_APPLICATION.T24_SEAB_MAIN_CARD_SK | — |
+| 3 | RECID | VARCHAR2 | N | 100 | NK | Mã bản ghi thẻ chính SeAB theo T24 — nguồn STG_DIM_SEAB_MAIN_CARD.RECID (1:1 từ SB_DWH.DIM_SEAB_MAIN_CARD.RECID). Join key với RESULT_MAIN_CARD_ID trên DIM_RLOS_APPLICATION | — | — |
+| 4 | HOME_ADDRESS | VARCHAR2 | N | 500 |  | Địa chỉ nhận Pin/Thẻ — nguồn STG_DIM_SEAB_MAIN_CARD.HOME_ADDRESS | Báo cáo RLOS APPLICATION (BC1) | HOME_ADDRESS (Địa chỉ nhận Pin/Thẻ) |
+| 5 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi — do SB_DWH quản lý, bê nguyên qua vùng chìa, không tính lại ở DTM | — | — |
+| 6 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành — do SB_DWH quản lý, bê nguyên qua vùng chìa | — | — |
