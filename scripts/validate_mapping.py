@@ -60,6 +60,16 @@ that have actually shipped before:
       reason to leave this blank — a past run left it empty for several
       columns across multiple tables even though the source description
       existed, and it went unnoticed because nothing checked for it.
+  14. An `EFF_DATE` or `<LAYER>_EFF_DATE` column's "Description" (column D)
+      must be the short fixed sentence — "Ngày bắt đầu hiệu lực của phiên
+      bản bản ghi (SCD Type 2)" for the bare `EFF_DATE` column, "Ngày bắt
+      đầu hiệu lực của layer <Layer Name>" for a `<LAYER>_EFF_DATE` column
+      — never the LLD's longer CDC prose (which source table/columns the
+      comparison runs against, "so sánh toàn bộ cột non-key...", etc.).
+      Every `EFF_DATE`-type row in every phase resolves to the same
+      `v_batch_date` mechanics, so restating the CDC explanation per table
+      is both redundant and was inconsistent across tables before this
+      check existed.
 
 Usage:
     python3 scripts/validate_mapping.py <output.xlsx>
@@ -225,6 +235,34 @@ def check_item_name_not_blank(ws, first_data_row, join_row, errors):
             )
 
 
+EFF_DATE_FIXED_DESC = "Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)"
+
+
+def check_eff_date_description(ws, first_data_row, join_row, errors):
+    """`EFF_DATE` and `<LAYER>_EFF_DATE` columns always resolve to the same
+    `v_batch_date` CDC mechanics project-wide, so their Description must be
+    the short fixed sentence — never the LLD's longer CDC prose restating
+    which source table/columns the comparison runs against."""
+    last_data_row = (join_row - 1) if join_row else ws.max_row
+    for r in range(first_data_row, last_data_row + 1):
+        name = ws.cell(row=r, column=1).value
+        if not name or not str(name).endswith("EFF_DATE"):
+            continue
+        desc_cell = ws.cell(row=r, column=4)
+        desc = desc_cell.value or ""
+        if name == "EFF_DATE":
+            expected = EFF_DATE_FIXED_DESC
+        else:
+            layer = str(name)[: -len("_EFF_DATE")]
+            expected = f"Ngày bắt đầu hiệu lực của layer {layer.replace('_', ' ').title()}"
+        if desc != expected and "CDC" in desc:
+            errors.append(
+                f"{desc_cell.coordinate}: Description của cột '{name}' đang chứa giải thích "
+                f"CDC dài (giá trị hiện tại: {desc!r}) — phải là câu cố định ngắn, ví dụ "
+                f"{expected!r} (xem rule #14)"
+            )
+
+
 def check_mapping_cells_not_blank(ws, header_row, first_data_row, join_row, errors):
     n_cols = last_used_mapping_col(ws, header_row)
     last_data_row = (join_row - 1) if join_row else ws.max_row
@@ -306,7 +344,7 @@ def check_notes_row(ws, notes_row, errors):
 
 def check_source_header_alignment(ws, header_row, errors):
     n_cols = last_used_mapping_col(ws, header_row)
-    for r in range(1, 5):
+    for r in range(1, header_row):
         for c in range(FIRST_MAPPING_COL, n_cols + 1):
             cell = ws.cell(row=r, column=c)
             if cell.value is None:
@@ -348,7 +386,7 @@ def check_condition_row_not_leftover(ws, header_row, condition_row, errors):
     formulas only ever reference its own declared aliases."""
     declared_aliases = set()
     n_cols = last_used_mapping_col(ws, header_row)
-    for r in range(1, 13):
+    for r in range(1, max(13, header_row)):
         for c in range(FIRST_MAPPING_COL, n_cols + 1):
             val = ws.cell(row=r, column=c).value
             if val:
@@ -409,6 +447,7 @@ def validate(path):
     check_join_conditions_one_per_cell(ws, header_row, join_content_rows, errors)
     check_mapping_cells_not_blank(ws, header_row, first_data_row, join_row, errors)
     check_item_name_not_blank(ws, first_data_row, join_row, errors)
+    check_eff_date_description(ws, first_data_row, join_row, errors)
     check_join_label_column(ws, join_row, errors)
     check_notes_row(ws, notes_row, errors)
     check_source_header_alignment(ws, header_row, errors)

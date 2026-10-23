@@ -10,7 +10,13 @@ contract. Summary:
 {
   "table_name": "DIM_LOS_APPLICATION",
   "table_description": "...",
-  "key_note": "Bao gồm các trường màu đỏ",
+  "primary_key": "DIMENSION_KEY",                       # required — column name(s);
+                                                          # join multiple columns with " + "
+                                                          # (e.g. "DAYID + CONTRACT")
+  "business_key": "APPLICATION_ID",                      # DIM only — omit entirely for FCT
+                                                          # (the template has no Business Key
+                                                          # row for FCT tables); join multiple
+                                                          # columns with " + " same as above
   "frequency": "Chạy dữ liệu FULL hàng ngày",          # optional, FCT only
   "sources": [                                          # header block, per source column
     {"column": "E", "lines": ["NG_SB_CLOS_CUST_INFO AS A", "NG_SB_CLOS_APPROVAL AS B"]},
@@ -32,7 +38,10 @@ contract. Summary:
       "type": "NUMBER",
       "item_name": "Surrogate Key",
       "description": "",
-      "is_key": true,
+      "is_key": true,                    # kept for traceability only — no longer affects
+                                          # rendering; PK/Business Key are declared once in
+                                          # the header block (see "primary_key"/"business_key"
+                                          # above) instead of red font per data row
       "condition": null,                # optional per-column condition NOTE row inserted
                                           # directly above this one column (Description
                                           # column only) — NOT the same thing as
@@ -94,6 +103,16 @@ before.
 The script never invents mapping logic — it only places already-decided
 strings into the right cells. All analysis happens in the agent turn before
 this script runs.
+
+Row height for every data/condition/join-content/notes row is computed from
+its own cell content (see `estimate_row_height`), not copied from the
+template's sample row — a long wrapped Description no longer gets clipped
+under a fixed height, and a short one doesn't carry unnecessary blank
+space. This measures text against each column's actual current width, so
+it tracks template column-width changes automatically. It requires the
+"Times New Roman.ttf" font file at `ROW_HEIGHT_FONT_PATH` (ships with
+macOS) to measure text width — this script is only run on the author's
+Mac, so no cross-platform fallback is implemented.
 """
 import copy
 import json
@@ -101,10 +120,77 @@ import sys
 from pathlib import Path
 
 import openpyxl
+from PIL import ImageFont
 
 HEADER_ROW_LABEL = "Column name"
 FIRST_MAPPING_COL = 5  # column E
 JOIN_LABEL_COL = 4  # column D — "Điều kiện join giữa các bảng" label (Description column)
+
+# Row-height estimation: measures each wrapped cell's text against its
+# column's actual width (read from the worksheet, never hardcoded) using the
+# template's own font, so height always tracks the template's current layout
+# even if column widths change later.
+ROW_HEIGHT_FONT_PATH = "/System/Library/Fonts/Supplemental/Times New Roman.ttf"
+ROW_HEIGHT_LINE_FACTOR = 1.25  # points per wrapped line = font_size_pt * this
+ROW_HEIGHT_MIN = 15.0
+ROW_HEIGHT_CELL_PADDING_PX = 5  # Excel's own left+right text inset inside a cell
+ROW_HEIGHT_MDW = 7  # Excel's column-width-unit-to-pixel conversion factor
+
+_row_height_font_cache = {}
+
+
+def _row_height_font(size_pt):
+    if size_pt not in _row_height_font_cache:
+        px = max(int(round(size_pt * 96 / 72)), 1)
+        _row_height_font_cache[size_pt] = ImageFont.truetype(ROW_HEIGHT_FONT_PATH, px)
+    return _row_height_font_cache[size_pt]
+
+
+def _count_wrapped_lines(text, col_width_chars, font_size_pt):
+    if not text:
+        return 1
+    font = _row_height_font(font_size_pt)
+    col_px = max(int(col_width_chars * ROW_HEIGHT_MDW) + 5 - ROW_HEIGHT_CELL_PADDING_PX, 1)
+    lines = 0
+    for para in str(text).split("\n"):
+        if para == "":
+            lines += 1
+            continue
+        cur = ""
+        for word in para.split(" "):
+            trial = (cur + " " + word).strip()
+            if cur == "" or font.getlength(trial) <= col_px:
+                cur = trial
+            else:
+                lines += 1
+                cur = word
+        lines += 1
+    return lines
+
+
+def estimate_row_height(ws, row, max_col):
+    """Estimate the row height (points) a data/condition/join row needs so
+    every wrapped cell in it displays without being clipped, measuring each
+    cell's actual text against its column's current width. Takes the max
+    across all wrap_text cells in the row — one tall cell drives the whole
+    row's height, same as Excel's own auto-fit."""
+    max_height = ROW_HEIGHT_MIN
+    for col in range(1, max_col + 1):
+        cell = ws.cell(row=row, column=col)
+        if cell.value is None:
+            continue
+        font_size_pt = cell.font.size or 12
+        if cell.alignment.wrap_text:
+            col_letter = openpyxl.utils.get_column_letter(col)
+            width = ws.column_dimensions[col_letter].width or 10
+            n_lines = _count_wrapped_lines(cell.value, width, font_size_pt)
+        else:
+            # not wrapped, but Excel still renders each "\n" as its own
+            # visual line (e.g. the numbered "Chú ý:" cell) — no need to
+            # measure pixel width, just count the literal line breaks.
+            n_lines = str(cell.value).count("\n") + 1
+        max_height = max(max_height, n_lines * font_size_pt * ROW_HEIGHT_LINE_FACTOR)
+    return max_height
 
 
 def fill_variable_sheet(wb, extra_variables):
@@ -208,18 +294,31 @@ def apply_row_style(ws, row, styles, height, max_col=6):
         ws.row_dimensions[row].height = height
 
 
-def set_key_font(cell, is_key):
-    f = copy.copy(cell.font)
-    f.color = openpyxl.styles.colors.Color(rgb="FFFF0000") if is_key else openpyxl.styles.colors.Color(rgb="FF000000")
-    cell.font = f
+def find_label_row(ws, label, before_row):
+    """Find the row whose column-A label matches `label`, searching rows
+    1..before_row-1 (the fixed header block above the column-header row)."""
+    for r in range(1, before_row):
+        if ws.cell(row=r, column=1).value == label:
+            return r
+    return None
 
 
-def fill_header_block(ws, data, header_row):
+def fill_header_block(ws, data, header_row, last_mapping_col=6):
     ws.cell(row=1, column=2).value = data["table_name"]
     ws.cell(row=2, column=2).value = data.get("table_description", "")
-    ws.cell(row=3, column=2).value = data.get("key_note", "Bao gồm các trường màu đỏ")
+
+    pk_row = find_label_row(ws, "Primary Key", header_row)
+    if pk_row is not None:
+        ws.cell(row=pk_row, column=2).value = data.get("primary_key", "")
+
+    bk_row = find_label_row(ws, "Business Key", header_row)
+    if bk_row is not None and data.get("business_key"):
+        ws.cell(row=bk_row, column=2).value = data["business_key"]
+
     if data.get("frequency"):
-        ws.cell(row=4, column=2).value = data["frequency"]
+        freq_row = find_label_row(ws, "Tần suất chạy dữ liệu", header_row)
+        if freq_row is not None:
+            ws.cell(row=freq_row, column=2).value = data["frequency"]
 
     # E1 always carries the template's intended "source line" style (bold,
     # no strikethrough) — use it as the single source of truth for every
@@ -240,12 +339,16 @@ def fill_header_block(ws, data, header_row):
     )
 
     # clear any pre-existing source lines from rows 1..header_row-1, cols
-    # E..F (the header block's own row count — grown by
+    # E..<last_mapping_col> (the header block's own row count — grown by
     # ensure_header_block_room when a table has more source tables than the
     # template's own worked example shipped rows for), resetting their font
-    # so no leftover styling (e.g. strikethrough) survives.
+    # so no leftover styling (e.g. strikethrough) survives. Goes past F when
+    # a table needs more than 2 parallel "How to mapping" columns (e.g. a
+    # FCT that UNIONs several distinct source tables into one target row
+    # shape, one column per source — see rules-sb_dwh.md's "Multiple
+    # parallel sources" section).
     for r in range(1, header_row):
-        for c in (5, 6):
+        for c in range(5, last_mapping_col + 1):
             cell = ws.cell(row=r, column=c)
             cell.value = None
             cell.font = copy.copy(source_font)
@@ -308,6 +411,35 @@ def ensure_header_block_room(ws, data, header_row):
     return header_row + shortfall
 
 
+TEMPLATE_LAST_MAPPING_COL = 6  # column F — every template ships styled mapping cols up to here
+
+
+def ensure_mapping_columns_room(ws, last_mapping_col):
+    """A table whose etl_logic UNIONs several distinct source tables into
+    one target row shape (e.g. FCT_RLOS_COLLATERAL's 4 collateral-type
+    sources) needs one "How to mapping <SOURCE>" column per source — more
+    parallel mapping columns than any template ships styled (every template
+    only styles up to column F). Column G onward would otherwise come out
+    unstyled (wrong font/no border) and column-width-unset (Excel's raw
+    default, far narrower than E/F). Copy both the per-row style and the
+    column width from column F into every column past it, for every row in
+    the sheet, before any other styling step reads from these columns."""
+    if last_mapping_col <= TEMPLATE_LAST_MAPPING_COL:
+        return
+    f_width = ws.column_dimensions["F"].width
+    for col in range(TEMPLATE_LAST_MAPPING_COL + 1, last_mapping_col + 1):
+        col_letter = openpyxl.utils.get_column_letter(col)
+        ws.column_dimensions[col_letter].width = f_width
+        for row in range(1, ws.max_row + 1):
+            src_cell = ws.cell(row=row, column=TEMPLATE_LAST_MAPPING_COL)
+            dst_cell = ws.cell(row=row, column=col)
+            dst_cell.font = copy.copy(src_cell.font)
+            dst_cell.fill = copy.copy(src_cell.fill)
+            dst_cell.border = copy.copy(src_cell.border)
+            dst_cell.alignment = copy.copy(src_cell.alignment)
+            dst_cell.number_format = src_cell.number_format
+
+
 def build(data, template_path, output_path):
     wb = openpyxl.load_workbook(template_path)
     ws = wb["Mapping"]
@@ -335,6 +467,7 @@ def build(data, template_path, output_path):
     mapping_headers = data["mapping_headers"]
     n_sources = len(mapping_headers)
     last_mapping_col = max(6, FIRST_MAPPING_COL + n_sources - 1)
+    ensure_mapping_columns_room(ws, last_mapping_col)
 
     # snapshot the styles we need to reuse before wiping the template's
     # sample data rows (data_style from the first data row, condition_style
@@ -377,7 +510,7 @@ def build(data, template_path, output_path):
             continue
         ws.cell(row=condition_row, column=c).value = None
 
-    fill_header_block(ws, data, header_row)
+    fill_header_block(ws, data, header_row, last_mapping_col=last_mapping_col)
     fill_mapping_headers(ws, header_row, mapping_headers, last_mapping_col)
 
     # table-wide row filter (e.g. STG_DTM's EXP_DATE/DAYID window) goes into
@@ -396,6 +529,7 @@ def build(data, template_path, output_path):
         if col.get("condition"):
             apply_row_style(ws, row, condition_style, condition_height, max_col=last_mapping_col)
             ws.cell(row=row, column=4).value = col["condition"]
+            ws.row_dimensions[row].height = estimate_row_height(ws, row, last_mapping_col)
             row += 1
 
         apply_row_style(ws, row, data_style, data_height, max_col=last_mapping_col)
@@ -403,7 +537,6 @@ def build(data, template_path, output_path):
         ws.cell(row=row, column=2).value = col.get("type", "")
         ws.cell(row=row, column=3).value = col.get("item_name", "")
         ws.cell(row=row, column=4).value = col.get("description", "")
-        set_key_font(ws.cell(row=row, column=1), col.get("is_key", False))
 
         mapping_vals = col.get("mapping", [])
         for j in range(n_sources):
@@ -413,6 +546,7 @@ def build(data, template_path, output_path):
             # a blank cell — blank would read as "not decided yet"
             ws.cell(row=row, column=FIRST_MAPPING_COL + j).value = val if val else "NULL"
 
+        ws.row_dimensions[row].height = estimate_row_height(ws, row, last_mapping_col)
         row += 1
 
     # blank separator row, then join conditions row(s), then notes
@@ -439,6 +573,7 @@ def build(data, template_path, output_path):
             for j, conds in enumerate(join_conditions):
                 if conds and clause_idx < len(conds):
                     ws.cell(row=row, column=FIRST_MAPPING_COL + j).value = conds[clause_idx]
+            ws.row_dimensions[row].height = estimate_row_height(ws, row, last_mapping_col)
             row += 1
 
     notes = data.get("notes")
@@ -460,6 +595,7 @@ def build(data, template_path, output_path):
             value_cell.value = notes
         label_cell.font = openpyxl.styles.Font(name=label_cell.font.name, bold=True, color=label_cell.font.color)
         value_cell.font = openpyxl.styles.Font(name=value_cell.font.name, bold=True, color=value_cell.font.color)
+        ws.row_dimensions[row].height = estimate_row_height(ws, row, 2)
 
     fill_variable_sheet(wb, data.get("extra_variables"))
 
