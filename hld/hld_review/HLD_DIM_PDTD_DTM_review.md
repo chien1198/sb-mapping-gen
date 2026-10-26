@@ -626,7 +626,7 @@ flowchart LR
 ### 14.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục sản phẩm tín dụng RLOS (bán lẻ/cá nhân) — lưu dòng sản phẩm chính (`PRODUCTLINE_CODE`) và sản phẩm nhánh (`SUB_PRODUCT_NAME`, con của sản phẩm chính). `PRODUCTLINE_SK` tách riêng cho layer cha (theo pattern T24, xem SB_DWH mục 13), chỉ layer Sub Product quản lý SCD2.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY` (giữ nguyên giá trị từ SB_DWH)
-- **Khóa nghiệp vụ (NK) theo layer:** `PRODUCTLINE_CODE` (Product Line); `PRODUCTLINE_CODE` + `SUB_PRODUCT_NAME` (Sub Product) — `SUB_PRODUCT_CODE` không unique trên dữ liệu thật nên không dùng làm khóa. ⚠️ review 2026-10-26 (theo yêu cầu người dùng, đồng bộ với SB_DWH): bỏ hẳn cột hash `SUB_PRODUCT_BK` — chỉ là hash dẫn xuất của NK gốc (vẫn còn đủ trong bảng), không phải PK, không được FCT nào tham chiếu làm khóa join, nên là dư thừa thuần.
+- **Khóa nghiệp vụ (NK/BK) theo layer:** `PRODUCTLINE_CODE` (Product Line); `PRODUCTLINE_CODE` + `SUB_PRODUCT_NAME` (Sub Product, hash vào `SUB_PRODUCT_BK`) — `SUB_PRODUCT_CODE` không unique trên dữ liệu thật nên không dùng làm khóa. ⚠️ review 2026-10-26 (theo yêu cầu người dùng, đồng bộ với SB_DWH): rollback — thêm lại cột hash `SUB_PRODUCT_BK` (đã bỏ ở review 2026-10-26 trước đó trong cùng ngày).
 - **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `PRODUCTLINE_CODE` + `SUB_PRODUCT_NAME` + `EFF_DATE`).
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
@@ -654,12 +654,13 @@ flowchart LR
 | 3 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 | NK | Mã dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_CODE (= PRODUCTLINE_CODE của MAS_PRODUCT_LINE, cùng khái niệm).| Báo cáo RLOS APPLICATION (BC1) | PRODUCT_LINE (Dòng sản phẩm) |
 | 4 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_NAME.| Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay PRODUCTLINE_CODE | PRODUCT_LINE (Dòng sản phẩm) |
 | 5 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | Layer nhỏ nhất/đại diện của cả dòng, FK duy nhất mà FCT_RLOS_APPLICATION dùng. Bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 6 | SUB_PRODUCT_CODE | VARCHAR2 | N | 200 |  | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE. ⚠️ review 2026-10-26: bỏ cột hash SUB_PRODUCT_BK (dư thừa, xem Section 14.1) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
-| 7 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 200 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME| Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
-| 8 | SCORE_REQUIRED | VARCHAR2 | N | 200 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED | — | Thiết kế dư thừa |
-| 9 | SCORE_MODEL | VARCHAR2 | N | 200 |  | Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL | — | Thiết kế dư thừa |
-| 10 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — CHỈ 1 cặp cho layer nhỏ nhất, do SB_DWH quản lý, bê nguyên qua tầng PDTD_DTM | — | — |
-| 11 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 6 | SUB_PRODUCT_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của layer Sub Product — PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(PRODUCTLINE_CODE \|\| SUB_PRODUCT_NAME, 'MD5'). ⚠️ review 2026-10-26 (theo yêu cầu người dùng): rollback — thêm lại cột này (xem Section 14.1) | — | — |
+| 7 | SUB_PRODUCT_CODE | VARCHAR2 | N | 200 |  | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
+| 8 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 200 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME| Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
+| 9 | SCORE_REQUIRED | VARCHAR2 | N | 200 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED | — | Thiết kế dư thừa |
+| 10 | SCORE_MODEL | VARCHAR2 | N | 200 |  | Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL | — | Thiết kế dư thừa |
+| 11 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — CHỈ 1 cặp cho layer nhỏ nhất, do SB_DWH quản lý, bê nguyên qua tầng PDTD_DTM | — | — |
+| 12 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 14A. DIM_RLOS_SECONDPRODUCT
 
