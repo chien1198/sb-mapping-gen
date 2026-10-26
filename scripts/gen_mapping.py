@@ -113,6 +113,36 @@ it tracks template column-width changes automatically. It requires the
 "Times New Roman.ttf" font file at `ROW_HEIGHT_FONT_PATH` (ships with
 macOS) to measure text width — this script is only run on the author's
 Mac, so no cross-platform fallback is implemented.
+
+Column D (Description) and every "How to mapping" column are forced to
+wrap_text=True regardless of what the template's own sample row set (see
+`capture_row_style`) — the FCT_LOAN template's sample row only has
+wrap_text on column C, which otherwise renders a long Description/mapping
+formula as one unreadable single-line cell overflowing its column border
+instead of wrapping. The DIM_LOAN template already sets wrap_text
+correctly on D/E/F, so this is a no-op there.
+
+Column width (D/E/F.../last_mapping_col) always tracks the template file's
+own current width — never hardcoded — so editing the template's column
+widths and regenerating is enough to re-flow every table; there is nothing
+to keep in sync by hand.
+
+A table with fewer sources than the template ships pre-styled mapping
+columns for (e.g. a 1-source FCT table against the FCT_LOAN template's 2
+pre-styled E/F columns) gets the unused column(s) deleted outright from
+the sheet (see `remove_unused_mapping_columns`), not merely blanked or
+hidden — a reviewer should see exactly N "How to mapping" columns for an
+N-source table.
+
+Every row past the last row this table's own content actually uses (data
+rows, the join section, the notes row) has its `row_dimensions` height
+entry deleted, resetting it to Excel's own default. The LOAN templates
+carry hundreds of leftover sample rows (up to row 2000+) with hand-set
+heights from whatever content used to live there — `ws.delete_rows()`
+clears their cell data but does NOT clear `row_dimensions` (a separate
+dict keyed by absolute row index), so without this cleanup those stale
+heights silently survive into the output on rows that are now empty,
+rendering as visibly uneven blank space in Excel.
 """
 import copy
 import json
@@ -271,11 +301,43 @@ def capture_row_style(ws, row, max_col=6):
     styles = []
     for c in range(1, max_col + 1):
         cell = ws.cell(row=row, column=c)
+        alignment = copy.copy(cell.alignment)
+        # Column D (Description) and every "How to mapping" column (E, F,
+        # ...) hold long free-text content that must wrap to be readable —
+        # the DIM template already ships wrap_text=True there, but the FCT
+        # template's own sample row does not (only column C has it), so a
+        # long Description/mapping formula renders as one unreadable
+        # single-line cell that overflows past its column's border instead
+        # of wrapping. Force it on here regardless of what the template's
+        # sample row set, rather than depending on each template file being
+        # authored consistently.
+        if c >= 4:
+            alignment = openpyxl.styles.Alignment(
+                horizontal=alignment.horizontal,
+                vertical=alignment.vertical,
+                wrap_text=True,
+                indent=alignment.indent,
+            )
+        font = copy.copy(cell.font)
+        # Column D (Description) carries a leftover hardcoded red
+        # (FFFF0000) in the FCT_LOAN template's own sample row — a relic
+        # from when this project still color-coded key columns in
+        # Description (that convention was dropped; Primary/Business Key
+        # is now declared in the header block instead, see rules-sb_dwh.md
+        # "Row 3"/"Row 4"). The DIM_LOAN template never had this (its
+        # Description cells use the theme's default/automatic color,
+        # i.e. black), so force column D back to that same default here
+        # rather than carrying the stale red into every FCT/AGG table.
+        if c == 4:
+            font = openpyxl.styles.Font(
+                name=font.name, size=font.size, bold=font.bold, italic=font.italic,
+                color=None,
+            )
         styles.append({
-            "font": copy.copy(cell.font),
+            "font": font,
             "fill": copy.copy(cell.fill),
             "border": copy.copy(cell.border),
-            "alignment": copy.copy(cell.alignment),
+            "alignment": alignment,
             "number_format": cell.number_format,
         })
     return styles, ws.row_dimensions[row].height
@@ -370,9 +432,27 @@ def fill_mapping_headers(ws, header_row, mapping_headers, last_mapping_col):
     # than this table actually uses (e.g. FCT_LOAN's own 2-system header
     # when this table only needs 1) — clear any leftover header label past
     # what mapping_headers declares, or it survives into the output looking
-    # like a real (but unfilled) source system
+    # like a real (but unfilled) source system. The leftover column itself
+    # is deleted outright at the end of build() (see remove_unused_mapping_columns)
+    # rather than just blanked here — a reviewer opening the file should see
+    # exactly N "How to mapping" columns for an N-source table, not an
+    # (even hidden) trace of one that was never used.
     for c in range(FIRST_MAPPING_COL + len(mapping_headers), last_mapping_col + 1):
         ws.cell(row=header_row, column=c).value = None
+
+
+def remove_unused_mapping_columns(ws, mapping_headers, last_mapping_col):
+    """Delete, outright, any "How to mapping" column past what this table's
+    own mapping_headers declares — e.g. a 1-source FCT table on a template
+    that ships 2 pre-styled mapping columns (E, F) ends up with only column
+    E. Called last, once every other write to the sheet (including ones
+    that reference columns by their original E/F/... position) is done, so
+    deleting a column here never shifts something still being written."""
+    n_sources = len(mapping_headers)
+    first_unused = FIRST_MAPPING_COL + n_sources
+    if first_unused > last_mapping_col:
+        return
+    ws.delete_cols(first_unused, last_mapping_col - first_unused + 1)
 
 
 def ensure_header_block_room(ws, data, header_row):
@@ -486,13 +566,43 @@ def build(data, template_path, output_path):
     if notes_row is not None:
         notes_style, notes_height = capture_row_style(ws, notes_row, max_col=2)
     else:
-        notes_style = notes_height = None
+        # This template (e.g. Mapping_FCT_LOAN_template) ships with no
+        # sample "Chú ý:" row to snapshot a style from — fall back to the
+        # DIM template's own convention for that row (bold Times New
+        # Roman 12pt, left/vertical-center) so notes on tables using this
+        # template still render styled instead of with openpyxl's blank
+        # default alignment/font.
+        notes_style = [
+            {
+                "font": openpyxl.styles.Font(name="Times New Roman", bold=True, size=12),
+                "fill": copy.copy(ws.cell(row=first_data_row, column=c).fill),
+                "border": copy.copy(ws.cell(row=first_data_row, column=c).border),
+                "alignment": openpyxl.styles.Alignment(horizontal="left", vertical="center"),
+                "number_format": "General",
+            }
+            for c in range(1, 3)
+        ]
+        notes_height = None
 
     # wipe every template sample row from first_data_row to the end of the
     # sheet so no stale sample content survives, regardless of how many rows
     # this table's data ends up needing
     if ws.max_row >= first_data_row:
         ws.delete_rows(first_data_row, ws.max_row - first_data_row + 1)
+
+    # delete_rows() above only removes cell data — openpyxl keeps
+    # row_dimensions (height, among other things) in a separate dict keyed
+    # by absolute row index that delete_rows never touches. The LOAN
+    # templates carry hundreds of leftover sample rows with hand-set
+    # heights (51, 34, 85, ...) stretching to row 2000+; without this, every
+    # one of those stale heights survives into the output on rows that are
+    # now empty past the real data, making them visibly uneven in Excel
+    # even though they hold nothing. Drop every row_dimensions entry from
+    # first_data_row through the highest row index the template defined
+    # one for, so those rows fall back to Excel's own default height.
+    for r in list(ws.row_dimensions.keys()):
+        if r >= first_data_row:
+            del ws.row_dimensions[r]
 
     # condition_row (the "Điều kiện lấy dữ liệu" sub-row right under the
     # header) sits ABOVE first_data_row, so the delete_rows above never
@@ -521,6 +631,18 @@ def build(data, template_path, output_path):
         for j, cond in enumerate(table_condition):
             if cond:
                 ws.cell(row=condition_row, column=FIRST_MAPPING_COL + j).value = cond
+    # condition_row's height was captured from the template's own sample
+    # row (often a tall multi-line filter) before its content was cleared
+    # above. A table that actually uses this row (table_condition set)
+    # still needs its height computed from the real filter text, same as
+    # every data/join/notes row. A table with no table_condition leaves
+    # this row genuinely empty — reset its height to Excel's own default
+    # (None) rather than carrying over the template's stale sample height,
+    # the same way the untouched header-block rows above already render.
+    if table_condition:
+        ws.row_dimensions[condition_row].height = estimate_row_height(ws, condition_row, last_mapping_col)
+    else:
+        ws.row_dimensions[condition_row].height = None
 
     row = first_data_row
     columns = data["columns"]
@@ -596,6 +718,8 @@ def build(data, template_path, output_path):
         label_cell.font = openpyxl.styles.Font(name=label_cell.font.name, bold=True, color=label_cell.font.color)
         value_cell.font = openpyxl.styles.Font(name=value_cell.font.name, bold=True, color=value_cell.font.color)
         ws.row_dimensions[row].height = estimate_row_height(ws, row, 2)
+
+    remove_unused_mapping_columns(ws, mapping_headers, last_mapping_col)
 
     fill_variable_sheet(wb, data.get("extra_variables"))
 
