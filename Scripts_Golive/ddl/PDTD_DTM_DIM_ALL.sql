@@ -159,7 +159,6 @@ BEGIN
       (
         dimension_key      NUMBER not null,
         exception_sk       NUMBER not null,
-        exception_bk       VARCHAR2(64),
         activityname       VARCHAR2(200),
         decision_code      VARCHAR2(200),
         exception_category VARCHAR2(500),
@@ -252,7 +251,6 @@ BEGIN
       (
         dimension_key        NUMBER not null,
         workstep_decision_sk NUMBER not null,
-        workstep_decision_bk VARCHAR2(64),
         workstep_code        VARCHAR2(200),
         decision_code        VARCHAR2(200),
         channel              VARCHAR2(200),
@@ -594,7 +592,6 @@ BEGIN
       (
         dimension_key           NUMBER not null,
         change_type_sk          NUMBER not null,
-        change_type_bk          VARCHAR2(64),
         change_type_code        VARCHAR2(100),
         change_type_name        VARCHAR2(200),
         detail_change_type_code VARCHAR2(100),
@@ -637,7 +634,6 @@ BEGIN
       (
         dimension_key      NUMBER not null,
         exception_sk       NUMBER not null,
-        exception_bk       VARCHAR2(64),
         activityname       VARCHAR2(200),
         decision_code      VARCHAR2(200),
         exception_category VARCHAR2(500),
@@ -688,7 +684,6 @@ BEGIN
         productline_code VARCHAR2(100),
         productline_name VARCHAR2(200),
         sub_product_sk    NUMBER not null,
-        sub_product_bk    VARCHAR2(64),
         sub_product_code VARCHAR2(100),
         sub_product_name VARCHAR2(150),
         score_required   VARCHAR2(10),
@@ -730,7 +725,6 @@ BEGIN
       (
         dimension_key     NUMBER not null,
         secondproduct_sk  NUMBER not null,
-        secondproduct_bk  VARCHAR2(64),
         productline_code  VARCHAR2(200),
         productline_name  VARCHAR2(200),
         secondary_product VARCHAR2(200),
@@ -771,7 +765,6 @@ BEGIN
       (
         dimension_key        NUMBER not null,
         workstep_decision_sk NUMBER not null,
-        workstep_decision_bk VARCHAR2(64),
         workstep_code        VARCHAR2(200),
         decision_code        VARCHAR2(200),
         req_type             VARCHAR2(255),

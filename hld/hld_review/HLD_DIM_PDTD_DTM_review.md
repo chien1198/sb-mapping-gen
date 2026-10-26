@@ -217,7 +217,7 @@ SB_DWH mới giữ làm DIM; ở PDTD_DTM nó là `FCT_CLOS_LEGAL_PARTY` (xem
 ### 5.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục các cặp (bước xử lý, quyết định) hợp lệ trên workflow CLOS (ví dụ WORKSTEP=CreditCommittee + DECISION=Submit).
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** composite `WORKSTEP_CODE` + `DECISION_CODE` — hash vào cột `WORKSTEP_DECISION_BK`
+- **Khóa nghiệp vụ (NK):** composite `WORKSTEP_CODE` + `DECISION_CODE`. ⚠️ review 2026-10-26 (theo yêu cầu người dùng, đồng bộ với SB_DWH): bỏ hẳn cột hash `WORKSTEP_DECISION_BK` — chỉ là hash dẫn xuất của NK gốc (vẫn còn đủ trong bảng), không phải PK, không được FCT nào tham chiếu làm khóa join, nên là dư thừa thuần.
 - **Độ chi tiết (grain):** 1 dòng = 1 cặp (WORKSTEP_CODE, DECISION_CODE) hợp lệ trên bảng nguồn.
 - **Phục vụ báo cáo:**
   - Báo cáo CLOS APPLICATION (BC2) — qua LAST_WORKSTEP_DECISION_SK trên FCT_CLOS_APPLICATION
@@ -246,19 +246,18 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_WORKSTEP_DECISION, kế thừa nguyên giá trị từ SB_DWH | — | — |
 | 2 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_WORKSTEP_DECISION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 3 | WORKSTEP_DECISION_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của cặp (bước xử lý, quyết định) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(WORKSTEP_CODE \|\| DECISION_CODE, 'MD5') | — | — |
-| 4 | WORKSTEP_CODE | NVARCHAR2 | N | 255 |  | Mã bước xử lý trên workflow CLOS — nguồn NG_SB_CLOS_MAS_DECISION.QUEUE_NAME. Cùng với DECISION_CODE là thành phần nguồn của WORKSTEP_DECISION_BK (không còn tự đánh dấu khóa — xem 3) | Báo cáo RLOS APPLICATION (BC1), CLOS APPLICATION (BC2), Thông tin phê duyệt (BC3), Tuần Chuyên viên Thẩm định (BC4), SLA - TAT (BC5), EXCEPTION - FTR (BC7), RETURN (BC8), KPI (BC9) | WORKSTEP (Bước hồ sơ) — giá trị đọc trực tiếp trên FCT_CLOS_WORKSTEP_EVENT.WORKSTEP_CODE, DIM này phục vụ làm danh mục đối chiếu/chuẩn hóa mã bước |
-| 5 | DECISION_CODE | NVARCHAR2 | N | 255 |  | Mã quyết định phát sinh tại bước xử lý trên — nguồn NG_SB_CLOS_MAS_DECISION.DECISION. UNIQUE (WORKSTEP_CODE, DECISION_CODE, EFF_DATE) | Báo cáo CLOS APPLICATION (BC2) | LAST_DECISION (Quyết định bước cuối) |
-| 6 | CHANNEL | NVARCHAR2 | N | 255 |  | Kênh áp dụng của cặp (bước xử lý, quyết định) — nguồn NG_SB_CLOS_MAS_DECISION.CHANNEL. Giữ có chủ đích để bảo toàn dữ liệu nguồn, hiện chưa có báo cáo nào tiêu thụ | — | Thiết kế dư thừa |
-| 7 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION | — | — |
-| 8 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 3 | WORKSTEP_CODE | NVARCHAR2 | N | 255 | NK | Mã bước xử lý trên workflow CLOS — nguồn NG_SB_CLOS_MAS_DECISION.QUEUE_NAME. Cùng với DECISION_CODE là khóa nghiệp vụ composite của bảng. ⚠️ review 2026-10-26: bỏ cột hash WORKSTEP_DECISION_BK (dư thừa, xem Section 5.1) | Báo cáo RLOS APPLICATION (BC1), CLOS APPLICATION (BC2), Thông tin phê duyệt (BC3), Tuần Chuyên viên Thẩm định (BC4), SLA - TAT (BC5), EXCEPTION - FTR (BC7), RETURN (BC8), KPI (BC9) | WORKSTEP (Bước hồ sơ) — giá trị đọc trực tiếp trên FCT_CLOS_WORKSTEP_EVENT.WORKSTEP_CODE, DIM này phục vụ làm danh mục đối chiếu/chuẩn hóa mã bước |
+| 4 | DECISION_CODE | NVARCHAR2 | N | 255 | NK | Mã quyết định phát sinh tại bước xử lý trên — nguồn NG_SB_CLOS_MAS_DECISION.DECISION. UNIQUE (WORKSTEP_CODE, DECISION_CODE, EFF_DATE) | Báo cáo CLOS APPLICATION (BC2) | LAST_DECISION (Quyết định bước cuối) |
+| 5 | CHANNEL | NVARCHAR2 | N | 255 |  | Kênh áp dụng của cặp (bước xử lý, quyết định) — nguồn NG_SB_CLOS_MAS_DECISION.CHANNEL. Giữ có chủ đích để bảo toàn dữ liệu nguồn, hiện chưa có báo cáo nào tiêu thụ | — | Thiết kế dư thừa |
+| 6 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION | — | — |
+| 7 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 6. DIM_CLOS_EXCEPTION
 
 ### 6.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục các lý do ngoại lệ được cấu hình cho từng tổ hợp bước xử lý + quyết định trên workflow CLOS — đây là danh mục cấu hình gốc thật sự, không phải bảng sự kiện/giao dịch theo hồ sơ.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** composite `ACTIVITYNAME` + `DECISION_CODE` + `EXCEPTION_CATEGORY` + `EXCEPTION_NAME` — hash vào cột `EXCEPTION_BK`
+- **Khóa nghiệp vụ (NK):** composite `ACTIVITYNAME` + `DECISION_CODE` + `EXCEPTION_CATEGORY` + `EXCEPTION_NAME`. ⚠️ review 2026-10-26 (theo yêu cầu người dùng, đồng bộ với SB_DWH): bỏ hẳn cột hash `EXCEPTION_BK` — chỉ là hash dẫn xuất của NK gốc (vẫn còn đủ trong bảng), không phải PK, không được FCT nào tham chiếu làm khóa join, nên là dư thừa thuần.
 - **Độ chi tiết (grain):** 1 dòng = 1 tổ hợp bước xử lý + quyết định + nhóm lý do + tên lý do
 - **Phục vụ báo cáo:**
   - Báo cáo EXCEPTION - FTR (BC7)
@@ -282,19 +281,18 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_CLOS_EXCEPTION, kế thừa nguyên giá trị từ SB_DWH | — | — |
 | 2 | EXCEPTION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_CLOS_EXCEPTION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 3 | EXCEPTION_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (bước, quyết định, nhóm lý do, tên lý do) — kế thừa nguyên văn từ SB_DWH | — | — |
-| 4 | ACTIVITYNAME | NVARCHAR2 | N | 255 |  | Tên bước phát sinh nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.ACTIVITYNAME) | Báo cáo EXCEPTION - FTR (BC7) | ACTIVITYNAME (Tên bước) |
-| 5 | DECISION_CODE | NVARCHAR2 | N | 100 |  | Mã quyết định tại bước xử lý — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.DECISION) | — | Nguồn cho chỉ tiêu/trường EXCEPTION_SK (khóa join 2 bước của FCT_CLOS_EXCEPTION) |
-| 6 | EXCEPTION_CATEGORY | NVARCHAR2 | N | 500 |  | Phân nhóm nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp<br>Báo cáo EXCEPTION - FTR (BC7) — khóa join 2 bước cùng ACTIVITYNAME | EXCEPTION_CATEGORY (Nhóm lý do quyết định) |
-| 7 | EXCEPTION_NAME | NVARCHAR2 | N | 500 |  | Tên nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_NAME) | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_NAME (Tên lý do) |
-| 8 | EXCEPTION_CODE | VARCHAR2 | N | 50 |  | Mã nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng DIM: CASE WHEN INSTR(EXCEPTION_CATEGORY, ':') > 0 THEN REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END, đặt sẵn trên DIM để tránh tính lại ở tầng report | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_CODE (Code lý do) |
-| 9 | RAISE_FLAG | NVARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Raise (nêu lý do) tại tổ hợp bước/quyết định này hay không — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.RAISE) | — | Thiết kế dư thừa |
-| 10 | CLEAR_FLAG | NVARCHAR2 | N | 255 |  | Cờ cho biết ngoại lệ này có được phép Clear (trả lời làm rõ) tại tổ hợp bước/quyết định này hay không — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.CLEAR) | — | Thiết kế dư thừa |
-| 11 | ID_SOURCE | NUMBER | N | 18 |  | Số định danh nội bộ của bản ghi danh mục trên bảng nguồn — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.ID, đổi tên thêm hậu tố SOURCE, tránh trùng khái niệm với DIMENSION_KEY) | — | Thiết kế dư thừa |
-| 12 | CODE_SOURCE | NVARCHAR2 | N | 255 |  | Mã viết tắt của tổ hợp ngoại lệ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.CODE, đổi tên tránh trùng khái niệm với EXCEPTION_CODE phái sinh ở 8) | — | Thiết kế dư thừa |
-| 13 | STATUS | NVARCHAR2 | N | 1 |  | Trạng thái bản ghi danh mục trên bảng nguồn — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.STATUS), giữ nguyên tên nguồn | — | Thiết kế dư thừa |
-| 14 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) | — | — |
-| 15 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 3 | ACTIVITYNAME | NVARCHAR2 | N | 255 | NK | Tên bước phát sinh nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.ACTIVITYNAME). ⚠️ review 2026-10-26: bỏ cột hash EXCEPTION_BK (dư thừa, xem Section 6.1) | Báo cáo EXCEPTION - FTR (BC7) | ACTIVITYNAME (Tên bước) |
+| 4 | DECISION_CODE | NVARCHAR2 | N | 100 | NK | Mã quyết định tại bước xử lý — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.DECISION) | — | Nguồn cho chỉ tiêu/trường EXCEPTION_SK (khóa join 2 bước của FCT_CLOS_EXCEPTION) |
+| 5 | EXCEPTION_CATEGORY | NVARCHAR2 | N | 500 | NK | Phân nhóm nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY) | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp<br>Báo cáo EXCEPTION - FTR (BC7) — khóa join 2 bước cùng ACTIVITYNAME | EXCEPTION_CATEGORY (Nhóm lý do quyết định) |
+| 6 | EXCEPTION_NAME | NVARCHAR2 | N | 500 | NK | Tên nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.EXCEPTION_NAME) | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_NAME (Tên lý do) |
+| 7 | EXCEPTION_CODE | VARCHAR2 | N | 50 |  | Mã nội dung cần làm rõ — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng DIM: CASE WHEN INSTR(EXCEPTION_CATEGORY, ':') > 0 THEN REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END, đặt sẵn trên DIM để tránh tính lại ở tầng report | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_CODE (Code lý do) |
+| 8 | RAISE_FLAG | NVARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Raise (nêu lý do) tại tổ hợp bước/quyết định này hay không — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.RAISE) | — | Thiết kế dư thừa |
+| 9 | CLEAR_FLAG | NVARCHAR2 | N | 255 |  | Cờ cho biết ngoại lệ này có được phép Clear (trả lời làm rõ) tại tổ hợp bước/quyết định này hay không — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.CLEAR) | — | Thiết kế dư thừa |
+| 10 | ID_SOURCE | NUMBER | N | 18 |  | Số định danh nội bộ của bản ghi danh mục trên bảng nguồn — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.ID, đổi tên thêm hậu tố SOURCE, tránh trùng khái niệm với DIMENSION_KEY) | — | Thiết kế dư thừa |
+| 11 | CODE_SOURCE | NVARCHAR2 | N | 255 |  | Mã viết tắt của tổ hợp ngoại lệ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.CODE, đổi tên tránh trùng khái niệm với EXCEPTION_CODE phái sinh ở 7) | — | Thiết kế dư thừa |
+| 12 | STATUS | NVARCHAR2 | N | 1 |  | Trạng thái bản ghi danh mục trên bảng nguồn — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_CLOS_MAS_EXCEPTION.STATUS), giữ nguyên tên nguồn | — | Thiết kế dư thừa |
+| 13 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) | — | — |
+| 14 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 7. DIM_DATE
 
@@ -512,7 +510,7 @@ flowchart LR
 ### 11.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục loại và chi tiết loại thay đổi điều kiện phê duyệt của hồ sơ RLOS — là danh mục cấu hình gốc, thông tin ít thay đổi.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** composite `CHANGE_TYPE_CODE` + `DETAIL_CHANGE_TYPE_CODE` — hash vào cột `CHANGE_TYPE_BK`
+- **Khóa nghiệp vụ (NK):** composite `CHANGE_TYPE_CODE` + `DETAIL_CHANGE_TYPE_CODE`. ⚠️ review 2026-10-26 (theo yêu cầu người dùng, đồng bộ với SB_DWH): bỏ hẳn cột hash `CHANGE_TYPE_BK` — chỉ là hash dẫn xuất của NK gốc (vẫn còn đủ trong bảng), không phải PK, không được FCT nào tham chiếu làm khóa join, nên là dư thừa thuần.
 - **Độ chi tiết (grain):** 1 dòng lưu lịch sử thay đổi của 1 tổ hợp loại + chi tiết loại thay đổi theo thời gian (SCD Type 2).
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1) — báo cáo duy nhất dùng bảng này
@@ -535,20 +533,19 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_CHANGE_TYPE, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
 | 2 | CHANGE_TYPE_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_CHANGE_TYPE, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 3 | CHANGE_TYPE_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (loại thay đổi, chi tiết loại thay đổi) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(CHANGE_TYPE_CODE \|\| DETAIL_CHANGE_TYPE_CODE, 'MD5') | — | — |
-| 4 | CHANGE_TYPE_CODE | NVARCHAR2 | N | 200 |  | Mã loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_CODE. Thành phần nguồn của CHANGE_TYPE_BK (không còn tự đánh dấu khóa, xem cột 3) | Báo cáo RLOS APPLICATION (BC1) — khóa tra CHANGE_TYPE_SK | — |
-| 5 | CHANGE_TYPE_NAME | NVARCHAR2 | N | 200 |  | Tên loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_NAME | — | — |
-| 6 | DETAIL_CHANGE_TYPE_CODE | NVARCHAR2 | N | 200 |  | Mã chi tiết loại thay đổi — nguồn SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_CODE | — | — |
-| 7 | DETAIL_CHANGE_TYPE_NAME | NVARCHAR2 | N | 200 |  | Tên chi tiết loại thay đổi — nguồn SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_NAME. BC1 dùng trường này làm CHANGE_TYPE_DETAIL | Báo cáo RLOS APPLICATION (BC1) | CHANGE_TYPE_DETAIL (Chi tiết loại thay đổi điều kiện) |
-| 8 | IS_ACTIVE | NVARCHAR2 | N | 1 |  | Cờ hiệu lực của loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.IS_ACTIVE | — | — |
-| 9 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) | — | — |
-| 10 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 3 | CHANGE_TYPE_CODE | NVARCHAR2 | N | 200 | NK | Mã loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_CODE. ⚠️ review 2026-10-26: bỏ cột hash CHANGE_TYPE_BK (dư thừa, xem Section 11.1) | Báo cáo RLOS APPLICATION (BC1) — khóa tra CHANGE_TYPE_SK | — |
+| 4 | CHANGE_TYPE_NAME | NVARCHAR2 | N | 200 |  | Tên loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_NAME | — | — |
+| 5 | DETAIL_CHANGE_TYPE_CODE | NVARCHAR2 | N | 200 | NK | Mã chi tiết loại thay đổi — nguồn SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_CODE | — | — |
+| 6 | DETAIL_CHANGE_TYPE_NAME | NVARCHAR2 | N | 200 |  | Tên chi tiết loại thay đổi — nguồn SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_NAME. BC1 dùng trường này làm CHANGE_TYPE_DETAIL | Báo cáo RLOS APPLICATION (BC1) | CHANGE_TYPE_DETAIL (Chi tiết loại thay đổi điều kiện) |
+| 7 | IS_ACTIVE | NVARCHAR2 | N | 1 |  | Cờ hiệu lực của loại thay đổi điều kiện phê duyệt — nguồn SB_RLOS_MAS_CHANGE_TYPE.IS_ACTIVE | — | — |
+| 8 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) | — | — |
+| 9 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 12. DIM_RLOS_WORKSTEP_DECISION
 ### 12.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục các cặp (bước xử lý, quyết định) hợp lệ trên workflow RLOS — đây là danh mục cấu hình gốc của BPM engine, không phải bảng sự kiện/giao dịch theo hồ sơ.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** composite `WORKSTEP_CODE` + `DECISION_CODE` — hash vào cột `WORKSTEP_DECISION_BK`
+- **Khóa nghiệp vụ (NK):** composite `WORKSTEP_CODE` + `DECISION_CODE`. ⚠️ review 2026-10-26 (theo yêu cầu người dùng, đồng bộ với SB_DWH): bỏ hẳn cột hash `WORKSTEP_DECISION_BK` — chỉ là hash dẫn xuất của NK gốc (vẫn còn đủ trong bảng), không phải PK, không được FCT nào tham chiếu làm khóa join, nên là dư thừa thuần.
 - **Độ chi tiết (grain):** 1 dòng = 1 cặp (WORKSTEP_CODE, DECISION_CODE) hợp lệ trên bảng nguồn.
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1) — qua LAST_WORKSTEP_DECISION_SK trên FCT_RLOS_APPLICATION
@@ -578,18 +575,17 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_WORKSTEP_DECISION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
 | 2 | WORKSTEP_DECISION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_WORKSTEP_DECISION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 3 | WORKSTEP_DECISION_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của cặp (bước xử lý, quyết định) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(WORKSTEP_CODE \|\| DECISION_CODE, 'MD5') | — | — |
-| 4 | WORKSTEP_CODE | NVARCHAR2 | N | 255 |  | Mã bước xử lý trên workflow RLOS — nguồn NG_SB_RLOS_MAS_DECISION.QUEUE_NAME. Cùng với DECISION_CODE là thành phần nguồn của WORKSTEP_DECISION_BK (không còn tự đánh dấu khóa — xem cột 3) | Báo cáo RLOS APPLICATION (BC1), Thông tin phê duyệt (BC3), Tuần Chuyên viên Thẩm định (BC4), SLA - TAT (BC5), RETURN (BC8) | WORKSTEP (Bước hồ sơ) — giá trị đọc trực tiếp trên FCT_RLOS_WORKSTEP_EVENT.WORKSTEP_CODE, DIM này phục vụ làm danh mục đối chiếu/chuẩn hóa mã bước |
-| 5 | DECISION_CODE | NVARCHAR2 | N | 255 |  | Mã quyết định phát sinh tại bước xử lý trên — nguồn NG_SB_RLOS_MAS_DECISION.DECISION. UNIQUE (WORKSTEP_CODE, DECISION_CODE, EFF_DATE) | Báo cáo RLOS APPLICATION (BC1) | LAST_DECISION (Quyết định bước cuối) |
-| 6 | REQ_TYPE | NVARCHAR2 | N | 255 |  | Loại yêu cầu điều chỉnh hồ sơ liên quan tới bước/quyết định — nguồn NG_SB_RLOS_MAS_DECISION.REQ_TYPE | — | — |
-| 7 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION | — | — |
-| 8 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 3 | WORKSTEP_CODE | NVARCHAR2 | N | 255 | NK | Mã bước xử lý trên workflow RLOS — nguồn NG_SB_RLOS_MAS_DECISION.QUEUE_NAME. Cùng với DECISION_CODE là khóa nghiệp vụ composite của bảng. ⚠️ review 2026-10-26: bỏ cột hash WORKSTEP_DECISION_BK (dư thừa, xem Section 12.1) | Báo cáo RLOS APPLICATION (BC1), Thông tin phê duyệt (BC3), Tuần Chuyên viên Thẩm định (BC4), SLA - TAT (BC5), RETURN (BC8) | WORKSTEP (Bước hồ sơ) — giá trị đọc trực tiếp trên FCT_RLOS_WORKSTEP_EVENT.WORKSTEP_CODE, DIM này phục vụ làm danh mục đối chiếu/chuẩn hóa mã bước |
+| 4 | DECISION_CODE | NVARCHAR2 | N | 255 | NK | Mã quyết định phát sinh tại bước xử lý trên — nguồn NG_SB_RLOS_MAS_DECISION.DECISION. UNIQUE (WORKSTEP_CODE, DECISION_CODE, EFF_DATE) | Báo cáo RLOS APPLICATION (BC1) | LAST_DECISION (Quyết định bước cuối) |
+| 5 | REQ_TYPE | NVARCHAR2 | N | 255 |  | Loại yêu cầu điều chỉnh hồ sơ liên quan tới bước/quyết định — nguồn NG_SB_RLOS_MAS_DECISION.REQ_TYPE | — | — |
+| 6 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do ETL tính qua CDC khi phát hiện thay đổi trên MAS_DECISION | — | — |
+| 7 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 13. DIM_RLOS_EXCEPTION
 ### 13.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục các lý do ngoại lệ (nội dung cần làm rõ) được cấu hình cho từng tổ hợp bước xử lý + quyết định trên workflow RLOS — danh mục cấu hình gốc thật sự, không phải bảng sự kiện/giao dịch theo hồ sơ.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY`
-- **Khóa nghiệp vụ (BK):** composite `ACTIVITYNAME` + `DECISION_CODE` + `EXCEPTION_CATEGORY` + `EXCEPTION_NAME` — hash vào cột `EXCEPTION_BK`.
+- **Khóa nghiệp vụ (NK):** composite `ACTIVITYNAME` + `DECISION_CODE` + `EXCEPTION_CATEGORY` + `EXCEPTION_NAME`. ⚠️ review 2026-10-26 (theo yêu cầu người dùng, đồng bộ với SB_DWH): bỏ hẳn cột hash `EXCEPTION_BK` — chỉ là hash dẫn xuất của NK gốc (vẫn còn đủ trong bảng), không phải PK, không được FCT nào tham chiếu làm khóa join, nên là dư thừa thuần.
 - **Độ chi tiết (grain):** 1 dòng = 1 tổ hợp bước xử lý + quyết định + nhóm lý do + tên lý do, lưu lịch sử thay đổi theo thời gian (SCD Type 2).
 - **Phục vụ báo cáo:**
   - Báo cáo EXCEPTION - FTR (BC7)
@@ -612,26 +608,25 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_EXCEPTION, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
 | 2 | EXCEPTION_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_EXCEPTION, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 3 | EXCEPTION_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (bước, quyết định, nhóm lý do, tên lý do) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(ACTIVITYNAME \|\| DECISION_CODE \|\| EXCEPTION_CATEGORY \|\| EXCEPTION_NAME, 'MD5') | — | — |
-| 4 | ACTIVITYNAME | NVARCHAR2 | N | 255 |  | Tên bước phát sinh nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.ACTIVITYNAME | Báo cáo EXCEPTION - FTR (BC7) | ACTIVITYNAME (Tên bước) |
-| 5 | DECISION_CODE | NVARCHAR2 | N | 100 |  | Mã quyết định tại bước xử lý — nguồn NG_SB_RLOS_MAS_EXCEPTION.DECISION (đổi tên thêm hậu tố CODE cho thống nhất với DIM_RLOS_WORKSTEP_DECISION.DECISION_CODE) | — | Nguồn cho chỉ tiêu/trường EXCEPTION_SK (khóa join 2 bước của FCT_RLOS_EXCEPTION) |
-| 6 | EXCEPTION_CATEGORY | NVARCHAR2 | N | 100 |  | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_CATEGORY (Nhóm lý do quyết định) |
-| 7 | EXCEPTION_NAME | NVARCHAR2 | N | 1000 |  | Tên nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_NAME | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_NAME (Tên lý do) |
-| 8 | EXCEPTION_CODE | VARCHAR2 | N | 50 |  | Mã nội dung cần làm rõ — PHÁI SINH: CASE WHEN INSTR(EXCEPTION_CATEGORY, ':') > 0 THEN REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_CODE (Code lý do) |
-| 9 | RAISE_FLAG | NVARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Raise (nêu lý do) tại tổ hợp bước/quyết định này hay không — nguồn NG_SB_RLOS_MAS_EXCEPTION.RAISE | — | Thiết kế dư thừa |
-| 10 | CLEAR_FLAG | NVARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Clear (trả lời làm rõ) tại tổ hợp bước/quyết định này hay không — nguồn NG_SB_RLOS_MAS_EXCEPTION.CLEAR | — | Thiết kế dư thừa |
-| 11 | ID_SOURCE | NUMBER | N | 18 |  | Số định danh nội bộ của bản ghi danh mục trên bảng nguồn — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_RLOS_MAS_EXCEPTION.ID, đổi tên thêm hậu tố SOURCE, tránh trùng khái niệm với DIMENSION_KEY) | — | Thiết kế dư thừa |
-| 12 | CODE_SOURCE | NVARCHAR2 | N | 255 |  | Mã viết tắt của tổ hợp ngoại lệ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_RLOS_MAS_EXCEPTION.CODE, đổi tên tránh trùng khái niệm với EXCEPTION_CODE phái sinh ở 8) | — | Thiết kế dư thừa |
-| 13 | STATUS | NVARCHAR2 | N | 1 |  | Trạng thái bản ghi danh mục trên bảng nguồn — nguồn NG_SB_RLOS_MAS_EXCEPTION.STATUS, giữ nguyên tên nguồn | — | Thiết kế dư thừa |
-| 14 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) | — | — |
-| 15 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 3 | ACTIVITYNAME | NVARCHAR2 | N | 255 | NK | Tên bước phát sinh nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.ACTIVITYNAME. ⚠️ review 2026-10-26: bỏ cột hash EXCEPTION_BK (dư thừa, xem Section 13.1) | Báo cáo EXCEPTION - FTR (BC7) | ACTIVITYNAME (Tên bước) |
+| 4 | DECISION_CODE | NVARCHAR2 | N | 100 | NK | Mã quyết định tại bước xử lý — nguồn NG_SB_RLOS_MAS_EXCEPTION.DECISION (đổi tên thêm hậu tố CODE cho thống nhất với DIM_RLOS_WORKSTEP_DECISION.DECISION_CODE) | — | Nguồn cho chỉ tiêu/trường EXCEPTION_SK (khóa join 2 bước của FCT_RLOS_EXCEPTION) |
+| 5 | EXCEPTION_CATEGORY | NVARCHAR2 | N | 100 | NK | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_CATEGORY | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_CATEGORY (Nhóm lý do quyết định) |
+| 6 | EXCEPTION_NAME | NVARCHAR2 | N | 1000 | NK | Tên nội dung cần làm rõ — nguồn NG_SB_RLOS_MAS_EXCEPTION.EXCEPTION_NAME | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_NAME (Tên lý do) |
+| 7 | EXCEPTION_CODE | VARCHAR2 | N | 50 |  | Mã nội dung cần làm rõ — PHÁI SINH: CASE WHEN INSTR(EXCEPTION_CATEGORY, ':') > 0 THEN REGEXP_SUBSTR(EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END | Báo cáo EXCEPTION - FTR (BC7) | EXCEPTION_CODE (Code lý do) |
+| 8 | RAISE_FLAG | NVARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Raise (nêu lý do) tại tổ hợp bước/quyết định này hay không — nguồn NG_SB_RLOS_MAS_EXCEPTION.RAISE | — | Thiết kế dư thừa |
+| 9 | CLEAR_FLAG | NVARCHAR2 | N | 5 |  | Cờ cho biết ngoại lệ này có được phép Clear (trả lời làm rõ) tại tổ hợp bước/quyết định này hay không — nguồn NG_SB_RLOS_MAS_EXCEPTION.CLEAR | — | Thiết kế dư thừa |
+| 10 | ID_SOURCE | NUMBER | N | 18 |  | Số định danh nội bộ của bản ghi danh mục trên bảng nguồn — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_RLOS_MAS_EXCEPTION.ID, đổi tên thêm hậu tố SOURCE, tránh trùng khái niệm với DIMENSION_KEY) | — | Thiết kế dư thừa |
+| 11 | CODE_SOURCE | NVARCHAR2 | N | 255 |  | Mã viết tắt của tổ hợp ngoại lệ — kế thừa nguyên văn từ SB_DWH (nguồn gốc NG_SB_RLOS_MAS_EXCEPTION.CODE, đổi tên tránh trùng khái niệm với EXCEPTION_CODE phái sinh ở 7) | — | Thiết kế dư thừa |
+| 12 | STATUS | NVARCHAR2 | N | 1 |  | Trạng thái bản ghi danh mục trên bảng nguồn — nguồn NG_SB_RLOS_MAS_EXCEPTION.STATUS, giữ nguyên tên nguồn | — | Thiết kế dư thừa |
+| 13 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) | — | — |
+| 14 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 14. DIM_RLOS_PRODUCT
 
 ### 14.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục sản phẩm tín dụng RLOS (bán lẻ/cá nhân) — lưu dòng sản phẩm chính (`PRODUCTLINE_CODE`) và sản phẩm nhánh (`SUB_PRODUCT_NAME`, con của sản phẩm chính). `PRODUCTLINE_SK` tách riêng cho layer cha (theo pattern T24, xem SB_DWH mục 13), chỉ layer Sub Product quản lý SCD2.
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY` (giữ nguyên giá trị từ SB_DWH)
-- **Khóa nghiệp vụ (NK/BK) theo layer:** `PRODUCTLINE_CODE` (Product Line); `PRODUCTLINE_CODE` + `SUB_PRODUCT_NAME` (Sub Product, hash vào `SUB_PRODUCT_BK`) — `SUB_PRODUCT_CODE` không unique trên dữ liệu thật nên không dùng làm khóa.
+- **Khóa nghiệp vụ (NK) theo layer:** `PRODUCTLINE_CODE` (Product Line); `PRODUCTLINE_CODE` + `SUB_PRODUCT_NAME` (Sub Product) — `SUB_PRODUCT_CODE` không unique trên dữ liệu thật nên không dùng làm khóa. ⚠️ review 2026-10-26 (theo yêu cầu người dùng, đồng bộ với SB_DWH): bỏ hẳn cột hash `SUB_PRODUCT_BK` — chỉ là hash dẫn xuất của NK gốc (vẫn còn đủ trong bảng), không phải PK, không được FCT nào tham chiếu làm khóa join, nên là dư thừa thuần.
 - **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `PRODUCTLINE_CODE` + `SUB_PRODUCT_NAME` + `EFF_DATE`).
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1)
@@ -659,20 +654,19 @@ flowchart LR
 | 3 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 | NK | Mã dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_CODE (= PRODUCTLINE_CODE của MAS_PRODUCT_LINE, cùng khái niệm).| Báo cáo RLOS APPLICATION (BC1) | PRODUCT_LINE (Dòng sản phẩm) |
 | 4 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_SUB_PRODUCT.PRODUCT_NAME.| Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay PRODUCTLINE_CODE | PRODUCT_LINE (Dòng sản phẩm) |
 | 5 | SUB_PRODUCT_SK | NUMBER | Y | 18 |  | Layer nhỏ nhất/đại diện của cả dòng, FK duy nhất mà FCT_RLOS_APPLICATION dùng. Bằng đúng giá trị DIMENSION_KEY của cùng dòng. Mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp | — | — |
-| 6 | SUB_PRODUCT_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của layer Sub Product — PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(PRODUCTLINE_CODE \|\| SUB_PRODUCT_NAME, 'MD5') | — | — |
-| 7 | SUB_PRODUCT_CODE | VARCHAR2 | N | 200 |  | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
-| 8 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 200 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME| Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
-| 9 | SCORE_REQUIRED | VARCHAR2 | N | 200 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED | — | Thiết kế dư thừa |
-| 10 | SCORE_MODEL | VARCHAR2 | N | 200 |  | Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL | — | Thiết kế dư thừa |
-| 11 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — CHỈ 1 cặp cho layer nhỏ nhất, do SB_DWH quản lý, bê nguyên qua tầng PDTD_DTM | — | — |
-| 12 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 6 | SUB_PRODUCT_CODE | VARCHAR2 | N | 200 |  | Mã sản phẩm nhánh — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_CODE. ⚠️ review 2026-10-26: bỏ cột hash SUB_PRODUCT_BK (dư thừa, xem Section 14.1) | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | SUB_PRODUCT (Sản phẩm nhánh); nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
+| 7 | SUB_PRODUCT_NAME | NVARCHAR2 | N | 200 | NK | Tên sản phẩm tín dụng chi tiết — nguồn MAS_SUB_PRODUCT.SUB_PRODUCT_NAME| Báo cáo KPI (BC9) — điều kiện lọc SEC/UNSEC | Nguồn cho chỉ tiêu/trường TAT_RLOS_SEC_*/TAT_RLOS_UNSEC_* (điều kiện lọc SEC/UNSEC trên AGG_LOS_KPI_YTD_DAILY) |
+| 8 | SCORE_REQUIRED | VARCHAR2 | N | 200 |  | Cờ yêu cầu chấm điểm — nguồn MAS_SUB_PRODUCT.SCORE_REQUIRED | — | Thiết kế dư thừa |
+| 9 | SCORE_MODEL | VARCHAR2 | N | 200 |  | Mô hình chấm điểm áp dụng — nguồn MAS_SUB_PRODUCT.SCORE_MODEL | — | Thiết kế dư thừa |
+| 10 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — CHỈ 1 cặp cho layer nhỏ nhất, do SB_DWH quản lý, bê nguyên qua tầng PDTD_DTM | — | — |
+| 11 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 14A. DIM_RLOS_SECONDPRODUCT
 
 ### 14A.1 Mục đích thiết kế
 - **Ý nghĩa bảng:** danh mục tổ hợp (sản phẩm chính, sản phẩm phụ) hợp lệ của RLOS — "sản phẩm phụ" ở đây là SeABuy/SeATeacher/SeAWomen/SeACivil/Thẻ tín dụng, sản phẩm thứ 2 đi kèm sản phẩm chính
 - **Khóa chính của bảng (PK):** `DIMENSION_KEY` (giữ nguyên giá trị từ SB_DWH)
-- **Khóa nghiệp vụ (BK):** composite `PRODUCTLINE_CODE` + `SECONDARY_PRODUCT` — hash vào cột `SECONDPRODUCT_BK`
+- **Khóa nghiệp vụ (NK):** composite `PRODUCTLINE_CODE` + `SECONDARY_PRODUCT`. ⚠️ review 2026-10-26 (theo yêu cầu người dùng, đồng bộ với SB_DWH): bỏ hẳn cột hash `SECONDPRODUCT_BK` — chỉ là hash dẫn xuất của NK gốc (vẫn còn đủ trong bảng), không phải PK, không được FCT nào tham chiếu làm khóa join, nên là dư thừa thuần.
 - **Độ chi tiết (grain):** 1 dòng lưu lịch sử thông tin thay đổi theo thời gian (SCD Type 2, khóa tự nhiên `PRODUCTLINE_CODE` + `SECONDARY_PRODUCT` + `EFF_DATE`).
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1) — qua `FCT_RLOS_APPLICATION_SECONDPRODUCT.SECONDPRODUCT_SK` (xem mục 13)
@@ -695,12 +689,11 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | DIMENSION_KEY | NUMBER | Y | 18 | PK | Khóa chính của bảng chiều DIM_RLOS_SECONDPRODUCT, sinh bằng Oracle sequence tại SB_DWH; PDTD_DTM giữ nguyên giá trị, không sinh sequence mới | — | — |
 | 2 | SECONDPRODUCT_SK | NUMBER | Y | 18 |  | Khóa tham chiếu đến bảng chiều DIM_RLOS_SECONDPRODUCT, bằng đúng giá trị DIMENSION_KEY của cùng dòng. Giá trị mặc định = -1 (dòng Unknown) nếu không có giá trị phù hợp hoặc hồ sơ không có sản phẩm phụ | — | — |
-| 3 | SECONDPRODUCT_BK | VARCHAR2 | N | 64 | BK | Khóa nghiệp vụ hash của tổ hợp (sản phẩm chính, sản phẩm phụ) — kế thừa nguyên văn từ SB_DWH, PHÁI SINH sẵn tại tầng SB_DWH: STANDARD_HASH(PRODUCTLINE_CODE \|\| SECONDARY_PRODUCT, 'MD5') | — | — |
-| 4 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 |  | Mã dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCTLINE_CODE.| Báo cáo RLOS APPLICATION (BC1) | PRODUCT_LINE (Dòng sản phẩm) |
-| 5 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCT_LINE_NAME.| Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay PRODUCTLINE_CODE | PRODUCT_LINE (Dòng sản phẩm) |
-| 6 | SECONDARY_PRODUCT | VARCHAR2 | N | 200 |  | Sản phẩm phụ đi kèm (SeABuy/SeATeacher/SeAWomen/SeACivil/Thẻ tín dụng — không phải sản phẩm con của sản phẩm chính, xác nhận EU Meeting note #10) — nguồn MAS_PRODUCT_LINE.SECONDARY_PRODUCT | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN qua FCT_RLOS_APPLICATION_SECONDPRODUCT.SECONDPRODUCT_SK | SAN_PHAM_PHU (Sản phẩm phụ chi tiết) |
-| 7 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do SB_DWH quản lý, bê nguyên qua tầng PDTD_DTM | — | — |
-| 8 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
+| 3 | PRODUCTLINE_CODE | VARCHAR2 | N | 200 | NK | Mã dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCTLINE_CODE. ⚠️ review 2026-10-26: bỏ cột hash SECONDPRODUCT_BK (dư thừa, xem Section 14A.1) | Báo cáo RLOS APPLICATION (BC1) | PRODUCT_LINE (Dòng sản phẩm) |
+| 4 | PRODUCTLINE_NAME | VARCHAR2 | N | 200 |  | Tên dòng sản phẩm chính — nguồn MAS_PRODUCT_LINE.PRODUCT_LINE_NAME.| Báo cáo RLOS APPLICATION (BC1) — có thể hiển thị thay PRODUCTLINE_CODE | PRODUCT_LINE (Dòng sản phẩm) |
+| 5 | SECONDARY_PRODUCT | VARCHAR2 | N | 200 | NK | Sản phẩm phụ đi kèm (SeABuy/SeATeacher/SeAWomen/SeACivil/Thẻ tín dụng — không phải sản phẩm con của sản phẩm chính, xác nhận EU Meeting note #10) — nguồn MAS_PRODUCT_LINE.SECONDARY_PRODUCT | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN qua FCT_RLOS_APPLICATION_SECONDPRODUCT.SECONDPRODUCT_SK | SAN_PHAM_PHU (Sản phẩm phụ chi tiết) |
+| 6 | EFF_DATE | DATE | N |  |  | Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2) — do SB_DWH quản lý, bê nguyên qua tầng PDTD_DTM | — | — |
+| 7 | EXP_DATE | DATE | N |  |  | Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành | — | — |
 
 ## 15. DIM_T24_COMPANY
 

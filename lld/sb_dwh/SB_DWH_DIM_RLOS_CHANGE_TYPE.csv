@@ -1,7 +1,6 @@
 target_table,target_column,nullable,data_type,key,description,etl_logic,etl_logic_type,source_table,source_column,note
 DIM_RLOS_CHANGE_TYPE,DIMENSION_KEY,false,NUMBER,PK,PK — Driving: SB_RLOS_MAS_CHANGE_TYPE,,generated,,,Sinh bằng Oracle sequence tại SB_DWH
 DIM_RLOS_CHANGE_TYPE,CHANGE_TYPE_SK,true,NUMBER,,Bằng đúng DIMENSION_KEY cùng dòng — dùng để Fact lookup vào DIM này,= DIMENSION_KEY (cùng dòng),generated,,,Mặc định -1 nếu không có giá trị phù hợp
-DIM_RLOS_CHANGE_TYPE,CHANGE_TYPE_BK,true,VARCHAR2(64),,"Khóa nghiệp vụ hash của tổ hợp (loại thay đổi, chi tiết loại thay đổi)","STANDARD_HASH(SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_CODE || SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_CODE, 'MD5')",generated,SB_RLOS_MAS_CHANGE_TYPE,,
 DIM_RLOS_CHANGE_TYPE,CHANGE_TYPE_CODE,true,VARCHAR2(100),NK,Business key (1/2) — mã loại thay đổi điều kiện phê duyệt,SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_CODE,direct,SB_RLOS_MAS_CHANGE_TYPE,CHANGE_TYPE_CODE,
 DIM_RLOS_CHANGE_TYPE,CHANGE_TYPE_NAME,true,VARCHAR2(200),,Tên loại thay đổi điều kiện phê duyệt,SB_RLOS_MAS_CHANGE_TYPE.CHANGE_TYPE_NAME,direct,SB_RLOS_MAS_CHANGE_TYPE,CHANGE_TYPE_NAME,
 DIM_RLOS_CHANGE_TYPE,DETAIL_CHANGE_TYPE_CODE,true,VARCHAR2(100),NK,Business key (2/2) — mã chi tiết loại thay đổi,SB_RLOS_MAS_CHANGE_TYPE.DETAIL_CHANGE_TYPE_CODE,direct,SB_RLOS_MAS_CHANGE_TYPE,DETAIL_CHANGE_TYPE_CODE,

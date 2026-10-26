@@ -210,7 +210,6 @@ BEGIN
    (
      dimension_key        NUMBER not null,
      exception_sk          NUMBER,
-     exception_bk          VARCHAR2(64),
      activityname          VARCHAR2(200),
      decision_code          VARCHAR2(200),
      exception_category    VARCHAR2(500),
@@ -250,19 +249,6 @@ BEGIN
        maxextents unlimited
      )';
    EXECUTE IMMEDIATE 'alter index SB_DWH.DIM_CLOS_EXCEPTION_PK nologging';
-   EXECUTE IMMEDIATE 'create index SB_DWH.EXCEPTION_BK_IDX_1 on SB_DWH.DIM_CLOS_EXCEPTION (EXCEPTION_BK)
-     tablespace SB_DWH_TBS
-     pctfree 10
-     initrans 2
-     maxtrans 255
-     storage
-     (
-       initial 64K
-       next 1M
-       minextents 1
-       maxextents unlimited
-     )
-     nologging';
    EXECUTE IMMEDIATE 'create index SB_DWH.DIM_CLOS_EXCEPTION_EFF_DATE_IDX_1 on SB_DWH.DIM_CLOS_EXCEPTION (EFF_DATE)
      tablespace SB_DWH_TBS
      pctfree 10
@@ -432,7 +418,6 @@ BEGIN
    (
      dimension_key            NUMBER not null,
      workstep_decision_sk      NUMBER,
-     workstep_decision_bk      VARCHAR2(64),
      workstep_code            VARCHAR2(200),
      decision_code             VARCHAR2(200),
      channel                  VARCHAR2(200),
@@ -465,19 +450,6 @@ BEGIN
        maxextents unlimited
      )';
    EXECUTE IMMEDIATE 'alter index SB_DWH.DIM_CLOS_WORKSTEP_DECISION_PK nologging';
-   EXECUTE IMMEDIATE 'create index SB_DWH.WORKSTEP_DECISION_BK_IDX_1 on SB_DWH.DIM_CLOS_WORKSTEP_DECISION (WORKSTEP_DECISION_BK)
-     tablespace SB_DWH_TBS
-     pctfree 10
-     initrans 2
-     maxtrans 255
-     storage
-     (
-       initial 64K
-       next 1M
-       minextents 1
-       maxextents unlimited
-     )
-     nologging';
    EXECUTE IMMEDIATE 'create index SB_DWH.DIM_CLOS_WORKSTEP_DECISION_EFF_DATE_IDX_1 on SB_DWH.DIM_CLOS_WORKSTEP_DECISION (EFF_DATE)
      tablespace SB_DWH_TBS
      pctfree 10
@@ -1008,7 +980,6 @@ BEGIN
    (
      dimension_key               NUMBER not null,
      change_type_sk               NUMBER,
-     change_type_bk               VARCHAR2(64),
      change_type_code             VARCHAR2(100),
      change_type_name             VARCHAR2(200),
      detail_change_type_code      VARCHAR2(100),
@@ -1043,19 +1014,6 @@ BEGIN
        maxextents unlimited
      )';
    EXECUTE IMMEDIATE 'alter index SB_DWH.DIM_RLOS_CHANGE_TYPE_PK nologging';
-   EXECUTE IMMEDIATE 'create index SB_DWH.CHANGE_TYPE_BK_IDX_1 on SB_DWH.DIM_RLOS_CHANGE_TYPE (CHANGE_TYPE_BK)
-     tablespace SB_DWH_TBS
-     pctfree 10
-     initrans 2
-     maxtrans 255
-     storage
-     (
-       initial 64K
-       next 1M
-       minextents 1
-       maxextents unlimited
-     )
-     nologging';
    EXECUTE IMMEDIATE 'create index SB_DWH.DIM_RLOS_CHANGE_TYPE_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_CHANGE_TYPE (EFF_DATE)
      tablespace SB_DWH_TBS
      pctfree 10
@@ -1103,7 +1061,6 @@ BEGIN
    (
      dimension_key        NUMBER not null,
      exception_sk          NUMBER,
-     exception_bk          VARCHAR2(64),
      activityname          VARCHAR2(200),
      decision_code          VARCHAR2(200),
      exception_category    VARCHAR2(500),
@@ -1143,19 +1100,6 @@ BEGIN
        maxextents unlimited
      )';
    EXECUTE IMMEDIATE 'alter index SB_DWH.DIM_RLOS_EXCEPTION_PK nologging';
-   EXECUTE IMMEDIATE 'create index SB_DWH.RLOS_EXCEPTION_BK_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTION (EXCEPTION_BK)
-     tablespace SB_DWH_TBS
-     pctfree 10
-     initrans 2
-     maxtrans 255
-     storage
-     (
-       initial 64K
-       next 1M
-       minextents 1
-       maxextents unlimited
-     )
-     nologging';
    EXECUTE IMMEDIATE 'create index SB_DWH.DIM_RLOS_EXCEPTION_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_EXCEPTION (EFF_DATE)
      tablespace SB_DWH_TBS
      pctfree 10
@@ -1206,7 +1150,6 @@ BEGIN
      productline_code     VARCHAR2(100),
      productline_name     VARCHAR2(200),
      sub_product_sk       NUMBER,
-     sub_product_bk       VARCHAR2(64),
      sub_product_code     VARCHAR2(100),
      sub_product_name     VARCHAR2(150),
      score_required       VARCHAR2(10),
@@ -1300,7 +1243,6 @@ BEGIN
    (
      dimension_key        NUMBER not null,
      secondproduct_sk       NUMBER not null,
-     secondproduct_bk       VARCHAR2(64),
      productline_code       VARCHAR2(200),
      productline_name       VARCHAR2(200),
      secondary_product      VARCHAR2(200),
@@ -1333,19 +1275,6 @@ BEGIN
        maxextents unlimited
      )';
    EXECUTE IMMEDIATE 'alter index SB_DWH.DIM_RLOS_SECONDPRODUCT_PK nologging';
-   EXECUTE IMMEDIATE 'create index SB_DWH.SECONDPRODUCT_BK_IDX_1 on SB_DWH.DIM_RLOS_SECONDPRODUCT (SECONDPRODUCT_BK)
-     tablespace SB_DWH_TBS
-     pctfree 10
-     initrans 2
-     maxtrans 255
-     storage
-     (
-       initial 64K
-       next 1M
-       minextents 1
-       maxextents unlimited
-     )
-     nologging';
    EXECUTE IMMEDIATE 'create index SB_DWH.DIM_RLOS_SECONDPRODUCT_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_SECONDPRODUCT (EFF_DATE)
      tablespace SB_DWH_TBS
      pctfree 10
@@ -1393,7 +1322,6 @@ BEGIN
    (
      dimension_key            NUMBER not null,
      workstep_decision_sk      NUMBER,
-     workstep_decision_bk      VARCHAR2(64),
      workstep_code            VARCHAR2(200),
      decision_code             VARCHAR2(200),
      req_type                 VARCHAR2(255),
@@ -1426,19 +1354,6 @@ BEGIN
        maxextents unlimited
      )';
    EXECUTE IMMEDIATE 'alter index SB_DWH.DIM_RLOS_WORKSTEP_DECISION_PK nologging';
-   EXECUTE IMMEDIATE 'create index SB_DWH.RLOS_WORKSTEP_DECISION_BK_IDX_1 on SB_DWH.DIM_RLOS_WORKSTEP_DECISION (WORKSTEP_DECISION_BK)
-     tablespace SB_DWH_TBS
-     pctfree 10
-     initrans 2
-     maxtrans 255
-     storage
-     (
-       initial 64K
-       next 1M
-       minextents 1
-       maxextents unlimited
-     )
-     nologging';
    EXECUTE IMMEDIATE 'create index SB_DWH.DIM_RLOS_WORKSTEP_DECISION_EFF_DATE_IDX_1 on SB_DWH.DIM_RLOS_WORKSTEP_DECISION (EFF_DATE)
      tablespace SB_DWH_TBS
      pctfree 10
