@@ -26,7 +26,8 @@ BEGIN
         customer_code            VARCHAR2(100),
         channel                  VARCHAR2(200),
         eff_date                 DATE,
-        exp_date                 DATE
+        exp_date                 DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -123,7 +124,8 @@ BEGIN
         industry_lvl2_code VARCHAR2(200),
         industry_lvl3_code VARCHAR2(200),
         eff_date           DATE,
-        exp_date           DATE
+        exp_date           DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -170,7 +172,8 @@ BEGIN
         code_source        VARCHAR2(255),
         status             VARCHAR2(50),
         eff_date           DATE,
-        exp_date           DATE
+        exp_date           DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -215,7 +218,8 @@ BEGIN
         sub_product_name         VARCHAR2(150),
         sub_product_active       VARCHAR2(100),
         sub_product_eff_date     DATE,
-        sub_product_exp_date     DATE
+        sub_product_exp_date     DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -255,7 +259,8 @@ BEGIN
         decision_code        VARCHAR2(200),
         channel              VARCHAR2(200),
         eff_date             DATE,
-        exp_date             DATE
+        exp_date             DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -307,7 +312,8 @@ BEGIN
         region_code       NUMBER,
         region_name       VARCHAR2(200),
         region_eff_date   DATE,
-        region_exp_date   DATE
+        region_exp_date   DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -365,7 +371,8 @@ BEGIN
         hub                  VARCHAR2(100),
         branch_manager_email VARCHAR2(200),
         eff_date             DATE,
-        exp_date             DATE
+        exp_date             DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -462,7 +469,8 @@ BEGIN
         totalnoneligible     VARCHAR2(5),
         cancel_reason        VARCHAR2(500),
         eff_date             DATE,
-        exp_date             DATE
+        exp_date             DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -556,7 +564,8 @@ BEGIN
         pro_valid         NVARCHAR2(255),
         order_promotion   NVARCHAR2(255),
         eff_date          DATE,
-        exp_date          DATE
+        exp_date          DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -598,7 +607,8 @@ BEGIN
         detail_change_type_name VARCHAR2(500),
         is_active               VARCHAR2(1),
         eff_date                DATE,
-        exp_date                DATE
+        exp_date                DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -645,7 +655,8 @@ BEGIN
         code_source        VARCHAR2(255),
         status             VARCHAR2(50),
         eff_date           DATE,
-        exp_date           DATE
+        exp_date           DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -690,7 +701,8 @@ BEGIN
         score_required   VARCHAR2(10),
         score_model      VARCHAR2(100),
         eff_date         DATE,
-        exp_date         DATE
+        exp_date         DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -730,7 +742,8 @@ BEGIN
         productline_name  VARCHAR2(200),
         secondary_product VARCHAR2(200),
         eff_date          DATE,
-        exp_date          DATE
+        exp_date          DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
@@ -770,7 +783,8 @@ BEGIN
         decision_code        VARCHAR2(200),
         req_type             VARCHAR2(255),
         eff_date             DATE,
-        exp_date             DATE
+        exp_date             DATE,
+        time_update TIMESTAMP
       )
       tablespace PDTD_DTM_TBS
         pctfree 10
