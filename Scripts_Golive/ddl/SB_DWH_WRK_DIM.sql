@@ -182,7 +182,7 @@ BEGIN
       eff_date              DATE,
       exp_date              DATE
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
-/*
+
    -- ============================================================
    -- 8. WRK_DIM_RLOS_SECONDPRODUCT
    -- ============================================================
@@ -220,7 +220,7 @@ BEGIN
       productline_code    VARCHAR2(100),
       productline_name    VARCHAR2(200)
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
-*/
+
    -- ============================================================
    -- 10. WRK_DIM_RLOS_WORKSTEP_DECISION
    -- ============================================================
