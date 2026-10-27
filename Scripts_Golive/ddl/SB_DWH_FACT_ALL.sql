@@ -19,7 +19,6 @@ CREATE TABLE SB_DWH.FCT_CLOS_APPLICATION (
     PROCESSED_DATE                DATE                ,
     PROPOSED_AMT                  NUMBER(20,2)        ,
     CREDIT_LIMIT_APPROVAL         NUMBER(20,2)        ,
-    CREDIT_LIMIT_COMMITTEE        NUMBER(20,2)        ,
     APPROVED_AMT_FINAL            NUMBER(20,2)        ,
     APPROVED_TERM                 NVARCHAR2(100)      ,
     INTEREST_RATE_PCT             NVARCHAR2(500)      ,
