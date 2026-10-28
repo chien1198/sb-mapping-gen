@@ -13,3 +13,4 @@
 "DIM_RLOS_EXCEPTION","STATUS","true","VARCHAR2(50)","","Trạng thái bản ghi danh mục trên bảng nguồn (còn hiệu lực/đã ngừng áp dụng...)","STG_DIM_RLOS_EXCEPTION.STATUS","direct","STG_DIM_RLOS_EXCEPTION","STATUS",""
 "DIM_RLOS_EXCEPTION","EFF_DATE","true","DATE","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","STG_DIM_RLOS_EXCEPTION.EFF_DATE","direct","STG_DIM_RLOS_EXCEPTION","EFF_DATE",""
 "DIM_RLOS_EXCEPTION","EXP_DATE","true","DATE","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","STG_DIM_RLOS_EXCEPTION.EXP_DATE","direct","STG_DIM_RLOS_EXCEPTION","EXP_DATE",""
+"DIM_RLOS_EXCEPTION","TIME_UPDATE","false","TIMESTAMP","","Thời điểm bản ghi được cập nhật lần gần nhất (audit column)","CURRENT_TIMESTAMP()","computed","","","Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất"

@@ -8,3 +8,4 @@
 "STG_DIM_RLOS_CARD_PROMOTION","ORDER_PROMOTION","true","NVARCHAR2(255)","","Thứ tự ưu tiên áp dụng của chương trình ưu đãi","DIM_RLOS_CARD_PROMOTION.ORDER_PROMOTION","direct","DIM_RLOS_CARD_PROMOTION","ORDER_PROMOTION",""
 "STG_DIM_RLOS_CARD_PROMOTION","EFF_DATE","true","DATE","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","DIM_RLOS_CARD_PROMOTION.EFF_DATE","direct","DIM_RLOS_CARD_PROMOTION","EFF_DATE",""
 "STG_DIM_RLOS_CARD_PROMOTION","EXP_DATE","true","DATE","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","DIM_RLOS_CARD_PROMOTION.EXP_DATE","direct","DIM_RLOS_CARD_PROMOTION","EXP_DATE",""
+"STG_DIM_RLOS_CARD_PROMOTION","TIME_UPDATE","false","TIMESTAMP","","Thời điểm bản ghi được cập nhật lần gần nhất (audit column)","CURRENT_TIMESTAMP()","computed","","","Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất"

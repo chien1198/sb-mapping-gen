@@ -6,3 +6,4 @@
 "STG_DIM_RLOS_WORKSTEP_DECISION","REQ_TYPE","true","VARCHAR2(255)","","Loại yêu cầu điều chỉnh hồ sơ liên quan tới bước/quyết định","DIM_RLOS_WORKSTEP_DECISION.REQ_TYPE","direct","DIM_RLOS_WORKSTEP_DECISION","REQ_TYPE",""
 "STG_DIM_RLOS_WORKSTEP_DECISION","EFF_DATE","true","DATE","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","DIM_RLOS_WORKSTEP_DECISION.EFF_DATE","direct","DIM_RLOS_WORKSTEP_DECISION","EFF_DATE",""
 "STG_DIM_RLOS_WORKSTEP_DECISION","EXP_DATE","true","DATE","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","DIM_RLOS_WORKSTEP_DECISION.EXP_DATE","direct","DIM_RLOS_WORKSTEP_DECISION","EXP_DATE",""
+"STG_DIM_RLOS_WORKSTEP_DECISION","TIME_UPDATE","false","TIMESTAMP","","Thời điểm bản ghi được cập nhật lần gần nhất (audit column)","CURRENT_TIMESTAMP()","computed","","","Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất"

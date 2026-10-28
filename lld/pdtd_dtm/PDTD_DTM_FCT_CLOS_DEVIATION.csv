@@ -7,3 +7,4 @@
 "FCT_CLOS_DEVIATION","DEV_PROPOSAL","true","VARCHAR2(4000)","","Đề xuất xử lý lệch chính sách","STG_FCT_CLOS_DEVIATION.DEV_PROPOSAL","direct","STG_FCT_CLOS_DEVIATION","DEV_PROPOSAL",""
 "FCT_CLOS_DEVIATION","AS_REGULAR","true","VARCHAR2(4000)","","Quy định chuẩn liên quan tới lệch chính sách","STG_FCT_CLOS_DEVIATION.AS_REGULAR","direct","STG_FCT_CLOS_DEVIATION","AS_REGULAR",""
 "FCT_CLOS_DEVIATION","PROCESSED_DATE","true","DATE","","Ngày xử lý của hồ sơ","STG_FCT_CLOS_DEVIATION.PROCESSED_DATE","direct","STG_FCT_CLOS_DEVIATION","PROCESSED_DATE",""
+FCT_CLOS_DEVIATION,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất

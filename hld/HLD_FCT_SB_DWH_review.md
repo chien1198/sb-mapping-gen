@@ -211,7 +211,6 @@ flowchart LR
         C["FCT_CLOS_EXCEPTION"]
     end
     A -->|1:1, khóa CDC khai đủ, không hash| C
-    B -.->|EXCEPTION_SK, LEFT JOIN EXCEPTION_CATEGORY+EXCEPTION_NAME rồi EXISTS-filter qua E| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
     F -.->|USER_SK, lookup theo RAISED_BY| C
     KC -.->|"CUSTOMER_SK: tra ID_NUMBER qua WI_NAME + NG_SB_CLOS_CUST_INFO_LEGAL"| C
@@ -227,6 +226,15 @@ flowchart LR
     L -.-> KC
 ```
 
+> **SRS BC7 cập nhật (2026-10-28):** bỏ lookup `EXCEPTION_SK` từ FCT sang
+> `DIM_CLOS_EXCEPTION` — thuật toán tính `ACTIVITYNAME`/`WORKSTEP_CODE` theo
+> SRS mới không còn đủ khóa (bỏ `EXCEPTION_NAME`) để xác định đúng 1 dòng
+> DIM, nên không còn là lookup 1:1 ổn định ở tầng SB_DWH. Việc tính
+> `WORKSTEP_CODE` (đổi tên từ `ACTIVITYNAME` theo yêu cầu) được chuyển hẳn
+> xuống PDTD_DTM — xem `HLD_FCT_PDTD_DTM_review.md`. `DIM_CLOS_EXCEPTION`
+> giữ nguyên cấu trúc, chỉ không còn được `FCT_CLOS_EXCEPTION` tham chiếu
+> trực tiếp ở tầng này.
+
 ### 3.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
@@ -235,19 +243,19 @@ flowchart LR
 | 2 | EXCEPTION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng ngoại lệ — PHÁI SINH: STANDARD_HASH(WI_NAME \|\| EXCEPTION_CATEGORY \|\| RAISED_BY \|\| TO_CHAR(RAISED_DATE_TIME,'YYYY-MM-DD HH24:MI:SS.FF6'), 'MD5') — gộp 4 cột PK tự nhiên cũ (WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME) thành 1 khóa đơn | — (cột kỹ thuật, một phần khóa chính) | — |
 | 3 | APPLICATION_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_CLOS_APPLICATION | — |
 | 4 | WI_NAME | NVARCHAR2 | Y | 256 |  | Mã hồ sơ tín dụng CLOS — nguồn NG_SB_CLOS_EXCEPTION.WI_NAME| Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN<br>Báo cáo RETURN (BC8) — khóa JOIN | WINAME (Mã hồ sơ) |
-| 5 | EXCEPTION_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_EXCEPTION — PHÁI SINH 2 bước đúng SRS BC7 (không phải lookup 1 cột): (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME, có thể khớp nhiều dòng DIM cùng category+name khác ACTIVITYNAME/DECISION_CODE; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_CLOS_ENTRY_EXIT (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó) — chỉ giữ tổ hợp đã thực sự xảy ra trong lịch sử xử lý hồ sơ. Mặc định -1 nếu không còn dòng nào khớp | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_CLOS_EXCEPTION | — |
-| 6 | WORKSTEP_CODE | VARCHAR2 | N | 200 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: tương ứng ACTIVITYNAME của dòng DIM_CLOS_EXCEPTION đã khớp EXCEPTION_SK (cột 5) — 1 phần BK composite 4 cột (ACTIVITYNAME+DECISION_CODE+EXCEPTION_CATEGORY+EXCEPTION_NAME) của DIM_CLOS_EXCEPTION; EXCEPTION_CATEGORY/EXCEPTION_NAME đã có sẵn (cột 11, 14). Giá trị đã có sẵn trong bước lọc EXISTS qua NG_SB_CLOS_ENTRY_EXIT, giữ lại làm cột output | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
-| 7 | DECISION_CODE | VARCHAR2 | N | 200 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: phần còn lại của BK composite DIM_CLOS_EXCEPTION ứng với dòng đã khớp EXCEPTION_SK (cột 5) — giá trị đã có sẵn trong bước lọc EXISTS qua NG_SB_CLOS_ENTRY_EXIT (điều kiện DECISION=DECISION_CODE của dòng DIM), giữ lại làm cột output | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
-| 8 | USER_SK | NUMBER | N | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu | — (cột kỹ thuật, khóa JOIN nội bộ — BC7 dùng cột RAISED_BY gốc để hiển thị, khớp bản RLOS) | — |
-| 9 | USERNAME | VARCHAR2 | N | 150 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: Tên tài khoản dùng để lookup USER_SK (cột 8) — nguồn NG_SB_CLOS_EXCEPTION.RAISED_BY, cùng giá trị đã dùng để lookup USER_SK, giữ lại làm cột output riêng theo đúng BK gốc của DIM_LOS_USER (khác RAISED_BY ở cột 14, dù cùng nguồn gốc giá trị — giữ tách biệt ý nghĩa khóa nghiệp vụ khỏi cột nghiệp vụ hiển thị) | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
-| 10 | CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_CUSTOMER: tra ID_NUMBER qua WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, rồi lookup DIM_CLOS_CUSTOMER theo CUSTOMER_CODE (BK) + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp | — (cột kỹ thuật, khóa JOIN nội bộ phục vụ PDTD_DTM tra CUST_GROUP để tính CHECK_FTR) | — |
-| 11 | CUSTOMER_CODE | VARCHAR2 | N | 100 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: Mã khách hàng (BK của DIM_CLOS_CUSTOMER) — giá trị đã tra ra trong bước lookup CUSTOMER_SK (cột 10), giữ lại làm cột output | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
-| 12 | EXCEPTION_CATEGORY | NVARCHAR2 | N | 200 |  | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_CATEGORY | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_CATEGORY (Nhóm nội dung ngoại lệ) |
-| 13 | RAISED_BY | NVARCHAR2 | N | 200 |  | Người nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_BY. Cột USER_SK bên cạnh giữ khóa tới DIM | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RAISED_BY (Người nêu) |
-| 14 | RAISED_DATE_TIME | TIMESTAMP | N |  |  | Thời điểm nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_DATE_TIME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, đồng thời là nguồn tính PROCESSED_DATE (TRUNC ở tầng report) | RAISED_DATE_TIME (Thời điểm nêu); nguồn cho chỉ tiêu/trường PROCESSED_DATE (Ngày dữ liệu, BC7) |
-| 15 | EXCEPTION_NAME | NVARCHAR2 | N | 200 |  | Tên nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_NAME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_NAME (Tên nội dung ngoại lệ) |
-| 16 | EXCEPTION_REMARKS | NVARCHAR2 | N | 200 |  | Ghi chú của nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_REMARKS | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_REMARKS (Ghi chú ngoại lệ) |
-| 17 | RCTYPE | NVARCHAR2 | N | 100 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_CLOS_EXCEPTION.RCTYPE | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RCTYPE (Raise/Clear) |
+| 5 | USER_SK | NUMBER | N | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu | — (cột kỹ thuật, khóa JOIN nội bộ — BC7 dùng cột RAISED_BY gốc để hiển thị, khớp bản RLOS) | — |
+| 6 | USERNAME | VARCHAR2 | N | 150 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: Tên tài khoản dùng để lookup USER_SK (cột 5) — nguồn NG_SB_CLOS_EXCEPTION.RAISED_BY, cùng giá trị đã dùng để lookup USER_SK, giữ lại làm cột output riêng theo đúng BK gốc của DIM_LOS_USER (khác RAISED_BY ở cột 11, dù cùng nguồn gốc giá trị — giữ tách biệt ý nghĩa khóa nghiệp vụ khỏi cột nghiệp vụ hiển thị) | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
+| 7 | CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_CUSTOMER: tra ID_NUMBER qua WI_NAME + UPPER(OBJ_TYPE)='KHÁCH HÀNG' trên NG_SB_CLOS_CUST_INFO_LEGAL, rồi lookup DIM_CLOS_CUSTOMER theo CUSTOMER_CODE (BK) + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp | — (cột kỹ thuật, khóa JOIN nội bộ phục vụ PDTD_DTM tra CUST_GROUP để tính CHECK_FTR) | — |
+| 8 | CUSTOMER_CODE | VARCHAR2 | N | 100 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: Mã khách hàng (BK của DIM_CLOS_CUSTOMER) — giá trị đã tra ra trong bước lookup CUSTOMER_SK (cột 7), giữ lại làm cột output | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
+| 9 | EXCEPTION_CATEGORY | NVARCHAR2 | N | 200 |  | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_CATEGORY | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp; cũng là nguồn PDTD_DTM dùng để tính WORKSTEP_CODE và CHECK_FTR (xem HLD_FCT_PDTD_DTM_review.md) | EXCEPTION_CATEGORY (Nhóm nội dung ngoại lệ) |
+| 10 | RAISED_BY | NVARCHAR2 | N | 200 |  | Người nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_BY. Cột USER_SK bên cạnh giữ khóa tới DIM | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RAISED_BY (Người nêu) |
+| 11 | RAISED_DATE_TIME | TIMESTAMP | N |  |  | Thời điểm nêu nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.RAISED_DATE_TIME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, đồng thời là nguồn tính PROCESSED_DATE (TRUNC ở tầng report); PDTD_DTM dùng để tính WORKSTEP_CODE (điều kiện RAISED_DATE_TIME >= ENTRYDATE) | RAISED_DATE_TIME (Thời điểm nêu); nguồn cho chỉ tiêu/trường PROCESSED_DATE (Ngày dữ liệu, BC7) |
+| 12 | EXCEPTION_NAME | NVARCHAR2 | N | 200 |  | Tên nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_NAME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_NAME (Tên nội dung ngoại lệ) |
+| 13 | EXCEPTION_REMARKS | NVARCHAR2 | N | 200 |  | Ghi chú của nội dung cần làm rõ — nguồn NG_SB_CLOS_EXCEPTION.EXCEPTION_REMARKS | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_REMARKS (Ghi chú ngoại lệ) |
+| 14 | RCTYPE | NVARCHAR2 | N | 100 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_CLOS_EXCEPTION.RCTYPE | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RCTYPE (Raise/Clear) |
+
+> **Đã bỏ (SRS BC7 cập nhật 2026-10-28):** `EXCEPTION_SK`, `WORKSTEP_CODE`,
+> `DECISION_CODE` — xem ghi chú trên sơ đồ lineage (mục 3.2).
 
 
 ## 4. FCT_CLOS_DEVIATION
@@ -801,7 +809,6 @@ flowchart LR
         C["FCT_RLOS_EXCEPTION"]
     end
     A -->|1:1, khóa CDC khai đủ, không hash| C
-    B -.->|EXCEPTION_SK, LEFT JOIN EXCEPTION_CATEGORY+EXCEPTION_NAME rồi EXISTS-filter qua E| C
     D -.->|APPLICATION_SK, theo phiên bản hiệu lực tại DAYID| C
     F -.->|USER_SK, lookup theo RAISED_BY| C
     P1 -.->|"SUB_PRODUCT — cột thô, LEFT JOIN theo WI_NAME; CHECK_FTR (whitelist theo BI_SUB_PRODUCT phái sinh từ cột này) tính tại PDTD_DTM"| C
@@ -816,6 +823,14 @@ flowchart LR
     U --> F
 ```
 
+> **SRS BC7 cập nhật (2026-10-28):** bỏ lookup `EXCEPTION_SK` từ FCT sang
+> `DIM_RLOS_EXCEPTION` — cùng lý do đã nêu ở FCT_CLOS_EXCEPTION (mục 3.2):
+> thuật toán mới không còn đủ khóa (bỏ `EXCEPTION_NAME`) để xác định đúng 1
+> dòng DIM. Việc tính `WORKSTEP_CODE` (đổi tên từ `ACTIVITYNAME`) chuyển
+> xuống PDTD_DTM — xem `HLD_FCT_PDTD_DTM_review.md`. `DIM_RLOS_EXCEPTION`
+> giữ nguyên cấu trúc, chỉ không còn được `FCT_RLOS_EXCEPTION` tham chiếu
+> trực tiếp ở tầng này.
+
 ### 10.3 Cấu trúc bảng
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả | Báo cáo sử dụng | Tên chỉ tiêu trên báo cáo |
@@ -824,18 +839,18 @@ flowchart LR
 | 2 | EXCEPTION_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ của dòng ngoại lệ — PHÁI SINH: STANDARD_HASH(WI_NAME \|\| EXCEPTION_CATEGORY \|\| RAISED_BY \|\| TO_CHAR(RAISED_DATE_TIME,'YYYY-MM-DD HH24:MI:SS.FF6'), 'MD5') — gộp 4 cột PK tự nhiên cũ (WI_NAME, EXCEPTION_CATEGORY, RAISED_BY, RAISED_DATE_TIME) thành 1 khóa đơn | — (cột kỹ thuật, một phần khóa chính) | — |
 | 3 | APPLICATION_SK | NUMBER | N | 18 |  | Khóa tới DIM_RLOS_APPLICATION theo phiên bản hiệu lực tại DAYID. Mặc định -1 | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
 | 4 | WI_NAME | NVARCHAR2 | Y | 100 |  | Mã hồ sơ tín dụng RLOS — nguồn NG_SB_RLOS_EXCEPTION.WI_NAME| WI_NAME (Mã hồ sơ) |
-| 5 | EXCEPTION_SK | NUMBER | N | 18 |  | Khóa tới DIM_RLOS_EXCEPTION — PHÁI SINH 2 bước đúng SRS BC7 (không phải lookup 1 cột): (1) LEFT JOIN theo EXCEPTION_CATEGORY + EXCEPTION_NAME, có thể khớp nhiều dòng DIM cùng category+name khác ACTIVITYNAME/DECISION_CODE; (2) lọc còn đúng 1 dòng bằng điều kiện tồn tại bản ghi NG_SB_RLOS_ENTRY_EXIT (WI_NAME khớp + WORKSTEP=ACTIVITYNAME + DECISION=DECISION_CODE của dòng DIM đó) — chỉ giữ tổ hợp đã thực sự xảy ra trong lịch sử xử lý hồ sơ. Mặc định -1 nếu không còn dòng nào khớp | Báo cáo EXCEPTION - FTR (BC7) — khóa JOIN sang DIM_RLOS_EXCEPTION để lấy ACTIVITYNAME, EXCEPTION_CODE | — |
-| 6 | WORKSTEP_CODE | VARCHAR2 | N | 200 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: tương ứng ACTIVITYNAME của dòng DIM_RLOS_EXCEPTION đã khớp EXCEPTION_SK (cột 5) — 1 phần BK composite 4 cột (ACTIVITYNAME+DECISION_CODE+EXCEPTION_CATEGORY+EXCEPTION_NAME) của DIM_RLOS_EXCEPTION; EXCEPTION_CATEGORY/EXCEPTION_NAME đã có sẵn (cột 10, 13). Giá trị đã có sẵn trong bước lọc EXISTS qua NG_SB_RLOS_ENTRY_EXIT, giữ lại làm cột output | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
-| 7 | DECISION_CODE | VARCHAR2 | N | 200 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: phần còn lại của BK composite DIM_RLOS_EXCEPTION ứng với dòng đã khớp EXCEPTION_SK (cột 5) — giá trị đã có sẵn trong bước lọc EXISTS qua NG_SB_RLOS_ENTRY_EXIT (điều kiện DECISION=DECISION_CODE của dòng DIM), giữ lại làm cột output | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
-| 8 | USER_SK | NUMBER | N | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu | — (cột kỹ thuật, khóa JOIN nội bộ — BC7 dùng cột RAISED_BY gốc để hiển thị) | — |
-| 9 | USERNAME | VARCHAR2 | N | 150 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: Tên tài khoản dùng để lookup USER_SK (cột 8) — nguồn NG_SB_RLOS_EXCEPTION.RAISED_BY, cùng giá trị đã dùng để lookup USER_SK, giữ lại làm cột output riêng theo đúng BK gốc của DIM_LOS_USER (khác RAISED_BY ở cột 13, dù cùng nguồn gốc giá trị — giữ tách biệt ý nghĩa khóa nghiệp vụ khỏi cột nghiệp vụ hiển thị) | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
-| 10 | EXCEPTION_CATEGORY | NVARCHAR2 | N | 200 |  | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_CATEGORY | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, cũng là khóa JOIN sang DIM_RLOS_EXCEPTION | EXCEPTION_CATEGORY (Nhóm lý do quyết định) |
-| 11 | RAISED_BY | NVARCHAR2 | N | 200 |  | Người nêu nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.RAISED_BY. Cột USER_SK bên cạnh giữ khóa tới DIM | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RAISED_BY (User tạo lý do) |
-| 12 | RAISED_DATE_TIME | TIMESTAMP | N |  |  | Thời điểm nêu nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.RAISED_DATE_TIME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — dùng làm PROCESSED_DATE (giữ nguyên giá trị timestamp, không TRUNC như nhánh CLOS) | RAISED_DATE_TIME (Thời gian tạo lý do); PROCESSED_DATE (Ngày dữ liệu, BC8) |
-| 13 | EXCEPTION_NAME | NVARCHAR2 | N | 200 |  | Tên nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_NAME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp, cũng là điều kiện lọc/khóa JOIN cho CHECK_FTR và DIM_RLOS_EXCEPTION | EXCEPTION_NAME (Tên lý do) |
-| 14 | EXCEPTION_REMARKS | NVARCHAR2 | N | 4000 |  | Ghi chú của nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_REMARKS | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_REMARKS (Ý kiến) |
-| 15 | RCTYPE | NVARCHAR2 | N | 50 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_RLOS_EXCEPTION.RCTYPE. Không dùng làm điều kiện lọc CHECK_FTR — vẫn giữ cột vì BC7 hiển thị trực tiếp làm trường riêng trên báo cáo | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | CHECK_FTR (thành phần Raise/Clear của trường "Hồ sơ đạt FTR hay không đạt FTR") |
-| 16 | SUB_PRODUCT | NVARCHAR2 | N | 200 |  | Sản phẩm vay chi tiết tự khai theo hồ sơ — cột thô (cùng cơ chế đã áp dụng cho CLOS mục 3): LEFT JOIN NG_SB_RLOS_APPLICANT_GENERAL theo WI_NAME, lấy SUB_PRODUCT (nguồn NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT). Không tính BI_SUB_PRODUCT ở đây — chỉ giữ giá trị gốc, PDTD_DTM tự CASE WHEN phân loại 'Credit Card' khi tính CHECK_FTR | Nguồn cho chỉ tiêu/trường CHECK_FTR| — |
+| 5 | USER_SK | NUMBER | N | 18 |  | Khóa tới DIM_LOS_USER, người nêu lý do. Mặc định -1. ĐÚNG GRAIN của bảng — 1 lần ghi nhận lý do có đúng 1 người nêu | — (cột kỹ thuật, khóa JOIN nội bộ — BC7 dùng cột RAISED_BY gốc để hiển thị) | — |
+| 6 | USERNAME | VARCHAR2 | N | 150 |  | CỘT MỚI — review bổ sung khóa nghiệp vụ (BK) cạnh SK: Tên tài khoản dùng để lookup USER_SK (cột 5) — nguồn NG_SB_RLOS_EXCEPTION.RAISED_BY, cùng giá trị đã dùng để lookup USER_SK, giữ lại làm cột output riêng theo đúng BK gốc của DIM_LOS_USER (khác RAISED_BY ở cột 10, dù cùng nguồn gốc giá trị — giữ tách biệt ý nghĩa khóa nghiệp vụ khỏi cột nghiệp vụ hiển thị) | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
+| 7 | EXCEPTION_CATEGORY | NVARCHAR2 | N | 200 |  | Phân nhóm nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_CATEGORY | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp; cũng là nguồn PDTD_DTM dùng để tính WORKSTEP_CODE và CHECK_FTR (xem HLD_FCT_PDTD_DTM_review.md) | EXCEPTION_CATEGORY (Nhóm lý do quyết định) |
+| 8 | RAISED_BY | NVARCHAR2 | N | 200 |  | Người nêu nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.RAISED_BY. Cột USER_SK bên cạnh giữ khóa tới DIM | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | RAISED_BY (User tạo lý do) |
+| 9 | RAISED_DATE_TIME | TIMESTAMP | N |  |  | Thời điểm nêu nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.RAISED_DATE_TIME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp<br>Báo cáo RETURN (BC8) — dùng làm PROCESSED_DATE (giữ nguyên giá trị timestamp, không TRUNC như nhánh CLOS); PDTD_DTM dùng để tính WORKSTEP_CODE (điều kiện RAISED_DATE_TIME >= ENTRYDATE) | RAISED_DATE_TIME (Thời gian tạo lý do); PROCESSED_DATE (Ngày dữ liệu, BC8) |
+| 10 | EXCEPTION_NAME | NVARCHAR2 | N | 200 |  | Tên nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_NAME | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_NAME (Tên lý do) |
+| 11 | EXCEPTION_REMARKS | NVARCHAR2 | N | 4000 |  | Ghi chú của nội dung cần làm rõ — nguồn NG_SB_RLOS_EXCEPTION.EXCEPTION_REMARKS | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | EXCEPTION_REMARKS (Ý kiến) |
+| 12 | RCTYPE | NVARCHAR2 | N | 50 |  | Loại ghi nhận, Raise (nêu lý do khi trả về) hay Clear (đã làm rõ/bổ sung và đẩy lại) — nguồn NG_SB_RLOS_EXCEPTION.RCTYPE. Không dùng làm điều kiện lọc CHECK_FTR — vẫn giữ cột vì BC7 hiển thị trực tiếp làm trường riêng trên báo cáo | Báo cáo EXCEPTION - FTR (BC7) — hiển thị trực tiếp | CHECK_FTR (thành phần Raise/Clear của trường "Hồ sơ đạt FTR hay không đạt FTR") |
+| 13 | SUB_PRODUCT | NVARCHAR2 | N | 200 |  | Sản phẩm vay chi tiết tự khai theo hồ sơ — cột thô (cùng cơ chế đã áp dụng cho CLOS mục 3): LEFT JOIN NG_SB_RLOS_APPLICANT_GENERAL theo WI_NAME, lấy SUB_PRODUCT (nguồn NG_SB_RLOS_APPLICANT_GENERAL.SUB_PRODUCT). Không tính BI_SUB_PRODUCT ở đây — chỉ giữ giá trị gốc, PDTD_DTM tự CASE WHEN phân loại 'Credit Card' khi tính CHECK_FTR | Nguồn cho chỉ tiêu/trường CHECK_FTR| — |
+
+> **Đã bỏ (SRS BC7 cập nhật 2026-10-28):** `EXCEPTION_SK`, `WORKSTEP_CODE`,
+> `DECISION_CODE` — xem ghi chú trên sơ đồ lineage (mục 10.2).
 
 
 ## 11. FCT_RLOS_DEVIATION

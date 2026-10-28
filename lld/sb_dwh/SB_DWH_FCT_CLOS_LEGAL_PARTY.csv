@@ -9,3 +9,4 @@ FCT_CLOS_LEGAL_PARTY,ID_NUMBER,true,VARCHAR2(100),,"Số giấy tờ định dan
 FCT_CLOS_LEGAL_PARTY,FULL_NAME,true,VARCHAR2(200),,Họ tên/tên đối tượng,NG_SB_CLOS_CUST_INFO_LEGAL.NAMEE,direct,NG_SB_CLOS_CUST_INFO_LEGAL,NAMEE,
 FCT_CLOS_LEGAL_PARTY,OBJ_TYPE,true,VARCHAR2(100),,"Loại đối tượng của giấy tờ pháp lý (Khách hàng, Người đại diện theo pháp luật, Chủ sở hữu TSBĐ, Thành viên góp vốn chính, Khác). 1 người (cùng ID_NUMBER) có thể giữ nhiều vai trò khác nhau trên cùng hồ sơ (nhiều dòng, xác nhận BA)",NG_SB_CLOS_CUST_INFO_LEGAL.OBJ_TYPE,direct,NG_SB_CLOS_CUST_INFO_LEGAL,OBJ_TYPE,
 FCT_CLOS_LEGAL_PARTY,LEGAL_DOC,true,VARCHAR2(100),,Tên loại giấy tờ pháp lý,NG_SB_CLOS_CUST_INFO_LEGAL.LEGAL_DOC,direct,NG_SB_CLOS_CUST_INFO_LEGAL,LEGAL_DOC,
+FCT_CLOS_LEGAL_PARTY,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất

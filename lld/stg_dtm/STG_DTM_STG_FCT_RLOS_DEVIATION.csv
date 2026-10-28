@@ -7,3 +7,4 @@
 "STG_FCT_RLOS_DEVIATION","CHECKING_RESULT","true","VARCHAR2(200)","","Kết quả kiểm tra chính sách","FCT_RLOS_DEVIATION.CHECKING_RESULT","direct","FCT_RLOS_DEVIATION","CHECKING_RESULT",""
 "STG_FCT_RLOS_DEVIATION","DEVIATION_REASON","true","VARCHAR2(4000)","","Lý do lệch chính sách","FCT_RLOS_DEVIATION.DEVIATION_REASON","direct","FCT_RLOS_DEVIATION","DEVIATION_REASON",""
 "STG_FCT_RLOS_DEVIATION","PROCESSED_DATE","true","DATE","","Ngày xử lý của hồ sơ, tính độc lập theo 3 mức ưu tiên","FCT_RLOS_DEVIATION.PROCESSED_DATE","direct","FCT_RLOS_DEVIATION","PROCESSED_DATE",""
+STG_FCT_RLOS_DEVIATION,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất

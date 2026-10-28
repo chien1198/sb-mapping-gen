@@ -24,3 +24,4 @@
 "DIM_LOS_USER","BRANCH_MANAGER_EMAIL","true","VARCHAR2(200)","","Email giám đốc chi nhánh quản lý tài khoản","STG_DIM_LOS_USER.BRANCH_MANAGER_EMAIL","direct","STG_DIM_LOS_USER","BRANCH_MANAGER_EMAIL",""
 "DIM_LOS_USER","EFF_DATE","true","DATE","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","STG_DIM_LOS_USER.EFF_DATE","direct","STG_DIM_LOS_USER","EFF_DATE","Do SB_DWH quản lý, bê nguyên qua vùng chìa — không tính lại SCD2 ở DTM"
 "DIM_LOS_USER","EXP_DATE","true","DATE","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","STG_DIM_LOS_USER.EXP_DATE","direct","STG_DIM_LOS_USER","EXP_DATE","Do SB_DWH quản lý, bê nguyên qua vùng chìa"
+"DIM_LOS_USER","TIME_UPDATE","false","TIMESTAMP","","Thời điểm bản ghi được cập nhật lần gần nhất (audit column)","CURRENT_TIMESTAMP()","computed","","","Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất"

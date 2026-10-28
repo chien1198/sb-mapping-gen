@@ -15,3 +15,4 @@
 "FCT_RLOS_COREPAYER","PHONE_1","true","VARCHAR2(50)","","Số điện thoại di động chính","STG_FCT_RLOS_COREPAYER.PHONE_1","direct","STG_FCT_RLOS_COREPAYER","PHONE_1",""
 "FCT_RLOS_COREPAYER","PHONE_2","true","VARCHAR2(50)","","Số điện thoại phụ","STG_FCT_RLOS_COREPAYER.PHONE_2","direct","STG_FCT_RLOS_COREPAYER","PHONE_2",""
 "FCT_RLOS_COREPAYER","HOME_PHONE","true","VARCHAR2(50)","","Số điện thoại cố định","STG_FCT_RLOS_COREPAYER.HOME_PHONE","direct","STG_FCT_RLOS_COREPAYER","HOME_PHONE",""
+FCT_RLOS_COREPAYER,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất

@@ -20,3 +20,4 @@
 "STG_DIM_CLOS_APPLICATION","CHANNEL","true","VARCHAR2(200)","","Kênh nộp hồ sơ (eBanking/khác)","DIM_CLOS_APPLICATION.CHANNEL","direct","DIM_CLOS_APPLICATION","CHANNEL",""
 "STG_DIM_CLOS_APPLICATION","EFF_DATE","true","DATE","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","DIM_CLOS_APPLICATION.EFF_DATE","direct","DIM_CLOS_APPLICATION","EFF_DATE",""
 "STG_DIM_CLOS_APPLICATION","EXP_DATE","true","DATE","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","DIM_CLOS_APPLICATION.EXP_DATE","direct","DIM_CLOS_APPLICATION","EXP_DATE",""
+"STG_DIM_CLOS_APPLICATION","TIME_UPDATE","false","TIMESTAMP","","Thời điểm bản ghi được cập nhật lần gần nhất (audit column)","CURRENT_TIMESTAMP()","computed","","","Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất"

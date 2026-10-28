@@ -17,3 +17,4 @@
 "STG_FCT_RLOS_COLLATERAL","APPRAISED_VALUE","true","NUMBER(36,2)","","Giá trị định giá của tài sản","FCT_RLOS_COLLATERAL.APPRAISED_VALUE","direct","FCT_RLOS_COLLATERAL","APPRAISED_VALUE",""
 "STG_FCT_RLOS_COLLATERAL","LOAN_RATE_LTV","true","NUMBER(10,2)","","Tỷ lệ cho vay trên giá trị tài sản, đơn vị phần trăm","FCT_RLOS_COLLATERAL.LOAN_RATE_LTV","direct","FCT_RLOS_COLLATERAL","LOAN_RATE_LTV",""
 "STG_FCT_RLOS_COLLATERAL","TYPES_OF_COLLATERALS","true","VARCHAR2(500)","","Phục vụ trực tiếp BC3.TYPES_OF_COLLATERALS","FCT_RLOS_COLLATERAL.TYPES_OF_COLLATERALS","direct","FCT_RLOS_COLLATERAL","TYPES_OF_COLLATERALS",""
+STG_FCT_RLOS_COLLATERAL,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất

@@ -8,3 +8,4 @@
 "DIM_RLOS_CHANGE_TYPE","IS_ACTIVE","true","VARCHAR2(1)","","Cờ hiệu lực của loại thay đổi điều kiện phê duyệt","STG_DIM_RLOS_CHANGE_TYPE.IS_ACTIVE","direct","STG_DIM_RLOS_CHANGE_TYPE","IS_ACTIVE",""
 "DIM_RLOS_CHANGE_TYPE","EFF_DATE","true","DATE","","Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2)","STG_DIM_RLOS_CHANGE_TYPE.EFF_DATE","direct","STG_DIM_RLOS_CHANGE_TYPE","EFF_DATE",""
 "DIM_RLOS_CHANGE_TYPE","EXP_DATE","true","DATE","","Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành","STG_DIM_RLOS_CHANGE_TYPE.EXP_DATE","direct","STG_DIM_RLOS_CHANGE_TYPE","EXP_DATE",""
+"DIM_RLOS_CHANGE_TYPE","TIME_UPDATE","false","TIMESTAMP","","Thời điểm bản ghi được cập nhật lần gần nhất (audit column)","CURRENT_TIMESTAMP()","computed","","","Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất"

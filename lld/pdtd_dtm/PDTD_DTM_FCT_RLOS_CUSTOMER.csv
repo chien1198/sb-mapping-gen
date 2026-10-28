@@ -36,3 +36,4 @@
 "FCT_RLOS_CUSTOMER","DISTRICT_NAME","true","VARCHAR2(200)","","Tên quận/huyện","STG_FCT_RLOS_CUSTOMER.DISTRICT_NAME","direct","STG_FCT_RLOS_CUSTOMER","DISTRICT_NAME",""
 "FCT_RLOS_CUSTOMER","DISTRICT_NAME_VN","true","VARCHAR2(200)","","Tên quận/huyện tiếng Việt có dấu","STG_FCT_RLOS_CUSTOMER.DISTRICT_NAME_VN","direct","STG_FCT_RLOS_CUSTOMER","DISTRICT_NAME_VN",""
 "FCT_RLOS_CUSTOMER","CUS_SEGMENT","true","VARCHAR2(100)","","Phân khúc khách hàng theo LOS (giá trị gốc, chưa chuẩn hóa)","STG_FCT_RLOS_CUSTOMER.CUS_SEGMENT","direct","STG_FCT_RLOS_CUSTOMER","CUS_SEGMENT",""
+FCT_RLOS_CUSTOMER,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất

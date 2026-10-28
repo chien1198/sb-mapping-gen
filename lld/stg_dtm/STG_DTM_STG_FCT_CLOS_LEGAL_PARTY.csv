@@ -9,3 +9,4 @@ STG_FCT_CLOS_LEGAL_PARTY,ID_NUMBER,false,VARCHAR2(100),,Số giấy tờ định
 STG_FCT_CLOS_LEGAL_PARTY,FULL_NAME,true,VARCHAR2(200),,Họ tên/tên đối tượng,FCT_CLOS_LEGAL_PARTY.FULL_NAME,direct,FCT_CLOS_LEGAL_PARTY,FULL_NAME,
 STG_FCT_CLOS_LEGAL_PARTY,OBJ_TYPE,true,VARCHAR2(100),,Loại đối tượng của giấy tờ pháp lý,FCT_CLOS_LEGAL_PARTY.OBJ_TYPE,direct,FCT_CLOS_LEGAL_PARTY,OBJ_TYPE,
 STG_FCT_CLOS_LEGAL_PARTY,LEGAL_DOC,true,VARCHAR2(100),,Tên loại giấy tờ pháp lý,FCT_CLOS_LEGAL_PARTY.LEGAL_DOC,direct,FCT_CLOS_LEGAL_PARTY,LEGAL_DOC,
+STG_FCT_CLOS_LEGAL_PARTY,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất

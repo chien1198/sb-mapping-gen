@@ -18,3 +18,4 @@
 "STG_DIM_LOS_COMPANY","REGION_NAME","true","VARCHAR2(200)","","Tên khu vực địa lý — layer Region","DIM_LOS_COMPANY.REGION_NAME","direct","DIM_LOS_COMPANY","REGION_NAME",""
 "STG_DIM_LOS_COMPANY","REGION_EFF_DATE","true","DATE","","Ngày bắt đầu hiệu lực của layer Region","DIM_LOS_COMPANY.REGION_EFF_DATE","direct","DIM_LOS_COMPANY","REGION_EFF_DATE",""
 "STG_DIM_LOS_COMPANY","REGION_EXP_DATE","true","DATE","","Ngày hết hiệu lực của layer Region; NULL = đang hiệu lực","DIM_LOS_COMPANY.REGION_EXP_DATE","direct","DIM_LOS_COMPANY","REGION_EXP_DATE",""
+"STG_DIM_LOS_COMPANY","TIME_UPDATE","false","TIMESTAMP","","Thời điểm bản ghi được cập nhật lần gần nhất (audit column)","CURRENT_TIMESTAMP()","computed","","","Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất"

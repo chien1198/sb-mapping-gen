@@ -1,4 +1,4 @@
--- SB_DWH: tao 17 bang WRK_DIM_* (CREATE). Chay 1 lan trong SQL Window (F8).
+-- SB_DWH: tao 18 bang WRK_DIM_* (CREATE). Chay 1 lan trong SQL Window (F8).
 -- Review 2026-10-12: WRK_DIM_LOS_COMPANY (1 bang) tach thanh 3 bang rieng
 -- theo layer SCD2 doc lap cua DIM_LOS_COMPANY — WRK_DIM_LOS_COMPANY_REGION,
 -- WRK_DIM_LOS_COMPANY_BRANCH, WRK_DIM_LOS_COMPANY_COMPANY (14 -> 16 bang).
@@ -34,7 +34,8 @@ BEGIN
       hub                      VARCHAR2(100),
       branch_manager_email     VARCHAR2(200),
       eff_date                 DATE,
-      exp_date                 DATE
+      exp_date                 DATE,
+      time_update              TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
    -- ============================================================
    -- 2a. WRK_DIM_CLOS_PRODUCT_LINE (layer Product Line — CDC độc lập từ NG_SB_CLOS_MAS_PRO_LINE)
@@ -44,7 +45,8 @@ BEGIN
       productline_code       VARCHAR2(100),
       productline_name       VARCHAR2(200),
       productline_eff_date   DATE,
-      productline_exp_date   DATE
+      productline_exp_date   DATE,
+      time_update            TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -62,7 +64,8 @@ BEGIN
       productline_code       VARCHAR2(100),
       productline_name       VARCHAR2(200),
       productline_eff_date   DATE,
-      productline_exp_date   DATE
+      productline_exp_date   DATE,
+      time_update            TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
    -- ============================================================
    -- 3. WRK_DIM_CLOS_EXCEPTION
@@ -80,7 +83,8 @@ BEGIN
       code_source           VARCHAR2(255),
       status                VARCHAR2(50),
       eff_date              DATE,
-      exp_date              DATE
+      exp_date              DATE,
+      time_update           TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -91,7 +95,8 @@ BEGIN
       region_code        NUMBER,
       region_name        VARCHAR2(200),
       region_eff_date    DATE,
-      region_exp_date    DATE
+      region_exp_date    DATE,
+      time_update        TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -108,7 +113,8 @@ BEGIN
       region_code        NUMBER,
       region_name        VARCHAR2(200),
       region_eff_date    DATE,
-      region_exp_date    DATE
+      region_exp_date    DATE,
+      time_update        TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -133,7 +139,8 @@ BEGIN
       region_code        NUMBER,
       region_name        VARCHAR2(200),
       region_eff_date    DATE,
-      region_exp_date    DATE
+      region_exp_date    DATE,
+      time_update        TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -147,7 +154,8 @@ BEGIN
       pro_valid            NVARCHAR2(255),
       order_promotion      NVARCHAR2(255),
       eff_date             DATE,
-      exp_date             DATE
+      exp_date             DATE,
+      time_update          TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -161,7 +169,8 @@ BEGIN
       detail_change_type_name     VARCHAR2(500),
       is_active                   VARCHAR2(1),
       eff_date                    DATE,
-      exp_date                    DATE
+      exp_date                    DATE,
+      time_update                 TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -180,7 +189,8 @@ BEGIN
       code_source           VARCHAR2(255),
       status                VARCHAR2(50),
       eff_date              DATE,
-      exp_date              DATE
+      exp_date              DATE,
+      time_update           TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -192,7 +202,8 @@ BEGIN
       productline_name       VARCHAR2(200),
       secondary_product      VARCHAR2(200),
       eff_date               DATE,
-      exp_date               DATE
+      exp_date               DATE,
+      time_update            TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -201,7 +212,8 @@ BEGIN
    EXECUTE IMMEDIATE 'CREATE TABLE SB_DWH.WRK_DIM_RLOS_PRODUCT_LINE (
       productline_sk      NUMBER,
       productline_code    VARCHAR2(100),
-      productline_name    VARCHAR2(200)
+      productline_name    VARCHAR2(200),
+      time_update         TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -218,7 +230,8 @@ BEGIN
       exp_date            DATE,
       productline_sk      NUMBER,
       productline_code    VARCHAR2(100),
-      productline_name    VARCHAR2(200)
+      productline_name    VARCHAR2(200),
+      time_update         TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -230,7 +243,8 @@ BEGIN
       decision_code            VARCHAR2(200),
       req_type                 VARCHAR2(255),
       eff_date                 DATE,
-      exp_date                 DATE
+      exp_date                 DATE,
+      time_update              TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -242,7 +256,8 @@ BEGIN
       decision_code            VARCHAR2(200),
       channel                  VARCHAR2(200),
       eff_date                 DATE,
-      exp_date                 DATE
+      exp_date                 DATE,
+      time_update              TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -268,7 +283,8 @@ BEGIN
       customer_code            VARCHAR2(100),
       channel                  VARCHAR2(200),
       eff_date                 DATE,
-      exp_date                 DATE
+      exp_date                 DATE,
+      time_update              TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -285,7 +301,8 @@ BEGIN
       industry_lvl2_code VARCHAR2(200),
       industry_lvl3_code VARCHAR2(200),
       eff_date           DATE,
-      exp_date           DATE
+      exp_date           DATE,
+      time_update        TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
    -- ============================================================
@@ -354,7 +371,8 @@ BEGIN
       totalnoneligible     VARCHAR2(5),
       cancel_reason        VARCHAR2(500),
       eff_date             DATE,
-      exp_date             DATE
+      exp_date             DATE,
+      time_update          TIMESTAMP
    ) TABLESPACE SB_DWH_TBS PCTFREE 10 INITRANS 1 MAXTRANS 255 STORAGE (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED)';
 
 END;

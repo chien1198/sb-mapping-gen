@@ -9,3 +9,4 @@
 "FCT_CLOS_COLLATERAL","COLL_MGMT_METHOD","true","VARCHAR2(4000)","","Phương thức quản lý tài sản","STG_FCT_CLOS_COLLATERAL.COLL_MGMT_METHOD","direct","STG_FCT_CLOS_COLLATERAL","COLL_MGMT_METHOD",""
 "FCT_CLOS_COLLATERAL","APPRAISED_VALUE","true","NVARCHAR2(100)","","Giá trị định giá của tài sản — lấy nguyên văn, không ép kiểu số","STG_FCT_CLOS_COLLATERAL.APPRAISED_VALUE","direct","STG_FCT_CLOS_COLLATERAL","APPRAISED_VALUE",""
 "FCT_CLOS_COLLATERAL","LOAN_RATE_LTV","true","NVARCHAR2(100)","","Tỷ lệ cho vay trên giá trị tài sản","STG_FCT_CLOS_COLLATERAL.LOAN_RATE_LTV","direct","STG_FCT_CLOS_COLLATERAL","LOAN_RATE_LTV",""
+FCT_CLOS_COLLATERAL,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất

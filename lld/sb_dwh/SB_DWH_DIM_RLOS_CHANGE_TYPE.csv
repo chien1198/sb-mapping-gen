@@ -8,3 +8,4 @@ DIM_RLOS_CHANGE_TYPE,DETAIL_CHANGE_TYPE_NAME,true,VARCHAR2(500),,Tên chi tiết
 DIM_RLOS_CHANGE_TYPE,IS_ACTIVE,true,VARCHAR2(1),,Cờ hiệu lực của loại thay đổi điều kiện phê duyệt,SB_RLOS_MAS_CHANGE_TYPE.IS_ACTIVE,direct,SB_RLOS_MAS_CHANGE_TYPE,IS_ACTIVE,
 DIM_RLOS_CHANGE_TYPE,EFF_DATE,true,DATE,,Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2),"CDC — so sánh bản ghi cũ/mới tại mỗi lần ETL chạy, gán = v_batch_date",scd2,SB_RLOS_MAS_CHANGE_TYPE,,KEY CDC = CHANGE_TYPE_CODE+DETAIL_CHANGE_TYPE_CODE theo DS_BANG_202608.xlsx
 DIM_RLOS_CHANGE_TYPE,EXP_DATE,true,DATE,,Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành,NULL,scd2,,,Đóng bằng EFF_DATE(bản ghi mới) - 1 giây khi CDC phát hiện thay đổi
+DIM_RLOS_CHANGE_TYPE,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất

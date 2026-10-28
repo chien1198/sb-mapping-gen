@@ -11,3 +11,4 @@
 "DIM_CLOS_PRODUCT","SUB_PRODUCT_ACTIVE","true","VARCHAR2(100)","","Trạng thái hiệu lực của sản phẩm nhánh","STG_DIM_CLOS_PRODUCT.SUB_PRODUCT_ACTIVE","direct","STG_DIM_CLOS_PRODUCT","SUB_PRODUCT_ACTIVE","Layer Sub Product"
 "DIM_CLOS_PRODUCT","SUB_PRODUCT_EFF_DATE","true","DATE","","Ngày bắt đầu hiệu lực của layer Sub Product","STG_DIM_CLOS_PRODUCT.SUB_PRODUCT_EFF_DATE","direct","STG_DIM_CLOS_PRODUCT","SUB_PRODUCT_EFF_DATE",""
 "DIM_CLOS_PRODUCT","SUB_PRODUCT_EXP_DATE","true","DATE","","Ngày hết hiệu lực của layer Sub Product; NULL = đang hiệu lực","STG_DIM_CLOS_PRODUCT.SUB_PRODUCT_EXP_DATE","direct","STG_DIM_CLOS_PRODUCT","SUB_PRODUCT_EXP_DATE",""
+"DIM_CLOS_PRODUCT","TIME_UPDATE","false","TIMESTAMP","","Thời điểm bản ghi được cập nhật lần gần nhất (audit column)","CURRENT_TIMESTAMP()","computed","","","Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất"

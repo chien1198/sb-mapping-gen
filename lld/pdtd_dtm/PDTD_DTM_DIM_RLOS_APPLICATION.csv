@@ -63,3 +63,4 @@ DIM_RLOS_APPLICATION,TOTALNONELIGIBLE,true,VARCHAR2(5),,Số lượng điều ki
 DIM_RLOS_APPLICATION,CANCEL_REASON,true,VARCHAR2(500),,Lý do hủy hồ sơ — lưu SCD1,STG_DIM_RLOS_APPLICATION.CANCEL_REASON,direct,STG_DIM_RLOS_APPLICATION,CANCEL_REASON,
 DIM_RLOS_APPLICATION,EFF_DATE,true,DATE,,Ngày bắt đầu hiệu lực của phiên bản bản ghi (SCD Type 2),STG_DIM_RLOS_APPLICATION.EFF_DATE,direct,STG_DIM_RLOS_APPLICATION,EFF_DATE,
 DIM_RLOS_APPLICATION,EXP_DATE,true,DATE,,Ngày hết hiệu lực của phiên bản bản ghi; NULL = bản ghi hiện hành,STG_DIM_RLOS_APPLICATION.EXP_DATE,direct,STG_DIM_RLOS_APPLICATION,EXP_DATE,
+DIM_RLOS_APPLICATION,TIME_UPDATE,false,TIMESTAMP,,Thời điểm bản ghi được cập nhật lần gần nhất (audit column),CURRENT_TIMESTAMP(),computed,,,Audit column — thời điểm bản ghi được ETL job cập nhật lần gần nhất
