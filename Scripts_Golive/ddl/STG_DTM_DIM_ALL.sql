@@ -6,7 +6,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_APPLICATION
       (
         dimension_key            NUMBER not null,
-        application_sk           NUMBER not null,
+        application_sk           NUMBER,
         wi_name                  VARCHAR2(100),
         loancaseid               VARCHAR2(100),
         stream                   VARCHAR2(200),
@@ -113,7 +113,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_CUSTOMER
       (
         dimension_key      NUMBER not null,
-        customer_sk        NUMBER not null,
+        customer_sk        NUMBER,
         customer_code      VARCHAR2(100),
         customer_name      VARCHAR2(200),
         cust_group         VARCHAR2(100),
@@ -159,7 +159,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_EXCEPTION
       (
         dimension_key      NUMBER not null,
-        exception_sk       NUMBER not null,
+        exception_sk       NUMBER,
         activityname       VARCHAR2(200),
         decision_code      VARCHAR2(200),
         exception_category VARCHAR2(500),
@@ -207,12 +207,12 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_PRODUCT
       (
         dimension_key          NUMBER not null,
-        productline_sk          NUMBER not null,
+        productline_sk          NUMBER,
         productline_code        VARCHAR2(100),
         productline_name        VARCHAR2(200),
         productline_eff_date    DATE,
         productline_exp_date    DATE,
-        sub_product_sk           NUMBER not null,
+        sub_product_sk           NUMBER,
         sub_product_code         VARCHAR2(100),
         sub_product_name         VARCHAR2(150),
         sub_product_active       VARCHAR2(100),
@@ -253,7 +253,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_CLOS_WORKSTEP_DECISION
       (
         dimension_key        NUMBER not null,
-        workstep_decision_sk NUMBER not null,
+        workstep_decision_sk NUMBER,
         workstep_code        VARCHAR2(200),
         decision_code        VARCHAR2(200),
         channel              VARCHAR2(200),
@@ -294,7 +294,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_LOS_COMPANY
       (
         dimension_key     NUMBER not null,
-        company_sk        NUMBER not null,
+        company_sk        NUMBER,
         company_code      VARCHAR2(50),
         company_name      VARCHAR2(200),
         company_address   VARCHAR2(500),
@@ -347,7 +347,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_LOS_USER
       (
         dimension_key        NUMBER not null,
-        user_sk              NUMBER not null,
+        user_sk              NUMBER,
         username             VARCHAR2(100),
         employee_name        VARCHAR2(200),
         employee_status      VARCHAR2(50),
@@ -406,7 +406,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_APPLICATION
       (
         dimension_key        NUMBER not null,
-        application_sk       NUMBER not null,
+        application_sk       NUMBER,
         wi_name              VARCHAR2(100),
         loancaseid           VARCHAR2(100),
         stream               VARCHAR2(200),
@@ -556,7 +556,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_CARD_PROMOTION
       (
         dimension_key     NUMBER not null,
-        card_promotion_sk NUMBER not null,
+        card_promotion_sk NUMBER,
         promotion_code    NVARCHAR2(255),
         promotion_desc    NVARCHAR2(255),
         pro_trans         NVARCHAR2(255),
@@ -599,7 +599,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_CHANGE_TYPE
       (
         dimension_key           NUMBER not null,
-        change_type_sk          NUMBER not null,
+        change_type_sk          NUMBER,
         change_type_code        VARCHAR2(100),
         change_type_name        VARCHAR2(200),
         detail_change_type_code VARCHAR2(100),
@@ -642,7 +642,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_EXCEPTION
       (
         dimension_key      NUMBER not null,
-        exception_sk       NUMBER not null,
+        exception_sk       NUMBER,
         activityname       VARCHAR2(200),
         decision_code      VARCHAR2(200),
         exception_category VARCHAR2(500),
@@ -693,7 +693,7 @@ BEGIN
         productline_sk    NUMBER not null,
         productline_code VARCHAR2(100),
         productline_name VARCHAR2(200),
-        sub_product_sk    NUMBER not null,
+        sub_product_sk    NUMBER,
         sub_product_bk    VARCHAR2(64),
         sub_product_code VARCHAR2(100),
         sub_product_name VARCHAR2(150),
@@ -777,7 +777,7 @@ BEGIN
    EXECUTE IMMEDIATE 'create table STG_DTM.STG_DIM_RLOS_WORKSTEP_DECISION
       (
         dimension_key        NUMBER not null,
-        workstep_decision_sk NUMBER not null,
+        workstep_decision_sk NUMBER,
         workstep_code        VARCHAR2(200),
         decision_code        VARCHAR2(200),
         req_type             VARCHAR2(255),
