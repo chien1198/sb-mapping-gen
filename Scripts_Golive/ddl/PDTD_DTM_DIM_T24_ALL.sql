@@ -433,3 +433,153 @@ alter table PDTD_DTM.DIM_T24_SEAB_MAIN_CARD
     maxextents unlimited
   );
 alter index PDTD_DTM.DIM_T24_SEAB_MAIN_CARD_PK nologging;
+
+--Bang DIM_T24_CUSTOMER
+create table PDTD_DTM.DIM_T24_CUSTOMER
+(
+  dimension_key        NUMBER not null,
+  total_name           VARCHAR2(200),
+  total                VARCHAR2(50),
+  total_sk             NUMBER,
+  company_book         VARCHAR2(44),
+  birth_incorp_date    DATE,
+  authoriser           VARCHAR2(50),
+  addition_value       VARCHAR2(400),
+  customer_group       VARCHAR2(50),
+  customer             VARCHAR2(200),
+  country              VARCHAR2(200),
+  contact_date         DATE,
+  account_officer_name VARCHAR2(50),
+  account_officer      VARCHAR2(16),
+  sms_1                VARCHAR2(200),
+  street               VARCHAR2(4000),
+  short_name           VARCHAR2(200),
+  customer_sk          NUMBER,
+  sector               VARCHAR2(16),
+  sector_sk            NUMBER,
+  seab_cu_segment      VARCHAR2(200),
+  seab_district1       VARCHAR2(200),
+  residence            VARCHAR2(200),
+  salary               NUMBER,
+  represent            VARCHAR2(200),
+  represent_tel        VARCHAR2(200),
+  relation_code        VARCHAR2(50),
+  rel_customer         VARCHAR2(50),
+  referred_by          VARCHAR2(40),
+  referred_emp         VARCHAR2(140),
+  turnover             NUMBER,
+  town_country         VARCHAR2(200),
+  total_asset          NUMBER,
+  title                VARCHAR2(200),
+  tax_id               VARCHAR2(200),
+  target               VARCHAR2(16),
+  sub_industry         VARCHAR2(16),
+  industry_sk          NUMBER,
+  inputter             VARCHAR2(50),
+  job_title            VARCHAR2(200),
+  legal_doc_name       VARCHAR2(200),
+  gender               VARCHAR2(200),
+  given_names          VARCHAR2(200),
+  industry             VARCHAR2(16),
+  industry_group       VARCHAR2(16),
+  eff_date             DATE,
+  email_1              VARCHAR2(200),
+  exp_date             DATE,
+  fax_1                VARCHAR2(200),
+  customer_liability   VARCHAR2(40),
+  customer_status      VARCHAR2(16),
+  cus_target           VARCHAR2(200),
+  date_of_birth        DATE,
+  portfolio            VARCHAR2(200),
+  phone_1              VARCHAR2(200),
+  referred_branch      VARCHAR2(16),
+  province             VARCHAR2(60),
+  nationality          VARCHAR2(8),
+  name1                VARCHAR2(4000),
+  occupation           VARCHAR2(200),
+  no_of_employees      NUMBER,
+  location_sk          NUMBER,
+  legal_iss_date       DATE,
+  marital_status       VARCHAR2(200),
+  loyalty              VARCHAR2(12),
+  legal_holder_name    VARCHAR2(400),
+  legal_exp_date       DATE,
+  legal_iss_auth       VARCHAR2(400),
+  legal_id             VARCHAR2(200),
+  employment_status    VARCHAR2(200),
+  seab_sales_type      VARCHAR2(35),
+  seab_sales_id        VARCHAR2(35),
+  seab_brokers_type    VARCHAR2(35),
+  seab_brokers_id      VARCHAR2(35),
+  campaign_id          VARCHAR2(35),
+  sb_id                VARCHAR2(50),
+  branch_salary        VARCHAR2(50),
+  residence_status     VARCHAR2(35),
+  represent_id         VARCHAR2(35),
+  no_of_dependents     NUMBER,
+  employers_name       VARCHAR2(100),
+  seab_purpose         VARCHAR2(4000),
+  customer_class       VARCHAR2(4000),
+  mnemonic             VARCHAR2(50),
+  priority             VARCHAR2(50),
+  vn_name              VARCHAR2(4000),
+  full_name            VARCHAR2(4000),
+  address              VARCHAR2(4000),
+  seab_pob             VARCHAR2(35),
+  date_time_authorise  DATE,
+  date_time_input      DATE,
+  channel              VARCHAR2(35),
+  sea_sub_channel      VARCHAR2(35),
+  language             VARCHAR2(8),
+  seab_fatca_tax       VARCHAR2(255),
+  auth_cust            VARCHAR2(35),
+  seab_reg_status      VARCHAR2(250)
+)
+partition by range (EXP_DATE)
+(
+  partition DIM_T24_CUSTOMER_P0 values less than (TO_DATE(' 9999-12-31 00:00:00', 'SYYYY-MM-DD HH24:MI:SS', 'NLS_CALENDAR=GREGORIAN'))
+    tablespace PDTD_DTM_TBS
+    pctfree 0
+    initrans 1
+    maxtrans 255
+    storage
+    (
+      initial 8M
+      next 1M
+      minextents 1
+      maxextents unlimited
+    ),
+  partition DIM_T24_CUSTOMER_P1 values less than (MAXVALUE)
+    tablespace PDTD_DTM_TBS
+    pctfree 0
+    initrans 1
+    maxtrans 255
+    storage
+    (
+      initial 8M
+      next 1M
+      minextents 1
+      maxextents unlimited
+    )
+);
+-- Create/Recreate indexes
+create index PDTD_DTM.DIM_T24_CUSTOMER_CUST_IDX on PDTD_DTM.DIM_T24_CUSTOMER (CUSTOMER)
+  nologging  local;
+create index PDTD_DTM.DIM_T24_CUSTOMER_LEGAL_IDX on PDTD_DTM.DIM_T24_CUSTOMER (LEGAL_ID)
+  nologging  local;
+-- Create/Recreate primary, unique and foreign key constraints
+alter table PDTD_DTM.DIM_T24_CUSTOMER
+  add constraint DIM_T24_CUSTOMER_PK primary key (DIMENSION_KEY)
+  using index
+  tablespace PDTD_DTM_TBS
+  pctfree 10
+  initrans 2
+  maxtrans 255
+  storage
+  (
+    initial 64K
+    next 1M
+    minextents 1
+    maxextents unlimited
+  );
+alter index PDTD_DTM.DIM_T24_CUSTOMER_PK nologging;
