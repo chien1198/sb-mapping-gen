@@ -28,9 +28,9 @@ stt,truong_bao_cao,y_nghia,bang_dtm,cot_dtm,trang_thai,ghi_chu
 27,PRODUCT_LINE,Dòng sản phẩm,DIM_CLOS_PRODUCT,PRODUCT_LINE_CODE,KHOP,"Đóng PENDING (review 2026-09-21): NG_SB_CLOS_CUST_INFO.PRODUCT_LINE (nguồn SRS) xác nhận CÙNG khái niệm với DIM_CLOS_PRODUCT.PRODUCT_LINE_CODE — đã dùng nhất quán khi thiết kế BC9 nhánh CLOS (SLHS_CLOS/SLGN_CLOS, xem HLD_DIM_SB_DWH.md 1.2.1.2). Theo quyết định người dùng: KHÔNG tạo cột text trùng lặp trên DIM_CLOS_APPLICATION — hợp nhất qua đúng 1 chiều sản phẩm, JOIN qua FCT_CLOS_APPLICATION.PRODUCT_SK (xem HLD_FCT_SB_DWH.md cột 9, 1.2.2.1) → DIM_CLOS_PRODUCT. Review 2026-10-09: sửa lại khóa JOIN PRODUCT_SK — PRODUCT_LINE_CODE=CUST_INFO.PRODUCT_LINE AND SUB_PRODUCT_NAME=CUST_INFO.SUB_PRODUCT (không còn SUB_PRODUCT_CODE, xem dòng 28)"
 28,SUB_PRODUCT,Sản phẩm nhánh,DIM_CLOS_PRODUCT,SUB_PRODUCT_NAME,KHOP,"Đóng PENDING (review 2026-09-21) — cùng lý do/công thức PRODUCT_LINE (dòng 27), JOIN qua cùng PRODUCT_SK. Review 2026-10-09: sửa cột đích SUB_PRODUCT_CODE→SUB_PRODUCT_NAME — NG_SB_CLOS_CUST_INFO.SUB_PRODUCT lưu giá trị TÊN sản phẩm nhánh (xác nhận SRS BC9 + người dùng), không phải mã, nên khớp đúng với SUB_PRODUCT_NAME"
 29,CREDIT_LIMITS,Hạn mức cấp,FCT_CLOS_APPLICATION,APPROVED_AMT_FINAL,KHOP,"Cột 31 — nguồn NG_SB_CLOS_CREDITINFO_COMM.CREDIT_LIMIT, đúng khớp SRS BC2 (NG_SB_CLOS_CREDITINFO_COMM > CREDIT_LIMIT)"
-30,LAST_WORKSTEP,Bước hồ sơ cuối,FCT_CLOS_APPLICATION,LAST_WORKSTEP,KHOP,"Cột 68 (bổ sung tại PDTD_DTM) — LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS để chuẩn hóa tên bước dùng chung 2 hệ. Khác LAST_WORKSTEP_SK (cột 6, khóa nội bộ tới DIM_CLOS_WORKSTEP)"
+30,LAST_WORKSTEP,Bước hồ sơ cuối,FCT_CLOS_APPLICATION,LAST_WORKSTEP,KHOP,"Cột 68 (bổ sung tại PDTD_DTM) — lấy WORKSTEP_CODE từ FCT_CLOS_WORKSTEP_EVENT tại dòng sự kiện có ENTRYDATE lớn nhất theo SRS BC2 (không lọc EXITDATE), không join Q_RLOS_REF_WORKSTEP_2SYSTEMS. Khác LAST_WORKSTEP_SK (cột 6, khóa nội bộ tới DIM_CLOS_WORKSTEP)"
 31,PRE_WORKSTEP,Bước hồ sơ trước đó,FCT_CLOS_APPLICATION,PRE_WORKSTEP_CODE,KHOP,Cột 39 — LAG theo ENTRYDATE
-32,LAST_ENTRYDATE,Thời gian vào bước cuối,FCT_CLOS_APPLICATION,LAST_ENTRYDATE,KHOP,Cột 33 — ENTRYDATE của sự kiện hoàn tất gần nhất
+32,LAST_ENTRYDATE,Thời gian vào bước cuối,FCT_CLOS_APPLICATION,LAST_ENTRYDATE,KHOP,Cột 33 — ENTRYDATE của dòng sự kiện có ENTRYDATE lớn nhất (không lọc EXITDATE)
 33,LAST_EXITDATE,Thời gian kết thúc bước cuối,FCT_CLOS_APPLICATION,LAST_EXITDATE,KHOP,Cột 34
 34,LAST_REMARKS,Ghi chú ý kiến bước cuối,FCT_CLOS_APPLICATION,LAST_REMARKS,KHOP,Cột 41
 35,LAST_DECISION,Quyết định bước cuối,FCT_CLOS_APPLICATION,WORKSTEP_DECISION_SK,KHOP,"Review 2026-10-04 (cross-check LLD/HLD) — sửa lại cot_dtm: cột đổi tên LAST_DECISION_SK→WORKSTEP_DECISION_SK (đồng bộ pattern, review 2026-10-04). Khóa tới DIM_CLOS_WORKSTEP_DECISION; giá trị hiển thị lấy qua join DIM_CLOS_WORKSTEP_DECISION.DECISION_CODE (bảng DIM này không có cột DECISION riêng, chỉ có DECISION_CODE)"
@@ -58,13 +58,13 @@ stt,truong_bao_cao,y_nghia,bang_dtm,cot_dtm,trang_thai,ghi_chu
 57,LAST_APPROVAL_DATE,Thời gian phê duyệt cuối cùng,FCT_CLOS_APPLICATION,LAST_APPROVAL_DATE,KHOP,Cột 27 — MAX(EXITDATE) tại bước phê duyệt
 58,BI_CAN_DATE,Thời gian hồ sơ vào vùng CancelRevoke,FCT_CLOS_APPLICATION,CANCEL_DATE,KHOP,Cột 32 — ENTRYDATE tại bước CancelRevoke
 59,RI_USER,User khởi tạo hồ sơ,FCT_CLOS_APPLICATION,RI_USER,KHOP,Cột 11 — User xử lý bước RequestInitiate
-60,BRANCH_USER,User Chi nhánh,FCT_CLOS_APPLICATION,BRANCH_USER,KHOP,"Cột 12 — User xử lý bước BranchSupport, hoàn tất gần nhất"
+60,BRANCH_USER,User Chi nhánh,FCT_CLOS_APPLICATION,BRANCH_USER,KHOP,"Cột 12 — User xử lý bước BranchSupport, hoàn tất gần nhất (đã có EXITDATE, lấy dòng ENTRYDATE lớn nhất)"
 61,DDE_USER,User Chuyên viên nhập liệu,FCT_CLOS_APPLICATION,DDE_USER,KHOP,Cột 13 — User xử lý bước DetailDataEntry
 62,QUALITY_CHECKER,User Kiểm soát nhập liệu,FCT_CLOS_APPLICATION,QC_USER,KHOP,Cột 14 — User xử lý bước DataInputerChecker
 63,PHV_USER,User Chuyên viên Thẩm định điện thoại,FCT_CLOS_APPLICATION,PHV_USER,KHOP,Cột 17 — User xử lý bước PhoneVerification
 64,FA_USER,User Chuyên viên Thực địa,FCT_CLOS_APPLICATION,FA_USER,KHOP,Cột 18 — User Chuyên viên Thực địa (bước FieldAssessment)
 65,UND_MAKER,User Chuyên viên thẩm định,FCT_CLOS_APPLICATION,UND_MAKER_USER,KHOP,Cột 15
 66,UND_CHECKER,User Kiểm soát thẩm định,FCT_CLOS_APPLICATION,UND_CHECKER_USER,KHOP,Cột 16
-67,BI_APPROVER,User Chuyên gia phê duyệt,FCT_CLOS_APPLICATION,APPROVER_USER,KHOP,"Cột 19 — User xử lý bước CreditApproval, hoàn tất gần nhất"
+67,BI_APPROVER,User Chuyên gia phê duyệt,FCT_CLOS_APPLICATION,APPROVER_USER,KHOP,"Cột 19 — User xử lý bước CreditApproval, hoàn tất gần nhất (đã có EXITDATE, lấy dòng ENTRYDATE lớn nhất)"
 68,BI_COMMITTEE,User Hội đồng tín dụng,FCT_CLOS_APPLICATION,COMMITTEE_USER,KHOP,Cột 20 — User Hội đồng tín dụng (bước CreditCommittee)
 69,BI_HOS_USER,User Hỗ trợ phê duyệt,FCT_CLOS_APPLICATION,HOS_USER,KHOP,Cột 21 — User Hỗ trợ phê duyệt (bước HOSupport)

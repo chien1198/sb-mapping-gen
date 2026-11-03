@@ -39,12 +39,12 @@ stt,truong_bao_cao,y_nghia,bang_dtm,cot_dtm,trang_thai,ghi_chu
 38,SUB_PRODUCT,Sản phẩm nhánh,DIM_RLOS_PRODUCT,SUB_PRODUCT_NAME,KHOP,"Cùng join SUB_PRODUCT_SK ở trên. SUB_PRODUCT_NAME là NK thật của layer Sub Product (SUB_PRODUCT_CODE không unique trên dữ liệu thật); cột SECONDARY_PRODUCT đã bị xóa khỏi DIM_RLOS_PRODUCT (orphaned, review 2026-10-04) — không còn là lựa chọn nguồn hợp lệ cho trường này"
 39,SECONDARY_PRODUCTLINE,Có sản phẩm phụ (YES/NO),DIM_RLOS_APPLICATION,IS_SEC_PRODUCT,KHOP,"Nguồn NG_SB_RLOS_APPLICANT_GENERAL.IS_SEC_PRODUCT. Cũng dùng làm khóa tra SLA (map Có→YES/Không→NO), xem cột 27-34"
 40,SAN_PHAM_PHU,Sản phẩm phụ chi tiết,FCT_RLOS_APPLICATION_SECONDPRODUCT,SUB_PRODUCT_LINE,KHOP,"FCT_RLOS_APPLICATION_SECONDPRODUCT (2.3.2.4, cột 6, đổi tên từ FCT_RLOS_SUB_PRODUCT review 2026-10-04) — nguồn NG_SB_RLOS_SUB_PRODUCT.SUB_PRODUCT_LINE"
-41,LAST_WORKSTEP,Bước hồ sơ cuối cùng,FCT_RLOS_APPLICATION,LAST_WORKSTEP,KHOP,"Cột 81 (bổ sung tại PDTD_DTM) — LEFT JOIN Q_RLOS_REF_WORKSTEP_2SYSTEMS để chuẩn hóa tên bước dùng chung 2 hệ. Khác LAST_WORKSTEP_SK (cột 6, khóa nội bộ tới DIM_RLOS_WORKSTEP)"
+41,LAST_WORKSTEP,Bước hồ sơ cuối cùng,FCT_RLOS_APPLICATION,LAST_WORKSTEP,KHOP,"Cột 81 (bổ sung tại PDTD_DTM) — lấy WORKSTEP_CODE từ FCT_RLOS_WORKSTEP_EVENT tại dòng sự kiện có ENTRYDATE lớn nhất theo SRS BC1 (không lọc EXITDATE), không join Q_RLOS_REF_WORKSTEP_2SYSTEMS. Khác LAST_WORKSTEP_SK (cột 6, khóa nội bộ tới DIM_RLOS_WORKSTEP)"
 42,PRE_WORKSTEP,Bước hồ sơ trước đó,FCT_RLOS_APPLICATION,PRE_WORKSTEP_CODE,KHOP,"Cột 41 — LAG theo ENTRYDATE, bê 1:1 từ SB_DWH"
-43,LAST_ENTRYDATE,Thời gian vào bước cuối,FCT_RLOS_APPLICATION,LAST_ENTRYDATE,KHOP,Cột 35 — ENTRYDATE của sự kiện hoàn tất gần nhất
+43,LAST_ENTRYDATE,Thời gian vào bước cuối,FCT_RLOS_APPLICATION,LAST_ENTRYDATE,KHOP,Cột 35 — ENTRYDATE của dòng sự kiện có ENTRYDATE lớn nhất (không lọc EXITDATE)
 44,LAST_EXITDATE,Thời gian kết thúc bước cuối,FCT_RLOS_APPLICATION,LAST_EXITDATE,KHOP,Cột 36
 45,LAST_REMARKS,Ghi chú ý kiến bước cuối,FCT_RLOS_APPLICATION,LAST_REMARKS,KHOP,Cột 43
-46,LAST_REMARK_DDE,Ghi chú tại bước nhập liệu DDE,FCT_RLOS_APPLICATION,LAST_REMARK_DDE,KHOP,Cột 44 — REMARK tại bước DetailDataEntry
+46,LAST_REMARK_DDE,Ghi chú tại bước nhập liệu DDE,FCT_RLOS_APPLICATION,LAST_REMARK_DDE,KHOP,"Cột 44 — REMARK tại bước DetailDataEntry, dòng có ENTRYDATE lớn nhất (không lọc EXITDATE)"
 47,LAST_DECISION,Quyết định tại bước cuối,FCT_RLOS_APPLICATION,WORKSTEP_DECISION_SK,KHOP,"Review 2026-10-04 (cross-check LLD/HLD) — sửa lại cot_dtm: cột đổi tên LAST_DECISION_SK→WORKSTEP_DECISION_SK (đồng bộ pattern, review 2026-10-04). Khóa tới DIM_RLOS_WORKSTEP_DECISION; giá trị hiển thị lấy qua join DIM_RLOS_WORKSTEP_DECISION.DECISION_CODE (bảng DIM này không có cột DECISION riêng, chỉ có DECISION_CODE)"
 48,UNDERWRITERMAKER_TAKERESPON,CV Thẩm định chịu trách nhiệm,FCT_RLOS_APPLICATION,UNDERWRITERMAKER_USERMAKE,KHOP,"Map vào UNDERWRITERMAKER_USERMAKE (cột 72, đã là kết quả COALESCE cuối cùng từ SB_DWH). review 2026-10-01: xóa cột UNDERWRITERMAKER_TAKERESPON khỏi PDTD_DTM — trùng giá trị 100% với USERMAKE, không cần cột riêng chỉ để đổi tên. ⚠️ CẢNH BÁO: nguồn NG_SB_RLOS_USER_MAKE_WORK_STEP không có trong DS_BANG_202608.xlsx — chưa xác nhận tồn tại thật trên DB (PENDING kỹ thuật riêng của HLD, không phải lỗi mapping)"
 49,UNDERWRITERCHECKER_TAKERESPON,Kiểm soát thẩm định chịu trách nhiệm,FCT_RLOS_APPLICATION,UNDERWRITERCHECKER_USERMAKE,KHOP,"Map vào UNDERWRITERCHECKER_USERMAKE (cột 73). review 2026-10-01: xóa cột UNDERWRITERCHECKER_TAKERESPON khỏi PDTD_DTM, cùng lý do cột trên. Cùng cảnh báo nguồn NG_SB_RLOS_USER_MAKE_WORK_STEP như trên"
@@ -74,14 +74,14 @@ stt,truong_bao_cao,y_nghia,bang_dtm,cot_dtm,trang_thai,ghi_chu
 74,CAN_USER_DATE,Thời gian cancel do NSD,FCT_RLOS_APPLICATION,CANCEL_USER_DATE,KHOP,Cột 33 — EXITDATE tại DECISION='Cancel' AND USERNAME IS NOT NULL
 75,AUTO_CAN_DATE,Thời gian cancel tự động,FCT_RLOS_APPLICATION,AUTO_CANCEL_DATE,KHOP,Cột 32 — ngày hệ thống tự động chuyển hồ sơ sang CancelRevoke
 76,FLAG_AUTO_CAN,Hồ sơ cancel tự động (YES/NO),FCT_RLOS_APPLICATION,FLAG_AUTO_CANCEL,KHOP,Cột 42 — 'YES' nếu AUTO_CANCEL_DATE khác NULL
-77,LAST_CAN_REMARKS,Ghi chú tại bước Cancel,FCT_RLOS_APPLICATION,LAST_CAN_REMARKS,KHOP,Cột 45 — ghi chú tại lần hủy hồ sơ
-78,BRANCH_USER,User Chi nhánh,FCT_RLOS_APPLICATION,BRANCH_USER,KHOP,"Cột 14 — User xử lý bước BranchSupport, hoàn tất gần nhất"
-79,DDE_USER,User Chuyên viên nhập liệu,FCT_RLOS_APPLICATION,DDE_USER,KHOP,"Cột 15 — User xử lý bước DetailDataEntry, hoàn tất gần nhất"
-80,QUALITY_CHECKER,User Kiểm soát nhập liệu,FCT_RLOS_APPLICATION,QC_USER,KHOP,Cột 16 — User xử lý bước DataInputerChecker
+77,LAST_CAN_REMARKS,Ghi chú tại bước Cancel,FCT_RLOS_APPLICATION,LAST_CAN_REMARKS,KHOP,"Cột 45 — ghi chú tại lần hủy hồ sơ (bước CancelRevoke), dòng có ENTRYDATE lớn nhất (không lọc EXITDATE)"
+78,BRANCH_USER,User Chi nhánh,FCT_RLOS_APPLICATION,BRANCH_USER,KHOP,"Cột 14 — User xử lý bước thuộc nhóm BI_WORKSTEP = '01.Branch' (join Q_RLOS_REF_WORKSTEP_2SYSTEMS, SYSTEM = 'OF', theo SRS BC1), hoàn tất gần nhất (đã có EXITDATE)"
+79,DDE_USER,User Chuyên viên nhập liệu,FCT_RLOS_APPLICATION,DDE_USER,KHOP,"Cột 15 — User xử lý bước thuộc nhóm BI_WORKSTEP = '02.DDE' (join Q_RLOS_REF_WORKSTEP_2SYSTEMS, SYSTEM = 'OF', theo SRS BC1), hoàn tất gần nhất (đã có EXITDATE)"
+80,QUALITY_CHECKER,User Kiểm soát nhập liệu,FCT_RLOS_APPLICATION,QC_USER,KHOP,"Cột 16 — User xử lý bước thuộc nhóm BI_WORKSTEP = '03.Data Quality check' (join Q_RLOS_REF_WORKSTEP_2SYSTEMS, SYSTEM = 'OF', theo SRS BC1), hoàn tất gần nhất (đã có EXITDATE)"
 81,UND_MAKER,User Chuyên viên thẩm định,FCT_RLOS_APPLICATION,UND_MAKER_USER,KHOP,Cột 17
 82,UND_CHECKER,User Kiểm soát thẩm định,FCT_RLOS_APPLICATION,UND_CHECKER_USER,KHOP,Cột 18
 83,PHV_USER,User Chuyên viên Thẩm định điện thoại,FCT_RLOS_APPLICATION,PHV_USER,KHOP,Cột 19 — User xử lý bước PhoneVerification
-84,BI_APPROVER,User Chuyên gia phê duyệt,FCT_RLOS_APPLICATION,APPROVER_USER,KHOP,"Cột 21 — User xử lý bước CreditApproval, hoàn tất gần nhất"
+84,BI_APPROVER,User Chuyên gia phê duyệt,FCT_RLOS_APPLICATION,APPROVER_USER,KHOP,"Cột 21 — User xử lý bước CreditApproval/CreditCommittee (SRS BC1: WORKSTEP IN (...)), hoàn tất gần nhất (đã có EXITDATE)"
 85,Loan Objective,Mục đích cho vay,DIM_RLOS_APPLICATION,LOAN_OBJECTIVE,KHOP,"Review 2026-10-04 (cross-check LLD/HLD) — sửa lại bang_dtm: LOAN_OBJECTIVE là cột mới bổ sung tại DIM_RLOS_APPLICATION (review trước, lưu SCD1), không tồn tại trên FCT_RLOS_APPLICATION. Nguồn gốc xa NG_SB_RLOS_CREDIT_PROPOSAL.LOAN_OBJECTIVE"
 86,SPP_Amount,Giá trị của sản phẩm phụ,FCT_RLOS_APPLICATION_SECONDPRODUCT,SPP_AMOUNT,KHOP,"Cột 7 (đổi tên bảng từ FCT_RLOS_SUB_PRODUCT review 2026-10-04) — LEFT JOIN đúng 1 trong 5 bảng grid theo WI_NAME+SUB_PRODUCT_LINE (không phải UNION), lấy LIMIT_NO"
 87,SPP_Term,Thời hạn của sản phẩm phụ,FCT_RLOS_APPLICATION_SECONDPRODUCT,SPP_TERM,KHOP,"Cột 8 (đổi tên bảng từ FCT_RLOS_SUB_PRODUCT review 2026-10-04) — CREDIT_CARD_APP.TERM; các bảng khác .TIME_VALID"

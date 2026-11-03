@@ -97,9 +97,9 @@ Excel/CSV gốc.
 
 - Bảng REF cam kết SLA cho hồ sơ CLOS doanh nghiệp lớn/định chế (`CUST_GROUP IN ('NBFI','JSC','FDI','BANK','STR','SOC')`), 1 dòng = 1 tổ hợp REF_PRODUCT + PRODUCT_LINE + SUB_PRODUCT + HAVE_ANY_DEVIATION + FLAG_APP_GRP, dùng cho hệ CLOS.
 - Khóa chính của bảng (PK): **UNIQUE (REF_PRODUCT, PRODUCT_LINE, SUB_PRODUCT, HAVE_ANY_DEVIATION, FLAG_APP_GRP)**; không có PK kỹ thuật riêng.
-- Quy tắc chọn giữa bảng này và `CLOS_REF_SLA_TDKHDN` (2.4.7): theo `CUST_GROUP` của hồ sơ CLOS (SRS BC5 BR 1.2; chi tiết + trích SRS tại `hld/HLD_Table_Design.md` Section 1 → 2.4.6, Section 3 dòng #13).
+- Quy tắc chọn giữa bảng này và `CLOS_REF_SLA_TDKHDN_2` (2.4.7): theo `CUST_GROUP` của hồ sơ CLOS (SRS BC5 BR 1.2; chi tiết + trích SRS tại `hld/HLD_Table_Design.md` Section 1 → 2.4.6, Section 3 dòng #13).
 
-##### 2.4.7 CLOS_REF_SLA_TDKHDN
+##### 2.4.7 CLOS_REF_SLA_TDKHDN_2
 
 Cấu trúc cột **giống hệt** `CLOS_REF_SLA_TDKHDNL` (2.4.6) — cùng 9 cột,
 cùng khóa UNIQUE (REF_PRODUCT, PRODUCT_LINE, SUB_PRODUCT,
@@ -129,10 +129,10 @@ luồng 1"): SRS BC5 có 1 sheet thứ ba trong `BC5TAT.xlsx` chỉ chứa
 SLA duy nhất (hằng số 4 giờ cho mọi vai trò:
 `SLA_CREDIT_OFFICER`/`SLA_MARKER`/`SLA_CHECKER`/`SLA_CREDIT_APPROVER`),
 còn `REF_PRODUCT` của nó kế thừa hoàn toàn từ chính bảng này
-(`CLOS_REF_SLA_TDKHDN`, tra theo `PRODUCT_LINE`+`SUB_PRODUCT`). Vì vậy
+(`CLOS_REF_SLA_TDKHDN_2`, tra theo `PRODUCT_LINE`+`SUB_PRODUCT`). Vì vậy
 **không tạo bảng REF_ vật lý riêng cho "luồng 1"** — giữ đúng 9 bảng REF_
 đã liệt kê trong split-proposal. Khi hồ sơ có `APP_GRP='C1'`:
-`REF_PRODUCT` vẫn lookup bình thường vào `CLOS_REF_SLA_TDKHDN`; còn 4
+`REF_PRODUCT` vẫn lookup bình thường vào `CLOS_REF_SLA_TDKHDN_2`; còn 4
 cột `SLA_*` dùng hằng số cứng = 4 giờ trong công thức PHÁI SINH tại
 `DIM_CLOS_APPLICATION` (2.2.1.1), không lookup bảng nào.
 
@@ -187,15 +187,15 @@ Chi tiết đầy đủ (mermaid) xem tại `hld/HLD_Table_Design.md` Section 1/
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | SYSTEM | VARCHAR2 | Y | 10 |  | Hệ sở hữu/nạp bảng map này — nguồn file.SYSTEM. Giá trị quan sát được: OF. KHÔNG phải cờ phân biệt CLOS/RLOS của dữ liệu — xem ghi chú bên dưới |
+| 1 | SYSTEM | VARCHAR2 | Y | 10 |  | Hệ sở hữu/nạp bảng map này — nguồn file.SYSTEM. Giá trị quan sát được: OF (75 dòng), BT (57 dòng). KHÔNG phải cờ phân biệt CLOS/RLOS của dữ liệu — xem ghi chú bên dưới |
 | 2 | IDFLOW | VARCHAR2 | N | 10 |  | Mã luồng xử lý — nguồn file.IDFLOW, ví dụ 12 cho luồng giải ngân |
 | 3 | WORKSTEP | VARCHAR2 | Y | 50 |  | Tên bước xử lý theo đúng cách LOS ghi — nguồn file.WORKSTEP, ví dụ DisbursementMaker |
-| 4 | WORKSTEP_DISPLAY | VARCHAR2 | N | 50 |  | Tên bước chuẩn hóa để hiển thị trên báo cáo — nguồn file.WORKSTEP_DISPLAY, ví dụ 12.Disbursement-Maker |
+| 4 | BI_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước chuẩn hóa để hiển thị trên báo cáo — nguồn file.BI_WORKSTEP, ví dụ 12.Disbursement-Maker |
 | 5 | DECISION | VARCHAR2 | N | 100 |  | Quyết định tại bước xử lý — nguồn file.DECISION. Cùng 1 bước có nhiều quyết định nên phải nằm trong tổ hợp tra |
 
 - Bảng REF map bước xử lý và quyết định của cả 2 hệ CLOS, RLOS về 1 tên bước chuẩn hóa dùng chung trên báo cáo, 1 dòng = 1 tổ hợp SYSTEM + IDFLOW + WORKSTEP + DECISION, dùng chung cho cả 2 hệ.
 - Khóa chính của bảng (PK): không khai PK/UNIQUE trên DDL gốc — tra theo tổ hợp **WORKSTEP** (+ **DECISION** khi cần phân biệt nhiều quyết định cùng 1 bước).
-- Cột `SYSTEM` KHÔNG phải cờ phân biệt CLOS/RLOS: toàn bộ 132 dòng dữ liệu chỉ quan sát được giá trị `OF` — đây là cột nội bộ của chính bảng map này (hệ sở hữu/nạp file map), không phải cờ đánh dấu dòng dữ liệu thuộc CLOS hay RLOS. Việc phân biệt CLOS/RLOS khi tra bảng này nằm ở phía DIM/FCT gọi join (đã biết trước đang xử lý hồ sơ hệ nào), **không dùng điều kiện `WHERE SYSTEM = ...`**. `IDFLOW` là cột phân biệt luồng xử lý thật sự trong bảng này (ví dụ 12 = luồng giải ngân), không phải `SYSTEM`. Mọi join từ `DIM_CLOS_WORKSTEP`/`DIM_RLOS_WORKSTEP` (2.2.1.3/2.3.1.3) và `FCT_CLOS_APPLICATION`/`FCT_RLOS_APPLICATION` (cột `LAST_WORKSTEP`, 2.2.2.1/2.3.2.1) vào bảng này chỉ dùng `WORKSTEP` (+ `DECISION`), không lọc theo `SYSTEM`.
+- Cột `SYSTEM` KHÔNG phải cờ phân biệt CLOS/RLOS: 132 dòng dữ liệu có 2 giá trị `OF` (75 dòng) và `BT` (57 dòng) — đây là cột nội bộ của chính bảng map này (hệ sở hữu/nạp file map), không phải cờ đánh dấu dòng dữ liệu thuộc CLOS hay RLOS. Việc phân biệt CLOS/RLOS khi tra bảng này nằm ở phía DIM/FCT gọi join (đã biết trước đang xử lý hồ sơ hệ nào), **không dùng `WHERE SYSTEM = ...` để phân biệt CLOS/RLOS**. Ngoại lệ: `BRANCH_USER`/`DDE_USER`/`QC_USER` của `FCT_RLOS_APPLICATION` (SRS BC1) lọc `SYSTEM = 'OF'` vì cùng `BI_WORKSTEP` nhưng `SYSTEM = 'BT'` gồm các bước khác (RegionalBranchSupport, QuickDataEntry, BranchChecker1/2/3...). `IDFLOW` là cột phân biệt luồng xử lý thật sự trong bảng này (ví dụ 12 = luồng giải ngân), không phải `SYSTEM`. Mọi join từ `DIM_CLOS_WORKSTEP`/`DIM_RLOS_WORKSTEP` (2.2.1.3/2.3.1.3) vào bảng này chỉ dùng `WORKSTEP` (+ `DECISION`), không lọc theo `SYSTEM`.
 
 ##### 2.4.10 REF_PHAN_LOAI_DDE
 

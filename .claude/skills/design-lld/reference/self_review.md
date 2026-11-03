@@ -361,13 +361,13 @@ chọn bảng động).
 PDTD_DTM):** lần sửa thứ nhất (khắc phục lỗi "JOIN lồng trong nhánh ELSE")
 vẫn còn giữ nguyên phần đầu công thức dạng `CASE WHEN CUST_GROUP IN (...)
 THEN LEFT JOIN CLOS_REF_SLA_TDKHDNL WHEN CUST_GROUP IN (...) THEN LEFT JOIN
-CLOS_REF_SLA_TDKHDN END <REF_TABLE> ON ...` — đây vẫn là cú pháp SQL không
+CLOS_REF_SLA_TDKHDN_2 END <REF_TABLE> ON ...` — đây vẫn là cú pháp SQL không
 hợp lệ: `CASE` là 1 biểu thức trả về **giá trị vô hướng** (số/chuỗi/ngày),
 không thể trả về "1 bảng" để JOIN động theo — SQL không có khái niệm chọn
 bảng nguồn bằng biểu thức điều kiện tại thời điểm JOIN.
 
 **Quy ước:** khi cần chọn 1 trong N bảng nguồn khác nhau tùy điều kiện trên
-driving table (VD chọn `CLOS_REF_SLA_TDKHDNL` hay `CLOS_REF_SLA_TDKHDN`
+driving table (VD chọn `CLOS_REF_SLA_TDKHDNL` hay `CLOS_REF_SLA_TDKHDN_2`
 theo `CUST_GROUP`), viết **N mệnh đề `LEFT JOIN` độc lập, mỗi bảng tự mang
 đúng điều kiện phân nhóm của mình trong `ON`** — không dùng `CASE` để chọn
 tên bảng. Vì điều kiện phân nhóm loại trừ lẫn nhau (1 dòng chỉ khớp đúng 1
