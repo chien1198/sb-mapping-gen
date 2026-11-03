@@ -283,8 +283,8 @@ flowchart LR
 | 11 | COMPANY_CODE | VARCHAR2 | N | 50 |  | CỘT MỚI — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.COMPANY_CODE: BK cạnh SK (layer Company), cùng giá trị đã dùng để lookup COMPANY_SK (cột 10) tại SB_DWH | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
 | 12 | CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_CLOS_CUSTOMER — quan hệ 1:1 với hồ sơ qua WI_NAME, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp. Đây là chân khách hàng LOS — khác T24_CUSTOMER_SK (chân T24, bổ sung riêng tại PDTD_DTM) — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CUSTOMER_SK | Báo cáo CLOS APPLICATION (BC2) — khóa JOIN tới ZONE (DIM_CLOS_CUSTOMER.ZONE) | — |
 | 13 | CUSTOMER_CODE | VARCHAR2 | N | 100 |  | CỘT MỚI — bê 1:1 từ SB_DWH.FCT_CLOS_APPLICATION.CUSTOMER_CODE: BK cạnh SK (DIM_CLOS_CUSTOMER), giá trị đã tra ra trong bước lookup CUSTOMER_SK (cột 12) tại SB_DWH | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
-| 14 | T24_CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), nối thẳng CUSTOMER_CODE (cột 13) = STG_DIM_CUSTOMER.LEGAL_ID, không qua DIM_CLOS_CUSTOMER. Mặc định -1| Báo cáo CLOS APPLICATION (BC2) — khóa JOIN sang DIM_T24_CUSTOMER (CUSTOMER_ID — ID khách hàng/Mã CIF) | — |
-| 15 | T24_CUSTOMER_CODE | VARCHAR2 | N | 50 |  | CỘT MỚI — bê 1:1 từ STG_DTM.STG_DIM_CUSTOMER.CUSTOMER: BK cạnh SK, mã khách hàng T24, giá trị đã có sẵn trong bước lookup T24_CUSTOMER_SK (cột 14) | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
+| 14 | T24_CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24), nối thẳng CUSTOMER_CODE (cột 13) = PDTD_DTM.DIM_T24_CUSTOMER.LEGAL_ID (lọc SCD2 theo v_batch_date), không qua DIM_CLOS_CUSTOMER, không dùng STG_DIM_CUSTOMER vì chỉ có delta 1 ngày. Mặc định -1| Báo cáo CLOS APPLICATION (BC2) — khóa JOIN sang DIM_T24_CUSTOMER (CUSTOMER_ID — ID khách hàng/Mã CIF) | — |
+| 15 | T24_CUSTOMER_CODE | VARCHAR2 | N | 50 |  | CỘT MỚI — bê từ PDTD_DTM.DIM_T24_CUSTOMER.CUSTOMER: BK cạnh SK, mã khách hàng T24, giá trị đã có sẵn trong bước lookup T24_CUSTOMER_SK (cột 14) | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
 | 16 | RI_USER | VARCHAR2 | N | 100 |  | User khởi tạo hồ sơ (bước RequestInitiate) — PHÁI SINH TẠI PDTD_DTM: USERNAME tại bản ghi SB_DWH.FCT_CLOS_WORKSTEP_EVENT WHERE WORKSTEP_CODE='RequestInitiate' theo WI_NAME (quy ước tối đa 1 dòng/hồ sơ, không cần MAX/MIN EXITDATE) — BỔ SUNG RIÊNG TẠI PDTD_DTM, không còn ở SB_DWH | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | RI_USER (User khởi tạo hồ sơ) |
 | 17 | BRANCH_USER | VARCHAR2 | N | 100 |  | User xử lý bước BranchSupport, HOÀN TẤT gần nhất — PHÁI SINH TẠI PDTD_DTM: USERNAME trên SB_DWH.FCT_CLOS_WORKSTEP_EVENT tại WORKSTEP_CODE='BranchSupport', bản ghi EXITDATE lớn nhất (<=DAYID) theo WI_NAME — BỔ SUNG RIÊNG TẠI PDTD_DTM, không còn ở SB_DWH | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | BRANCH_USER (User Chi nhánh) |
 | 18 | DDE_USER | VARCHAR2 | N | 100 |  | User xử lý bước DetailDataEntry, HOÀN TẤT gần nhất — PHÁI SINH TẠI PDTD_DTM : USERNAME trên SB_DWH.FCT_CLOS_WORKSTEP_EVENT tại WORKSTEP_CODE='DetailDataEntry', bản ghi EXITDATE lớn nhất (<=DAYID) theo WI_NAME — BỔ SUNG RIÊNG TẠI PDTD_DTM, không còn ở SB_DWH | Báo cáo CLOS APPLICATION (BC2) — hiển thị trực tiếp | DDE_USER (User Chuyên viên nhập liệu) |
@@ -828,8 +828,8 @@ flowchart LR
     subgraph REF_DTM["Bảng REF tại PDTD_DTM"]
         REF(["REF_RLOS_FLOW / RLOS_REF_SLA_TDKHCN / REF_SLA_NLTT"])
     end
-    subgraph STG_DTM["Vùng chìa STG_DTM"]
-        STG(["STG_DIM_CARD / STG_DIM_SEAB_MAIN_CARD"])
+    subgraph STG_DTM["Dim T24 tại PDTD_DTM"]
+        STG(["DIM_T24_CARD / DIM_T24_SEAB_MAIN_CARD"])
     end
     subgraph PDTD_DTM
         D["FCT_RLOS_APPLICATION"]
@@ -838,7 +838,7 @@ flowchart LR
     DV -.->|"report-time: DAYID=MAX(DAYID)/WI_NAME, COUNT(*) >=3 → 'YES' — sinh DEVIATION_G3"| D
     REF -->|"LEFT JOIN theo STREAM (BUSINESS_FLOW); PRODUCT_LINE/CHANGE_TYPE/DEVIATION_G3/APP_GRP (REF_PRODUCT, SLA_*); PRODUCT_SK report-time (SLA Nhập liệu tập trung, BC9)"| D
     WE -.->|"WORKSTEP_DECISION_SK → WORKSTEP_CODE/DECISION_CODE — sinh APPLICATION_STATUS/FLAG_AUTO_CANCEL, AUTO_CANCEL_DATE "| D
-    STG -.->|"MAIN_ID/RECID = RESULT_MAIN_CARD_ID (qua DIM_RLOS_APPLICATION) — sinh T24_CARD_SK/T24_SEAB_MAIN_CARD_SK"| D
+    STG -.->|"MAIN_ID/RECID = RESULT_MAIN_CARD_ID (qua DIM_RLOS_APPLICATION), lọc SCD2 theo v_batch_date — sinh T24_CARD_SK/T24_SEAB_MAIN_CARD_SK"| D
     WE -.->|"PHÁI SINH TẠI PDTD_DTM (chuyển từ SB_DWH, xóa khỏi FCT_RLOS_APPLICATION SB_DWH) — MAX/MIN/LAG(ENTRYDATE/EXITDATE/WORKSTEP_CODE) theo WI_NAME+WORKSTEP_CODE — sinh USER_SK (đổi tên từ LAST_USER_SK), BRANCH_USER, DDE_USER, QC_USER, UND_MAKER_USER, UND_CHECKER_USER, PHV_USER, APPROVER_USER (USERNAME tại từng WORKSTEP_CODE cố định, bản ghi EXITDATE lớn nhất), LAST_APPROVAL_DATE/MIN_UWM/MIN_APP (MAX/MIN EXITDATE/ENTRYDATE), CANCEL_USER_DATE, CANCEL_DATE (ENTRYDATE tại WORKSTEP_CODE='CancelRevoke'), LAST_ENTRYDATE/LAST_EXITDATE/PRE_WORKSTEP_CODE/LAST_REMARKS/LAST_REMARK_DDE/LAST_CAN_REMARKS (của sự kiện hoàn tất gần nhất) — FLAG_AUTO_CANCEL tiếp tục dùng CANCEL_DATE làm input, cùng bảng"| D
     RAPP -.->|"APPLICATION_SK — tra INTEREST_RATE_PCT/LOAN_TO_VALUE/LOAN_OBJECTIVE/TOTAL_INCOME/10 cột cờ nguồn thu/PRODUCT_NAME (đã chuyển từ FCT_RLOS_APPLICATION SB_DWH sang DIM_RLOS_APPLICATION, SCD1) — input cho REPAYMENT_SOURCE/INCOM_3/BUSINESS_INCOM/FLAG_BUSINESS_INCOME tính tại AGG_LOS_KPI_APPLICATION (mục 3)"| D
     WE -.->|"sinh UNDERWRITERMAKER/CHECKER/APPROVAL_USERMAKE — lấy dòng ENTRYDATE lớn nhất theo WI_NAME + WORKSTEP_CODE cố định"| D
@@ -1333,7 +1333,8 @@ flowchart LR
 - **Ý nghĩa bảng:** thông tin người vay chính (applicant) của hồ sơ RLOS
   tại PDTD_DTM, chi tiết tới TỪNG GIẤY TỜ ĐỊNH DANH. Bê 1:1 từ SB_DWH,
   riêng `T24_CUSTOMER_SK` được tính bổ sung tại PDTD_DTM (join
-  STG_DTM.STG_DIM_CUSTOMER — SB_DWH không được đọc STG_DTM)
+  PDTD_DTM.DIM_T24_CUSTOMER, đầy đủ lịch sử — không dùng STG_DIM_CUSTOMER vì
+  STG_DTM chỉ có delta 1 ngày; SB_DWH không được đọc STG_DTM)
 - **Khóa nghiệp vụ (BK):** composite `WI_NAME`+`ID_TYPE`+`ID_NUMBER` —
   hash vào cột `CUSTOMER_BK`, bê 1:1 từ SB_DWH
 - **Khóa chính của bảng (PK):** `DAYID`, `CUSTOMER_BK` (giữ nguyên như SB_DWH).
@@ -1353,14 +1354,14 @@ flowchart LR
     subgraph SB_DWH
         C["FCT_RLOS_CUSTOMER"]
     end
-    subgraph STG_DTM
-        T(["STG_DIM_CUSTOMER"])
+    subgraph STG_DTM["Dim T24 tại PDTD_DTM"]
+        T(["DIM_T24_CUSTOMER"])
     end
     subgraph PDTD_DTM
         D["FCT_RLOS_CUSTOMER"]
     end
     C -.->|"bê 1:1, 35 cột"| D
-    T -.->|"LEFT JOIN theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME của chính dòng STG_FCT_RLOS_CUSTOMER đang xét (đúng nguyên văn SRS BC1 BR 1.2) — sinh T24_CUSTOMER_SK, JOIN ngay tại PDTD_DTM (SB_DWH không được đọc STG_DTM)"| D
+    T -.->|"LEFT JOIN theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME của chính dòng STG_FCT_RLOS_CUSTOMER đang xét (đúng nguyên văn SRS BC1 BR 1.2) — lọc SCD2 theo v_batch_date — sinh T24_CUSTOMER_SK, JOIN ngay tại PDTD_DTM (SB_DWH không được đọc STG_DTM)"| D
 ```
 
 
@@ -1373,8 +1374,8 @@ flowchart LR
 | 2 | CUSTOMER_BK | VARCHAR2 | Y | 64 | PK | Khóa nghiệp vụ hash của tổ hợp (hồ sơ, loại giấy tờ, số giấy tờ) — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.CUSTOMER_BK: PHÁI SINH STANDARD_HASH(WI_NAME \|\| ID_TYPE \|\| ID_NUMBER, 'MD5') | — (cột kỹ thuật, khóa chính) | — |
 | 3 | APPLICATION_SK | NUMBER | N | 18 |  | Khóa tới DIM_RLOS_APPLICATION, join theo WI_NAME + điều kiện SCD2 hiệu lực tại DAYID. Mặc định -1 nếu không khớp — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.APPLICATION_SK | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_RLOS_APPLICATION | — |
 | 4 | WI_NAME | VARCHAR2 | Y | 100 |  | Mã hồ sơ RLOS — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.WI_NAME (nguồn gốc xa: NG_SB_RLOS_APPLICANT_IDGRID.WI_NAME, driving table tại SB_DWH). Quan hệ 1:N với giấy tờ (1 hồ sơ có thể có nhiều giấy tờ) — vị trí liền sau APPLICATION_SK, đồng bộ thứ tự với SB_DWH mục 4 | Báo cáo RLOS APPLICATION (BC1)<br>Báo cáo CLOS APPLICATION (BC2) | WINAME (Mã hồ sơ) |
-| 5 | T24_CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24) — TÍNH RIÊNG TẠI PDTD_DTM (không bê từ SB_DWH): LEFT JOIN STG_DTM.STG_DIM_CUSTOMER theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME (đúng nguyên văn SRS BC1 BR 1.2), lấy DIMENSION_KEY. Mặc định -1 nếu không khớp. Chân khách hàng T24 — khác chân khách hàng LOS/applicant thể hiện bằng chính WI_NAME/ID_TYPE/ID_NUMBER | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_CUSTOMER lấy CUSTOMER_ID | Nguồn cho chỉ tiêu/trường CUSTOMER_ID (BC1) |
-| 6 | T24_CUSTOMER_CODE | VARCHAR2 | N | 50 |  | CỘT MỚI — bê 1:1 từ STG_DTM.STG_DIM_CUSTOMER.CUSTOMER: BK cạnh SK, mã khách hàng T24, giá trị đã có sẵn trong bước lookup T24_CUSTOMER_SK (cột 5) | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
+| 5 | T24_CUSTOMER_SK | NUMBER | N | 18 |  | Khóa tới DIM_T24_CUSTOMER (T24) — TÍNH RIÊNG TẠI PDTD_DTM (không bê từ SB_DWH): LEFT JOIN PDTD_DTM.DIM_T24_CUSTOMER theo ID_NUMBER=LEGAL_ID AND ID_TYPE=LEGAL_DOC_NAME (đúng nguyên văn SRS BC1 BR 1.2), lọc SCD2 v_batch_date BETWEEN EFF_DATE AND NVL(EXP_DATE, v_batch_date), lấy DIMENSION_KEY. Mặc định -1 nếu không khớp. Chân khách hàng T24 — khác chân khách hàng LOS/applicant thể hiện bằng chính WI_NAME/ID_TYPE/ID_NUMBER | Báo cáo RLOS APPLICATION (BC1) — khóa JOIN sang DIM_T24_CUSTOMER lấy CUSTOMER_ID | Nguồn cho chỉ tiêu/trường CUSTOMER_ID (BC1) |
+| 6 | T24_CUSTOMER_CODE | VARCHAR2 | N | 50 |  | CỘT MỚI — bê từ PDTD_DTM.DIM_T24_CUSTOMER.CUSTOMER: BK cạnh SK, mã khách hàng T24, giá trị đã có sẵn trong bước lookup T24_CUSTOMER_SK (cột 5) | — (cột bổ sung, phục vụ truy vết/đối soát BK không qua DIM) | — |
 | 7 | ID_TYPE | VARCHAR2 | N | 50 |  | Loại giấy tờ định danh — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ID_TYPE (nguồn gốc xa: NG_SB_RLOS_APPLICANT_IDGRID.ID_TYPE) | — | Thiết kế dư thừa (đầu vào cho pivot ADD_ID/ADD_ID_OTHER nếu cần tại tầng report) |
 | 8 | ID_NUMBER | VARCHAR2 | N | 100 |  | Số giấy tờ định danh — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ID_NUMBER (nguồn gốc xa: NG_SB_RLOS_APPLICANT_IDGRID.ID_NUMBER) | — | Thiết kế dư thừa (đầu vào cho pivot ADD_ID/ADD_ID_OTHER nếu cần tại tầng report) |
 | 9 | ISSUE_DATE | DATE | N |  |  | Ngày cấp giấy tờ — bê 1:1 từ SB_DWH.FCT_RLOS_CUSTOMER.ISSUE_DATE | — | Thiết kế dư thừa |

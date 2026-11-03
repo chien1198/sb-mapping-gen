@@ -735,8 +735,8 @@ Lấy 1:1 từ bảng có sẵn trên `STG_DTM.STG_DIM_COMPANY`.
 - **Phục vụ báo cáo:**
   - Báo cáo RLOS APPLICATION (BC1) — qua FCT_RLOS_CUSTOMER.T24_CUSTOMER_SK
   - Báo cáo CLOS APPLICATION (BC2) — qua FCT_CLOS_APPLICATION.T24_CUSTOMER_SK
-  - Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — qua FCT_RLOS_LOAN_DISBURSEMENT.CUSTOMER_SK, lọc SEAB_CU_SEGMENT IN ('14','21')
-  - Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FCT_CLOS_LOAN_DISBURSEMENT.CUSTOMER_SK, lọc SEAB_CU_SEGMENT NOT IN ('14','21')
+  - Báo cáo Giải ngân _ Quá hạn KHCN (BC10) — qua FCT_RLOS_LOAN_DISBURSEMENT.CUSTOMER_SK, lọc SEAB_CU_SEGMENT IN ('14','21') (lọc tại ETL fact, INNER JOIN theo CUSTOMER_SK)
+  - Báo cáo Giải ngân _ Quá hạn KHDN (BC11) — qua FCT_CLOS_LOAN_DISBURSEMENT.CUSTOMER_SK, lọc SEAB_CU_SEGMENT NOT IN ('14','21') (lọc tại ETL fact, INNER JOIN theo CUSTOMER_SK)
 
 ### 16.2 Sơ đồ lineage
 ```mermaid
