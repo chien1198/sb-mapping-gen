@@ -55,9 +55,9 @@ stt,truong_bao_cao,y_nghia,bang_dtm,cot_dtm,trang_thai,ghi_chu
 54,MIN_UWM,Thời gian hồ sơ lên CV thẩm định,FCT_CLOS_APPLICATION,MIN_UWM,KHOP,Cột 28 — MIN(ENTRYDATE) tại UnderwriterMaker
 55,MIN_APP,Thời gian hồ sơ lên cấp phê duyệt,FCT_CLOS_APPLICATION,MIN_APP,KHOP,Cột 29 — MIN(ENTRYDATE) tại CreditApproval/CreditCommittee
 56,FLAG_AUTO_CAN,Hồ sơ bị tự động hủy (YES/NO),FCT_CLOS_APPLICATION,FLAG_AUTO_CANCEL,KHOP,Cột 40 — 'YES' nếu AUTO_CANCEL_DATE khác NULL. SRS mô tả công thức khác (BI_CAN_DATE IS NOT NULL AND LAST_DECISION='Auto-Cancel') nhưng cùng ý nghĩa nghiệp vụ với FLAG_AUTO_CANCEL đã thiết kế sẵn — không phát hiện lệch cần xử lý riêng
-57,LAST_APPROVAL_DATE,Thời gian phê duyệt cuối cùng,FCT_CLOS_APPLICATION,LAST_APPROVAL_DATE,KHOP,Cột 27 — MAX(EXITDATE) tại bước phê duyệt
+57,LAST_APPROVAL_DATE,Thời gian phê duyệt cuối cùng,FCT_CLOS_APPLICATION,LAST_APPROVAL_DATE,KHOP,"Cột 59 — 'YES' nếu CANCEL_DATE IS NOT NULL AND LAST_DECISION = 'Auto-Cancel' (DECISION_CODE của hồ sơ qua WORKSTEP_DECISION_SK), khớp SRS BC2. Review 2026-11-09: sửa mô tả cũ (nhầm theo AUTO_CANCEL_DATE, cột này không có ở CLOS); phụ thuộc CANCEL_DATE nay đã carry-forward nên không mất giá trị từ ngày thứ 2"
 58,BI_CAN_DATE,Thời gian hồ sơ vào vùng CancelRevoke,FCT_CLOS_APPLICATION,CANCEL_DATE,KHOP,Cột 32 — ENTRYDATE tại bước CancelRevoke
-59,RI_USER,User khởi tạo hồ sơ,FCT_CLOS_APPLICATION,RI_USER,KHOP,Cột 11 — User xử lý bước RequestInitiate
+59,RI_USER,User khởi tạo hồ sơ,FCT_CLOS_APPLICATION,RI_USER,KHOP,"Cột 31 — ENTRYDATE lần gần nhất vào bước CancelRevoke. Review 2026-11-09: carry-forward bằng FCT_CLOS_APPLICATION_PREV (mẫu B1, GREATEST null-safe) để không mất giá trị từ ngày thứ 2; lấy giá trị last khi hồ sơ vào CancelRevoke nhiều lần (SRS không nêu MIN/MAX)"
 60,BRANCH_USER,User Chi nhánh,FCT_CLOS_APPLICATION,BRANCH_USER,KHOP,"Cột 12 — User xử lý bước BranchSupport, hoàn tất gần nhất (đã có EXITDATE, lấy dòng ENTRYDATE lớn nhất)"
 61,DDE_USER,User Chuyên viên nhập liệu,FCT_CLOS_APPLICATION,DDE_USER,KHOP,Cột 13 — User xử lý bước DetailDataEntry
 62,QUALITY_CHECKER,User Kiểm soát nhập liệu,FCT_CLOS_APPLICATION,QC_USER,KHOP,Cột 14 — User xử lý bước DataInputerChecker

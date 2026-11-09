@@ -123,18 +123,7 @@ chỉ quan sát được 2 giá trị: `CGPD`, `BOD/CC`.
 - Bảng REF cam kết SLA cho hồ sơ CLOS doanh nghiệp vừa/nhỏ (`CUST_GROUP IN ('MSME','SME','USME')`), cùng cấu trúc với `CLOS_REF_SLA_TDKHDNL`, dùng cho hệ CLOS.
 - Khóa chính của bảng (PK): **UNIQUE (REF_PRODUCT, PRODUCT_LINE, SUB_PRODUCT, HAVE_ANY_DEVIATION, FLAG_APP_GRP)**; không có PK kỹ thuật riêng.
 
-**Trường hợp `APP_GRP = 'C1'`** (SRS gọi là "sheet cam kết SLA TDKHDN
-luồng 1"): SRS BC5 có 1 sheet thứ ba trong `BC5TAT.xlsx` chỉ chứa
-`REF_PRODUCT` cho hồ sơ có `APP_GRP='C1'` — sheet này chỉ có 1 giá trị
-SLA duy nhất (hằng số 4 giờ cho mọi vai trò:
-`SLA_CREDIT_OFFICER`/`SLA_MARKER`/`SLA_CHECKER`/`SLA_CREDIT_APPROVER`),
-còn `REF_PRODUCT` của nó kế thừa hoàn toàn từ chính bảng này
-(`CLOS_REF_SLA_TDKHDN_2`, tra theo `PRODUCT_LINE`+`SUB_PRODUCT`). Vì vậy
-**không tạo bảng REF_ vật lý riêng cho "luồng 1"** — giữ đúng 9 bảng REF_
-đã liệt kê trong split-proposal. Khi hồ sơ có `APP_GRP='C1'`:
-`REF_PRODUCT` vẫn lookup bình thường vào `CLOS_REF_SLA_TDKHDN_2`; còn 4
-cột `SLA_*` dùng hằng số cứng = 4 giờ trong công thức PHÁI SINH tại
-`DIM_CLOS_APPLICATION` (2.2.1.1), không lookup bảng nào.
+**Trường hợp `APP_GRP = 'C1'`** (SRS gọi là "sheet cam kết SLA TDKHDN luồng 1"): sheet này trong `BC5TAT(REF_SLA).xlsx` chỉ có 2 cột `APP_GRP` và `SLA_CREDIT_APPROVER` (1 dòng: C1 = 4 giờ), ghi chú "giá trị REF_PRODUCT giống danh sách tại sheet luồng 2". Vì vậy **không tạo bảng REF_ vật lý riêng cho "luồng 1"** — giữ đúng 9 bảng REF_ đã liệt kê trong split-proposal. Khi hồ sơ có `APP_GRP='C1'`: `REF_PRODUCT` vẫn lookup bình thường vào `CLOS_REF_SLA_TDKHDN_2`; chỉ `SLA_CREDIT_APPROVER` dùng hằng số cứng = 4 giờ (không lookup); 3 cột `SLA_CREDIT_OFFICER`/`SLA_MARKER`/`SLA_CHECKER` vẫn lookup như hồ sơ thường (SRS BC5 chỉ quy định C1 cho `SLA_CREDIT_APPROVER`).
 
 ##### 2.4.8 REF_SLA_NLTT
 

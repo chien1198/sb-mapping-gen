@@ -206,7 +206,6 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_APPLICATION (
     LAST_REMARKS                  VARCHAR2(4000)      ,
     PROPOSED_AMT                  NUMBER(20,2)        ,
     CREDIT_LIMIT_APPROVAL         NUMBER(20,2)        ,
-    CREDIT_LIMIT_COMMITTEE        NUMBER(20,2)        ,
     APPROVED_AMT_FINAL            NUMBER(20,2)        ,
     APPROVED_TERM                 NVARCHAR2(100)      ,
     INTEREST_RATE_PCT             NVARCHAR2(500)      ,
@@ -239,6 +238,9 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_APPLICATION (
     HAS_FINAL_APPROVAL_FLAG       VARCHAR2(1)         ,
     HAS_CANCELLED_FLAG            VARCHAR2(1)         ,
     TIME_UPDATE                   TIMESTAMP           ,
+    MIN_APP_EXITDATE              TIMESTAMP           ,
+    FIRST_DDE_SUBMIT_DATE         TIMESTAMP           ,
+    FIRST_WORKSTEP_RETURN         VARCHAR2(200)       ,
 
 	CONSTRAINT FCT_CLOS_APPLICATION_PK PRIMARY KEY (WI_NAME, DAYID) USING INDEX LOCAL
 )
@@ -313,9 +315,7 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_EXCEPTION (
     DAYID                         DATE                NOT NULL,
     EXCEPTION_BK                  VARCHAR2(64)        NOT NULL,
     APPLICATION_SK                NUMBER,
-    EXCEPTION_SK                  NUMBER,
-    WORKSTEP_CODE                 VARCHAR2(200)       ,
-    DECISION_CODE                 VARCHAR2(200)       ,
+    WORKSTEP_CODE                 VARCHAR2(200)       NOT NULL,
     USER_SK                       NUMBER,
     USERNAME                      VARCHAR2(150)       ,
     CUSTOMER_SK                   NUMBER,
@@ -332,7 +332,7 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_EXCEPTION (
     PHAN_LOAI_DDE                 VARCHAR2(100)       ,
     TIME_UPDATE                   TIMESTAMP           ,
 
-	CONSTRAINT FCT_CLOS_EXCEPTION_PK PRIMARY KEY (EXCEPTION_BK, DAYID) USING INDEX LOCAL
+	CONSTRAINT FCT_CLOS_EXCEPTION_PK PRIMARY KEY (DAYID, EXCEPTION_BK, WORKSTEP_CODE) USING INDEX LOCAL
 )
 PARTITION BY RANGE (DAYID)
 INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
@@ -439,7 +439,6 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT (
     WF_ACTIVITYNAME               VARCHAR2(200)       ,
     WF_CREATEDBY                  VARCHAR2(50)        ,
     APPROVED_DATE           DATE                ,
-    APPROVAL_FLAG                 VARCHAR2(50)        ,
     WORKSTEP_FLAG                 VARCHAR2(200)       ,
     UNDERWRITERMAKER_USERMAKE     VARCHAR2(100)       ,
     UNDERWRITERCHECKER_USERMAKE   VARCHAR2(100)       ,
@@ -535,7 +534,6 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_APPLICATION (
     MIN_UWM                       TIMESTAMP           ,
     MIN_APP                       TIMESTAMP           ,
     CANCEL_USER_DATE              DATE                ,
-    CANCEL_DATE                   DATE                ,
     LAST_ENTRYDATE                TIMESTAMP           ,
     LAST_EXITDATE                 TIMESTAMP           ,
     PRE_WORKSTEP_CODE             VARCHAR2(200)       ,
@@ -568,6 +566,9 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_APPLICATION (
     HAS_FINAL_APPROVAL_FLAG       VARCHAR2(1)         ,
     HAS_CANCELLED_FLAG            VARCHAR2(1)         ,
     TIME_UPDATE                   TIMESTAMP           ,
+    MIN_APP_EXITDATE              TIMESTAMP           ,
+    FIRST_DDE_SUBMIT_DATE         TIMESTAMP           ,
+    FIRST_WORKSTEP_RETURN         VARCHAR2(200)       ,
 
 	CONSTRAINT FCT_RLOS_APPLICATION_PK PRIMARY KEY (WI_NAME, DAYID) USING INDEX LOCAL
 )
@@ -747,7 +748,7 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_EXCEPTION (
     DAYID                         DATE                NOT NULL,
     EXCEPTION_BK                  VARCHAR2(64)        NOT NULL,
     APPLICATION_SK                NUMBER,
-    WORKSTEP_CODE                 VARCHAR2(200)       ,
+    WORKSTEP_CODE                 VARCHAR2(200)       NOT NULL,
     USER_SK                       NUMBER,
     USERNAME                      VARCHAR2(150)       ,
     WI_NAME                       VARCHAR2(100)       NOT NULL,
@@ -763,7 +764,7 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_EXCEPTION (
     PHAN_LOAI_DDE                 VARCHAR2(100)       ,
     TIME_UPDATE                   TIMESTAMP           ,
 
-	CONSTRAINT FCT_RLOS_EXCEPTION_PK PRIMARY KEY (EXCEPTION_BK, DAYID) USING INDEX LOCAL
+	CONSTRAINT FCT_RLOS_EXCEPTION_PK PRIMARY KEY (DAYID, EXCEPTION_BK, WORKSTEP_CODE) USING INDEX LOCAL
 )
 PARTITION BY RANGE (DAYID)
 INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
@@ -850,7 +851,6 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT (
     WF_PROCESSNAME                VARCHAR2(50)        ,
     WF_ACTIVITYNAME               VARCHAR2(200)       ,
     WF_CREATEDBY                  VARCHAR2(50)        ,
-    APPROVAL_FLAG                 VARCHAR2(50)        ,
     WORKSTEP_FLAG                 VARCHAR2(200)       ,
     UNDERWRITERMAKER_USERMAKE     VARCHAR2(100)       ,
     UNDERWRITERCHECKER_USERMAKE   VARCHAR2(100)       ,
