@@ -10,12 +10,6 @@
 --   FCT_RLOS_EXCEPTION       : WORKSTEP_CODE NOT NULL; PK (DAYID, EXCEPTION_BK, WORKSTEP_CODE)
 --   FCT_CLOS_WORKSTEP_EVENT  : bo cot APPROVAL_FLAG
 --   FCT_RLOS_WORKSTEP_EVENT  : bo cot APPROVAL_FLAG
--- Phan 1: DROP TABLE. Phan 2: CREATE TABLE. Phan 3: GRANT SELECT cho U_RISK_DTM_FSSC.
--- CHU Y: chay script nay se XOA SACH DU LIEU hien co trong 6 bang tren
--- (DROP TABLE). Can chay lai ETL de nap lai du lieu. Rieng 2 bang APPLICATION:
--- cac cot carry-forward (HAS_*_FLAG, MIN_*, FIRST_*, *_USER, LAST_*...) doc tu
--- snapshot ngay truoc cua chinh bang nay, nen phai chay lai ETL lan luot tung ngay
--- tu ngay bat dau thi moi dung lai duoc gia tri lich su.
 -- ============================================================
 
 -- ================================================================

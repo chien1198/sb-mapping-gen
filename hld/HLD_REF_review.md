@@ -131,19 +131,19 @@ chỉ quan sát được 2 giá trị: `CGPD`, `BOD/CC`.
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | REF_PRODUCT | NVARCHAR2 | Y | 200 | PK | Nhóm sản phẩm dùng để tra cam kết SLA — nguồn file.REF_PRODUCT |
 | 2 | PRODUCT_LINE | NVARCHAR2 | Y | 200 | PK | Dòng sản phẩm — nguồn file.Product_Line, ví dụ SeAHome-TTD |
-| 3 | POLICY | NVARCHAR2 | N | 200 | PK | Chính sách tín dụng áp dụng cho hồ sơ — nguồn file.Policy, ví dụ THETD.THU.NHAP. Ký tự * nghĩa là khớp theo mẫu |
-| 4 | SUB_PRODUCT | NVARCHAR2 | N | 200 | PK | Sản phẩm nhánh — nguồn file.Sub_Product. Để trống nghĩa là áp cho mọi sản phẩm nhánh |
-| 5 | NEW_CHANGE_REQUEST | NVARCHAR2 | Y | 200 | PK | Loại yêu cầu — nguồn file.New_Change_Request, ví dụ New cho hồ sơ mới |
-| 6 | SLA_DE_RESULT | NUMBER | N | 10,2 |  | Cam kết giờ cho bước nhập liệu chi tiết — nguồn file.SLA_DE_RESULT. Tên cột có hậu tố RESULT nhưng đây là số giờ cam kết, không phải kết quả đạt/không đạt |
-| 7 | SLA_QC_RESULT | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát nhập liệu — nguồn file.SLA_QC_RESULT. Cũng là số giờ, không phải kết quả |
-| 8 | SLA_DE_TOTAL_RESULT | NUMBER | N | 10,2 |  | Cam kết giờ cho cả khâu nhập liệu, bằng tổng SLA_DE_RESULT + SLA_QC_RESULT — nguồn file.SLA_DE_TOTAL_RESULT. Là 1 thành phần của POINT ở BC9 |
-| 9 | QD_DDE | NUMBER | N | 10,2 |  | Điểm quy đổi năng suất bước nhập liệu — nguồn file.QD_DDE |
-| 10 | QD_QC | NUMBER | N | 10,2 |  | Điểm quy đổi năng suất bước kiểm soát nhập liệu — nguồn file.QD_QC |
-| 11 | SYSTEM_CODE | VARCHAR2 | Y | 10 | PK | Hệ nguồn của dòng cam kết: CLOS hoặc RLOS — nguồn file.SYSTEM_CODE |
+| 3 | SUB_PRODUCT | NVARCHAR2 | N | 200 | PK | Sản phẩm nhánh — nguồn file.Sub_Product. Để trống nghĩa là áp cho mọi sản phẩm nhánh |
+| 4 | NEW_CHANGE_REQUEST | NVARCHAR2 | N | 200 | PK | Loại yêu cầu — nguồn file.New_Change_Request, ví dụ New cho hồ sơ mới |
+| 5 | SLA_DE_RESULT | NUMBER | N | 10,2 |  | Cam kết giờ cho bước nhập liệu chi tiết — nguồn file.SLA_DE_RESULT. Tên cột có hậu tố RESULT nhưng đây là số giờ cam kết, không phải kết quả đạt/không đạt |
+| 6 | SLA_QC_RESULT | NUMBER | N | 10,2 |  | Cam kết giờ cho bước kiểm soát nhập liệu — nguồn file.SLA_QC_RESULT. Cũng là số giờ, không phải kết quả |
+| 7 | SLA_DE_TOTAL_RESULT | NUMBER | N | 10,2 |  | Cam kết giờ cho cả khâu nhập liệu, bằng tổng SLA_DE_RESULT + SLA_QC_RESULT — nguồn file.SLA_DE_TOTAL_RESULT. Là 1 thành phần của POINT ở BC9 |
+| 8 | QD_DDE | NUMBER | N | 10,2 |  | Điểm quy đổi năng suất bước nhập liệu — nguồn file.QD_DDE |
+| 9 | QD_QC | NUMBER | N | 10,2 |  | Điểm quy đổi năng suất bước kiểm soát nhập liệu — nguồn file.QD_QC |
+| 10 | SYSTEMNAME | VARCHAR2 | Y | 10 | PK | Hệ nguồn của dòng cam kết: CLOS hoặc RLOS — nguồn file.SYSTEMNAME |
 
-- Bảng REF cam kết SLA và điểm quy đổi cho 2 bước nhập liệu/kiểm soát nhập liệu, 1 dòng = 1 tổ hợp REF_PRODUCT + PRODUCT_LINE + POLICY + SUB_PRODUCT + NEW_CHANGE_REQUEST + SYSTEM_CODE, dùng chung cho cả 2 hệ (cột SYSTEM_CODE phân biệt CLOS/RLOS).
-- Khóa chính của bảng (PK): **UNIQUE (REF_PRODUCT, PRODUCT_LINE, POLICY, SUB_PRODUCT, NEW_CHANGE_REQUEST, SYSTEM_CODE)**; không có PK kỹ thuật riêng.
-- Phân biệt với `Q_RLOS_REF_WORKSTEP_2SYSTEMS` (2.4.9): ở bảng này, cột `SYSTEM_CODE` THẬT SỰ là 1 phần khóa PK và phân biệt CLOS/RLOS của từng dòng cam kết — khác với cột `SYSTEM` ở 2.4.9 (không phải cờ phân biệt hệ, xem ghi chú ở đó).
+- Bảng REF cam kết SLA và điểm quy đổi cho 2 bước nhập liệu/kiểm soát nhập liệu, 1 dòng = 1 tổ hợp REF_PRODUCT + PRODUCT_LINE + SUB_PRODUCT + NEW_CHANGE_REQUEST + SYSTEMNAME, dùng chung cho cả 2 hệ (cột SYSTEMNAME phân biệt CLOS/RLOS).
+- Cấu trúc bảng theo DDL (`REF_ALL.sql`, commit a4e37b2) và seed thật `input/data_ref_initial.xlsx`: không có cột `POLICY`; cột phân biệt hệ tên `SYSTEMNAME` (cùng quy ước với `REF_PHAN_LOAI_DDE`). `NEW_CHANGE_REQUEST` cho phép NULL (dòng RLOS để trống).
+- Khóa chính của bảng (PK): **UNIQUE (REF_PRODUCT, PRODUCT_LINE, SUB_PRODUCT, NEW_CHANGE_REQUEST, SYSTEMNAME)**; không có PK kỹ thuật riêng.
+- Phân biệt với `Q_RLOS_REF_WORKSTEP_2SYSTEMS` (2.4.9): ở bảng này, cột `SYSTEMNAME` THẬT SỰ là 1 phần khóa PK và phân biệt CLOS/RLOS của từng dòng cam kết — khác với cột `SYSTEM` ở 2.4.9 (không phải cờ phân biệt hệ, xem ghi chú ở đó).
 
 **Cách khai thác — report-time lookup, không denormalize vào DIM (cả 2 hệ):**
 báo cáo (BC5, và `POINT` của BC9 tại `AGG_LOS_KPI_APPLICATION`) tự
@@ -155,17 +155,17 @@ NLTT"):
   (qua `FCT_RLOS_APPLICATION.SUB_PRODUCT_SK` → `DIM_RLOS_PRODUCT.
   PRODUCTLINE_SK` → layer Product Line, xem `HLD_DIM_SB_DWH_review.md`
   mục 13; chỉ cần đúng 1 khóa `PRODUCTLINE_NAME`, không cần
-  `SUB_PRODUCT`) + `SYSTEM_CODE='RLOS'`. Seed thật xác nhận unique theo đúng
+  `SUB_PRODUCT`) + `SYSTEMNAME='RLOS'`. Seed thật xác nhận unique theo đúng
   `PRODUCT_LINE` (28 dòng, mỗi `Product Line` xuất hiện đúng 1 lần) —
   không rủi ro 1:N.
 - **Nhánh CLOS:** `PRODUCT_LINE = DIM_CLOS_PRODUCT.PRODUCT_LINE_NAME`
   + `(SUB_PRODUCT IS NULL OR SUB_PRODUCT = DIM_CLOS_PRODUCT.PRODUCT_
   NAME)` (qua `FCT_CLOS_APPLICATION.PRODUCT_SK`) + `NEW_CHANGE_
   REQUEST = DIM_CLOS_APPLICATION.CHANGE_REQUEST` (qua `APPLICATION_SK`)
-  + `SYSTEM_CODE='CLOS'`. Seed thật (16 dòng) xác nhận unique theo tổ
-  hợp 3 cột này, không cần `REF_PRODUCT`/`POLICY`.
-- Cả 2 nhánh **không dùng cột `REF_PRODUCT`/`POLICY`** làm khóa tra cho
-  nhóm SLA nhập liệu tập trung — 2 cột này vẫn giữ trong khai báo cấu
+  + `SYSTEMNAME='CLOS'`. Seed thật (16 dòng) xác nhận unique theo tổ
+  hợp 3 cột này, không cần `REF_PRODUCT`. Lưu ý: dòng `SUB_PRODUCT` NULL và dòng `SUB_PRODUCT` cụ thể cùng `PRODUCT_LINE` (Hạn mức, Cấp tín dụng ngắn hạn × New/Change Request) cùng khớp — join 2 lần (dòng cụ thể + dòng NULL) rồi `NVL`, dòng cụ thể thắng (suy ra từ seed, SRS không ghi — chờ BA xác nhận).
+- Cả 2 nhánh **không dùng cột `REF_PRODUCT`** làm khóa tra cho
+  nhóm SLA nhập liệu tập trung — cột này vẫn giữ trong khai báo cấu
   trúc bảng nhưng không phải điều kiện JOIN thật.
 - `QD_DDE`/`QD_QC` dùng chung đúng 1 điều kiện JOIN với `SLA_DE_RESULT`
   ở trên.
