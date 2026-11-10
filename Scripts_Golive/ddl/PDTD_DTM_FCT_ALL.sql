@@ -455,6 +455,11 @@ INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
     )
 );
 
+-- Phục vụ lookup theo WI_NAME trong AUTO_CANCEL_DATE (FCT_RLOS_APPLICATION): EXISTS BranchSupport / NOT EXISTS Cancel
+CREATE INDEX PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT_IX1
+    ON PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT (WI_NAME, WORKSTEP_CODE, ENTRYDATE) LOCAL;
+
+
 COMMIT;
 
 -- ============================================================
