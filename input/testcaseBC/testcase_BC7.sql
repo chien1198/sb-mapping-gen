@@ -1,0 +1,238 @@
+WITH CLOS_FIRST_RETURN AS (
+    SELECT WINAME, WORKSTEP AS FIRST_WORKSTEP_RETURN
+    FROM(
+        SELECT WINAME, WORKSTEP,
+            ROW_NUMBER() OVER (PARTITION BY WINAME ORDER BY EXITDATE ASC) AS RN
+        FROM SBLOS2.NG_SB_CLOS_ENTRY_EXIT
+        WHERE EXITDATE IS NOT NULL
+          AND ((WORKSTEP = 'DetailDataEntry' AND DECISION = 'Send_Back')
+             OR (WORKSTEP IN ('DataInputerChecker', 'UnderwriterMaker', 'CreditApproval')
+             AND DECISION = 'Additional_Doc_Required')
+             OR (WORKSTEP = 'UnderwriterMaker' AND DECISION = 'Send_Back to BranchSupport')
+          )
+    )
+    WHERE RN = 1
+),
+RLOS_FIRST_RETURN AS (
+    SELECT WINAME, WORKSTEP AS FIRST_WORKSTEP_RETURN
+    FROM (
+        SELECT WINAME, WORKSTEP,
+            ROW_NUMBER() OVER (PARTITION BY WINAME ORDER BY EXITDATE ASC) AS RN
+        FROM SBLOS2.NG_SB_RLOS_ENTRY_EXIT
+        WHERE EXITDATE IS NOT NULL
+          AND ((WORKSTEP = 'DetailDataEntry' AND DECISION = 'Send_Back')
+             OR (WORKSTEP IN ('DataInputerChecker', 'UnderwriterMaker', 'CreditApproval')
+             AND DECISION = 'Additional_Doc_Required')
+             OR (WORKSTEP = 'UnderwriterMaker'
+              AND DECISION = 'Send_Back to BranchSupport')
+          )
+    )
+    WHERE RN = 1
+),
+SRC AS
+    (
+    SELECT
+        A.WI_NAME AS WI_NAME,
+        TRUNC(A.RAISED_DATE_TIME) AS PROCESSED_DATE,
+        (SELECT D.ACTIVITYNAME FROM SBLOS2.NG_SB_CLOS_MAS_EXCEPTION D
+            WHERE D.EXCEPTION_CATEGORY = A.EXCEPTION_CATEGORY 
+			AND D.EXCEPTION_NAME = A.EXCEPTION_NAME
+            AND EXISTS (SELECT 1 FROM SBLOS2.NG_SB_CLOS_ENTRY_EXIT B
+                        WHERE B.WINAME = A.WI_NAME 
+						AND B.WORKSTEP = D.ACTIVITYNAME 
+						AND B.DECISION = D.DECISION)
+			AND ROWNUM = 1)                 AS ACTIVITYNAME,
+        A.EXCEPTION_CATEGORY AS EXCEPTION_CATEGORY,
+        A.EXCEPTION_NAME AS EXCEPTION_NAME,
+        A.EXCEPTION_REMARKS AS EXCEPTION_REMARKS,
+        A.RAISED_BY AS RAISED_BY,
+        TRUNC(A.RAISED_DATE_TIME) AS RAISED_DATE_TIME,
+        CASE WHEN A.EXCEPTION_CATEGORY LIKE '%:%'
+                THEN REGEXP_SUBSTR(A.EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END AS EXCEPTION_CODE,
+        C.LOANCASEID AS LOANCASEID,
+        CFR.FIRST_WORKSTEP_RETURN AS FIRST_WORKSTEP_RETURN,
+		G.PHAN_LOAI_DDE AS PHAN_LOAI_DDE
+    FROM SBLOS2.NG_SB_CLOS_EXCEPTION A
+    LEFT JOIN SBLOS2.NG_SB_CLOS_EXTTABLE C ON A.WI_NAME = C.WINAME
+	LEFT JOIN CLOS_FIRST_RETURN CFR ON A.WI_NAME = CFR.WINAME
+	LEFT JOIN REF_PHAN_LOAI_DDE G ON A.EXCEPTION_CATEGORY = G.EXCEPTION_CATEGORY
+		AND G.SYSTEMNAME = 'CLOS'
+    UNION ALL
+
+    SELECT
+        A.WI_NAME AS WI_NAME,
+        TRUNC(A.RAISED_DATE_TIME) AS PROCESSED_DATE,
+        (SELECT B.ACTIVITYNAME FROM SBLOS2.NG_SB_RLOS_MAS_EXCEPTION B
+            WHERE B.EXCEPTION_CATEGORY = A.EXCEPTION_CATEGORY AND B.EXCEPTION_NAME = A.EXCEPTION_NAME
+            AND EXISTS (SELECT 1 FROM SBLOS2.NG_SB_RLOS_ENTRY_EXIT D
+                        WHERE D.WINAME = A.WI_NAME AND D.WORKSTEP = B.ACTIVITYNAME AND D.DECISION = B.DECISION)
+            AND ROWNUM = 1) AS ACTIVITYNAME,
+        A.EXCEPTION_CATEGORY AS EXCEPTION_CATEGORY,
+        A.EXCEPTION_NAME AS EXCEPTION_NAME,
+        A.EXCEPTION_REMARKS AS EXCEPTION_REMARKS,
+        A.RAISED_BY AS RAISED_BY,
+        TRUNC(A.RAISED_DATE_TIME) AS RAISED_DATE_TIME,
+        CASE WHEN A.EXCEPTION_CATEGORY LIKE '%:%'
+                THEN REGEXP_SUBSTR(A.EXCEPTION_CATEGORY, '^[^:]+') ELSE NULL END AS EXCEPTION_CODE,
+        C.LOANCASEID AS LOANCASEID,
+        CFR.FIRST_WORKSTEP_RETURN AS FIRST_WORKSTEP_RETURN,
+		G.PHAN_LOAI_DDE AS PHAN_LOAI_DDE
+    FROM SBLOS2.NG_SB_RLOS_EXCEPTION A
+    LEFT JOIN SBLOS2.NG_SB_RLOS_EXTTABLE C ON A.WI_NAME = C.WI_NAME
+	LEFT JOIN RLOS_FIRST_RETURN RFR ON A.WI_NAME = RFR.WINAME
+	LEFT JOIN REF_PHAN_LOAI_DDE G ON A.EXCEPTION_CATEGORY = G.EXCEPTION_CATEGORY
+		AND G.SYSTEMNAME = 'RLOS'
+    ),
+    TBL AS
+    (
+    SELECT
+        WI_NAME, PROCESSED_DATE, ACTIVITYNAME, EXCEPTION_CATEGORY, EXCEPTION_NAME,
+        EXCEPTION_REMARKS, RAISED_BY, RAISED_DATE_TIME, EXCEPTION_CODE, LOANCASEID,
+        FIRST_WORKSTEP_RETURN, PHAN_LOAI_DDE
+    FROM PDTD_DTM.BC7
+    )
+SELECT 'NGUON - DICH' AS SRC, x.* FROM (SELECT * FROM SRC MINUS SELECT * FROM TGT) x
+UNION ALL
+SELECT 'DICH - NGUON' AS SRC, y.* FROM (SELECT * FROM TGT MINUS SELECT * FROM SRC) y;
+
+--check  (CLOS) 
+WITH EXCEPTION_DETAIL AS (
+	SELECT A.WI_NAME, A.EXCEPTION_CATEGORY, A.EXCEPTION_NAME,
+		   D.ACTIVITYNAME, D.DECISION AS MAS_DECISION, F.CUST_GROUP,
+		   CASE WHEN EXISTS (SELECT 1 FROM SBLOS2.NG_SB_CLOS_ENTRY_EXIT H
+							 WHERE H.WINAME = A.WI_NAME
+							   AND H.WORKSTEP = D.ACTIVITYNAME
+							   AND H.DECISION = D.DECISION)
+				THEN 1 ELSE 0 END AS HAS_MATCHING_STEP
+	FROM SBLOS2.NG_SB_CLOS_EXCEPTION A
+	LEFT JOIN SBLOS2.NG_SB_CLOS_MAS_EXCEPTION D
+		ON D.EXCEPTION_CATEGORY = A.EXCEPTION_CATEGORY
+	   AND D.EXCEPTION_NAME = A.EXCEPTION_NAME
+	LEFT JOIN SBLOS2.NG_SB_CLOS_CUST_INFO F
+		ON F.WI_NAME = A.WI_NAME
+),
+EXCEPTION_FLAG AS (
+	SELECT WI_NAME,
+		CASE
+			WHEN HAS_MATCHING_STEP = 0 THEN 0
+			WHEN CUST_GROUP IN ('MSME', 'SME', 'USME') THEN
+				CASE
+					WHEN ACTIVITYNAME = 'DetailDataEntry' AND MAS_DECISION = 'Send_Back'
+						AND (EXCEPTION_CATEGORY LIKE N'%DE-BR-NEW: Chất lượng bản scan mờ không thấy thông tin - %'
+							OR EXCEPTION_CATEGORY = N'DE-BR-NEW: Bổ sung ý kiến tư vấn của bên thứ 3 (pháp chế, chính sách, sản phẩm, thẩm định,…)'
+							OR EXCEPTION_CATEGORY = N'DE-BR-NEW: Lỗi hệ thống (LOS, T24, XHTD,…)'
+							OR EXCEPTION_CATEGORY = N'DE-BR-NEW: Lỗi lựa chọn phân luồng, quy trình trên hệ thống')
+					THEN 1
+					WHEN ACTIVITYNAME = 'DataInputerChecker' AND MAS_DECISION = 'Additional_Doc_Required'
+						AND (EXCEPTION_CATEGORY LIKE N'%BC3-BR-NEW: Chất lượng bản scan mờ không thấy thông tin - %'
+							OR EXCEPTION_CATEGORY = N'BC3-BR-NEW: Bổ sung ý kiến tư vấn của bên thứ 3 (pháp chế, chính sách, sản phẩm, thẩm định,…)'
+							OR EXCEPTION_CATEGORY = N'BC3-BR-NEW: Lỗi hệ thống (LOS, T24, XHTD,…)')
+					THEN 1
+					WHEN ACTIVITYNAME = 'UnderwriterMaker' AND MAS_DECISION = 'Additional_Doc_Required'
+						AND (EXCEPTION_CATEGORY LIKE N'%UW-BR- FTR:Bổ sung hồ sơ%'
+							OR EXCEPTION_CATEGORY = N'UW-BR-FTR: bổ sung hồ sơ'
+							OR EXCEPTION_CATEGORY = N'UW-BR-FTR:Giải trình, làm rõ nội dung hồ sơ trường hợp các nội dung yêu cầu giải trình làm rõ ngoài HD thẩm định')
+					THEN 1
+					WHEN ACTIVITYNAME = 'UnderwriterMaker' AND MAS_DECISION = 'Send_Back to BranchSupport'
+						AND EXCEPTION_CATEGORY = N'UW-BR: Gửi dự thảo đề xuất cho chi nhánh'
+					THEN 1
+					ELSE 0
+				END
+			WHEN CUST_GROUP IN ('FDI', 'SOC', 'JSC', 'NBFI', 'BANK', 'STR') THEN
+				CASE
+					WHEN ACTIVITYNAME = 'DetailDataEntry' AND MAS_DECISION = 'Send_Back'
+						AND (EXCEPTION_CATEGORY LIKE N'%DE-BR-NEW: Chất lượng bản scan mờ không thấy thông tin - %'
+							OR EXCEPTION_CATEGORY = N'DE-BR-NEW: Bổ sung ý kiến tư vấn của bên thứ 3 (pháp chế, chính sách, sản phẩm, thẩm định,…)'
+							OR EXCEPTION_CATEGORY = N'DE-BR-NEW: Lỗi hệ thống (LOS, T24, XHTD,…)'
+							OR EXCEPTION_CATEGORY = N'DE-BR-NEW: Lỗi lựa chọn phân luồng, quy trình trên hệ thống')
+					THEN 1
+					WHEN ACTIVITYNAME = 'DataInputerChecker' AND MAS_DECISION = 'Additional_Doc_Required'
+						AND (EXCEPTION_CATEGORY LIKE N'%BC3-BR-NEW: Chất lượng bản scan mờ không thấy thông tin - %'
+							OR EXCEPTION_CATEGORY = N'BC3-BR-NEW: Bổ sung ý kiến tư vấn của bên thứ 3 (pháp chế, chính sách, sản phẩm, thẩm định,…)'
+							OR EXCEPTION_CATEGORY = N'BC3-BR-NEW: Lỗi hệ thống (LOS, T24, XHTD,…)')
+					THEN 1
+					WHEN ACTIVITYNAME = 'UnderwriterMaker' AND MAS_DECISION = 'Additional_Doc_Required'
+						AND (EXCEPTION_CATEGORY LIKE N'%UW-BR- FTR:Bổ sung hồ sơ%'
+							OR EXCEPTION_CATEGORY = N'UW-BR-FTR: bổ sung hồ sơ'
+							OR EXCEPTION_CATEGORY = N'UW-BR-FTR:Giải trình, làm rõ nội dung hồ sơ trường hợp các nội dung yêu cầu giải trình làm rõ ngoài HD thẩm định'
+							OR EXCEPTION_CATEGORY = N'UW-BR: Gửi dự thảo đề xuất cho chi nhánh')
+					THEN 1
+					ELSE 0
+				END
+			ELSE 0
+		END AS NGOAI_LE
+	FROM EXCEPTION_DETAIL
+),
+SRC AS (
+	SELECT WI_NAME AS WINAME,
+		CASE
+			WHEN SUM(CASE WHEN NGOAI_LE = 0 THEN 1 ELSE 0 END) = 0
+			THEN 'First Time Right'
+			ELSE 'Not First Time Right'
+		END AS CHECK_FTR
+	FROM EXCEPTION_FLAG
+	GROUP BY WI_NAME
+),
+TBL AS (
+	SELECT DISTINCT WI_NAME AS WINAME, CHECK_FTR
+	FROM PDTD_DTM.BC7
+	WHERE SYSTEMNAME = 'CLOS'
+)
+SELECT 'NGUON - DICH' AS SRC, x.* FROM (SELECT * FROM SRC MINUS SELECT * FROM TGT) x
+UNION ALL
+SELECT 'DICH - NGUON' AS SRC, y.* FROM (SELECT * FROM TGT MINUS SELECT * FROM SRC) y;
+
+--check FTR(RLOS) 
+WITH EXCEPTION_DETAIL AS (
+    SELECT
+        A.WI_NAME,
+        A.EXCEPTION_CATEGORY,
+        A.EXCEPTION_NAME,
+        CASE
+            WHEN F.SUB_PRODUCT LIKE '%Phát hành%' OR F.SUB_PRODUCT LIKE '%TTD%'
+            THEN 'Credit Card'
+            ELSE F.SUB_PRODUCT
+        END AS BI_SUB_PRODUCT
+    FROM SBLOS2.NG_SB_RLOS_EXCEPTION A
+    LEFT JOIN SBLOS2.NG_SB_RLOS_APPLICANT_GENERAL F
+        ON A.WI_NAME = F.WI_NAME
+),
+EXCEPTION_FLAG AS (
+    SELECT WI_NAME,
+        CASE
+            WHEN EXCEPTION_CATEGORY LIKE '%BR%' AND (
+                    (EXCEPTION_NAME = 'UW-BR-FTR : Hồ sơ Scan mờ không rõ thông tin'
+                        AND BI_SUB_PRODUCT = 'Credit Card')
+                 OR (EXCEPTION_NAME = 'UW-BR-FTR : Hồ sơ Scan thiếu trang không đúng định dạng'
+                        AND NVL(BI_SUB_PRODUCT, 'XX') <> 'Credit Card')
+                 OR (EXCEPTION_NAME = 'DE-BR-NEW: Chứng từ thiếu thông tin theo checklist'
+                        AND NVL(BI_SUB_PRODUCT, 'XX') <> 'Credit Card')
+                 OR (EXCEPTION_NAME = 'DE-BR-NEW: Chất lượng bản scan mờ không thấy thông tin'
+                        AND BI_SUB_PRODUCT = 'Credit Card')
+                 OR (EXCEPTION_CATEGORY LIKE '%FTR%'
+                        AND EXCEPTION_NAME NOT IN ('UW-BR-FTR : Hồ sơ Scan mờ không rõ thông tin',
+                                                   'UW-BR-FTR : Hồ sơ Scan thiếu trang không đúng định dạng'))
+            )
+            THEN 1
+            ELSE 0
+        END AS IS_NGOAI_LE
+    FROM EXCEPTION_DETAIL
+),
+SRC AS (
+    SELECT WI_NAME AS WINAME,
+        CASE
+            WHEN SUM(CASE WHEN IS_NGOAI_LE = 0 THEN 1 ELSE 0 END) = 0
+            THEN 'First Time Right'
+            ELSE 'Not First Time Right'
+        END AS CHECK_FTR
+    FROM EXCEPTION_FLAG
+    GROUP BY WI_NAME
+),
+TBL AS (
+    SELECT DISTINCT WI_NAME AS WINAME, CHECK_FTR
+    FROM PDTD_DTM.BC7
+    WHERE SYSTEMNAME = 'RLOS'
+)
+SELECT 'NGUON - DICH' AS SRC, x.* FROM (SELECT * FROM SRC MINUS SELECT * FROM TGT) x
+UNION ALL
+SELECT 'DICH - NGUON' AS SRC, y.* FROM (SELECT * FROM TGT MINUS SELECT * FROM SRC) y;
