@@ -526,7 +526,7 @@ flowchart LR
   - Báo cáo Tuần Chuyên viên Thẩm định (BC4)
   - Báo cáo SLA - TAT (BC5) — khóa tra REF_SLA_NLTT qua PRODUCT_SK
   - Báo cáo NGOẠI LỆ (BC6)
-  - Báo cáo RETURN (BC8) — RETURN_CNT_DATAENTRY/UNDERWRITING/APPROVAL
+  - Báo cáo RETURN (BC8) — không có cột đếm return ở SB_DWH; `RETURN_CNT_DATAENTRY/UNDERWRITING/APPROVAL` tính cộng dồn tại PDTD_DTM (`HLD_FCT_PDTD_DTM_review.md`, review 2026-11-13)
   - Báo cáo KPI (BC9) — AGG_LOS_KPI_APPLICATION.INCOM_3/BUSINESS_INCOM
   - Báo cáo Giải ngân _ Quá hạn KHCN (BC10)
 

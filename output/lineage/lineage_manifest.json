@@ -1,0 +1,19 @@
+{
+  "layers": {
+    "pdtd_dtm": {
+      "files": 40,
+      "sha256": "845c6dc74d458b04ec086aeb7222597b20910d62265ca6068cb964a8ab18774e"
+    },
+    "stg_dtm": {
+      "files": 28,
+      "sha256": "d4612c744f9c47bdfbb0e6d729356b69e8ed28b31de489b278c53abcbea67143"
+    },
+    "sb_dwh": {
+      "files": 28,
+      "sha256": "bee6b398fdaf8e60a44db0f5264fa65ad59e9598a40f8ab212b33dddbc375a90"
+    }
+  },
+  "generated_at": "2026-11-13 18:00:09",
+  "rows": 2841,
+  "pdtd_columns": 1070
+}
