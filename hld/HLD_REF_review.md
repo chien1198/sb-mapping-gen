@@ -1,14 +1,14 @@
 # HLD — REF_ tables (bảng danh mục dùng chung)
 
 **Trích xuất từ:** `hld/HLD_Table_Design.md` (nguồn tổng, giữ nguyên không xóa)
-**Phạm vi:** 10 bảng REF_/TMP_REF_/Q_RLOS_REF_
+**Phạm vi:** 9 bảng REF_/TMP_REF_
 **Ghi chú:** nhóm này dùng chung giữa CLOS/RLOS
 
 ---
 
 #### 2.4 Bộ bảng REF_
 
-Cả 10 bảng dưới đây chỉ tồn tại vật lý ở tầng PDTD_DTM (không có bản
+Cả 9 bảng dưới đây chỉ tồn tại vật lý ở tầng PDTD_DTM (không có bản
 SB_DWH) — không phân theo CHUNG/CLOS/RLOS/DIM/FCT như các nhóm khác. Đây
 là **danh mục tĩnh khởi tạo/cập nhật thủ công** từ file Excel/CSV do BA
 cung cấp, không phải luồng ETL — không có bước "Data Lineage" ở Section 1
@@ -143,7 +143,6 @@ chỉ quan sát được 2 giá trị: `CGPD`, `BOD/CC`.
 - Bảng REF cam kết SLA và điểm quy đổi cho 2 bước nhập liệu/kiểm soát nhập liệu, 1 dòng = 1 tổ hợp REF_PRODUCT + PRODUCT_LINE + SUB_PRODUCT + NEW_CHANGE_REQUEST + SYSTEMNAME, dùng chung cho cả 2 hệ (cột SYSTEMNAME phân biệt CLOS/RLOS).
 - Cấu trúc bảng theo DDL (`REF_ALL.sql`, commit a4e37b2) và seed thật `input/data_ref_initial.xlsx`: không có cột `POLICY`; cột phân biệt hệ tên `SYSTEMNAME` (cùng quy ước với `REF_PHAN_LOAI_DDE`). `NEW_CHANGE_REQUEST` cho phép NULL (dòng RLOS để trống).
 - Khóa chính của bảng (PK): **UNIQUE (REF_PRODUCT, PRODUCT_LINE, SUB_PRODUCT, NEW_CHANGE_REQUEST, SYSTEMNAME)**; không có PK kỹ thuật riêng.
-- Phân biệt với `Q_RLOS_REF_WORKSTEP_2SYSTEMS` (2.4.9): ở bảng này, cột `SYSTEMNAME` THẬT SỰ là 1 phần khóa PK và phân biệt CLOS/RLOS của từng dòng cam kết — khác với cột `SYSTEM` ở 2.4.9 (không phải cờ phân biệt hệ, xem ghi chú ở đó).
 
 **Cách khai thác — report-time lookup, không denormalize vào DIM (cả 2 hệ):**
 báo cáo (BC5, và `POINT` của BC9 tại `AGG_LOS_KPI_APPLICATION`) tự
@@ -172,21 +171,7 @@ NLTT"):
 
 Chi tiết đầy đủ (mermaid) xem tại `hld/HLD_Table_Design.md` Section 1/2/3.
 
-##### 2.4.9 Q_RLOS_REF_WORKSTEP_2SYSTEMS
-
-| STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | SYSTEM | VARCHAR2 | Y | 10 |  | Hệ sở hữu/nạp bảng map này — nguồn file.SYSTEM. Giá trị quan sát được: OF (75 dòng), BT (57 dòng). KHÔNG phải cờ phân biệt CLOS/RLOS của dữ liệu — xem ghi chú bên dưới |
-| 2 | IDFLOW | VARCHAR2 | N | 10 |  | Mã luồng xử lý — nguồn file.IDFLOW, ví dụ 12 cho luồng giải ngân |
-| 3 | WORKSTEP | VARCHAR2 | Y | 50 |  | Tên bước xử lý theo đúng cách LOS ghi — nguồn file.WORKSTEP, ví dụ DisbursementMaker |
-| 4 | BI_WORKSTEP | VARCHAR2 | N | 50 |  | Tên bước chuẩn hóa để hiển thị trên báo cáo — nguồn file.BI_WORKSTEP, ví dụ 12.Disbursement-Maker |
-| 5 | DECISION | VARCHAR2 | N | 100 |  | Quyết định tại bước xử lý — nguồn file.DECISION. Cùng 1 bước có nhiều quyết định nên phải nằm trong tổ hợp tra |
-
-- Bảng REF map bước xử lý và quyết định của cả 2 hệ CLOS, RLOS về 1 tên bước chuẩn hóa dùng chung trên báo cáo, 1 dòng = 1 tổ hợp SYSTEM + IDFLOW + WORKSTEP + DECISION, dùng chung cho cả 2 hệ.
-- Khóa chính của bảng (PK): không khai PK/UNIQUE trên DDL gốc — tra theo tổ hợp **WORKSTEP** (+ **DECISION** khi cần phân biệt nhiều quyết định cùng 1 bước).
-- Cột `SYSTEM` KHÔNG phải cờ phân biệt CLOS/RLOS: 132 dòng dữ liệu có 2 giá trị `OF` (75 dòng) và `BT` (57 dòng) — đây là cột nội bộ của chính bảng map này (hệ sở hữu/nạp file map), không phải cờ đánh dấu dòng dữ liệu thuộc CLOS hay RLOS. Việc phân biệt CLOS/RLOS khi tra bảng này nằm ở phía DIM/FCT gọi join (đã biết trước đang xử lý hồ sơ hệ nào), **không dùng `WHERE SYSTEM = ...` để phân biệt CLOS/RLOS**. Ngoại lệ: `BRANCH_USER`/`DDE_USER`/`QC_USER` của `FCT_RLOS_APPLICATION` (SRS BC1) lọc `SYSTEM = 'OF'` vì cùng `BI_WORKSTEP` nhưng `SYSTEM = 'BT'` gồm các bước khác (RegionalBranchSupport, QuickDataEntry, BranchChecker1/2/3...). `IDFLOW` là cột phân biệt luồng xử lý thật sự trong bảng này (ví dụ 12 = luồng giải ngân), không phải `SYSTEM`. Mọi join từ `DIM_CLOS_WORKSTEP`/`DIM_RLOS_WORKSTEP` (2.2.1.3/2.3.1.3) vào bảng này chỉ dùng `WORKSTEP` (+ `DECISION`), không lọc theo `SYSTEM`.
-
-##### 2.4.10 REF_PHAN_LOAI_DDE
+##### 2.4.9 REF_PHAN_LOAI_DDE
 
 | STT | Tên cột | Kiểu dữ liệu | Bắt buộc | Độ lớn | Khóa | Mô tả |
 | --- | --- | --- | --- | --- | --- | --- |

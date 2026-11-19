@@ -1,17 +1,6 @@
 
 /* ----------------------------------------------------------------------
-   1. Q_RLOS_REF_WORKSTEP_2SYSTEMS
----------------------------------------------------------------------- */
-CREATE TABLE PDTD_DTM.Q_RLOS_REF_WORKSTEP_2SYSTEMS (
-    SYSTEM          VARCHAR2(10)    NOT NULL,   
-    IDFLOW          VARCHAR2(10),               
-    WORKSTEP        VARCHAR2(50)    NOT NULL,   
-    BI_WORKSTEP     VARCHAR2(50),               
-    DECISION        VARCHAR2(100)               
-);
-
-/* ----------------------------------------------------------------------
-   2. TMP_REF_COMPANY_REGION_KHDN
+   1. TMP_REF_COMPANY_REGION_KHDN
 ---------------------------------------------------------------------- */
 CREATE TABLE PDTD_DTM.TMP_REF_COMPANY_REGION_KHDN (
     COMPANY_CODE    VARCHAR2(20)    NOT NULL,   
@@ -22,7 +11,7 @@ CREATE TABLE PDTD_DTM.TMP_REF_COMPANY_REGION_KHDN (
 );
 
 /* ----------------------------------------------------------------------
-   3. TMP_REF_COMPANY_REGION_KHCN
+   2. TMP_REF_COMPANY_REGION_KHCN
 ---------------------------------------------------------------------- */
 CREATE TABLE PDTD_DTM.TMP_REF_COMPANY_REGION_KHCN (
     COMPANY_CODE    VARCHAR2(20)    NOT NULL,   
@@ -33,7 +22,7 @@ CREATE TABLE PDTD_DTM.TMP_REF_COMPANY_REGION_KHCN (
 );
 
 /* ----------------------------------------------------------------------
-   4. REF_RLOS_FLOW
+   3. REF_RLOS_FLOW
 ---------------------------------------------------------------------- */
 CREATE TABLE PDTD_DTM.REF_RLOS_FLOW (
     STREAM          VARCHAR2(200)   NOT NULL,   
@@ -42,7 +31,7 @@ CREATE TABLE PDTD_DTM.REF_RLOS_FLOW (
 );
 
 /* ----------------------------------------------------------------------
-   5. REF_CLOS_LEGAL
+   4. REF_CLOS_LEGAL
 ---------------------------------------------------------------------- */
 CREATE TABLE PDTD_DTM.REF_CLOS_LEGAL (
     OBJ_TYPE        VARCHAR2(50)    NOT NULL,   
@@ -51,7 +40,7 @@ CREATE TABLE PDTD_DTM.REF_CLOS_LEGAL (
 );
 
 /* ----------------------------------------------------------------------
-   6. REF_PHAN_LOAI_DDE
+   5. REF_PHAN_LOAI_DDE
 ---------------------------------------------------------------------- */
 CREATE TABLE PDTD_DTM.REF_PHAN_LOAI_DDE (
     EXCEPTION_CATEGORY NVARCHAR2(255),
@@ -62,7 +51,7 @@ CREATE TABLE PDTD_DTM.REF_PHAN_LOAI_DDE (
 
 
 /* ------------------------------------------------------------
-   7) Sheet: RLOS_REF_SLA_TDKHCN
+   6) Sheet: RLOS_REF_SLA_TDKHCN
    ------------------------------------------------------------ */
 CREATE TABLE PDTD_DTM.RLOS_REF_SLA_TDKHCN (
     REF_PRODUCT            NVARCHAR2(200) NOT NULL,
@@ -82,7 +71,7 @@ CREATE TABLE PDTD_DTM.RLOS_REF_SLA_TDKHCN (
 );
 
 /* ------------------------------------------------------------
-   8) Sheet: CLOS_REF_SLA_TDKHDNL
+   7) Sheet: CLOS_REF_SLA_TDKHDNL
    ------------------------------------------------------------ */
 CREATE TABLE PDTD_DTM.CLOS_REF_SLA_TDKHDNL (
     REF_PRODUCT             NVARCHAR2(200) NOT NULL,
@@ -101,7 +90,7 @@ CREATE TABLE PDTD_DTM.CLOS_REF_SLA_TDKHDNL (
 );
 
 /* ------------------------------------------------------------
-   9) Sheet: CLOS_REF_SLA_TDKHDN_2
+   8) Sheet: CLOS_REF_SLA_TDKHDN_2
    ------------------------------------------------------------ */
 CREATE TABLE PDTD_DTM.CLOS_REF_SLA_TDKHDN_2 (
     REF_PRODUCT             NVARCHAR2(200) NOT NULL,
@@ -120,7 +109,7 @@ CREATE TABLE PDTD_DTM.CLOS_REF_SLA_TDKHDN_2 (
 );
 
 /* ------------------------------------------------------------
-   10) Sheet: REF_SLA_NLTT
+   9) Sheet: REF_SLA_NLTT
    ------------------------------------------------------------ */
 CREATE TABLE PDTD_DTM.REF_SLA_NLTT (
     REF_PRODUCT              NVARCHAR2(200) NOT NULL,
