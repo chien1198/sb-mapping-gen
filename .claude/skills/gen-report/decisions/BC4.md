@@ -8,7 +8,7 @@ File câu lệnh: `mapping/BAOCAO/BC4_UW_WEEKLY.sql`
 |---|---|---|---|
 | Grain | 1 dòng / hồ sơ (mỗi nhánh CLOS, RLOS). `WORKSTEP`, `UND_MAKER`, `REMARKS` lấy từ dòng sự kiện `UnderwriterMaker` mới nhất; `ENTRYDATE`/`EXITDATE` là MIN/MAX cả hồ sơ tại `UnderwriterMaker` + `UnderwriterChecker` | 2026-11-13 | Khớp SRS và testcase BA |
 | `FLAG` | Cấp hồ sơ, thứ tự ưu tiên 5 nhánh SRS (nhánh nhỏ hơn thắng): nhánh theo **quyết định** (đã phê duyệt / CVTĐ chốt / chuyển-trả lại) lấy từ mọi dòng sự kiện; nhánh theo **trạng thái workflow** (chưa PD / đang-phải xử lý) chỉ lấy từ **dòng mới nhất** (`DAYID`, `ENTRYDATE` lớn nhất) | 2026-11-13 | `WORKSTEP_FLAG` ở LLD tính theo từng dòng; dòng cũ giữ `WF_ACTIVITYNAME` lúc ghi nên không dùng cho nhánh trạng thái (khớp SRS/BA: trạng thái hiện tại trên `WFINSTRUMENTTABLE`) |
-| Phạm vi ngày | `REPORT_DATE` (= `PROCESSED_DATE` của sự kiện) đúng bằng ngày báo cáo chọn; `REPORT_WEEK` chỉ hiển thị tuần chứa ngày đó | 2026-11-13 | Giống BC1–BC3 |
+| Phạm vi ngày | Khoảng ngày `:p_date_from`/`:p_date_to`: `REPORT_DATE` (= `PROCESSED_DATE` của sự kiện) nằm trong `[d_from, d_to]`; hồ sơ ra **1 dòng** với `REPORT_DATE = TRUNC(MAX(PROCESSED_DATE))` trong khoảng, `REPORT_WEEK` tính theo ngày đó; `FLAG` tính theo lịch sử đến `d_to` | 2026-11-20 | Người dùng chốt 1 dòng / hồ sơ; trước đó (2026-11-13) báo cáo chỉ chọn 1 ngày |
 
 ## Theo LLD / quyết định trước (không cảnh báo)
 
@@ -21,5 +21,5 @@ File câu lệnh: `mapping/BAOCAO/BC4_UW_WEEKLY.sql`
 
 ## Giả định kỹ thuật (đã nêu với người dùng)
 
-- Dòng sự kiện trong phạm vi: `DAYID` = ngày báo cáo và `PROCESSED_DATE` trong ngày (hồ sơ đang treo được carry-forward theo LLD).
-- `ENTRYDATE`/`EXITDATE`/`FLAG`/dòng `UnderwriterMaker` mới nhất đọc lịch sử sự kiện: chỉ lấy phiên bản mới nhất theo `WORKSTEP_EVENT_BK` (`NOT EXISTS`), `DAYID` đến ngày báo cáo.
+- Dòng sự kiện trong phạm vi (`*_scope`): `DAYID BETWEEN d_from AND d_to` và `PROCESSED_DATE` trong `[d_from, d_to]` (hồ sơ đang treo được carry-forward theo LLD); `MAX(PROCESSED_DATE)` gộp các phiên bản về 1 dòng / hồ sơ. Snapshot (`FCT_*_APPLICATION.HAS_UWM_FLAG`, `FCT_RLOS_CUSTOMER`) lọc `DAYID = d_to`.
+- `ENTRYDATE`/`EXITDATE`/`FLAG`/dòng `UnderwriterMaker` mới nhất đọc lịch sử sự kiện (`*_hist`): chỉ lấy phiên bản mới nhất theo `WORKSTEP_EVENT_BK` (`NOT EXISTS`), `DAYID <= d_to` và **không chặn dưới** theo `d_from` (cần toàn bộ lịch sử các bước).

@@ -22,7 +22,8 @@ File câu lệnh: `mapping/BAOCAO/BC3_APPROVAL_INFO.sql`
 
 ## Giả định kỹ thuật (đã nêu với người dùng)
 
-- Ngày báo cáo = `EXITDATE` của sự kiện (BR 1.1 BC3), không phải `PROCESSED_DATE`. Lọc chi nhánh qua `COMPANY_SK` của snapshot hồ sơ.
-- Phiên bản sự kiện: chỉ lấy phiên bản mới nhất theo `WORKSTEP_EVENT_BK` (`NOT EXISTS` DAYID lớn hơn), giới hạn đến ngày báo cáo.
+- Tham số (2026-11-20): khoảng ngày `:p_date_from`/`:p_date_to` thay cho một ngày; trường ngày nghiệp vụ = `EXITDATE` của sự kiện (BR 1.1 BC3), không phải `PROCESSED_DATE`, nằm trong `[d_from, d_to]`. Lọc chi nhánh qua `COMPANY_SK` của snapshot hồ sơ.
+- Bảng sự kiện lọc `DAYID BETWEEN d_from AND d_to`; snapshot (`FCT_*_APPLICATION`, `FCT_*_COLLATERAL`, `FCT_RLOS_CUSTOMER`) lọc `DAYID = d_to`.
+- Phiên bản sự kiện: chỉ lấy phiên bản mới nhất theo `WORKSTEP_EVENT_BK` (`NOT EXISTS` DAYID lớn hơn), giới hạn đến `d_to`.
 - UNION ALL hai nhánh: các cột khác kiểu giữa CLOS và RLOS (`APPRAISED_VALUE`, `LTV`, `CREDIT_TERM`, `CURRENCY`) ép về `NVARCHAR2` (nhánh RLOS dùng `TO_NCHAR`).
 - `COLLATERA_MANAGEMENT` chỉ có ở SRS CLOS; nhánh RLOS để `NULL`.

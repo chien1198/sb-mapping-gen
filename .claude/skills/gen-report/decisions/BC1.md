@@ -17,15 +17,20 @@ File câu lệnh: `mapping/BAOCAO/BC1_RLOS_APPLICATION.sql`
 | Điểm | Quyết định | Ngày | Ghi chú |
 |---|---|---|---|
 | CUSTOMER_ID | Giữ: `DIM_T24_CUSTOMER` qua `T24_CUSTOMER_SK` của dòng đại diện | 2026-11-13 | |
-| LAST_DECISION | Giữ: `a.DECISION_CODE` | 2026-11-13 | |
 | CURRENT_RESIDENTIAL_ADDRESS | Giữ ghép `CITY_NAME`/`DISTRICT_NAME` (bản không dấu) | 2026-11-13 | Lệch HLD (dùng `*_VN`) — giữ theo chỉ đạo |
 | TSBD_GTCG | Giữ cờ theo loại `VALPAPER` (không xét `NUMBERSIGN`) | 2026-11-13 | Khớp testcase BA/SRS |
 | PRODUCT_LINE | Giữ `a.PRODUCTLINE_CODE` (bảng `FCT_RLOS_APPLICATION`) | 2026-11-13 | |
 | SUB_PRODUCT | Giữ `pr.SUB_PRODUCT_NAME` | 2026-11-13 | |
 | OWNERSHIP | Giữ lọc `COLLATERAL_TYPE_CODE = 'REALESTATE'` | 2026-11-13 | `FCT_RLOS_COLLATERAL` gộp 4 nguồn nên phải lọc loại |
 
+## Đã đổi so với bản gen trước
+
+| Điểm | Quyết định | Ngày | Ghi chú |
+|---|---|---|---|
+| LAST_DECISION | Đổi: `a.LAST_DECISION` (cột mới ở `FCT_RLOS_APPLICATION`, đi cùng `LAST_WORKSTEP`) thay cho `a.DECISION_CODE` | 2026-11-20 | Đảo quyết định 2026-11-13. `DECISION_CODE` là quyết định của sự kiện hoàn tất gần nhất (EXITDATE NOT NULL) nên lệch `LAST_WORKSTEP` khi bước cuối đang mở. Theo SRS BC1 và testcase BA (`RN = 1`); NULL khi bước cuối đang mở |
+
 ## Theo LLD (không cảnh báo)
 
 DATE_OF_BIRTH, GENDER (lấy từ `FCT_RLOS_CUSTOMER`, không qua T24) · BRANCH_CODE, BRANCH_NAME, COMPANY_CODE, COMPANY_NAME
-(qua `DIM_LOS_COMPANY`) · INTEREST_RATE (`INTEREST_RATE_PCT`) · CREATION_DATE, PROCESSED_DATE, LAST_DECISION (ETL ở
+(qua `DIM_LOS_COMPANY`) · INTEREST_RATE (`INTEREST_RATE_PCT`) · CREATION_DATE, PROCESSED_DATE (ETL ở
 SB_DWH/PDTD_DTM) — LLD là nguồn đáng tin; các điểm này lineage `check_report.py` có thể hiện `mismatch` so với chữ SRS.

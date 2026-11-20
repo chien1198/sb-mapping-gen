@@ -8,7 +8,7 @@ File câu lệnh: `mapping/BAOCAO/BC7_EXCEPTION_FTR.sql`
 |---|---|---|---|
 | Grain | 1 dòng / (exception × bước), đúng grain `FCT_*_EXCEPTION` (`DAYID`, `EXCEPTION_BK`, `WORKSTEP_CODE`) | 2026-11-13 | Không dùng `ROWNUM = 1` như testcase BA |
 | `PROCESSED_DATE` | `TRUNC(RAISED_DATE_TIME)` cho cả CLOS và RLOS | 2026-11-13 | SRS RLOS không ghi TRUNC |
-| Phạm vi ngày | `DAYID` = ngày báo cáo (snapshot đầy đủ) và `RAISED_DATE_TIME` trong ngày báo cáo | 2026-11-13 | Người dùng xác nhận một `DAYID` đủ dữ liệu |
+| Phạm vi ngày | Khoảng ngày `:p_date_from`/`:p_date_to`: `DAYID = d_to` (snapshot đầy đủ lịch sử) và `RAISED_DATE_TIME` trong `[d_from, d_to]` | 2026-11-20 | Người dùng xác nhận một `DAYID` đủ dữ liệu (2026-11-13); mở rộng sang khoảng ngày 2026-11-20 |
 
 ## Theo LLD (không cảnh báo)
 

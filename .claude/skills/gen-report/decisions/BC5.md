@@ -12,8 +12,8 @@ File câu lệnh: `mapping/BAOCAO/BC5_SLA_TAT.sql`
 
 ## Giả định đã nêu (không bị phản đối)
 
-- Phạm vi: `FCT_*_APPLICATION` có `DAYID` = ngày báo cáo và `PROCESSED_DATE` trong ngày (BR 1.1); lọc chi nhánh qua `COMPANY_SK`.
-- Lịch sử sự kiện: chỉ lấy phiên bản mới nhất theo `WORKSTEP_EVENT_BK`, `DAYID` đến ngày báo cáo.
+- Phạm vi (2026-11-20, khoảng ngày `:p_date_from`/`:p_date_to`): `FCT_*_APPLICATION` có `DAYID = d_to` và `PROCESSED_DATE` trong `[d_from, d_to]` (BR 1.1); lọc chi nhánh qua `COMPANY_SK`.
+- Lịch sử sự kiện: chỉ lấy phiên bản mới nhất theo `WORKSTEP_EVENT_BK`, `DAYID <= d_to`, **không chặn dưới** theo `d_from` vì TAT cộng toàn bộ các bước của hồ sơ.
 - `ROUND(..., 2)` cho mọi cột TAT (theo testcase BA). `STEP07_COMMITTEE_*` chỉ có `CL_TAT`, `WK_TAT` (SRS không có CPC).
 - `TAT_KHOI_PDTD_*`: RLOS = Phòng thẩm định + `CreditApproval` nếu hồ sơ chưa có `CreditCommittee` (testcase BA); CLOS = cộng cả 4 bước (SRS và BA).
 - CLOS: bước nhập liệu gồm cả `CLOS_DetailDataEntry`, `CLOS_DataInputerChecker` (SRS CLOS).

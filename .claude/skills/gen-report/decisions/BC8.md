@@ -8,7 +8,7 @@ File câu lệnh: `mapping/BAOCAO/BC8_RETURN.sql` (đã gen 2026-11-13 sau khi L
 |---|---|---|---|
 | Grain | 1 dòng / sự kiện (dòng `FCT_*_WORKSTEP_EVENT` có `WORKSTEP_CODE` thuộc 6 bước và `DECISION_CODE` thuộc nhóm trả về/hủy); `SL_RETURN_*` lặp lại giá trị của hồ sơ | 2026-11-13 | Khớp testcase BA |
 | `PROCESSED_DATE` | `TRUNC(EXITDATE)` | 2026-11-13 | Nhất quán BC7 |
-| Phạm vi đếm `SL_RETURN_*` | Đếm toàn bộ lịch sử đến ngày báo cáo, thực hiện bằng **cột đếm lũy kế trên `FCT_*_APPLICATION`** (không đếm report-time) | 2026-11-13 | Người dùng chốt phương án cột lũy kế |
+| Phạm vi đếm `SL_RETURN_*` | Đếm toàn bộ lịch sử đến `:p_date_to`, thực hiện bằng **cột đếm lũy kế trên `FCT_*_APPLICATION`** tại `DAYID = d_to` (không đếm report-time) | 2026-11-13 | Người dùng chốt phương án cột lũy kế; 2026-11-20 đổi từ "ngày báo cáo" sang `d_to` khi báo cáo lọc khoảng ngày |
 | Tên cột | `RETURN_CNT_DATAENTRY`, `RETURN_CNT_UNDERWRITING`, `RETURN_CNT_APPROVAL` (ánh xạ sang `SL_RETURN_NHAPLIEU`, `SL_RETURN_THAMDINH`, `SL_RETURN_PHEDUYET` ở báo cáo) | 2026-11-13 | Trùng tên HLD cũ |
 | Phần trừ exception | Lấy từ lát cắt `STG_FCT_*_EXCEPTION` (không từ `FCT_*_EXCEPTION`) để tránh vòng phụ thuộc job | 2026-11-13 | `FCT_*_EXCEPTION` đọc `FCT_*_APPLICATION` nên phải chạy sau |
 | Đối soát định kỳ | Không cần job đối soát; chấp nhận cột đếm không tự phục hồi nếu bỏ lỡ ngày batch | 2026-11-13 | |
@@ -23,7 +23,7 @@ Mẫu C (cộng dồn): `RETURN_CNT_x = NVL(PREV.RETURN_CNT_x, 0) + <số sự k
 
 ## Khi gen BC8 sau khi LLD có 3 cột
 
-Câu lệnh đọc 3 cột từ `FCT_*_APPLICATION` tại `DAYID` = ngày báo cáo, ghép với các sự kiện return có `EXITDATE` trong ngày (`DAYID` = ngày báo cáo, `WORKSTEP_CODE` thuộc 6 bước, `DECISION_CODE` thuộc nhóm trả về/hủy), 1 dòng/sự kiện, `PROCESSED_DATE = TRUNC(EXITDATE)`, lọc chi nhánh qua `COMPANY_SK`, ghép CLOS và RLOS bằng `UNION ALL`.
+Câu lệnh đọc 3 cột từ `FCT_*_APPLICATION` tại `DAYID = d_to`, ghép với các sự kiện return có `EXITDATE` trong `[d_from, d_to]` (`DAYID BETWEEN d_from AND d_to` kèm lọc phiên bản mới nhất `nv.DAYID <= d_to`, `WORKSTEP_CODE` thuộc 6 bước, `DECISION_CODE` thuộc nhóm trả về/hủy), 1 dòng/sự kiện, `PROCESSED_DATE = TRUNC(EXITDATE)`, lọc chi nhánh qua `COMPANY_SK`, ghép CLOS và RLOS bằng `UNION ALL`.
 
 
 ## Ghi chú cho điều chỉnh thiết kế: bổ sung 3 cột đếm lũy kế
