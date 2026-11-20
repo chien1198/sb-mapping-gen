@@ -2,14 +2,15 @@
    BC5 - Bao cao SLA - TAT (CLOS + RLOS, PDTD_DTM, Oracle 19c)
    Nguon thiet ke: extract/srs_report/BC5.md + lld/pdtd_dtm/* (skill gen-report)
    Tham so:
-     :p_report_date   DATE      Ngay bao cao (PROCESSED_DATE), mac dinh T-1
-     :p_branch_code   VARCHAR2  Ma chi nhanh, NULL = tat ca chi nhanh
+     :p_date_from     DATE      Tu ngay (PROCESSED_DATE), mac dinh T-1
+     :p_date_to       DATE      Den ngay (PROCESSED_DATE), mac dinh T-1; ngay du lieu cua bang snapshot (DAYID) = :p_date_to
    Grain: 1 dong / ho so (moi nhanh CLOS, RLOS).
-     - Pham vi: FCT_*_APPLICATION co DAYID = ngay bao cao va PROCESSED_DATE trong ngay bao cao.
+     - Pham vi: FCT_*_APPLICATION co DAYID = :p_date_to va PROCESSED_DATE trong [:p_date_from, :p_date_to].
      - STEPnn_* / TAT_*: SUM theo buoc cua TAT_CALENDAR_HOUR / TAT_WORKING_HOUR / TAT_CPC_HOUR tren
        FCT_*_WORKSTEP_EVENT (LLD da tinh san; buoc dang treo tinh den het ngay batch), lam tron 2 chu so.
      - FCT_*_WORKSTEP_EVENT ghi nhieu phien ban / su kien (moi DAYID 1 dong) -> chi lay phien ban moi nhat
-       cua tung WORKSTEP_EVENT_BK den ngay bao cao.
+       cua tung WORKSTEP_EVENT_BK den :p_date_to. Day la lich su cac buoc de cong TAT nen CHI chan tren
+       DAYID <= :p_date_to, KHONG chan duoi theo :p_date_from (cac buoc co the phat sinh truoc :p_date_from).
      - SLA_DE / SLA_QC / QD_DDE / QD_QC: tra PDTD_DTM.REF_SLA_NLTT luc truy van
        (RLOS: PRODUCT_LINE = DIM_RLOS_PRODUCT.PRODUCTLINE_NAME; CLOS: PRODUCT_LINE = DIM_CLOS_PRODUCT.PRODUCTLINE_NAME (noi theo PRODUCTLINE_SK, lay ten moi nhat cua layer Product Line),
        NEW_CHANGE_REQUEST = CHANGE_REQUEST, SUB_PRODUCT NULL hoac bang SUB_PRODUCT cua ho so).
@@ -17,32 +18,32 @@
    ===================================================================== */
 WITH
 p AS (
-    SELECT TRUNC(:p_report_date) AS rpt_date FROM DUAL
+    SELECT TRUNC(:p_date_from) AS d_from,
+           TRUNC(:p_date_to)   AS d_to
+    FROM   DUAL
 ),
 -- ===== CLOS =====
 clos_app AS (
     SELECT a.*
     FROM   PDTD_DTM.FCT_CLOS_APPLICATION a
-    JOIN   p ON a.DAYID = p.rpt_date
-            AND a.PROCESSED_DATE >= p.rpt_date
-            AND a.PROCESSED_DATE <  p.rpt_date + 1
-    LEFT JOIN PDTD_DTM.DIM_LOS_COMPANY c ON c.DIMENSION_KEY = a.COMPANY_SK
-    WHERE  (:p_branch_code IS NULL OR c.BRANCH_CODE = :p_branch_code)
+    JOIN   p ON a.DAYID = p.d_to
+            AND a.PROCESSED_DATE >= p.d_from
+            AND a.PROCESSED_DATE <  p.d_to + 1
 ),
--- Su kien cac buoc tinh TAT (phien ban moi nhat cua tung su kien, den ngay bao cao)
+-- Su kien cac buoc tinh TAT (phien ban moi nhat cua tung su kien, den :p_date_to)
 clos_ev AS (
     SELECT e.WI_NAME, e.WORKSTEP_CODE, e.DECISION_CODE, e.ENTRYDATE, e.EXITDATE,
            e.TAT_CALENDAR_HOUR, e.TAT_WORKING_HOUR, e.TAT_CPC_HOUR,
            NVL(e.EXITDATE, CAST(TRUNC(e.ENTRYDATE) + 1 AS TIMESTAMP) - INTERVAL '1' SECOND) AS EXITDATE_EFF
     FROM   PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT e
     JOIN   clos_app a ON a.WI_NAME = e.WI_NAME
-    JOIN   p ON e.DAYID <= p.rpt_date
+    JOIN   p ON e.DAYID <= p.d_to
     WHERE  e.WORKSTEP_CODE IN ('BranchSupport','DetailDataEntry','CLOS_DetailDataEntry','DataInputerChecker','CLOS_DataInputerChecker','UnderwriterMaker','UnderwriterChecker','CreditApproval','CreditCommittee')
       AND  NOT EXISTS (SELECT 1
                        FROM   PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT nv
                        WHERE  nv.WORKSTEP_EVENT_BK = e.WORKSTEP_EVENT_BK
                          AND  nv.DAYID > e.DAYID
-                         AND  nv.DAYID <= p.rpt_date)
+                         AND  nv.DAYID <= p.d_to)
 ),
 clos_agg AS (
     SELECT a.WI_NAME,
@@ -87,26 +88,24 @@ clos_agg AS (
 rlos_app AS (
     SELECT a.*
     FROM   PDTD_DTM.FCT_RLOS_APPLICATION a
-    JOIN   p ON a.DAYID = p.rpt_date
-            AND a.PROCESSED_DATE >= p.rpt_date
-            AND a.PROCESSED_DATE <  p.rpt_date + 1
-    LEFT JOIN PDTD_DTM.DIM_LOS_COMPANY c ON c.DIMENSION_KEY = a.COMPANY_SK
-    WHERE  (:p_branch_code IS NULL OR c.BRANCH_CODE = :p_branch_code)
+    JOIN   p ON a.DAYID = p.d_to
+            AND a.PROCESSED_DATE >= p.d_from
+            AND a.PROCESSED_DATE <  p.d_to + 1
 ),
--- Su kien cac buoc tinh TAT (phien ban moi nhat cua tung su kien, den ngay bao cao)
+-- Su kien cac buoc tinh TAT (phien ban moi nhat cua tung su kien, den :p_date_to)
 rlos_ev AS (
     SELECT e.WI_NAME, e.WORKSTEP_CODE, e.DECISION_CODE, e.ENTRYDATE, e.EXITDATE,
            e.TAT_CALENDAR_HOUR, e.TAT_WORKING_HOUR, e.TAT_CPC_HOUR,
            NVL(e.EXITDATE, CAST(TRUNC(e.ENTRYDATE) + 1 AS TIMESTAMP) - INTERVAL '1' SECOND) AS EXITDATE_EFF
     FROM   PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT e
     JOIN   rlos_app a ON a.WI_NAME = e.WI_NAME
-    JOIN   p ON e.DAYID <= p.rpt_date
+    JOIN   p ON e.DAYID <= p.d_to
     WHERE  e.WORKSTEP_CODE IN ('BranchSupport','DetailDataEntry','DataInputerChecker','UnderwriterMaker','UnderwriterChecker','CreditApproval','CreditCommittee')
       AND  NOT EXISTS (SELECT 1
                        FROM   PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT nv
                        WHERE  nv.WORKSTEP_EVENT_BK = e.WORKSTEP_EVENT_BK
                          AND  nv.DAYID > e.DAYID
-                         AND  nv.DAYID <= p.rpt_date)
+                         AND  nv.DAYID <= p.d_to)
 ),
 rlos_agg AS (
     SELECT a.WI_NAME,

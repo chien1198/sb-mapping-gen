@@ -2,50 +2,54 @@
    BC4 - Bao cao Tuan Chuyen vien Tham dinh (CLOS + RLOS, PDTD_DTM, Oracle 19c)
    Nguon thiet ke: extract/srs_report/BC4.md + lld/pdtd_dtm/* (skill gen-report)
    Tham so:
-     :p_report_date   DATE      Ngay bao cao (REPORT_DATE), mac dinh T-1
-     :p_branch_code   VARCHAR2  Ma chi nhanh, NULL = tat ca chi nhanh
-   Grain: 1 dong / ho so (moi nhanh CLOS, RLOS).
-     - Pham vi: ho so da co buoc tham dinh (FCT_*_APPLICATION.HAS_UWM_FLAG = 'Y'), co dong su kien
-       DAYID = ngay bao cao va PROCESSED_DATE (= REPORT_DATE) trong ngay bao cao.
+     :p_date_from     DATE      Tu ngay (REPORT_DATE = PROCESSED_DATE), mac dinh T-1
+     :p_date_to       DATE      Den ngay (REPORT_DATE = PROCESSED_DATE), mac dinh T-1; ngay du lieu cua bang snapshot (DAYID) = :p_date_to
+   Grain: 1 dong / ho so (moi nhanh CLOS, RLOS), ke ca ho so co PROCESSED_DATE o nhieu ngay trong khoang.
+     - Pham vi: ho so da co buoc tham dinh (FCT_*_APPLICATION.HAS_UWM_FLAG = 'Y' tai DAYID = :p_date_to), co dong
+       su kien DAYID trong [:p_date_from, :p_date_to] va PROCESSED_DATE trong [:p_date_from, :p_date_to].
+     - REPORT_DATE = ngay PROCESSED_DATE moi nhat cua ho so trong khoang; MAX(PROCESSED_DATE) gop cac phien ban
+       su kien trong khoang ve 1 dong / ho so nen o buoc xac dinh pham vi khong loc phien ban moi nhat.
      - WORKSTEP / UND_MAKER / REMARKS: dong su kien UnderwriterMaker moi nhat.
      - ENTRYDATE / EXITDATE: MIN / MAX tai UnderwriterMaker + UnderwriterChecker.
      - FLAG cap ho so (thu tu uu tien 5 nhanh cua SRS): nhanh theo quyet dinh (da phe duyet / CVTD chot / chuyen-tra lai)
        lay tu moi dong su kien; nhanh theo trang thai workflow (chua PD / dang-phai xu ly) chi lay tu dong moi nhat
        cua ho so, vi dong cu giu WF_ACTIVITYNAME luc ghi.
    REPORT_WEEK tinh truc tiep tu REPORT_DATE (khong dung DIM_DATE): Thu 2 - Chu nhat, dinh dang YYYYMMDD-YYYYMMDD.
-   FCT_*_WORKSTEP_EVENT ghi nhieu phien ban / su kien (moi DAYID 1 dong) -> doc lich su chi lay phien ban
-   moi nhat cua tung WORKSTEP_EVENT_BK den ngay bao cao.
+   FCT_*_WORKSTEP_EVENT (lat cat ngay phat sinh): CTE *_scope loc DAYID trong [:p_date_from, :p_date_to];
+   CTE *_hist doc toan bo lich su cua ho so nen CHI chan tren DAYID <= :p_date_to (khong chan duoi, vi cac buoc
+   cua ho so co the phat sinh truoc :p_date_from) va chi lay phien ban moi nhat cua tung WORKSTEP_EVENT_BK.
+   Bang snapshot (FCT_*_APPLICATION, FCT_RLOS_CUSTOMER): loc DAYID = :p_date_to.
    ===================================================================== */
 WITH
 p AS (
-    SELECT TRUNC(:p_report_date) AS rpt_date FROM DUAL
+    SELECT TRUNC(:p_date_from) AS d_from,
+           TRUNC(:p_date_to)   AS d_to
+    FROM   DUAL
 ),
 -- ===== CLOS =====
--- Ho so trong pham vi ngay bao cao (+ loc chi nhanh)
+-- Ho so trong pham vi khoang bao cao
 clos_scope AS (
     SELECT e.WI_NAME,
            a.CUSTOMER_SK,
            TRUNC(MAX(e.PROCESSED_DATE)) AS REPORT_DATE
     FROM   PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT e
-    JOIN   p ON e.DAYID = p.rpt_date
-            AND e.PROCESSED_DATE >= p.rpt_date
-            AND e.PROCESSED_DATE <  p.rpt_date + 1
-    JOIN   PDTD_DTM.FCT_CLOS_APPLICATION a ON a.WI_NAME = e.WI_NAME AND a.DAYID = p.rpt_date AND a.HAS_UWM_FLAG = 'Y'
-    LEFT JOIN PDTD_DTM.DIM_LOS_COMPANY   c ON c.DIMENSION_KEY = a.COMPANY_SK
-    WHERE  (:p_branch_code IS NULL OR c.BRANCH_CODE = :p_branch_code)
+    JOIN   p ON e.DAYID BETWEEN p.d_from AND p.d_to
+            AND e.PROCESSED_DATE >= p.d_from
+            AND e.PROCESSED_DATE <  p.d_to + 1
+    JOIN   PDTD_DTM.FCT_CLOS_APPLICATION a ON a.WI_NAME = e.WI_NAME AND a.DAYID = p.d_to AND a.HAS_UWM_FLAG = 'Y'
     GROUP  BY e.WI_NAME, a.CUSTOMER_SK
 ),
--- Lich su su kien cua ho so (phien ban moi nhat cua tung su kien, den ngay bao cao)
+-- Lich su su kien cua ho so (phien ban moi nhat cua tung su kien, den :p_date_to)
 clos_hist AS (
     SELECT e.*
     FROM   PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT e
     JOIN   clos_scope s ON s.WI_NAME = e.WI_NAME
-    JOIN   p ON e.DAYID <= p.rpt_date
+    JOIN   p ON e.DAYID <= p.d_to
     WHERE  NOT EXISTS (SELECT 1
                        FROM   PDTD_DTM.FCT_CLOS_WORKSTEP_EVENT nv
                        WHERE  nv.WORKSTEP_EVENT_BK = e.WORKSTEP_EVENT_BK
                          AND  nv.DAYID > e.DAYID
-                         AND  nv.DAYID <= p.rpt_date)
+                         AND  nv.DAYID <= p.d_to)
 ),
 -- Dong su kien UnderwriterMaker moi nhat / ho so
 clos_uw AS (
@@ -82,24 +86,22 @@ rlos_scope AS (
     SELECT e.WI_NAME,
            TRUNC(MAX(e.PROCESSED_DATE)) AS REPORT_DATE
     FROM   PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT e
-    JOIN   p ON e.DAYID = p.rpt_date
-            AND e.PROCESSED_DATE >= p.rpt_date
-            AND e.PROCESSED_DATE <  p.rpt_date + 1
-    JOIN   PDTD_DTM.FCT_RLOS_APPLICATION a ON a.WI_NAME = e.WI_NAME AND a.DAYID = p.rpt_date AND a.HAS_UWM_FLAG = 'Y'
-    LEFT JOIN PDTD_DTM.DIM_LOS_COMPANY   c ON c.DIMENSION_KEY = a.COMPANY_SK
-    WHERE  (:p_branch_code IS NULL OR c.BRANCH_CODE = :p_branch_code)
+    JOIN   p ON e.DAYID BETWEEN p.d_from AND p.d_to
+            AND e.PROCESSED_DATE >= p.d_from
+            AND e.PROCESSED_DATE <  p.d_to + 1
+    JOIN   PDTD_DTM.FCT_RLOS_APPLICATION a ON a.WI_NAME = e.WI_NAME AND a.DAYID = p.d_to AND a.HAS_UWM_FLAG = 'Y'
     GROUP  BY e.WI_NAME
 ),
 rlos_hist AS (
     SELECT e.*
     FROM   PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT e
     JOIN   rlos_scope s ON s.WI_NAME = e.WI_NAME
-    JOIN   p ON e.DAYID <= p.rpt_date
+    JOIN   p ON e.DAYID <= p.d_to
     WHERE  NOT EXISTS (SELECT 1
                        FROM   PDTD_DTM.FCT_RLOS_WORKSTEP_EVENT nv
                        WHERE  nv.WORKSTEP_EVENT_BK = e.WORKSTEP_EVENT_BK
                          AND  nv.DAYID > e.DAYID
-                         AND  nv.DAYID <= p.rpt_date)
+                         AND  nv.DAYID <= p.d_to)
 ),
 rlos_uw AS (
     SELECT h.WI_NAME,
@@ -139,7 +141,7 @@ rlos_cust AS (
                    ORDER BY CASE WHEN cu.ID_TYPE IN ('TCC','CC') THEN 0 ELSE 1 END, cu.ID_TYPE
                ) AS RN
         FROM   PDTD_DTM.FCT_RLOS_CUSTOMER cu
-        JOIN   p ON cu.DAYID = p.rpt_date
+        JOIN   p ON cu.DAYID = p.d_to
         JOIN   rlos_scope s ON s.WI_NAME = cu.WI_NAME
     )
     WHERE RN = 1

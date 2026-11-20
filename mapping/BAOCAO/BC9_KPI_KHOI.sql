@@ -1,19 +1,17 @@
 /* =====================================================================
-   BC9 - Bao cao KPI, phan KPI Khoi (1 dong / nam; PDTD_DTM, Oracle 19c)
+   BC9 - Bao cao KPI, phan KPI Khoi (1 dong; PDTD_DTM, Oracle 19c)
    Nguon thiet ke: extract/srs_report/BC9.md (muc "KPI Khoi") + lld/pdtd_dtm/* (skill gen-report)
    Tham so:
-     :p_year   NUMBER   Nam bao cao (YYYY)
-   Ngay du lieu: nam hien tai = T-1 (TRUNC(SYSDATE) - 1); nam qua khu = 31/12 cua nam do.
-   Doc cac cot luy ke nam (_YTD) cua AGG_LOS_KPI_YTD_DAILY tai ngay du lieu; bang tong hop khong co chieu
+     :p_date_to   DATE   Ngay du lieu (DAYID), mac dinh T-1 (TRUNC(SYSDATE) - 1)
+   Bang AGG_LOS_KPI_YTD_DAILY luy ke tu 1/1 den DAYID nen chi can :p_date_to (khong co :p_date_from).
+   Doc cac cot luy ke nam (_YTD) cua AGG_LOS_KPI_YTD_DAILY tai DAYID = :p_date_to; bang tong hop khong co chieu
    chi nhanh nen KHONG ap dung loc chi nhanh o phan nay (da chap nhan). Cac chi tieu da loai tai khoan test,
    3 don vi VN0010401 / VN0010101 / VN0010002 va chi tinh luong BL / KHCN_HO ngay tai bang tong hop.
    TAT_RLOS = trung binh cong cua TAT trung binh nhom UNSEC va nhom SEC; TY_LE_GN = SLGN * 100 / SLHS.
    ===================================================================== */
 WITH
 p AS (
-    SELECT CASE WHEN :p_year = EXTRACT(YEAR FROM SYSDATE) THEN TRUNC(SYSDATE) - 1
-                ELSE TO_DATE(:p_year || '-12-31', 'YYYY-MM-DD') END AS data_day
-    FROM   DUAL
+    SELECT TRUNC(:p_date_to) AS data_day FROM DUAL
 ),
 y AS (
     SELECT p.data_day,

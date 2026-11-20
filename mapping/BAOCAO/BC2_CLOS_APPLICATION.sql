@@ -2,27 +2,27 @@
    BC2 - Bao cao CLOS APPLICATION (PDTD_DTM, Oracle 19c)
    Nguon thiet ke: extract/srs_report/BC2.md + lld/pdtd_dtm/* (skill gen-report)
    Tham so:
-     :p_report_date   DATE      Ngay bao cao (PROCESSED_DATE), mac dinh T-1 (TRUNC(SYSDATE) - 1)
-     :p_branch_code   VARCHAR2  Ma chi nhanh, NULL = tat ca chi nhanh
+     :p_date_from     DATE      Tu ngay (PROCESSED_DATE), mac dinh T-1 (TRUNC(SYSDATE) - 1)
+     :p_date_to       DATE      Den ngay (PROCESSED_DATE), mac dinh T-1; ngay du lieu (DAYID) = :p_date_to
    Grain: 1 dong / (ho so x ngoai le). Ho so khong co ngoai le van ra 1 dong (LEFT JOIN).
      - DEV_PROPOSAL (FCT_CLOS_DEVIATION) len nhieu dong, khong gop.
      - 9 co TSDB_* gop theo ho so (MAX), 1 dong / ho so.
-   FCT_CLOS_APPLICATION la full snapshot theo DAYID; PROCESSED_DATE la thuoc tinh co dinh
-   cua ho so -> loc DAYID = PROCESSED_DATE = :p_report_date (cung mau BC1).
+   FCT_CLOS_APPLICATION la full snapshot lich su theo DAYID -> loc DAYID = :p_date_to (trang thai ho so
+   tai ngay den) va PROCESSED_DATE trong [:p_date_from, :p_date_to] (cung mau BC1).
    ===================================================================== */
 WITH
 p AS (
-    SELECT TRUNC(:p_report_date) AS rpt_date FROM DUAL
+    SELECT TRUNC(:p_date_from) AS d_from,
+           TRUNC(:p_date_to)   AS d_to
+    FROM   DUAL
 ),
--- Tap ho so cua ngay bao cao (+ loc chi nhanh)
+-- Tap ho so co PROCESSED_DATE trong khoang bao cao
 app AS (
     SELECT a.*
     FROM   PDTD_DTM.FCT_CLOS_APPLICATION a
-    JOIN   p ON a.DAYID = p.rpt_date
-            AND a.PROCESSED_DATE >= p.rpt_date
-            AND a.PROCESSED_DATE <  p.rpt_date + 1
-    LEFT JOIN PDTD_DTM.DIM_LOS_COMPANY c ON c.DIMENSION_KEY = a.COMPANY_SK
-    WHERE  (:p_branch_code IS NULL OR c.BRANCH_CODE = :p_branch_code)
+    JOIN   p ON a.DAYID = p.d_to
+            AND a.PROCESSED_DATE >= p.d_from
+            AND a.PROCESSED_DATE <  p.d_to + 1
 ),
 -- Tai san bao dam: gop co theo ho so (COLLATERAL_TYPE_CODE = COLLTYPE goc, tieng Viet khong dau)
 coll AS (
@@ -80,7 +80,7 @@ SELECT
     a.LAST_ENTRYDATE,
     a.LAST_EXITDATE,
     a.LAST_REMARKS,
-    a.DECISION_CODE                                         AS LAST_DECISION,
+    a.LAST_DECISION                                         AS LAST_DECISION,
     a.UNDERWRITERMAKER_USERMAKE                             AS UNDERWRITERMAKER_TAKERESPON,
     a.UNDERWRITERCHECKER_USERMAKE                           AS UNDERWRITERCHECKER_TAKERESPON,
     a.APPROVAL_USERMAKE                                     AS APPROVAL_TAKERESPON,
