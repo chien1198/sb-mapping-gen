@@ -11,7 +11,9 @@ that have actually shipped before:
      exactly ONE JOIN clause. Multiple clauses for the same source system
      go on separate ROWS (one clause per row, one column per system) —
      mirroring the FCT_LOAN template's own worked example — never stacked
-     with "\\n" inside a single cell.
+     with "\\n" inside a single cell. JOIN keywords nested inside a
+     parenthesised derived table do not count (that whole sub-select +
+     its alias is one JOIN clause).
   4. Every "How to mapping <SYSTEM>" cell for a real column row must be
      non-empty — blank means "forgot to decide", not "not applicable"
      (the convention for "not applicable" is the literal string "NULL").
@@ -194,6 +196,28 @@ def check_no_strikethrough(ws, errors):
                 errors.append(f"{cell.coordinate}: cell bị gạch ngang (strikethrough), giá trị={cell.value!r}")
 
 
+def strip_parenthesised(val):
+    """Return `val` with everything inside parentheses removed (nested too),
+    ignoring parentheses that sit inside single-quoted string literals. A
+    derived table `LEFT JOIN (SELECT ... LEFT JOIN ... ) X ON ...` is ONE JOIN
+    clause no matter how many joins its own body contains, so only JOIN
+    keywords at parenthesis depth 0 count toward the one-clause-per-cell rule."""
+    out, depth, in_quote = [], 0, False
+    for ch in val:
+        if ch == "'":
+            in_quote = not in_quote
+        if not in_quote:
+            if ch == "(":
+                depth += 1
+                continue
+            if ch == ")":
+                depth = max(0, depth - 1)
+                continue
+        if depth == 0:
+            out.append(ch)
+    return "".join(out)
+
+
 def check_join_conditions_one_per_cell(ws, header_row, join_content_rows, errors):
     n_cols = last_used_mapping_col(ws, header_row)
     for r in join_content_rows:
@@ -202,11 +226,12 @@ def check_join_conditions_one_per_cell(ws, header_row, join_content_rows, errors
             val = cell.value
             if not val:
                 continue
+            top = strip_parenthesised(val).upper()
             join_count = (
-                val.upper().count("LEFT JOIN")
-                + val.upper().count("INNER JOIN")
-                + val.upper().count("RIGHT JOIN")
-                + val.upper().count("JOIN:")
+                top.count("LEFT JOIN")
+                + top.count("INNER JOIN")
+                + top.count("RIGHT JOIN")
+                + top.count("JOIN:")
             )
             if join_count > 1 or "\n" in val:
                 errors.append(

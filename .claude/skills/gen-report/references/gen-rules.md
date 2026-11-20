@@ -24,10 +24,21 @@
 ## 2. Bảng driving, snapshot và tham số
 
 - Bảng driving là `FCT_RLOS_APPLICATION` / `FCT_CLOS_APPLICATION` (1 hồ sơ × 1 ngày dữ liệu, full snapshot theo `DAYID`).
-- Tham số lấy từ SRS, mục Business Rules BR x.1 (ví dụ BC1: Ngày báo cáo = `PROCESSED_DATE`, mặc định T-1;
-  Chi nhánh tùy chọn, NULL = tất cả). Dùng bind variable (`:p_report_date`, `:p_branch_code`) — **không** dùng `v_batch_date`,
-  đó là biến của ETL.
-- Mẫu lọc BC1 (cùng mẫu BC9): `DAYID = rpt_date` **và** `PROCESSED_DATE >= rpt_date AND < rpt_date + 1`.
+- Tham số báo cáo (quyết định 2026-11-20, thay cho "Ngày báo cáo" một ngày trong SRS BR x.1): khoảng ngày
+  `:p_date_from`, `:p_date_to` (mặc định cùng T-1) và `:p_branch_code` (tùy chọn, NULL = tất cả). Dùng bind variable —
+  **không** dùng `v_batch_date`, đó là biến của ETL. CTE `p` khai báo `d_from = TRUNC(:p_date_from)`, `d_to = TRUNC(:p_date_to)`.
+  Khoảng ngày lấy cả hai đầu: `>= p.d_from AND < p.d_to + 1`.
+- Quy tắc lọc theo loại bảng:
+  - Bảng **snapshot full lịch sử** (`FCT_*_APPLICATION`, `*_CUSTOMER`, `*_COLLATERAL`, `*_DEVIATION`, `*_EXCEPTION`,
+    `AGG_LOS_KPI_APPLICATION`...): lọc `DAYID = p.d_to` **và** lọc trường ngày nghiệp vụ trong `[d_from, d_to]`.
+    Không lọc `DAYID` theo khoảng với các bảng này.
+  - Hai bảng `FCT_*_WORKSTEP_EVENT` (lát cắt theo ngày phát sinh): được lọc `DAYID` theo khoảng.
+    Xem mục 8 (dòng báo cáo và lịch sử dùng cận khác nhau).
+  - Báo cáo mà trường ngày nghiệp vụ chính là `DAYID` (BC10, BC11): `DAYID BETWEEN d_from AND d_to`, 1 dòng / (ngày, hợp đồng).
+  - Bảng cộng dồn năm (`AGG_LOS_KPI_YTD_DAILY`, BC9 KPI Khối): chỉ `DAYID = :p_date_to`, không có `:p_date_from`.
+- Trường ngày nghiệp vụ theo báo cáo: BC1/BC2/BC5/BC6/BC9 = `PROCESSED_DATE`; BC3/BC8 = `EXITDATE`; BC4 = `REPORT_DATE`
+  (= `PROCESSED_DATE`); BC7 = `RAISED_DATE_TIME`; BC10/BC11 = `DAYID`.
+- Mẫu lọc BC1 (cùng mẫu BC9): `DAYID = p.d_to` **và** `PROCESSED_DATE >= p.d_from AND < p.d_to + 1`.
   Báo cáo khác: đọc SRS và LLD của driving table để xác định điều kiện thật.
 - Join các bảng con (`FCT_*_CUSTOMER`, `*_COREPAYER`, `*_COLLATERAL`, ...) với driving theo **`DAYID` và `WI_NAME`**.
 
@@ -76,11 +87,17 @@
 
 ## 8. Bảng sự kiện workstep (`FCT_*_WORKSTEP_EVENT`)
 
-- Mỗi sự kiện có thể có nhiều phiên bản (mỗi `DAYID` 1 dòng; mở ngày 1, đóng ngày 2 = 2 dòng). Khi đọc lịch sử qua nhiều
-  `DAYID` chỉ lấy phiên bản mới nhất theo `WORKSTEP_EVENT_BK`:
-  `AND NOT EXISTS (SELECT 1 FROM ... nv WHERE nv.WORKSTEP_EVENT_BK = e.WORKSTEP_EVENT_BK AND nv.DAYID > e.DAYID AND nv.DAYID <= :rpt_date)`
-  và giới hạn `e.DAYID <= :rpt_date`.
-- Lấy thông tin hồ sơ (số tiền, kỳ hạn, chi nhánh) từ snapshot `FCT_*_APPLICATION` tại `DAYID = ngày báo cáo`.
+- Mỗi sự kiện có thể có nhiều phiên bản (mỗi `DAYID` 1 dòng; mở ngày 1, đóng ngày 2 = 2 dòng). Luôn chỉ lấy phiên bản
+  mới nhất theo `WORKSTEP_EVENT_BK`:
+  `AND NOT EXISTS (SELECT 1 FROM ... nv WHERE nv.WORKSTEP_EVENT_BK = e.WORKSTEP_EVENT_BK AND nv.DAYID > e.DAYID AND nv.DAYID <= p.d_to)`.
+- Cận `DAYID` phụ thuộc vai trò của bảng sự kiện trong câu lệnh:
+  - Sự kiện là **dòng báo cáo** (BC3, BC8) hoặc dùng để **xác định phạm vi hồ sơ** (BC4 `*_scope`):
+    `e.DAYID BETWEEN p.d_from AND p.d_to` kèm trường ngày nghiệp vụ trong khoảng (`EXITDATE`, `PROCESSED_DATE`).
+    Dòng có `EXITDATE` trong khoảng luôn được ghi ở `DAYID` không sớm hơn ngày thoát nên cận dưới `d_from` an toàn.
+  - Sự kiện là **lịch sử các bước của hồ sơ** (BC4 `*_hist`, BC5 `*_ev`): chỉ `e.DAYID <= p.d_to`, **không** chặn dưới
+    theo `d_from`, vì các bước có thể phát sinh trước `d_from` và TAT / FLAG / ENTRYDATE / EXITDATE cần toàn bộ lịch sử.
+- Lấy thông tin hồ sơ (số tiền, kỳ hạn, chi nhánh, `RETURN_CNT_*`) từ snapshot `FCT_*_APPLICATION` tại `DAYID = p.d_to`
+  (trạng thái hồ sơ tại ngày đến).
 
 ## 9. Không làm
 
