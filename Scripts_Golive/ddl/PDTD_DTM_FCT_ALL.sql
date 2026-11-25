@@ -171,9 +171,11 @@ COMMIT;
 -- ===========================================================================
 -- NOTE: bang append-only luu ket qua BC5 (SLA - TAT) cua LAN PHE DUYET DAU tung ho so (Approved/Rejected).
 --       1 dong = 1 ho so x 1 he thong (CLOS/RLOS); chi INSERT, khong UPDATE/MERGE; ho so chua duyet va dong lan 2 KHONG luu o day.
--- PK          : (SYSTEMNAME, WI_NAME). Bang KHONG partition (grain 1 dong/ho so, khong phai anh chup theo ngay);
---               DAYID chi la cot doi soat (ngay batch ghi dong), khong nam trong PK va BC5 khong loc theo DAYID.
--- Chi muc IX1 : PROCESSED_DATE - BC5 lay tap ho so theo khoang PROCESSED_DATE.
+-- Partition   : RANGE (PROCESSED_DATE) INTERVAL 1 DAY (cung kieu cac bang AGG khac); BC5 loc khoang PROCESSED_DATE nen partition pruning
+--               thay chi muc rieng. DAYID chi la cot doi soat (ngay batch ghi dong), khong nam trong PK va BC5 khong loc theo DAYID.
+-- PK          : (SYSTEMNAME, WI_NAME) dung index GLOBAL (USING INDEX, khong LOCAL): Oracle khong cho unique index LOCAL thieu cot partition key
+--               (ORA-14039), va ETL kiem tra NOT EXISTS theo (SYSTEMNAME, WI_NAME) nen can 1 lan tra index thay vi quet tung partition.
+--               Neu sau nay DROP/TRUNCATE partition cu thi phai kem UPDATE GLOBAL INDEXES.
 -- ===========================================================================
 -- DROP TABLE PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL
 CREATE TABLE PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL (
@@ -229,10 +231,14 @@ CREATE TABLE PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL (
     TIME_UPDATE                   TIMESTAMP,
 
 	CONSTRAINT AGG_LOS_SLA_TAT_APPROVAL_PK PRIMARY KEY (SYSTEMNAME, WI_NAME) USING INDEX
+)
+PARTITION BY RANGE (PROCESSED_DATE)
+INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
+(
+    PARTITION AGG_LOS_SLA_TAT_APPROVAL_P0 VALUES LESS THAN (
+        TO_DATE(' 2008-01-01 00:00:00', 'SYYYY-MM-DD HH24:MI:SS', 'NLS_CALENDAR=GREGORIAN')
+    )
 );
-
-CREATE INDEX PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL_IX1
-    ON PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL (PROCESSED_DATE);
 
 COMMIT;
 
@@ -276,9 +282,9 @@ CREATE TABLE PDTD_DTM.FCT_CLOS_APPLICATION (
     LAST_EXITDATE                 TIMESTAMP           ,
     PRE_WORKSTEP_CODE             VARCHAR2(200)       ,
     LAST_REMARKS                  VARCHAR2(4000)      ,
-    PROPOSED_AMT                  NUMBER(20,2)        ,
-    CREDIT_LIMIT_APPROVAL         NUMBER(20,2)        ,
-    APPROVED_AMT_FINAL            NUMBER(20,2)        ,
+    PROPOSED_AMT                  NVARCHAR2(150)      ,
+    CREDIT_LIMIT_APPROVAL         NVARCHAR2(100)      ,
+    APPROVED_AMT_FINAL            NVARCHAR2(100)      ,
     APPROVED_TERM                 NVARCHAR2(100)      ,
     INTEREST_RATE_PCT             NVARCHAR2(500)      ,
     CURRENCY_CODE                 NVARCHAR2(100)      ,
@@ -551,7 +557,7 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_APPLICATION_SECONDPRODUCT (
     SECONDARY_PRODUCT             VARCHAR2(200)       ,
     WI_NAME                       VARCHAR2(100)       ,
     SUB_PRODUCT_LINE              VARCHAR2(200)       ,
-    SPP_AMOUNT                    NUMBER(20,2)        ,
+    SPP_AMOUNT                    NVARCHAR2(100)      ,
     SPP_TERM                      NUMBER(5)           ,
     CARD_TYPE_CODE                VARCHAR2(100)       ,
     TIME_UPDATE                   TIMESTAMP           ,
@@ -622,8 +628,8 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_APPLICATION (
     LAST_REMARKS                  VARCHAR2(4000)      ,
     LAST_REMARK_DDE               VARCHAR2(4000)      ,
     LAST_CAN_REMARKS              VARCHAR2(4000)      ,
-    APPROVED_AMT_FINAL            NUMBER(25,2)        ,
-    APPROVED_TERM                 NUMBER(15)           ,
+    APPROVED_AMT_FINAL            NVARCHAR2(100)      ,
+    APPROVED_TERM                 NVARCHAR2(100)       ,
     CURRENCY_CODE                 VARCHAR2(10)        ,
     UNDERWRITERMAKER_USERMAKE     VARCHAR2(100)       ,
     UNDERWRITERCHECKER_USERMAKE   VARCHAR2(100)       ,
@@ -690,7 +696,7 @@ CREATE TABLE PDTD_DTM.FCT_RLOS_COLLATERAL (
     CONTROL_POSTER                VARCHAR2(100)       ,
     VALPAPER_TYPE                 VARCHAR2(100)       ,
     NUMBERSIGN                    VARCHAR2(200)       ,
-    APPRAISED_VALUE               NUMBER(36,2)        ,
+    APPRAISED_VALUE               NVARCHAR2(100)      ,
     LOAN_RATE_LTV                 NUMBER(10,2)        ,
     TYPES_OF_COLLATERALS          VARCHAR2(500)       ,
     TIME_UPDATE                   TIMESTAMP           ,

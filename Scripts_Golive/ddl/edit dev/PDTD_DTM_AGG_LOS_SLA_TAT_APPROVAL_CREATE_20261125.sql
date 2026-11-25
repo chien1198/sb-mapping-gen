@@ -8,9 +8,11 @@
 -- ===========================================================================
 -- NOTE: bang append-only luu ket qua BC5 (SLA - TAT) cua LAN PHE DUYET DAU tung ho so (Approved/Rejected).
 --       1 dong = 1 ho so x 1 he thong (CLOS/RLOS); chi INSERT, khong UPDATE/MERGE; ho so chua duyet va dong lan 2 KHONG luu o day.
--- PK          : (SYSTEMNAME, WI_NAME). Bang KHONG partition (grain 1 dong/ho so, khong phai anh chup theo ngay);
---               DAYID chi la cot doi soat (ngay batch ghi dong), khong nam trong PK va BC5 khong loc theo DAYID.
--- Chi muc IX1 : PROCESSED_DATE - BC5 lay tap ho so theo khoang PROCESSED_DATE.
+-- Partition   : RANGE (PROCESSED_DATE) INTERVAL 1 DAY (cung kieu cac bang AGG khac); BC5 loc khoang PROCESSED_DATE nen partition pruning
+--               thay chi muc rieng. DAYID chi la cot doi soat (ngay batch ghi dong), khong nam trong PK va BC5 khong loc theo DAYID.
+-- PK          : (SYSTEMNAME, WI_NAME) dung index GLOBAL (USING INDEX, khong LOCAL): Oracle khong cho unique index LOCAL thieu cot partition key
+--               (ORA-14039), va ETL kiem tra NOT EXISTS theo (SYSTEMNAME, WI_NAME) nen can 1 lan tra index thay vi quet tung partition.
+--               Neu sau nay DROP/TRUNCATE partition cu thi phai kem UPDATE GLOBAL INDEXES.
 -- ===========================================================================
 -- DROP TABLE PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL
 CREATE TABLE PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL (
@@ -66,9 +68,13 @@ CREATE TABLE PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL (
     TIME_UPDATE                   TIMESTAMP,
 
 	CONSTRAINT AGG_LOS_SLA_TAT_APPROVAL_PK PRIMARY KEY (SYSTEMNAME, WI_NAME) USING INDEX
+)
+PARTITION BY RANGE (PROCESSED_DATE)
+INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
+(
+    PARTITION AGG_LOS_SLA_TAT_APPROVAL_P0 VALUES LESS THAN (
+        TO_DATE(' 2008-01-01 00:00:00', 'SYYYY-MM-DD HH24:MI:SS', 'NLS_CALENDAR=GREGORIAN')
+    )
 );
-
-CREATE INDEX PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL_IX1
-    ON PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL (PROCESSED_DATE);
 
 COMMIT;

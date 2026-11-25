@@ -12,8 +12,8 @@
                             (Processing/Cancelled), TAT cac buoc den hien tai. Ho so chi o BranchSupport co PROCESSED_DATE NULL nen khong len bao cao.
      - 'From Second Approval': ho so da phe duyet lan 1 va co event buoc PDTD (ke ca PhoneVerification) SAU do (quay lai PDTD); tinh truc tiep, PD lan 3 tro di gop chung.
          PROCESSED_DATE = FCT.PROCESSED_DATE (ngay phe duyet gan nhat), TAT = cac buoc SAU lan phe duyet dau (event co NVL(EXITDATE, ENTRYDATE) > MIN_APP_EXITDATE).
-         BI_APPSTATUS: 'Cancelled' neu buoc cuoi la CancelRevoke/CancelPermanent va buoc ngay truoc (PRE_WORKSTEP_CODE) thuoc PDTD;
-                       'Processing' neu co event buoc PDTD tu lan phe duyet gan nhat tro di (da bi tra lai / cho phe duyet lai); con lai = APPLICATION_STATUS (Approved/Rejected).
+         BI_APPSTATUS: 'Processing' neu buoc cuoi (LAST_WORKSTEP) thuoc PDTD va LAST_ENTRYDATE >= PROCESSED_DATE (ho so dang o buoc PDTD sau lan phe duyet gan nhat: da bi tra lai / cho phe duyet lai);
+                       con lai = APPLICATION_STATUS (Approved/Rejected, hoac 'Cancelled' khi ho so da duyet roi bi huy tai buoc PDTD - FCT_*_APPLICATION da xu ly san, review 2026-11-25).
    Phan live (tinh truc tiep):
      - FCT_*_APPLICATION co DAYID = :p_date_to va PROCESSED_DATE trong [:p_date_from, :p_date_to].
      - STEPnn_* / TAT_*: SUM theo buoc cua TAT_CALENDAR_HOUR / TAT_WORKING_HOUR / TAT_CPC_HOUR tren FCT_*_WORKSTEP_EVENT (LLD da tinh san; buoc dang treo
@@ -82,9 +82,8 @@ clos_agg AS (
            ROUND(NVL(SUM(CASE WHEN e.WORKSTEP_CODE IN ('UnderwriterMaker','UnderwriterChecker') THEN e.TAT_WORKING_HOUR END), 0), 2)  AS TAT_PHONG_WK_TAT,
            ROUND(NVL(SUM(CASE WHEN e.WORKSTEP_CODE IN ('UnderwriterMaker','UnderwriterChecker','CreditApproval','CreditCommittee') THEN e.TAT_CALENDAR_HOUR END), 0), 2)  AS TAT_KHOI_PDTD_CL_TAT,
            ROUND(NVL(SUM(CASE WHEN e.WORKSTEP_CODE IN ('UnderwriterMaker','UnderwriterChecker','CreditApproval','CreditCommittee') THEN e.TAT_WORKING_HOUR END), 0), 2)  AS TAT_KHOI_PDTD_WK_TAT,
-           -- PDTD_EVT_CNT: co event buoc PDTD sau lan duyet dau -> ho so da duyet moi co dong 'From Second Approval'; INFLIGHT_CNT: event buoc PDTD tu lan phe duyet gan nhat tro di (dang xu ly)
+           -- PDTD_EVT_CNT: co event buoc PDTD sau lan duyet dau -> ho so da duyet moi co dong 'From Second Approval'
            COUNT(CASE WHEN e.WORKSTEP_CODE IN ('DetailDataEntry','CLOS_DetailDataEntry','DataInputerChecker','CLOS_DataInputerChecker','UnderwriterMaker','UnderwriterChecker','PhoneVerification','CreditApproval','CreditCommittee') THEN 1 END)                                        AS PDTD_EVT_CNT,
-           COUNT(CASE WHEN e.WORKSTEP_CODE IN ('DetailDataEntry','CLOS_DetailDataEntry','DataInputerChecker','CLOS_DataInputerChecker','UnderwriterMaker','UnderwriterChecker','PhoneVerification','CreditApproval','CreditCommittee') AND e.ENTRYDATE >= a.PROCESSED_DATE THEN 1 END)    AS INFLIGHT_CNT,
            MIN(CASE WHEN e.WORKSTEP_CODE IN ('DetailDataEntry','CLOS_DetailDataEntry') THEN e.ENTRYDATE END)                   AS ENTRYDATE_DDE,
            MAX(CASE WHEN e.WORKSTEP_CODE IN ('DetailDataEntry','CLOS_DetailDataEntry') THEN e.EXITDATE  END)                   AS EXITDATE_DDE
     FROM   clos_app a
@@ -169,9 +168,8 @@ rlos_agg AS (
            ROUND(NVL(SUM(CASE WHEN e.WORKSTEP_CODE IN ('UnderwriterMaker','UnderwriterChecker') THEN e.TAT_WORKING_HOUR END), 0)
              + CASE WHEN COUNT(CASE WHEN e.WORKSTEP_CODE = 'CreditCommittee' THEN 1 END) = 0
                     THEN NVL(SUM(CASE WHEN e.WORKSTEP_CODE = 'CreditApproval' THEN e.TAT_WORKING_HOUR END), 0) ELSE 0 END, 2)  AS TAT_KHOI_PDTD_WK_TAT,
-           -- PDTD_EVT_CNT: co event buoc PDTD sau lan duyet dau -> ho so da duyet moi co dong 'From Second Approval'; INFLIGHT_CNT: event buoc PDTD tu lan phe duyet gan nhat tro di (dang xu ly)
+           -- PDTD_EVT_CNT: co event buoc PDTD sau lan duyet dau -> ho so da duyet moi co dong 'From Second Approval'
            COUNT(CASE WHEN e.WORKSTEP_CODE IN ('DetailDataEntry','DataInputerChecker','UnderwriterMaker','UnderwriterChecker','PhoneVerification','CreditApproval','CreditCommittee') THEN 1 END)                                        AS PDTD_EVT_CNT,
-           COUNT(CASE WHEN e.WORKSTEP_CODE IN ('DetailDataEntry','DataInputerChecker','UnderwriterMaker','UnderwriterChecker','PhoneVerification','CreditApproval','CreditCommittee') AND e.ENTRYDATE >= a.PROCESSED_DATE THEN 1 END)    AS INFLIGHT_CNT,
            MIN(CASE WHEN e.WORKSTEP_CODE = 'DetailDataEntry' THEN e.ENTRYDATE END)                   AS ENTRYDATE_DDE,
            MAX(CASE WHEN e.WORKSTEP_CODE = 'DetailDataEntry' THEN e.EXITDATE  END)                   AS EXITDATE_DDE
     FROM   rlos_app a
@@ -238,8 +236,7 @@ SELECT
     a.PROCESSED_DATE,
     a.WI_NAME                                               AS WINAME,
     CASE WHEN a.MIN_APP_EXITDATE IS NULL THEN a.APPLICATION_STATUS
-         WHEN a.LAST_WORKSTEP IN ('CancelRevoke','CancelPermanent') AND a.PRE_WORKSTEP_CODE IN ('DetailDataEntry','CLOS_DetailDataEntry','DataInputerChecker','CLOS_DataInputerChecker','UnderwriterMaker','UnderwriterChecker','PhoneVerification','CreditApproval','CreditCommittee') THEN 'Cancelled'
-         WHEN g.INFLIGHT_CNT > 0 THEN 'Processing'
+         WHEN a.LAST_WORKSTEP IN ('DetailDataEntry','CLOS_DetailDataEntry','DataInputerChecker','CLOS_DataInputerChecker','UnderwriterMaker','UnderwriterChecker','PhoneVerification','CreditApproval','CreditCommittee') AND a.LAST_ENTRYDATE >= a.PROCESSED_DATE THEN 'Processing'   -- ho so dang o buoc PDTD sau lan duyet gan nhat; 'Cancelled' da co san trong APPLICATION_STATUS
          ELSE a.APPLICATION_STATUS END                       AS BI_APPSTATUS,
     g.STEP01_BRANCH_CL_TAT,
     g.STEP01_BRANCH_WK_TAT,
@@ -305,8 +302,7 @@ SELECT
     a.PROCESSED_DATE,
     a.WI_NAME                                               AS WINAME,
     CASE WHEN a.MIN_APP_EXITDATE IS NULL THEN a.APPLICATION_STATUS
-         WHEN a.LAST_WORKSTEP IN ('CancelRevoke','CancelPermanent') AND a.PRE_WORKSTEP_CODE IN ('DetailDataEntry','DataInputerChecker','UnderwriterMaker','UnderwriterChecker','PhoneVerification','CreditApproval','CreditCommittee') THEN 'Cancelled'
-         WHEN g.INFLIGHT_CNT > 0 THEN 'Processing'
+         WHEN a.LAST_WORKSTEP IN ('DetailDataEntry','DataInputerChecker','UnderwriterMaker','UnderwriterChecker','PhoneVerification','CreditApproval','CreditCommittee') AND a.LAST_ENTRYDATE >= a.PROCESSED_DATE THEN 'Processing'   -- ho so dang o buoc PDTD sau lan duyet gan nhat; 'Cancelled' da co san trong APPLICATION_STATUS
          ELSE a.APPLICATION_STATUS END                       AS BI_APPSTATUS,
     g.STEP01_BRANCH_CL_TAT,
     g.STEP01_BRANCH_WK_TAT,
