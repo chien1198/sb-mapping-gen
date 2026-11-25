@@ -166,6 +166,77 @@ INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
 COMMIT;
 
 -- ============================================================
+-- PDTD_DTM_AGG_LOS_SLA_TAT_APPROVAL.sql
+-- ============================================================
+-- ===========================================================================
+-- NOTE: bang append-only luu ket qua BC5 (SLA - TAT) cua LAN PHE DUYET DAU tung ho so (Approved/Rejected).
+--       1 dong = 1 ho so x 1 he thong (CLOS/RLOS); chi INSERT, khong UPDATE/MERGE; ho so chua duyet va dong lan 2 KHONG luu o day.
+-- PK          : (SYSTEMNAME, WI_NAME). Bang KHONG partition (grain 1 dong/ho so, khong phai anh chup theo ngay);
+--               DAYID chi la cot doi soat (ngay batch ghi dong), khong nam trong PK va BC5 khong loc theo DAYID.
+-- Chi muc IX1 : PROCESSED_DATE - BC5 lay tap ho so theo khoang PROCESSED_DATE.
+-- ===========================================================================
+-- DROP TABLE PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL
+CREATE TABLE PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL (
+    SYSTEMNAME                    VARCHAR2(10)        NOT NULL,
+    WI_NAME                       VARCHAR2(100)       NOT NULL,
+    DAYID                         DATE                NOT NULL,
+    PROCESSED_DATE                DATE                NOT NULL,
+    BI_APPSTATUS                  VARCHAR2(50)        NOT NULL,
+    STEP01_BRANCH_CL_TAT          NUMBER(18,2)        NOT NULL,
+    STEP01_BRANCH_WK_TAT          NUMBER(18,2)        NOT NULL,
+    STEP01_BRANCH_TAT_CPC         NUMBER(18,2)        NOT NULL,
+    STEP02_DDE_CL_TAT             NUMBER(18,2)        NOT NULL,
+    STEP02_DDE_WK_TAT             NUMBER(18,2)        NOT NULL,
+    STEP02_DDE_TAT_CPC            NUMBER(18,2)        NOT NULL,
+    STEP03_QUALITY_CHECKER_CL_TAT NUMBER(18,2)        NOT NULL,
+    STEP03_QUALITY_CHECKER_WK_TAT NUMBER(18,2)        NOT NULL,
+    STEP03_QUALITY_CHECKER_TAT_CPC NUMBER(18,2)        NOT NULL,
+    STEP04_UNDMAKER_CL_TAT        NUMBER(18,2)        NOT NULL,
+    STEP04_UNDMAKER_WK_TAT        NUMBER(18,2)        NOT NULL,
+    STEP04_UNDMAKER_TAT_CPC       NUMBER(18,2)        NOT NULL,
+    STEP04_UNDCHECKER_CL_TAT      NUMBER(18,2)        NOT NULL,
+    STEP04_UNDCHECKER_WK_TAT      NUMBER(18,2)        NOT NULL,
+    STEP04_UNDCHECKER_TAT_CPC     NUMBER(18,2)        NOT NULL,
+    STEP04_UND_TAT_CPC            NUMBER(18,2)        NOT NULL,
+    STEP07_APPROVER_CL_TAT        NUMBER(18,2)        NOT NULL,
+    STEP07_APPROVER_WK_TAT        NUMBER(18,2)        NOT NULL,
+    STEP07_APPROVER_TAT_CPC       NUMBER(18,2)        NOT NULL,
+    STEP07_COMMITTEE_CL_TAT       NUMBER(18,2)        NOT NULL,
+    STEP07_COMMITTEE_WK_TAT       NUMBER(18,2)        NOT NULL,
+    TAT_PHONG_CL_TAT              NUMBER(18,2)        NOT NULL,
+    TAT_PHONG_WK_TAT              NUMBER(18,2)        NOT NULL,
+    TAT_KHOI_PDTD_CL_TAT          NUMBER(18,2)        NOT NULL,
+    TAT_KHOI_PDTD_WK_TAT          NUMBER(18,2)        NOT NULL,
+    ENTRYDATE_DDE                 TIMESTAMP,
+    EXITDATE_DDE                  TIMESTAMP,
+    REF_PRODUCT                   VARCHAR2(200),
+    SLA_CREDIT_OFFICER            NUMBER(10,2),
+    SLA_CREDIT_APPROVER           NUMBER(10,2),
+    SLA_MARKER                    NUMBER(10,2),
+    SLA_CHECKER                   NUMBER(10,2),
+    SLA_MARKER_RESUTL             VARCHAR2(10),
+    SLA_CHECKER_RESUTL            VARCHAR2(10),
+    SLA_CO_RESUTL                 VARCHAR2(10),
+    SLA_APPROVER_RESULT           VARCHAR2(10),
+    SLA_CO_APPROVER_RESULT        VARCHAR2(10),
+    SLA_DE                        NUMBER(10,2),
+    SLA_QC                        NUMBER(10,2),
+    SLA_DE_RESULT                 VARCHAR2(10),
+    SLA_QC_RESULT                 VARCHAR2(10),
+    SLA_DE_TOTAL_RESULT           VARCHAR2(10),
+    QD_DDE                        NUMBER(10,2),
+    QD_QC                         NUMBER(10,2),
+    TIME_UPDATE                   TIMESTAMP,
+
+	CONSTRAINT AGG_LOS_SLA_TAT_APPROVAL_PK PRIMARY KEY (SYSTEMNAME, WI_NAME) USING INDEX
+);
+
+CREATE INDEX PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL_IX1
+    ON PDTD_DTM.AGG_LOS_SLA_TAT_APPROVAL (PROCESSED_DATE);
+
+COMMIT;
+
+-- ============================================================
 -- PDTD_DTM_FCT_CLOS_APPLICATION.sql
 -- ============================================================
 CREATE TABLE PDTD_DTM.FCT_CLOS_APPLICATION (

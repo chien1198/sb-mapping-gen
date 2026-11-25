@@ -10,6 +10,7 @@ File câu lệnh: `mapping/BAOCAO/BC9_RLOS.sql`, `BC9_CLOS.sql`, `BC9_KPI_KHOI.s
 | Tham số ngày | Khoảng ngày `:p_date_from`/`:p_date_to` cho RLOS/CLOS; KPI Khối chỉ `:p_date_to` (thay `:p_year`), đọc `AGG_LOS_KPI_YTD_DAILY` tại `DAYID = d_to` | 2026-11-20 | Người dùng chốt chuyển KPI Khối sang `DAYID`; bảng cộng dồn năm nên không có `p_date_from` |
 | Loại tài khoản test | Chỉ lọc ở phần KPI Khối (đã nằm trong bảng tổng hợp); phần RLOS/CLOS không loại | 2026-11-13 | SRS phần hồ sơ không ghi loại trừ |
 | Lọc chi nhánh | Phần KPI Khối không lọc chi nhánh (bảng tổng hợp không có chiều chi nhánh); phần hồ sơ lọc qua `COMPANY_SK` | 2026-11-13 | |
+| SLHS đếm cả Rejected | `SLHS_RLOS/CLOS` (và `_WTD/_MTD/_QTD/_YTD`) đếm hồ sơ Approved **và** Rejected, mỗi hồ sơ 1 lần/năm; điều kiện `HAS_FINAL_APPROVAL_FLAG = 'Y'` thay cho `APPLICATION_STATUS = 'Approved'` | 2026-11-25 | Theo BA (BC9: SLHS cộng vào năm khi hồ sơ Approved/Rejected, PD lần 2 sang năm sau tính thêm vào năm sau). SLGN giữ `Approved` nên `TY_LE_GN = SLGN/SLHS` thấp hơn. TAT chỉ lần PD đầu (đã đúng từ 2026-11-23). Chỉ đổi LLD `AGG_LOS_KPI_YTD_DAILY`, init, HLD, mapping; SQL BC9 không đổi. |
 
 ## Giả định kỹ thuật
 

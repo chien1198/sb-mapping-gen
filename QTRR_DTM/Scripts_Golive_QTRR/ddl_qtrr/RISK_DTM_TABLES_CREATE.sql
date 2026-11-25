@@ -102,7 +102,6 @@ create table RISK_DTM.FCT_MD
   ben_address             VARCHAR2(4000),
   first_principal_amt_lcy NUMBER(25,5),
   seab_total_amt          NUMBER,
-  check_changed           VARCHAR2(10),
   prin_movement           NUMBER
 )
 partition by range (DAYID)
@@ -233,20 +232,20 @@ create table RISK_DTM.FCT_FUNDS_TRANSFER
   ft_id               VARCHAR2(50) not null,
   channel             VARCHAR2(200),
   charge_code         VARCHAR2(50),
-  charged_customer    VARCHAR2(240),
+  charged_customer    VARCHAR2(40),
   classify_code       VARCHAR2(140),
   co_code             VARCHAR2(11),
   commission_code     VARCHAR2(80),
-  credit_acct_no      VARCHAR2(264),
+  credit_acct_no      VARCHAR2(64),
   credit_amount       NUMBER(25,5),
   credit_currency     VARCHAR2(12),
-  credit_customer     VARCHAR2(240),
+  credit_customer     VARCHAR2(40),
   credit_their_ref    VARCHAR2(50),
   credit_value_date   DATE,
-  debit_acct_no       VARCHAR2(264),
+  debit_acct_no       VARCHAR2(64),
   debit_amount        NUMBER(25,5),
   debit_currency      VARCHAR2(12),
-  debit_customer      VARCHAR2(240),
+  debit_customer      VARCHAR2(40),
   debit_value_date    DATE,
   inputter            VARCHAR2(50),
   ordering_cust       VARCHAR2(4000),
@@ -300,12 +299,12 @@ create table RISK_DTM.FCT_FUNDS_TRANSFER
   loc_tot_tax_amt     NUMBER,
   local_charge_amt    NUMBER,
   loc_pos_chgs_amt    NUMBER,
-  ft_pay_details      VARCHAR2(35),
+  ft_pay_details      VARCHAR2(4000),
   campaign_id         VARCHAR2(35),
   seab_sales_type     VARCHAR2(35),
-  seab_sales_id       VARCHAR2(235),
+  seab_sales_id       VARCHAR2(35),
   seab_brokers_type   VARCHAR2(35),
-  seab_brokers_id     VARCHAR2(235),
+  seab_brokers_id     VARCHAR2(35),
   profit_centre_dept  VARCHAR2(16),
   seab_ofs_ref        VARCHAR2(1000),
   at_unique_id        VARCHAR2(86),
@@ -313,8 +312,8 @@ create table RISK_DTM.FCT_FUNDS_TRANSFER
   trace_id            VARCHAR2(48),
   at_add_info         VARCHAR2(60),
   ben_customer        VARCHAR2(255),
-  in_ben_customer     VARCHAR2(450),
-  in_ben_acct_no      VARCHAR2(235),
+  in_ben_customer     VARCHAR2(150),
+  in_ben_acct_no      VARCHAR2(35),
   branch_id           VARCHAR2(35),
   province            VARCHAR2(35),
   bank_branches_sk    NUMBER,
@@ -324,7 +323,7 @@ create table RISK_DTM.FCT_FUNDS_TRANSFER
   cheque_number       VARCHAR2(35),
   trans_purpose       VARCHAR2(35),
   pay_principal       NUMBER,
-  charge_acct_no      VARCHAR2(264),
+  charge_acct_no      VARCHAR2(64),
   treasury_rate       NUMBER,
   purpose_details     VARCHAR2(35),
   sending_addr        VARCHAR2(2000),
@@ -334,7 +333,7 @@ create table RISK_DTM.FCT_FUNDS_TRANSFER
   seab_token_key      VARCHAR2(100),
   atm_trans_date      DATE,
   dept_code           VARCHAR2(16),
-  ord_cust_acct       VARCHAR2(235),
+  ord_cust_acct       VARCHAR2(35),
   ft_cost_pool        VARCHAR2(255),
   commission_type1    VARCHAR2(20),
   commission_type2    VARCHAR2(20),
@@ -360,7 +359,6 @@ create table RISK_DTM.FCT_FUNDS_TRANSFER
   seab_partner1       VARCHAR2(500),
   seab_remit_fee      VARCHAR2(25),
   id_pack             VARCHAR2(4000),
-  seab_token_card     VARCHAR2(65),
   sb_ft_sof           VARCHAR2(100),
   seab_los_id         VARCHAR2(100),
   inw_send_bic        VARCHAR2(255),
@@ -640,7 +638,14 @@ create table RISK_DTM.DIM_COLL_RIGHT
   recid               VARCHAR2(200),
   alloc_work_id       VARCHAR2(200),
   expiry_date         DATE,
-  right_at_company    VARCHAR2(50)
+  right_at_company    VARCHAR2(50),
+  coll_right_id         VARCHAR2(200),
+  coll_right_limit_ref  VARCHAR2(200),
+  customer_id           VARCHAR2(200),
+  coll_right_allocation VARCHAR2(200),
+  coll_right_value_date DATE,
+  coll_right_exp_date   DATE,
+  collateral_id         VARCHAR2(200)
 )
 tablespace RISK_DTM_TBS
   pctfree 0
@@ -648,7 +653,7 @@ tablespace RISK_DTM_TBS
   maxtrans 255
 compress
 nologging;
--- Create/Recreate indexes 
+-- Create/Recreate indexes
 create index RISK_DTM.COLLATERAL_RIGHT_IDX on RISK_DTM.DIM_COLL_RIGHT (RECID)
   tablespace RISK_DTM_TBS
   pctfree 10
