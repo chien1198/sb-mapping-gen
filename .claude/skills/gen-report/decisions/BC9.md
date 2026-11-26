@@ -15,6 +15,7 @@ File câu lệnh: `mapping/BAOCAO/BC9_RLOS.sql`, `BC9_CLOS.sql`, `BC9_KPI_KHOI.s
 ## Giả định kỹ thuật
 
 - Phần hồ sơ: `AGG_LOS_KPI_APPLICATION` có `DAYID = d_to`, `PROCESSED_DATE` trong `[d_from, d_to]`, `APPLICATION_STATUS` thuộc `Approved`/`Rejected`/`Cancelled` (tương đương `INNER JOIN` quyết định phê duyệt/hủy của SRS).
+- Review 2026-11-25 (BA): hồ sơ đã duyệt, bị hủy rồi được khôi phục mà chưa duyệt lại có `APPLICATION_STATUS` = `Processing` nên tạm rời danh sách này cho đến khi được duyệt lại; hồ sơ duyệt rồi bị hủy tại bước PDTD hiện `Cancelled` (vẫn nằm trong danh sách). SQL không đổi.
 - Cột `VOLUME`, `POINT`, `QUY_DOI`, `TSBD_G2`, `INCOM_3`, `BUSINESS_INCOM`, `DEVIATION_G2/G3` đọc nguyên văn từ bảng tổng hợp (LLD đã tính).
 - KPI Khối: đọc cột `_YTD` của `AGG_LOS_KPI_YTD_DAILY` tại `DAYID = :p_date_to` (mặc định T-1); nhãn `YEAR_MONTH` lấy từ `:p_date_to`.
 - `TAT_RLOS` = (TAT trung bình UNSEC + TAT trung bình SEC)/2 theo SRS; chia `NULLIF` để tránh chia 0.
