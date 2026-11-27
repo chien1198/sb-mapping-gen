@@ -1,0 +1,6 @@
+/* BC2 - Bao cao CLOS APPLICATION */
+SELECT *
+FROM   PDTD_DTM.PKG_REPORT.BC2_CLOS_APPLICATION(
+           TO_DATE(SUBSTR('@{p_date_from}{2026-11-26}', 1, 10), 'YYYY-MM-DD'),
+           TO_DATE(SUBSTR('@{p_date_to}{2026-11-26}',   1, 10), 'YYYY-MM-DD'))
+ORDER BY WINAME
