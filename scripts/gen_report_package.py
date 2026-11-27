@@ -148,13 +148,13 @@ def build(reports):
     spec, body_parts, summary = [], [], []
     for r in reports:
         sig = f"{r['name']}(p_date_from DATE, p_date_to DATE)"
-        spec.append(f"  -- {r['title']}\n  FUNCTION {sig} RETURN CLOB SQL_MACRO(TABLE);\n")
+        spec.append(f"  -- {r['title']}\n  FUNCTION {sig} RETURN CLOB SQL_MACRO;\n")
         expr, nchunk = clob_expr(r)
         hdr = "\n".join("  " + ln if ln.strip() else ln for ln in r["header"].split("\n"))
         body_parts.append(
             f"{hdr}\n"
             f"  FUNCTION {sig}\n"
-            f"    RETURN CLOB SQL_MACRO(TABLE) IS\n"
+            f"    RETURN CLOB SQL_MACRO IS\n"
             f"  BEGIN\n"
             f"    RETURN {expr};\n"
             f"  END {r['name']};\n")

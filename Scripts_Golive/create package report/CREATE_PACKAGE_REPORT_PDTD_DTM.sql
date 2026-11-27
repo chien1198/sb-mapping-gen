@@ -1,45 +1,45 @@
 CREATE OR REPLACE PACKAGE PDTD_DTM.PKG_REPORT AS
   -- BC1 - Bao cao RLOS APPLICATION
-  FUNCTION BC1_RLOS_APPLICATION(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC1_RLOS_APPLICATION(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC2 - Bao cao CLOS APPLICATION
-  FUNCTION BC2_CLOS_APPLICATION(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC2_CLOS_APPLICATION(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC3 - Bao cao Thong tin phe duyet (CLOS + RLOS)
-  FUNCTION BC3_APPROVAL_INFO(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC3_APPROVAL_INFO(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC4 - Bao cao Tuan Chuyen vien Tham dinh (CLOS + RLOS)
-  FUNCTION BC4_UW_WEEKLY(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC4_UW_WEEKLY(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC5 - Bao cao SLA - TAT (CLOS + RLOS)
-  FUNCTION BC5_SLA_TAT(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC5_SLA_TAT(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC6 - Bao cao NGOAI LE CLOS
-  FUNCTION BC6_CLOS_DEVIATION(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC6_CLOS_DEVIATION(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC6 - Bao cao NGOAI LE RLOS
-  FUNCTION BC6_RLOS_DEVIATION(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC6_RLOS_DEVIATION(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC7 - Bao cao EXCEPTION - FTR (CLOS + RLOS)
-  FUNCTION BC7_EXCEPTION_FTR(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC7_EXCEPTION_FTR(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC8 - Bao cao RETURN (CLOS + RLOS)
-  FUNCTION BC8_RETURN(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC8_RETURN(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC9 - Bao cao KPI, phan nguon CLOS (1 dong / ho so)
-  FUNCTION BC9_CLOS(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC9_CLOS(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC9 - Bao cao KPI, phan KPI Khoi (1 dong)
-  FUNCTION BC9_KPI_KHOI(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC9_KPI_KHOI(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC9 - Bao cao KPI, phan nguon RLOS (1 dong / ho so)
-  FUNCTION BC9_RLOS(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC9_RLOS(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC10 - Bao cao Giai ngan / Qua han KHCN
-  FUNCTION BC10_RLOS_DISBURSEMENT(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC10_RLOS_DISBURSEMENT(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 
   -- BC11 - Bao cao Giai ngan / Qua han KHDN
-  FUNCTION BC11_CLOS_DISBURSEMENT(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO(TABLE);
+  FUNCTION BC11_CLOS_DISBURSEMENT(p_date_from DATE, p_date_to DATE) RETURN CLOB SQL_MACRO;
 END PKG_REPORT;
 /
 
@@ -59,7 +59,7 @@ CREATE OR REPLACE PACKAGE BODY PDTD_DTM.PKG_REPORT AS
      tai ngay den) va PROCESSED_DATE trong [p_date_from, p_date_to] (cung mau BC9).
      ===================================================================== */
   FUNCTION BC1_RLOS_APPLICATION(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 WITH
@@ -271,7 +271,7 @@ ORDER BY   a.WI_NAME, cp.ID_NO_CO, sp.SUB_PRODUCT_BK, cl.COLLATERAL_BK
      tai ngay den) va PROCESSED_DATE trong [p_date_from, p_date_to] (cung mau BC1).
      ===================================================================== */
   FUNCTION BC2_CLOS_APPLICATION(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 WITH
@@ -410,7 +410,7 @@ ORDER BY   a.WI_NAME, dev.DEVIATION_BK
      Hai nhanh CLOS / RLOS ghep bang UNION ALL; cot khac kieu ep ve NVARCHAR2.
      ===================================================================== */
   FUNCTION BC3_APPROVAL_INFO(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 WITH
@@ -553,7 +553,7 @@ ORDER BY   SYSTEMNAME, WINAME, ENTRYDATE, DESCRIPTION
      Bang snapshot (FCT_*_APPLICATION, FCT_RLOS_CUSTOMER): loc DAYID = p_date_to.
      ===================================================================== */
   FUNCTION BC4_UW_WEEKLY(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 WITH
@@ -761,7 +761,7 @@ ORDER BY   SYSTEMNAME, WINAME
        - Ten truong SLA_*_RESUTL giu dung chinh ta cua SRS.
      ===================================================================== */
   FUNCTION BC5_SLA_TAT(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 WITH
@@ -1117,7 +1117,7 @@ ORDER BY   SYSTEMNAME, WINAME, BI_FLAG_APPROVAL
      BC6 CLOS va BC6 RLOS co bo cot khac nhau nen la 2 cau lenh rieng.
      ===================================================================== */
   FUNCTION BC6_CLOS_DEVIATION(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 SELECT
@@ -1146,7 +1146,7 @@ ORDER BY   d.WI_NAME, d.DEVIATION_BK
      BC6 RLOS va BC6 CLOS co bo cot khac nhau nen la 2 cau lenh rieng.
      ===================================================================== */
   FUNCTION BC6_RLOS_DEVIATION(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 SELECT
@@ -1178,7 +1178,7 @@ ORDER BY   d.WI_NAME, d.DEVIATION_BK
      Hai nhanh CLOS / RLOS cung bo cot, ghep bang UNION ALL.
      ===================================================================== */
   FUNCTION BC7_EXCEPTION_FTR(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 WITH
@@ -1249,7 +1249,7 @@ ORDER BY   WI_NAME, RAISED_DATE_TIME, ACTIVITYNAME
      Hai nhanh CLOS / RLOS cung bo cot, ghep bang UNION ALL.
      ===================================================================== */
   FUNCTION BC8_RETURN(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 WITH
@@ -1322,7 +1322,7 @@ ORDER BY   WI_NAME, EXITDATE
      tu choi / huy (FCT_CLOS_APPLICATION.APPLICATION_STATUS). Khong loai tai khoan test o phan nay.
      ===================================================================== */
   FUNCTION BC9_CLOS(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 SELECT
@@ -1355,7 +1355,7 @@ ORDER BY   k.WI_NAME
      TAT_RLOS = trung binh cong cua TAT trung binh nhom UNSEC va nhom SEC; TY_LE_GN = SLGN * 100 / SLHS.
      ===================================================================== */
   FUNCTION BC9_KPI_KHOI(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 WITH
@@ -1406,7 +1406,7 @@ FROM   y
      tu choi / huy (FCT_RLOS_APPLICATION.APPLICATION_STATUS). Khong loai tai khoan test o phan nay.
      ===================================================================== */
   FUNCTION BC9_RLOS(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 SELECT
@@ -1445,7 +1445,7 @@ ORDER BY   k.WI_NAME
      ZONE, DISBURSEMENT_AMT, CUR_BALANCE, NO_DAYS_OVERDUE, CUR_BUCKET, APPROVAL_DATE da tinh san tai LLD.
      ===================================================================== */
   FUNCTION BC10_RLOS_DISBURSEMENT(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 SELECT
@@ -1493,7 +1493,7 @@ ORDER BY   f.T24_CONTRACT
      LOANCASEID, APPROVAL_WINAME_LOS, APPROVAL_DATE da tinh san tai LLD.
      ===================================================================== */
   FUNCTION BC11_CLOS_DISBURSEMENT(p_date_from DATE, p_date_to DATE)
-    RETURN CLOB SQL_MACRO(TABLE) IS
+    RETURN CLOB SQL_MACRO IS
   BEGIN
     RETURN TO_CLOB(q'[
 SELECT
